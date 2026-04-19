@@ -8,55 +8,105 @@
 {% endblock %}
 
 {% block content %}
-<div class="grid grid-2">
-    <div class="card">
-        <h2 class="section-title">Order Info</h2>
-        <p><strong>Customer:</strong> {{ order.customer_name }}</p>
-        <p><strong>Phone:</strong> {{ order.phone }}</p>
-
-        {% if order.status == "PENDING" %}
-            <p><strong>Status:</strong> <span class="badge badge-pending">Pending</span></p>
-        {% elif order.status == "PROCESSING" %}
-            <p><strong>Status:</strong> <span class="badge badge-processing">Processing</span></p>
-        {% elif order.status == "DONE" %}
-            <p><strong>Status:</strong> <span class="badge badge-done">Done</span></p>
-        {% elif order.status == "CANCELLED" %}
-            <p><strong>Status:</strong> <span class="badge badge-cancelled">Cancelled</span></p>
-        {% endif %}
-
-        <p><strong>Deadline:</strong> {{ order.deadline|date:"Y-m-d H:i" }}</p>
-        <p><strong>Progress:</strong> {{ order.done_pcs }} / {{ order.total_pcs }} pcs</p>
-        <p><strong>Remaining:</strong> {{ order.remaining_pcs }} pcs</p>
-
-        {% if order.status != "DONE" %}
-        <div style="margin-top:18px;">
-            <form method="post" action="{% url 'production_update' order.pk %}">
-                {% csrf_token %}
-                <input type="hidden" name="complete_all" value="1">
-                <button type="submit" class="btn btn-primary" style="background:#16a34a;border-color:#16a34a;">
-                    Complete All
-                </button>
-            </form>
+<div class="detail-hero-card">
+    <div class="detail-top">
+        <div>
+            <div class="detail-order-no">{{ order.order_no }}</div>
+            <div class="detail-customer">{{ order.customer_name }}</div>
         </div>
-        {% endif %}
+
+        <div class="detail-badges">
+            {% if order.status == "PENDING" %}
+                <span class="status-pill status-yellow">Pending</span>
+            {% elif order.status == "PROCESSING" %}
+                <span class="status-pill status-blue">Processing</span>
+            {% elif order.status == "DONE" %}
+                <span class="status-pill status-green">Done</span>
+            {% elif order.status == "CANCEL" or order.status == "CANCELLED" %}
+                <span class="status-pill status-red">Cancel</span>
+            {% else %}
+                <span class="status-pill status-gray">{{ order.status }}</span>
+            {% endif %}
+        </div>
     </div>
 
-    <div class="card">
-        <h2 class="section-title">Design Files</h2>
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:14px;">
-            {% for img in order.design_files.all %}
-            <div style="border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#fff;">
-                <img
-                    src="{{ img.image.url }}"
-                    data-src="{{ img.image.url }}"
-                    class="design-preview-img"
-                    style="width:100%;height:160px;object-fit:cover;display:block;cursor:pointer;"
-                >
-            </div>
-            {% empty %}
-            <p>No design files uploaded.</p>
-            {% endfor %}
+    <div class="detail-grid">
+        <div class="info-mini-card">
+            <div class="mini-label">Phone</div>
+            <div class="mini-value">{{ order.phone|default:"-" }}</div>
         </div>
+
+        <div class="info-mini-card">
+            <div class="mini-label">Deadline</div>
+            <div class="mini-value">
+                {% if order.deadline %}
+                    {{ order.deadline|date:"Y-m-d H:i" }}
+                {% else %}
+                    -
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="info-mini-card">
+            <div class="mini-label">Time Left</div>
+            <div class="mini-value">
+                {% if order.deadline %}
+                    {% if order.deadline < now %}
+                        <span class="text-red">Overdue</span>
+                    {% else %}
+                        {{ order.deadline|timeuntil }}
+                    {% endif %}
+                {% else %}
+                    -
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="info-mini-card">
+            <div class="mini-label">Progress</div>
+            <div class="mini-value">{{ order.done_pcs }} / {{ order.total_pcs }} pcs</div>
+        </div>
+
+        <div class="info-mini-card">
+            <div class="mini-label">Remaining</div>
+            <div class="mini-value">{{ remaining_pcs }} pcs</div>
+        </div>
+    </div>
+
+    {% if order.status != "DONE" and order.status != "CANCEL" and order.status != "CANCELLED" %}
+    <div class="detail-actions">
+        <form method="post" action="{% url 'production_update' order.pk %}">
+            {% csrf_token %}
+            <button type="submit" name="complete_all" value="1" class="btn-success-modern">
+                Complete All
+            </button>
+        </form>
+
+        <form method="post" action="{% url 'production_update' order.pk %}" onsubmit="return confirm('Are you sure you want to cancel this order?');">
+            {% csrf_token %}
+            <button type="submit" name="cancel_order" value="1" class="btn-danger-modern">
+                Cancel Order
+            </button>
+        </form>
+    </div>
+    {% endif %}
+</div>
+
+<div class="card">
+    <h2 class="section-title">Design Files</h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:14px;">
+        {% for img in order.design_files.all %}
+        <div style="border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#fff;">
+            <img
+                src="{{ img.image.url }}"
+                data-src="{{ img.image.url }}"
+                class="design-preview-img"
+                style="width:100%;height:160px;object-fit:cover;display:block;cursor:pointer;"
+            >
+        </div>
+        {% empty %}
+        <p>No design files uploaded.</p>
+        {% endfor %}
     </div>
 </div>
 
@@ -88,7 +138,7 @@
                 <td>{{ item.done_qty }}</td>
                 <td>{{ item.remaining_qty }}</td>
                 <td>
-                    {% if item.remaining_qty > 0 %}
+                    {% if item.remaining_qty > 0 and order.status != "CANCEL" and order.status != "CANCELLED" %}
                     <form method="post" action="{% url 'production_update' order.pk %}" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
                         {% csrf_token %}
                         <input type="hidden" name="item_id" value="{{ item.pk }}">
@@ -97,7 +147,7 @@
                         <button type="submit" class="btn btn-primary">Save</button>
                     </form>
                     {% else %}
-                    <span class="badge badge-done">Done</span>
+                    <span class="status-pill status-green">Done</span>
                     {% endif %}
                 </td>
             </tr>
@@ -161,6 +211,169 @@
         </div>
     </div>
 </div>
+
+<style>
+.detail-hero-card{
+    background: rgba(255,255,255,.92);
+    border: 1px solid var(--line);
+    border-radius: 26px;
+    padding: 28px;
+    box-shadow: 0 10px 30px rgba(15,23,42,.05);
+    margin-bottom: 20px;
+}
+
+.detail-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:16px;
+    margin-bottom:22px;
+    flex-wrap:wrap;
+}
+
+.detail-order-no{
+    font-size:34px;
+    font-weight:900;
+    color:#1f2937;
+    line-height:1.1;
+}
+
+.detail-customer{
+    margin-top:8px;
+    font-size:15px;
+    color:#6b7280;
+    font-weight:600;
+}
+
+.detail-badges{
+    display:flex;
+    align-items:center;
+    gap:10px;
+}
+
+.status-pill{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-width:100px;
+    padding:9px 14px;
+    border-radius:999px;
+    font-size:13px;
+    font-weight:800;
+}
+
+.status-green{
+    background:#ecfdf5;
+    color:#16a34a;
+}
+
+.status-blue{
+    background:#eff6ff;
+    color:#2563eb;
+}
+
+.status-yellow{
+    background:#fff7ed;
+    color:#d97706;
+}
+
+.status-red{
+    background:#fef2f2;
+    color:#dc2626;
+}
+
+.status-gray{
+    background:#f3f4f6;
+    color:#6b7280;
+}
+
+.detail-grid{
+    display:grid;
+    grid-template-columns:repeat(5, minmax(0,1fr));
+    gap:14px;
+    margin-bottom:22px;
+}
+
+.info-mini-card{
+    background:#faf8f2;
+    border:1px solid var(--line);
+    border-radius:18px;
+    padding:16px;
+}
+
+.mini-label{
+    font-size:12px;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:#9ca3af;
+    font-weight:800;
+    margin-bottom:8px;
+}
+
+.mini-value{
+    font-size:16px;
+    color:#1f2937;
+    font-weight:800;
+    line-height:1.35;
+}
+
+.text-red{
+    color:#dc2626;
+    font-weight:800;
+}
+
+.detail-actions{
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+}
+
+.btn-success-modern{
+    border:none;
+    background:#16a34a;
+    color:#fff;
+    padding:12px 18px;
+    border-radius:14px;
+    font-weight:800;
+    cursor:pointer;
+    box-shadow:0 8px 20px rgba(22,163,74,.18);
+}
+
+.btn-success-modern:hover{
+    background:#15803d;
+}
+
+.btn-danger-modern{
+    border:none;
+    background:#dc2626;
+    color:#fff;
+    padding:12px 18px;
+    border-radius:14px;
+    font-weight:800;
+    cursor:pointer;
+    box-shadow:0 8px 20px rgba(220,38,38,.18);
+}
+
+.btn-danger-modern:hover{
+    background:#b91c1c;
+}
+
+@media (max-width: 1100px){
+    .detail-grid{
+        grid-template-columns:repeat(2, minmax(0,1fr));
+    }
+}
+
+@media (max-width: 640px){
+    .detail-grid{
+        grid-template-columns:1fr;
+    }
+
+    .detail-order-no{
+        font-size:28px;
+    }
+}
+</style>
 
 <script>
 document.addEventListener("DOMContentLoaded", function () {

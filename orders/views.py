@@ -9,17 +9,99 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
-from .forms import OrderForm, OrderItemFormSet
-from .models import Order, OrderDesignFile, OrderProgress
-from .services import deduct_stock_for_order
-from django.contrib.auth.decorators import login_required, permission_required
-from django.shortcuts import get_object_or_404, render
-from django.forms.models import model_to_dict
+from .forms import OrderForm, OrderItemFormSet, ProductionFilterForm
 from .models import Order, OrderDesignFile, OrderHistory, OrderProgress
+from .services import deduct_stock_for_order
+
+
+def _stringify(value):
+    if value is None:
+        return ""
+    return str(value)
+
+
+def _log_order_history(order, action, field_name="", old_value="", new_value="", user=None, remark=""):
+    OrderHistory.objects.create(
+        order=order,
+        action=action,
+        field_name=field_name,
+        old_value=_stringify(old_value),
+        new_value=_stringify(new_value),
+        changed_by=user if user and user.is_authenticated else None,
+        remark=remark or "",
+    )
+
+
+def _snapshot_order(order):
+    return {
+        "order_type": order.order_type,
+        "customer_name": order.customer_name,
+        "phone": order.phone,
+        "customer_location": order.customer_location,
+        "deadline": order.deadline.isoformat() if order.deadline else "",
+        "remark": order.remark,
+        "total_amount": str(order.total_amount or 0),
+        "deposit_amount": str(order.deposit_amount or 0),
+        "paid_amount": str(order.paid_amount or 0),
+        "status": order.status,
+        "total_pcs": str(order.total_pcs or 0),
+        "done_pcs": str(order.done_pcs or 0),
+    }
+
+
+def _snapshot_item(item):
+    return {
+        "item_mode": item.item_mode,
+        "description": item.description,
+        "shirt_item": str(item.shirt_item) if item.shirt_item else "",
+        "film_item": str(item.film_item) if item.film_item else "",
+        "color": str(item.color) if item.color else "",
+        "size": str(item.size) if item.size else "",
+        "quantity": str(item.quantity or 0),
+        "unit_price": str(item.unit_price or 0),
+        "manual_film_meter": str(item.manual_film_meter or 0),
+        "line_total": str(item.line_total or 0),
+    }
+
+
+def _log_order_changes(order, before_data, after_data, user=None):
+    for field_name, old_value in before_data.items():
+        new_value = after_data.get(field_name)
+        if _stringify(old_value) != _stringify(new_value):
+            _log_order_history(
+                order=order,
+                action=OrderHistory.ACTION_EDIT,
+                field_name=field_name,
+                old_value=old_value,
+                new_value=new_value,
+                user=user,
+            )
+
+
+def _get_cancel_status():
+    if hasattr(Order, "STATUS_CANCEL"):
+        return Order.STATUS_CANCEL
+    if hasattr(Order, "STATUS_CANCELLED"):
+        return Order.STATUS_CANCELLED
+    return "CANCEL"
+
+
+def _status_badge(status):
+    cancel_status = _get_cancel_status()
+
+    if status == Order.STATUS_DONE:
+        return "green"
+    if status == cancel_status:
+        return "red"
+    if status == Order.STATUS_PROCESSING:
+        return "blue"
+    return "yellow"
+
+
 @login_required
 @permission_required("orders.view_order", raise_exception=True)
 def order_list(request):
-    orders = Order.objects.all()
+    orders = Order.objects.all().order_by("-created_at", "-id")
     return render(request, "orders/order_list.html", {"orders": orders})
 
 
@@ -135,6 +217,7 @@ def order_create(request):
         },
     )
 
+
 @login_required
 @permission_required("orders.view_order", raise_exception=True)
 def order_detail(request, pk):
@@ -152,50 +235,80 @@ def order_detail(request, pk):
 @login_required
 @permission_required("orders.view_order", raise_exception=True)
 def production_list(request):
+    form = ProductionFilterForm(request.GET or None)
     qs = Order.objects.all()
 
-    keyword = (request.GET.get("q") or "").strip()
-    if keyword:
-        qs = qs.filter(
-            Q(customer_name__icontains=keyword) |
-            Q(order_no__icontains=keyword)
-        )
+    if form.is_valid():
+        keyword = (form.cleaned_data.get("q") or "").strip()
+        status = form.cleaned_data.get("status") or ProductionFilterForm.STATUS_ACTIVE
+        deadline = form.cleaned_data.get("deadline")
 
-    status = (request.GET.get("status") or "").strip()
-    if status:
-        qs = qs.filter(status=status)
+        if keyword:
+            qs = qs.filter(
+                Q(customer_name__icontains=keyword) |
+                Q(order_no__icontains=keyword)
+            )
 
-    date_from = (request.GET.get("date_from") or "").strip()
-    date_to = (request.GET.get("date_to") or "").strip()
+        cancel_status = _get_cancel_status()
 
-    if date_from:
-        qs = qs.filter(created_at__date__gte=date_from)
-    if date_to:
-        qs = qs.filter(created_at__date__lte=date_to)
+        if status == ProductionFilterForm.STATUS_ACTIVE:
+            qs = qs.filter(
+                status__in=[
+                    Order.STATUS_PENDING,
+                    Order.STATUS_PROCESSING,
+                ]
+            )
+        elif status == ProductionFilterForm.STATUS_DONE:
+            qs = qs.filter(status=Order.STATUS_DONE)
+        elif status == ProductionFilterForm.STATUS_CANCEL:
+            qs = qs.filter(status=cancel_status)
 
-    sort = (request.GET.get("sort") or "deadline").strip()
-    if sort == "created":
-        qs = qs.order_by("-created_at", "-id")
-    else:
-        qs = qs.order_by("deadline", "-id")
+        if deadline:
+            qs = qs.filter(deadline__date=deadline)
+
+    qs = qs.order_by("deadline", "-id")
 
     paginator = Paginator(qs, 50)
     page_number = request.GET.get("page")
-    orders = paginator.get_page(page_number)
+    page_obj = paginator.get_page(page_number)
 
+    start_no = (page_obj.number - 1) * paginator.per_page
     now = timezone.now()
+
+    rows = []
+    for idx, order in enumerate(page_obj.object_list, start=1):
+        deadline = getattr(order, "deadline", None)
+
+        if deadline:
+            if now > deadline:
+                countdown_text = "Overdue"
+            else:
+                diff = deadline - now
+                total_seconds = int(diff.total_seconds())
+                hours = total_seconds // 3600
+                minutes = (total_seconds % 3600) // 60
+                countdown_text = f"{hours}h {minutes}m"
+        else:
+            countdown_text = "-"
+
+        rows.append(
+            {
+                "no": start_no + idx,
+                "order": order,
+                "countdown_text": countdown_text,
+                "status_color": _status_badge(order.status),
+            }
+        )
 
     return render(
         request,
         "orders/production_list.html",
         {
-            "orders": orders,
+            "form": form,
+            "page_obj": page_obj,
+            "rows": rows,
+            "total_found": paginator.count,
             "now": now,
-            "status_value": status,
-            "sort_value": sort,
-            "q_value": keyword,
-            "date_from": date_from,
-            "date_to": date_to,
         },
     )
 
@@ -211,11 +324,17 @@ def production_detail(request, pk):
         ),
         pk=pk,
     )
+
+    remaining_pcs = Decimal(order.total_pcs or 0) - Decimal(order.done_pcs or 0)
+    if remaining_pcs < 0:
+        remaining_pcs = Decimal("0")
+
     return render(
         request,
         "orders/production_detail.html",
         {
             "order": order,
+            "remaining_pcs": remaining_pcs,
         },
     )
 
@@ -227,6 +346,13 @@ def production_update(request, pk):
     order = get_object_or_404(Order, pk=pk)
 
     if request.method == "POST":
+        if request.POST.get("cancel_order"):
+            cancel_status = _get_cancel_status()
+            order.status = cancel_status
+            order.save(update_fields=["status"])
+            messages.success(request, "Order marked as CANCEL.")
+            return redirect("production_detail", pk=order.pk)
+
         if request.POST.get("complete_all"):
             for item in order.items.all():
                 remaining = Decimal(item.quantity or 0) - Decimal(item.done_qty or 0)
@@ -287,6 +413,7 @@ def production_update(request, pk):
 
     return redirect("production_detail", pk=order.pk)
 
+
 @login_required
 @permission_required("orders.view_order", raise_exception=True)
 def order_invoice(request, pk):
@@ -319,176 +446,6 @@ def order_invoice_pdf(request, pk):
         },
     )
 
-@login_required
-@permission_required("orders.change_order", raise_exception=True)
-@transaction.atomic
-def order_edit(request, pk):
-    order = get_object_or_404(
-        Order.objects.prefetch_related("items", "design_files"),
-        pk=pk,
-    )
-
-    if request.method == "POST":
-        form = OrderForm(request.POST, request.FILES, instance=order)
-        formset = OrderItemFormSet(request.POST, request.FILES, instance=order)
-
-        if form.is_valid() and formset.is_valid():
-            try:
-                order = form.save(commit=False)
-                order.save()
-
-                items = formset.save(commit=False)
-
-                total_amount = Decimal("0")
-                total_pcs = Decimal("0")
-
-                for obj in formset.deleted_objects:
-                    obj.delete()
-
-                for item in items:
-                    if (
-                        not item.description
-                        and not item.shirt_item
-                        and not item.film_item
-                    ):
-                        continue
-
-                    item.order = order
-                    item.save()
-
-                    total_amount += Decimal(item.line_total or 0)
-                    total_pcs += Decimal(item.quantity or 0)
-
-                uploaded_files = request.FILES.getlist("design_files")
-                for f in uploaded_files:
-                    OrderDesignFile.objects.create(order=order, image=f)
-
-                discount_amount = Decimal(request.POST.get("discount_amount") or 0)
-                shipping_fee = Decimal(request.POST.get("shipping_fee") or 0)
-                deposit_amount = Decimal(request.POST.get("deposit_amount") or 0)
-                paid_amount = Decimal(request.POST.get("paid_amount") or 0)
-
-                order.total_amount = total_amount - discount_amount + shipping_fee
-                order.deposit_amount = deposit_amount
-                order.paid_amount = paid_amount
-                order.total_pcs = total_pcs
-
-                current_done = Decimal(order.done_pcs or 0)
-                if current_done > total_pcs:
-                    order.done_pcs = total_pcs
-
-                if order.done_pcs >= order.total_pcs and order.total_pcs > 0:
-                    order.status = Order.STATUS_DONE
-                elif order.done_pcs > 0:
-                    order.status = Order.STATUS_PROCESSING
-                else:
-                    order.status = Order.STATUS_PENDING
-
-                order.save(
-                    update_fields=[
-                        "order_type",
-                        "customer_name",
-                        "phone",
-                        "customer_location",
-                        "deadline",
-                        "remark",
-                        "total_amount",
-                        "deposit_amount",
-                        "paid_amount",
-                        "total_pcs",
-                        "done_pcs",
-                        "status",
-                    ]
-                )
-
-                messages.success(request, f"Order {order.order_no} updated successfully.")
-                return redirect("order_detail", pk=order.pk)
-
-            except ValidationError as e:
-                messages.error(request, str(e))
-        else:
-            messages.error(request, "Please fix the errors below and try again.")
-    else:
-        form = OrderForm(instance=order)
-        form.fields["discount_amount"].initial = Decimal("0")
-        form.fields["shipping_fee"].initial = Decimal("0")
-        formset = OrderItemFormSet(instance=order)
-
-    return render(
-        request,
-        "orders/order_form.html",
-        {
-            "form": form,
-            "formset": formset,
-            "is_edit": True,
-            "page_title": f"Edit {order.order_no}",
-            "page_subtitle": "Update custom printing order",
-            "submit_label": "Update Order",
-            "order": order,
-        },
-    )
-def _stringify(value):
-    if value is None:
-        return ""
-    return str(value)
-
-
-def _log_order_history(order, action, field_name="", old_value="", new_value="", user=None, remark=""):
-    OrderHistory.objects.create(
-        order=order,
-        action=action,
-        field_name=field_name,
-        old_value=_stringify(old_value),
-        new_value=_stringify(new_value),
-        changed_by=user if user and user.is_authenticated else None,
-        remark=remark or "",
-    )
-
-
-def _snapshot_order(order):
-    return {
-        "order_type": order.order_type,
-        "customer_name": order.customer_name,
-        "phone": order.phone,
-        "customer_location": order.customer_location,
-        "deadline": order.deadline.isoformat() if order.deadline else "",
-        "remark": order.remark,
-        "total_amount": str(order.total_amount or 0),
-        "deposit_amount": str(order.deposit_amount or 0),
-        "paid_amount": str(order.paid_amount or 0),
-        "status": order.status,
-        "total_pcs": str(order.total_pcs or 0),
-        "done_pcs": str(order.done_pcs or 0),
-    }
-
-
-def _snapshot_item(item):
-    return {
-        "item_mode": item.item_mode,
-        "description": item.description,
-        "shirt_item": str(item.shirt_item) if item.shirt_item else "",
-        "film_item": str(item.film_item) if item.film_item else "",
-        "color": str(item.color) if item.color else "",
-        "size": str(item.size) if item.size else "",
-        "quantity": str(item.quantity or 0),
-        "unit_price": str(item.unit_price or 0),
-        "manual_film_meter": str(item.manual_film_meter or 0),
-        "line_total": str(item.line_total or 0),
-    }
-
-
-def _log_order_changes(order, before_data, after_data, user=None):
-    for field_name, old_value in before_data.items():
-        new_value = after_data.get(field_name)
-        if _stringify(old_value) != _stringify(new_value):
-            _log_order_history(
-                order=order,
-                action=OrderHistory.ACTION_EDIT,
-                field_name=field_name,
-                old_value=old_value,
-                new_value=new_value,
-                user=user,
-            )
 
 @login_required
 @permission_required("orders.change_order", raise_exception=True)
@@ -643,4 +600,4 @@ def order_edit(request, pk):
             "submit_label": "Update Order",
             "order": order,
         },
-    )            
+    )

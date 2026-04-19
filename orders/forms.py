@@ -241,3 +241,45 @@ OrderItemFormSet = inlineformset_factory(
     extra=1,
     can_delete=True,
 )
+class ProductionFilterForm(forms.Form):
+    STATUS_ACTIVE = "ACTIVE"
+    STATUS_ALL = "ALL"
+    STATUS_DONE = "DONE"
+    STATUS_CANCEL = "CANCEL"
+
+    STATUS_CHOICES = [
+        (STATUS_ACTIVE, "Pending & Processing"),
+        (STATUS_ALL, "All"),
+        (STATUS_DONE, "Done"),
+        (STATUS_CANCEL, "Cancel"),
+    ]
+
+    q = forms.CharField(
+        required=False,
+        label="Search",
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": "Customer name or order no",
+            }
+        ),
+    )
+
+    status = forms.ChoiceField(
+        required=False,
+        label="Status",
+        initial=STATUS_ACTIVE,
+        choices=STATUS_CHOICES,
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+
+    deadline = forms.DateField(
+        required=False,
+        label="Deadline",
+        widget=forms.DateInput(
+            attrs={
+                "type": "date",
+                "class": "form-control",
+            }
+        ),
+    )
