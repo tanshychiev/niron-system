@@ -23,14 +23,41 @@ def _can_create_operating(user):
     return user.is_superuser or user.has_perm("finance.can_create_operating_expense")
 
 
+def _apply_filters(request, qs):
+    form = ExpenseFilterForm(request.GET or None)
+    if form.is_valid():
+        date_from = form.cleaned_data.get("date_from")
+        date_to = form.cleaned_data.get("date_to")
+        created_by = (form.cleaned_data.get("created_by") or "").strip()
+        keyword = (form.cleaned_data.get("keyword") or "").strip()
+
+        if date_from:
+            qs = qs.filter(created_at__date__gte=date_from)
+        if date_to:
+            qs = qs.filter(created_at__date__lte=date_to)
+        if created_by:
+            qs = qs.filter(
+                Q(created_by__username__icontains=created_by)
+                | Q(created_by__first_name__icontains=created_by)
+                | Q(created_by__last_name__icontains=created_by)
+            )
+        if keyword:
+            qs = qs.filter(
+                Q(note__icontains=keyword)
+                | Q(category__icontains=keyword)
+                | Q(batch__batch_code__icontains=keyword)
+            )
+
+    return form, qs
+
+
 def _get_revenue_total():
     try:
         from orders.models import Order
     except Exception:
         return Decimal("0.00")
 
-    field_candidates = ["total_selling_price", "total_price", "price", "grand_total"]
-    for field_name in field_candidates:
+    for field_name in ["total_selling_price", "total_price", "price", "grand_total"]:
         try:
             value = Order.objects.aggregate(total=Sum(field_name))["total"]
             if value is not None:
@@ -144,54 +171,76 @@ def _get_revenue_chart_data():
 
 
 @login_required
-def expense_list(request):
+def expense_summary(request):
     qs = Expense.objects.select_related("created_by", "batch").all()
-
-    form = ExpenseFilterForm(request.GET or None)
-    if form.is_valid():
-        date_from = form.cleaned_data.get("date_from")
-        date_to = form.cleaned_data.get("date_to")
-        expense_type = form.cleaned_data.get("expense_type")
-        created_by = (form.cleaned_data.get("created_by") or "").strip()
-        keyword = (form.cleaned_data.get("keyword") or "").strip()
-
-        if date_from:
-            qs = qs.filter(created_at__date__gte=date_from)
-        if date_to:
-            qs = qs.filter(created_at__date__lte=date_to)
-        if expense_type:
-            qs = qs.filter(expense_type=expense_type)
-        if created_by:
-            qs = qs.filter(
-                Q(created_by__username__icontains=created_by)
-                | Q(created_by__first_name__icontains=created_by)
-                | Q(created_by__last_name__icontains=created_by)
-            )
-        if keyword:
-            qs = qs.filter(
-                Q(note__icontains=keyword)
-                | Q(category__icontains=keyword)
-                | Q(batch__batch_code__icontains=keyword)
-            )
-
+    form, qs = _apply_filters(request, qs)
     total_expense = qs.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
 
-    context = {
+    return render(request, "finance/expense_summary.html", {
         "form": form,
         "expenses": qs[:300],
         "total_expense": total_expense,
-        "can_create_other": _can_create_other(request.user),
-        "can_create_batch": _can_create_batch(request.user),
-        "can_create_operating": _can_create_operating(request.user),
-    }
-    return render(request, "finance/expense_list.html", context)
+        "page_title_text": "Expense Summary",
+        "page_subtitle_text": "All expense activity in one page",
+    })
+
+
+@login_required
+def other_expense_list(request):
+    qs = Expense.objects.select_related("created_by", "batch").filter(expense_type=Expense.TYPE_OTHER)
+    form, qs = _apply_filters(request, qs)
+    total_expense = qs.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+
+    return render(request, "finance/expense_type_list.html", {
+        "form": form,
+        "expenses": qs[:300],
+        "total_expense": total_expense,
+        "page_title_text": "Other Expense",
+        "page_subtitle_text": "Other expense records",
+        "create_url_name": "create_other_expense",
+        "create_label": "+ Create Other Expense",
+    })
+
+
+@login_required
+def batch_expense_list(request):
+    qs = Expense.objects.select_related("created_by", "batch").filter(expense_type=Expense.TYPE_BATCH)
+    form, qs = _apply_filters(request, qs)
+    total_expense = qs.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+
+    return render(request, "finance/expense_type_list.html", {
+        "form": form,
+        "expenses": qs[:300],
+        "total_expense": total_expense,
+        "page_title_text": "Batch Expense",
+        "page_subtitle_text": "Batch expense records linked to inventory batch",
+        "create_url_name": "create_batch_expense",
+        "create_label": "+ Create Batch Expense",
+    })
+
+
+@login_required
+def operating_expense_list(request):
+    qs = Expense.objects.select_related("created_by", "batch").filter(expense_type=Expense.TYPE_OPERATING)
+    form, qs = _apply_filters(request, qs)
+    total_expense = qs.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+
+    return render(request, "finance/expense_type_list.html", {
+        "form": form,
+        "expenses": qs[:300],
+        "total_expense": total_expense,
+        "page_title_text": "Operating Expense",
+        "page_subtitle_text": "Salary, commission, boosting, rent and other operating expense",
+        "create_url_name": "create_operating_expense",
+        "create_label": "+ Create Operating Expense",
+    })
 
 
 @login_required
 def create_other_expense(request):
     if not _can_create_other(request.user):
         messages.error(request, "You do not have permission to create other expense.")
-        return redirect("expense_list")
+        return redirect("other_expense_list")
 
     if request.method == "POST":
         form = OtherExpenseForm(request.POST)
@@ -201,37 +250,14 @@ def create_other_expense(request):
             obj.created_by = request.user
             obj.save()
             messages.success(request, "Other expense created successfully.")
-            return redirect("expense_list")
+            return redirect("other_expense_list")
     else:
         form = OtherExpenseForm()
 
     return render(request, "finance/expense_form.html", {
         "title": "Create Other Expense",
         "form": form,
-    })
-
-
-@login_required
-def create_operating_expense(request):
-    if not _can_create_operating(request.user):
-        messages.error(request, "You do not have permission to create operating expense.")
-        return redirect("expense_list")
-
-    if request.method == "POST":
-        form = OperatingExpenseForm(request.POST)
-        if form.is_valid():
-            obj = form.save(commit=False)
-            obj.expense_type = Expense.TYPE_OPERATING
-            obj.created_by = request.user
-            obj.save()
-            messages.success(request, "Operating expense created successfully.")
-            return redirect("expense_list")
-    else:
-        form = OperatingExpenseForm()
-
-    return render(request, "finance/expense_form.html", {
-        "title": "Create Operating Expense",
-        "form": form,
+        "back_url": "other_expense_list",
     })
 
 
@@ -239,7 +265,7 @@ def create_operating_expense(request):
 def create_batch_expense(request):
     if not _can_create_batch(request.user):
         messages.error(request, "You do not have permission to create batch expense.")
-        return redirect("expense_list")
+        return redirect("batch_expense_list")
 
     if request.method == "POST":
         form = BatchExpenseForm(request.POST)
@@ -249,13 +275,39 @@ def create_batch_expense(request):
             obj.created_by = request.user
             obj.save()
             messages.success(request, "Batch expense created successfully.")
-            return redirect("expense_list")
+            return redirect("batch_expense_list")
     else:
         form = BatchExpenseForm()
 
     return render(request, "finance/expense_form.html", {
         "title": "Create Batch Expense",
         "form": form,
+        "back_url": "batch_expense_list",
+    })
+
+
+@login_required
+def create_operating_expense(request):
+    if not _can_create_operating(request.user):
+        messages.error(request, "You do not have permission to create operating expense.")
+        return redirect("operating_expense_list")
+
+    if request.method == "POST":
+        form = OperatingExpenseForm(request.POST)
+        if form.is_valid():
+            obj = form.save(commit=False)
+            obj.expense_type = Expense.TYPE_OPERATING
+            obj.created_by = request.user
+            obj.save()
+            messages.success(request, "Operating expense created successfully.")
+            return redirect("operating_expense_list")
+    else:
+        form = OperatingExpenseForm()
+
+    return render(request, "finance/expense_form.html", {
+        "title": "Create Operating Expense",
+        "form": form,
+        "back_url": "operating_expense_list",
     })
 
 

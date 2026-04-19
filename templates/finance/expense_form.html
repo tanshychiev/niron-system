@@ -78,7 +78,7 @@
                 <h3>{{ title }}</h3>
                 <p>Fill the information below.</p>
             </div>
-            <a href="{% url 'expense_list' %}" class="btn">Back</a>
+            <a href="{% url back_url %}" class="btn">Back</a>
         </div>
 
         <form method="post">
@@ -95,7 +95,7 @@
             {% endfor %}
 
             <div class="submit-row">
-                <a href="{% url 'expense_list' %}" class="btn">Cancel</a>
+                <a href="{% url back_url %}" class="btn">Cancel</a>
                 <button type="submit" class="btn-primary">Save Expense</button>
             </div>
         </form>

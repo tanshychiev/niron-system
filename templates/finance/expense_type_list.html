@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 
-{% block title %}Expense List{% endblock %}
-{% block page_title %}Expense List{% endblock %}
-{% block page_subtitle %}Other expense, batch expense, and operating expense in one page{% endblock %}
+{% block title %}{{ page_title_text }}{% endblock %}
+{% block page_title %}{{ page_title_text }}{% endblock %}
+{% block page_subtitle %}{{ page_subtitle_text }}{% endblock %}
 {% block topbar_title %}Finance{% endblock %}
-{% block topbar_subtitle %}Expense activity and records{% endblock %}
+{% block topbar_subtitle %}Expense records{% endblock %}
 
 {% block content %}
 <style>
@@ -14,15 +14,13 @@
         gap: 20px;
         margin-bottom: 24px;
     }
-
-    .stat-card {
+    .stat-card, .filter-card, .table-card {
         background: rgba(255,255,255,.88);
         border: 1px solid var(--line);
         border-radius: 22px;
-        padding: 24px;
         box-shadow: var(--shadow);
     }
-
+    .stat-card { padding: 24px; }
     .stat-label {
         color: var(--muted);
         font-size: 13px;
@@ -31,33 +29,18 @@
         text-transform: uppercase;
         letter-spacing: .8px;
     }
-
     .stat-value {
         font-size: 34px;
         font-weight: 800;
         color: #B42318;
-        letter-spacing: -.8px;
     }
-
-    .filter-card,
-    .table-card {
-        background: rgba(255,255,255,.88);
-        border: 1px solid var(--line);
-        border-radius: 22px;
-        box-shadow: var(--shadow);
-    }
-
-    .filter-card {
-        padding: 22px;
-    }
-
+    .filter-card { padding: 22px; }
     .filter-grid {
         display: grid;
-        grid-template-columns: repeat(5, 1fr);
+        grid-template-columns: repeat(4, 1fr) 160px;
         gap: 14px;
         align-items: end;
     }
-
     .field-label {
         display: block;
         font-size: 12px;
@@ -67,7 +50,6 @@
         letter-spacing: .8px;
         margin-bottom: 8px;
     }
-
     .expense-toolbar {
         display: flex;
         justify-content: space-between;
@@ -76,79 +58,24 @@
         padding: 22px 22px 0;
         flex-wrap: wrap;
     }
-
     .expense-toolbar h3 {
         margin: 0;
         font-size: 22px;
         font-weight: 800;
     }
-
-    .expense-buttons {
-        display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-    }
-
     .table-wrap {
         padding: 12px 22px 22px;
         overflow-x: auto;
     }
-
-    .badge-soft {
-        display: inline-flex;
-        align-items: center;
-        padding: 7px 12px;
-        border-radius: 999px;
-        font-size: 12px;
-        font-weight: 800;
-        letter-spacing: .4px;
-    }
-
-    .badge-other {
-        background: #FFF3D6;
-        color: #C97D00;
-    }
-
-    .badge-batch {
-        background: #EEF2FF;
-        color: #4338CA;
-    }
-
-    .badge-operating {
-        background: #ECFDF3;
-        color: #067647;
-    }
-
-    .amount-text {
-        font-weight: 800;
-        color: #B42318;
-        white-space: nowrap;
-    }
-
-    .sub-text {
-        color: var(--muted);
-        font-size: 12px;
-        margin-top: 4px;
-    }
+    .amount-text { font-weight: 800; color: #B42318; white-space: nowrap; }
+    .sub-text { color: var(--muted); font-size: 12px; margin-top: 4px; }
 
     @media (max-width: 1200px) {
-        .summary-grid {
-            grid-template-columns: 1fr;
-        }
-
-        .filter-grid {
-            grid-template-columns: repeat(2, 1fr);
-        }
+        .summary-grid { grid-template-columns: 1fr; }
+        .filter-grid { grid-template-columns: repeat(2, 1fr); }
     }
-
     @media (max-width: 700px) {
-        .filter-grid {
-            grid-template-columns: 1fr;
-        }
-
-        .expense-toolbar {
-            align-items: flex-start;
-        }
+        .filter-grid { grid-template-columns: 1fr; }
     }
 </style>
 
@@ -169,10 +96,6 @@
                 {{ form.date_to }}
             </div>
             <div>
-                <label class="field-label">Type</label>
-                {{ form.expense_type }}
-            </div>
-            <div>
                 <label class="field-label">Record By</label>
                 {{ form.created_by }}
             </div>
@@ -190,22 +113,12 @@
 <div class="table-card">
     <div class="expense-toolbar">
         <div>
-            <h3>Expense Activity</h3>
-            <div class="sub-text">All expense types in one list</div>
+            <h3>{{ page_title_text }} List</h3>
+            <div class="sub-text">{{ page_subtitle_text }}</div>
         </div>
 
-        <div class="expense-buttons">
-            {% if can_create_other %}
-            <a href="{% url 'create_other_expense' %}" class="btn-primary">+ Other Expense</a>
-            {% endif %}
-
-            {% if can_create_batch %}
-            <a href="{% url 'create_batch_expense' %}" class="btn">+ Batch Expense</a>
-            {% endif %}
-
-            {% if can_create_operating %}
-            <a href="{% url 'create_operating_expense' %}" class="btn">+ Operating Expense</a>
-            {% endif %}
+        <div>
+            <a href="{% url create_url_name %}" class="btn-primary">{{ create_label }}</a>
         </div>
     </div>
 
@@ -214,7 +127,6 @@
             <thead>
                 <tr>
                     <th>Date</th>
-                    <th>Type</th>
                     <th>Title</th>
                     <th>Amount</th>
                     <th>Record By</th>
@@ -226,15 +138,6 @@
                 <tr>
                     <td>{{ row.created_at|date:"d M Y H:i" }}</td>
                     <td>
-                        {% if row.expense_type == "OTHER" %}
-                            <span class="badge-soft badge-other">Other Expense</span>
-                        {% elif row.expense_type == "BATCH" %}
-                            <span class="badge-soft badge-batch">Batch Expense</span>
-                        {% else %}
-                            <span class="badge-soft badge-operating">Operating Expense</span>
-                        {% endif %}
-                    </td>
-                    <td>
                         <div style="font-weight:800;">
                             {% if row.expense_type == "BATCH" and row.batch %}
                                 {{ row.batch }}
@@ -244,9 +147,6 @@
                                 Other Expense
                             {% endif %}
                         </div>
-                        {% if row.batch %}
-                        <div class="sub-text">Batch linked</div>
-                        {% endif %}
                     </td>
                     <td class="amount-text">${{ row.amount|floatformat:2 }}</td>
                     <td>{{ row.created_by.get_full_name|default:row.created_by.username }}</td>
@@ -254,8 +154,8 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="6" style="text-align:center; color:var(--muted); padding:36px 12px;">
-                        No expense activity found.
+                    <td colspan="5" style="text-align:center; color:var(--muted); padding:36px 12px;">
+                        No record found.
                     </td>
                 </tr>
                 {% endfor %}

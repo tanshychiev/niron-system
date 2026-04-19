@@ -526,7 +526,10 @@
     </button>
     <div class="nav-submenu" id="menu-finance">
         {% if perms.finance.view_expense %}
-        <a class="nav-link" href="/expenses/">Expense List</a>
+        <a class="nav-link" href="/expenses/">Expense Summary</a>
+        <a class="nav-link" href="/expenses/other/">Other Expense</a>
+        <a class="nav-link" href="/expenses/batch/">Batch Expense</a>
+        <a class="nav-link" href="/expenses/operating/">Operating Expense</a>
         <a class="nav-link" href="/profit-dashboard/">Profit Dashboard</a>
         {% endif %}
     </div>
