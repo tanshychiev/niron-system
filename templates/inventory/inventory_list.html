@@ -81,18 +81,18 @@
                   <div class="size-name">{{ size_row.size_name }}</div>
                   <div class="size-values">
   <div class="size-line available">
-    <span class="size-label">Available</span>
-    <span class="size-number">{{ size_row.available_qty }}</span>
+    <span class="size-label">Avail.</span>
+    <span class="size-number">{{ size_row.available_qty|floatformat:0 }}</span>
   </div>
 
   <div class="size-line pending">
-    <span class="size-label">Processing</span>
-    <span class="size-number small">{{ size_row.in_progress_qty }}</span>
+    <span class="size-label">In Proc.</span>
+    <span class="size-number small">{{ size_row.in_progress_qty|floatformat:0 }}</span>
   </div>
 
   <div class="size-line total">
     <span class="size-label">Total</span>
-    <span class="size-number small">{{ size_row.total_qty }}</span>
+    <span class="size-number small">{{ size_row.total_qty|floatformat:0 }}</span>
   </div>
 </div>
                 </div>
@@ -104,15 +104,15 @@
             <div class="totals-row">
               <div class="metric metric-available">
                 <div class="metric-label">Available</div>
-                <div class="metric-value">{{ card.available_qty }}</div>
+                <div class="metric-value">{{ card.available_qty|floatformat:0 }}</div>
               </div>
               <div class="metric metric-progress">
                 <div class="metric-label">PROCESSING</div>
-                <div class="metric-value">{{ card.in_progress_qty }}</div>
+                <div class="metric-value">{{ card.in_progress_qty|floatformat:0 }}</div>
               </div>
               <div class="metric metric-total">
                 <div class="metric-label">Total</div>
-                <div class="metric-value">{{ card.total_qty }}</div>
+                <div class="metric-value">{{ card.total_qty|floatformat:0 }}</div>
               </div>
             </div>
           </div>
@@ -155,7 +155,7 @@
                 <td>{{ batch.supplier|default:"-" }}</td>
                 <td>{{ batch.created_by|default:"-" }}</td>
                 <td>{{ batch.received_date|date:"d/m/Y" }}</td>
-                <td class="text-end">{{ batch.total_cloth }}</td>
+                <td class="text-end">{{ batch.total_cloth|floatformat:0 }}</td>
               </tr>
             {% empty %}
               <tr>

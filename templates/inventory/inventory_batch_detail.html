@@ -25,7 +25,7 @@
 
   <div class="info-card">
     <h3 class="card-title">Summary</h3>
-    <p><strong>Total Cloth:</strong> {{ batch.total_cloth }}</p>
+    <p><strong>Total Cloth:</strong> {{ batch.total_cloth|floatformat:0 }}</p>
     <p><strong>Received At:</strong> {{ batch.created_at|date:"d/m/Y H:i" }}</p>
     <p><strong>Last Updated:</strong> {{ batch.updated_at|date:"d/m/Y H:i" }}</p>
     {% if batch.is_deleted %}
@@ -60,9 +60,9 @@
           <td>{{ row.item.name }}</td>
           <td>{{ row.color.name|default:"-" }}</td>
           <td>{{ row.size.name|default:"-" }}</td>
-          <td>{{ row.qty_received }}</td>
-          <td>{{ row.qty_remaining }}</td>
-          <td>{{ row.qty_used }}</td>
+          <td>{{ row.qty_received|floatformat:0 }}</td>
+          <td>{{ row.qty_remaining|floatformat:0 }}</td>
+          <td>{{ row.qty_used|floatformat:0 }}</td>
           <td>
             <a href="{% url 'inventory_adjustment_create' row.id %}" class="btn-light">Adjust</a>
           </td>

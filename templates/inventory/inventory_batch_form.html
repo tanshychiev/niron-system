@@ -135,7 +135,7 @@
 
       <div class="stock-in-total-box">
         <div class="stock-in-total-label">Total Stock In</div>
-        <div class="stock-in-total-value" id="totalStockIn">0.00</div>
+        <div class="stock-in-total-value" id="totalStockIn">0</div>
       </div>
     </div>
 
@@ -302,18 +302,21 @@
 
     const prefix = getPrefix();
 
-    function buildEmptyField(name, type, extraAttrs = "") {
+    function formatQty(value) {
+      return Number.isInteger(value) ? String(value) : String(value);
+    }
+
+    function buildEmptyField(name, type) {
       if (type === "select") {
         const source = document.querySelector(`[name="${prefix}-0-${name}"]`);
         if (!source) return "";
-        const html = source.outerHTML
+        return source.outerHTML
           .replaceAll(`${prefix}-0-${name}`, `${prefix}-__prefix__-${name}`)
           .replaceAll(`id_${prefix}-0-${name}`, `id_${prefix}-__prefix__-${name}`);
-        return html;
       }
 
       if (type === "number") {
-        return `<input type="number" name="${prefix}-__prefix__-${name}" id="id_${prefix}-__prefix__-${name}" step="0.01" class="form-control">`;
+        return `<input type="number" name="${prefix}-__prefix__-${name}" id="id_${prefix}-__prefix__-${name}" step="1" min="0" class="form-control">`;
       }
 
       if (type === "delete") {
@@ -363,16 +366,9 @@
         const checkbox = row.querySelector('input[type="checkbox"][name$="-DELETE"]');
 
         if (!btn || !checkbox || btn.dataset.bound === "1") return;
-
         btn.dataset.bound = "1";
 
         btn.addEventListener("click", function () {
-          const hasItem =
-            row.querySelector('select[name$="-item"]')?.value ||
-            row.querySelector('input[name$="-quantity"]')?.value ||
-            row.querySelector('select[name$="-color"]')?.value ||
-            row.querySelector('select[name$="-size"]')?.value;
-
           const ok = window.confirm("Are you sure you want to delete this row?");
           if (!ok) return;
 
@@ -399,6 +395,8 @@
     function bindQtyInputs() {
       const qtyInputs = rowsContainer.querySelectorAll('input[name$="-quantity"]');
       qtyInputs.forEach((input) => {
+        input.step = "1";
+        input.min = "0";
         if (input.dataset.bound === "1") return;
         input.dataset.bound = "1";
         input.addEventListener("input", updateTotalStockIn);
@@ -420,7 +418,7 @@
       });
 
       if (totalStockInEl) {
-        totalStockInEl.textContent = total.toFixed(2);
+        totalStockInEl.textContent = formatQty(total);
       }
     }
 
