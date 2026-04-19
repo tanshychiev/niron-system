@@ -20,6 +20,9 @@
             --danger-bg: #FDECEC;
             --danger-line: #F5C2C7;
             --danger-text: #B42318;
+            --success-bg: #ECFDF3;
+            --success-line: #ABEFC6;
+            --success-text: #067647;
         }
 
         * { box-sizing: border-box; }
@@ -41,15 +44,21 @@
         }
 
         .sidebar {
-            width: 270px;
+            width: 278px;
             background: var(--panel);
             border-right: 1px solid var(--line);
-            padding: 24px 18px;
+            padding: 24px 18px 18px;
             position: sticky;
             top: 0;
             height: 100vh;
             overflow-y: auto;
             flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .logo-wrap {
+            margin-bottom: 18px;
         }
 
         .logo {
@@ -61,6 +70,7 @@
             align-items: center;
             gap: 10px;
             margin-bottom: 6px;
+            text-decoration: none;
         }
 
         .logo::before {
@@ -79,8 +89,12 @@
             letter-spacing: 2px;
             color: var(--muted);
             text-transform: uppercase;
-            margin-bottom: 22px;
+            margin-bottom: 0;
             padding-left: 52px;
+        }
+
+        .sidebar-scroll {
+            flex: 1;
         }
 
         .nav-group {
@@ -131,7 +145,7 @@
         }
 
         .nav-submenu.show {
-            max-height: 420px;
+            max-height: 520px;
             opacity: 1;
             padding: 8px 0 4px 10px;
         }
@@ -159,6 +173,32 @@
             font-weight: 700;
         }
 
+        .sidebar-footer {
+            border-top: 1px solid var(--line);
+            padding-top: 16px;
+            margin-top: 10px;
+        }
+
+        .logout-link {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            text-decoration: none;
+            border-radius: 14px;
+            padding: 12px 14px;
+            background: #fff;
+            border: 1px solid var(--line);
+            color: #B42318;
+            font-size: 14px;
+            font-weight: 700;
+            transition: 0.2s ease;
+        }
+
+        .logout-link:hover {
+            background: var(--danger-bg);
+            border-color: var(--danger-line);
+        }
+
         .main {
             flex: 1;
             display: flex;
@@ -170,12 +210,60 @@
             min-height: 76px;
             display: flex;
             align-items: center;
-            justify-content: flex-end;
+            justify-content: space-between;
             padding: 14px 34px;
             border-bottom: 1px solid var(--line);
             background: rgba(255,255,255,.82);
             backdrop-filter: blur(10px);
             gap: 12px;
+        }
+
+        .topbar-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
+        }
+
+        .topbar-title {
+            font-size: 15px;
+            font-weight: 800;
+            color: var(--text);
+        }
+
+        .topbar-subtitle {
+            font-size: 12px;
+            color: var(--muted);
+            margin-top: 3px;
+        }
+
+        .topbar-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .user-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            border-radius: 14px;
+            background: white;
+            border: 1px solid var(--line);
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        .user-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 999px;
+            background: var(--accent);
+            display: inline-block;
+            flex-shrink: 0;
         }
 
         .content-wrap {
@@ -317,6 +405,12 @@
             font-weight: 700;
         }
 
+        .alert-success {
+            background: var(--success-bg);
+            border: 1px solid var(--success-line);
+            color: var(--success-text);
+        }
+
         .app-table, table {
             width: 100%;
             border-collapse: collapse;
@@ -353,7 +447,13 @@
             .topbar {
                 padding: 16px 20px;
                 min-height: auto;
-                justify-content: flex-end;
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .topbar-right {
+                width: 100%;
+                justify-content: flex-start;
             }
 
             .content-wrap { padding: 20px; }
@@ -366,139 +466,160 @@
 <body>
     <div class="layout">
         <aside class="sidebar">
-            <div class="logo">Niron</div>
-            <div class="logo-sub">Custom Printing</div>
-
-            {% if perms.inventory.view_inventorybatch %}
-            <div class="nav-group">
-                <button class="nav-toggle" type="button" data-target="menu-inventory">
-                    <span>Inventory</span>
-                    <span class="nav-arrow">▼</span>
-                </button>
-                <div class="nav-submenu" id="menu-inventory">
-                    <a class="nav-link" href="/inventory/">Finished Tshirt Inventory</a>
-
-                    {% if perms.inventory.add_inventorybatch %}
-                    <a class="nav-link" href="/inventory/batches/new/">Stock In</a>
-                    {% endif %}
-
-                    {% if perms.inventory.add_inventoryadjustment %}
-                    <a class="nav-link" href="/inventory/adjust-stock/">Adjust Stock</a>
-                    {% endif %}
-
-                    {% if perms.inventory.view_inventoryadjustment %}
-                    <a class="nav-link" href="/inventory/adjustments/">Adjustment History</a>
-                    {% endif %}
-                </div>
+            <div class="logo-wrap">
+                <a href="/" class="logo">Niron</a>
+                <div class="logo-sub">Custom Printing</div>
             </div>
-            {% endif %}
 
-            {% if perms.orders.view_order or perms.orders.add_order %}
-            <div class="nav-group">
-                <button class="nav-toggle" type="button" data-target="menu-orders">
-                    <span>Orders</span>
-                    <span class="nav-arrow">▼</span>
-                </button>
-                <div class="nav-submenu" id="menu-orders">
-                    {% if perms.orders.view_order %}
-                    <a class="nav-link" href="/orders/">Order List</a>
-                    {% endif %}
+            <div class="sidebar-scroll">
+                {% if perms.inventory.view_inventorybatch %}
+                <div class="nav-group">
+                    <button class="nav-toggle" type="button" data-target="menu-inventory">
+                        <span>Inventory</span>
+                        <span class="nav-arrow">▼</span>
+                    </button>
+                    <div class="nav-submenu" id="menu-inventory">
+                        <a class="nav-link" href="/inventory/">Finished Tshirt Inventory</a>
 
-                    {% if perms.orders.add_order %}
-                    <a class="nav-link" href="/orders/new/">Create Order</a>
-                    {% endif %}
+                        {% if perms.inventory.add_inventorybatch %}
+                        <a class="nav-link" href="/inventory/batches/new/">Stock In</a>
+                        {% endif %}
 
-                    {% if perms.orders.view_order %}
-                    <a class="nav-link" href="/orders/production/">Production List</a>
-                    {% endif %}
+                        {% if perms.inventory.add_inventoryadjustment %}
+                        <a class="nav-link" href="/inventory/adjust-stock/">Adjust Stock</a>
+                        {% endif %}
+
+                        {% if perms.inventory.view_inventoryadjustment %}
+                        <a class="nav-link" href="/inventory/adjustments/">Adjustment History</a>
+                        {% endif %}
+                    </div>
                 </div>
+                {% endif %}
+
+                {% if perms.orders.view_order or perms.orders.add_order %}
+                <div class="nav-group">
+                    <button class="nav-toggle" type="button" data-target="menu-orders">
+                        <span>Orders</span>
+                        <span class="nav-arrow">▼</span>
+                    </button>
+                    <div class="nav-submenu" id="menu-orders">
+                        {% if perms.orders.view_order %}
+                        <a class="nav-link" href="/orders/">Order List</a>
+                        {% endif %}
+
+                        {% if perms.orders.add_order %}
+                        <a class="nav-link" href="/orders/new/">Create Order</a>
+                        {% endif %}
+
+                        {% if perms.orders.view_order %}
+                        <a class="nav-link" href="/orders/production/">Production List</a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if perms.finance.view_expense or perms.finance.add_expense %}
+<div class="nav-group">
+    <button class="nav-toggle" type="button" data-target="menu-finance">
+        <span>Finance</span>
+        <span class="nav-arrow">▼</span>
+    </button>
+    <div class="nav-submenu" id="menu-finance">
+        {% if perms.finance.view_expense %}
+        <a class="nav-link" href="/expenses/">Expense List</a>
+        <a class="nav-link" href="/profit-dashboard/">Profit Dashboard</a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+                {% if perms.inventory.view_inventoryitem or perms.inventory.view_color or perms.inventory.view_size %}
+                <div class="nav-group">
+                    <button class="nav-toggle" type="button" data-target="menu-setup">
+                        <span>Setup</span>
+                        <span class="nav-arrow">▼</span>
+                    </button>
+                    <div class="nav-submenu" id="menu-setup">
+                        {% if perms.inventory.view_inventoryitem %}
+                        <a class="nav-link" href="/inventory/items/">Item List</a>
+                        {% endif %}
+
+                        {% if perms.inventory.view_color %}
+                        <a class="nav-link" href="/inventory/colors/">Color List</a>
+                        {% endif %}
+
+                        {% if perms.inventory.view_size %}
+                        <a class="nav-link" href="/inventory/sizes/">Size List</a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if perms.auth.view_user or perms.auth.add_user or perms.auth.view_group or perms.auth.view_permission %}
+                <div class="nav-group">
+                    <button class="nav-toggle" type="button" data-target="menu-users">
+                        <span>Users & Permissions</span>
+                        <span class="nav-arrow">▼</span>
+                    </button>
+                    <div class="nav-submenu" id="menu-users">
+                        {% if perms.auth.view_user %}
+                        <a class="nav-link" href="/users/">User List</a>
+                        {% endif %}
+
+                        {% if perms.auth.add_user %}
+                        <a class="nav-link" style="font-size:12px; padding-left:28px; opacity:.85;" href="/users/new/">
+                            + Create User
+                        </a>
+                        {% endif %}
+
+                        {% if perms.auth.view_group %}
+                        <a class="nav-link" href="/users/roles/">Roles</a>
+                        {% endif %}
+
+                        {% if perms.auth.add_group %}
+                        <a class="nav-link" style="font-size:12px; padding-left:28px; opacity:.85;" href="/users/roles/create/">
+                            + Create Role
+                        </a>
+                        {% endif %}
+
+                        {% if perms.auth.view_permission %}
+                        <a class="nav-link" href="/users/permissions/">Permissions</a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
             </div>
-            {% endif %}
 
-            {% if perms.inventory.view_inventoryitem or perms.inventory.view_color or perms.inventory.view_size %}
-            <div class="nav-group">
-                <button class="nav-toggle" type="button" data-target="menu-setup">
-                    <span>Setup</span>
-                    <span class="nav-arrow">▼</span>
-                </button>
-                <div class="nav-submenu" id="menu-setup">
-                    {% if perms.inventory.view_inventoryitem %}
-                    <a class="nav-link" href="/inventory/items/">Item List</a>
-                    {% endif %}
-
-                    {% if perms.inventory.view_color %}
-                    <a class="nav-link" href="/inventory/colors/">Color List</a>
-                    {% endif %}
-
-                    {% if perms.inventory.view_size %}
-                    <a class="nav-link" href="/inventory/sizes/">Size List</a>
-                    {% endif %}
-                </div>
-            </div>
-            {% endif %}
-
-            {% if perms.auth.view_user or perms.auth.add_user or perms.auth.view_group or perms.auth.view_permission %}
-            <div class="nav-group">
-                <button class="nav-toggle" type="button" data-target="menu-users">
-                    <span>Users & Permissions</span>
-                    <span class="nav-arrow">▼</span>
-                </button>
-                <div class="nav-submenu" id="menu-users">
-                    {% if perms.auth.view_user %}
-                    <a class="nav-link" href="/users/">User List</a>
-                    {% endif %}
-
-                    {% if perms.auth.add_user %}
-                    <a class="nav-link" style="font-size:12px; padding-left:28px; opacity:.85;" href="/users/new/">
-                        + Create User
-                    </a>
-                    {% endif %}
-
-                    {% if perms.auth.view_group %}
-                    <a class="nav-link" href="/users/roles/">Roles</a>
-                    {% endif %}
-
-                    {% if perms.auth.add_group %}
-                    <a class="nav-link" style="font-size:12px; padding-left:28px; opacity:.85;" href="/users/roles/create/">
-                        + Create Role
-                    </a>
-                    {% endif %}
-
-                    {% if perms.auth.view_permission %}
-                    <a class="nav-link" href="/users/permissions/">Permissions</a>
-                    {% endif %}
-                </div>
-            </div>
-            {% endif %}
-
-            {% if user.is_superuser %}
-            <div class="nav-group">
-                <button class="nav-toggle" type="button" data-target="menu-system">
-                    <span>System</span>
-                    <span class="nav-arrow">▼</span>
-                </button>
-                <div class="nav-submenu" id="menu-system">
-                    <a class="nav-link" href="/admin/">Admin Panel</a>
-                    <a class="nav-link" href="/logout/">Logout</a>
-                </div>
-            </div>
-            {% elif user.is_authenticated %}
-            <div class="nav-group">
-                <button class="nav-toggle" type="button" data-target="menu-account">
-                    <span>Account</span>
-                    <span class="nav-arrow">▼</span>
-                </button>
-                <div class="nav-submenu" id="menu-account">
-                    <a class="nav-link" href="/logout/">Logout</a>
-                </div>
+            {% if user.is_authenticated %}
+            <div class="sidebar-footer">
+                <a class="logout-link" href="/logout/">
+                    <span>Logout</span>
+                    <span>↗</span>
+                </a>
             </div>
             {% endif %}
         </aside>
 
         <div class="main">
             <div class="topbar">
-                <div>
-                    {% block top_actions %}{% endblock %}
+                <div class="topbar-left">
+                    <div>
+                        <div class="topbar-title">{% block topbar_title %}Niron System{% endblock %}</div>
+                        <div class="topbar-subtitle">{% block topbar_subtitle %}Custom printing management platform{% endblock %}</div>
+                    </div>
+                </div>
+
+                <div class="topbar-right">
+                    {% if user.is_authenticated %}
+                    <div class="user-chip">
+                        <span class="user-dot"></span>
+                        <span>{{ user.get_full_name|default:user.username }}</span>
+                    </div>
+                    {% endif %}
+
+                    <div>
+                        {% block top_actions %}{% endblock %}
+                    </div>
                 </div>
             </div>
 
@@ -559,8 +680,10 @@
                     const href = link.getAttribute("href");
                     if (!href) return;
 
-                    if (href !== "/" && currentPath.startsWith(href)) {
-                        closeAll();
+                    if (
+                        href === currentPath ||
+                        (href !== "/" && currentPath.startsWith(href))
+                    ) {
                         menu.classList.add("show");
                         toggle.classList.add("active");
                         link.classList.add("current");

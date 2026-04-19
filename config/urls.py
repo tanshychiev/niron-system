@@ -9,6 +9,13 @@ urlpatterns = [
     path("", include("accounts.urls")),
     path("orders/", include("orders.urls")),
     path("inventory/", include("inventory.urls")),
+    path("admin/", admin.site.urls),
+    path("", include("accounts.urls")),
+    path("", include("inventory.urls")),
+    path("", include("orders.urls")),
+    path("", include("finance.urls")),
+
+
 ]
 
 if settings.DEBUG:

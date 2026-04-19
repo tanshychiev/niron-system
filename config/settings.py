@@ -25,6 +25,7 @@ INSTALLED_APPS = [
     "accounts",
     "inventory.apps.InventoryConfig",
     "orders.apps.OrdersConfig",
+    "finance",
 ]
 
 MIDDLEWARE = [
