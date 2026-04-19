@@ -385,12 +385,21 @@ def create_batch_expense(request):
             batch = obj.batch
             if batch:
                 detail = _get_batch_expense_data(batch)
+
+                manual_cost = request.POST.get("batch_cost_manual")
+                manual_delivery_fee = request.POST.get("batch_delivery_fee_manual")
+                manual_other_fee = request.POST.get("batch_other_fee_manual")
+
+                cost = _to_decimal(manual_cost) if manual_cost not in (None, "") else detail["cost"]
+                delivery_fee = _to_decimal(manual_delivery_fee) if manual_delivery_fee not in (None, "") else detail["delivery_fee"]
+                other_fee = _to_decimal(manual_other_fee) if manual_other_fee not in (None, "") else detail["other_fee"]
+
                 obj.batch_created_at = detail["created_at"]
                 obj.batch_total_cloth = detail["total_cloth"]
-                obj.batch_cost = detail["cost"]
-                obj.batch_delivery_fee = detail["delivery_fee"]
-                obj.batch_other_fee = detail["other_fee"]
-                obj.amount = detail["amount"]
+                obj.batch_cost = cost
+                obj.batch_delivery_fee = delivery_fee
+                obj.batch_other_fee = other_fee
+                obj.amount = cost + delivery_fee + other_fee
             else:
                 obj.batch_created_at = None
                 obj.batch_total_cloth = 0
@@ -405,12 +414,15 @@ def create_batch_expense(request):
     else:
         form = BatchExpenseForm()
 
-    return render(request, "finance/create_batch_expense.html", {
-        "title": "Create Batch Expense",
-        "form": form,
-        "back_url": "batch_expense_list",
-    })
-
+    return render(
+        request,
+        "finance/create_batch_expense.html",
+        {
+            "title": "Create Batch Expense",
+            "form": form,
+            "back_url": "batch_expense_list",
+        },
+    )
 
 @login_required
 def create_operating_expense(request):
@@ -488,6 +500,29 @@ def batch_expense_preview(request):
         return JsonResponse({"error": "Batch not found"}, status=404)
 
     data = _get_batch_expense_data(batch)
+    rows = _get_batch_rows(batch)
+
+    rows_data = []
+    color_map = {}
+
+    for row in rows:
+        qty_received = _get_row_qty_received(row)
+        color_name = _get_row_color_name(row) or "-"
+
+        rows_data.append({
+            "item_code": _get_row_item_code(row) or "-",
+            "item_name": _get_row_item_name(row) or "-",
+            "color": color_name,
+            "size": _get_row_size_name(row) or "-",
+            "qty_received": f"{qty_received:.2f}",
+        })
+
+        color_map[color_name] = color_map.get(color_name, Decimal("0.00")) + qty_received
+
+    color_summary = [
+        {"color": color, "qty": f"{qty:.2f}"}
+        for color, qty in color_map.items()
+    ]
 
     return JsonResponse({
         "batch_name": str(batch),
@@ -497,4 +532,69 @@ def batch_expense_preview(request):
         "delivery_fee": f"{data['delivery_fee']:.2f}",
         "other_fee": f"{data['other_fee']:.2f}",
         "amount": f"{data['amount']:.2f}",
+        "rows": rows_data,
+        "color_summary": color_summary,
+        "color_count": len(color_summary),
     })
+def _safe_text(value):
+    return "" if value is None else str(value)
+
+
+def _get_row_item_code(row):
+    item = getattr(row, "item", None)
+    if item is not None:
+        for field_name in ["code", "item_code", "sku", "name"]:
+            value = getattr(item, field_name, None)
+            if value not in (None, ""):
+                return str(value)
+
+    for field_name in ["item_code", "code", "sku"]:
+        value = getattr(row, field_name, None)
+        if value not in (None, ""):
+            return str(value)
+    return ""
+
+
+def _get_row_item_name(row):
+    item = getattr(row, "item", None)
+    if item is not None:
+        for field_name in ["name", "title"]:
+            value = getattr(item, field_name, None)
+            if value not in (None, ""):
+                return str(value)
+
+    for field_name in ["item_name", "name", "title"]:
+        value = getattr(row, field_name, None)
+        if value not in (None, ""):
+            return str(value)
+    return ""
+
+
+def _get_row_color_name(row):
+    color_obj = getattr(row, "color", None)
+    if color_obj is not None:
+        for field_name in ["name", "title"]:
+            value = getattr(color_obj, field_name, None)
+            if value not in (None, ""):
+                return str(value)
+
+    for field_name in ["color_name", "color"]:
+        value = getattr(row, field_name, None)
+        if value not in (None, ""):
+            return str(value)
+    return ""
+
+
+def _get_row_size_name(row):
+    size_obj = getattr(row, "size", None)
+    if size_obj is not None:
+        for field_name in ["name", "title"]:
+            value = getattr(size_obj, field_name, None)
+            if value not in (None, ""):
+                return str(value)
+
+    for field_name in ["size_name", "size"]:
+        value = getattr(row, field_name, None)
+        if value not in (None, ""):
+            return str(value)
+    return ""

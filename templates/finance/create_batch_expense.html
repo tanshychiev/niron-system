@@ -9,7 +9,7 @@
 {% block content %}
 <style>
     .form-shell {
-        max-width: 860px;
+        max-width: 980px;
         margin: 0 auto;
     }
 
@@ -109,6 +109,109 @@
         color: #b06c00;
     }
 
+    .edit-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 14px;
+        margin-top: 18px;
+    }
+
+    .money-input {
+        width: 100%;
+        padding: 12px 14px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: white;
+        font-size: 15px;
+        font-weight: 700;
+        color: var(--text);
+        outline: none;
+    }
+
+    .money-input:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 4px rgba(232,155,20,.12);
+    }
+
+    .table-card {
+        margin-top: 18px;
+        background: white;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        overflow: hidden;
+    }
+
+    .table-card-title {
+        padding: 16px 18px 0;
+        font-size: 18px;
+        font-weight: 800;
+        color: var(--text);
+    }
+
+    .table-card-subtitle {
+        padding: 6px 18px 0;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    .table-wrap {
+        overflow-x: auto;
+        padding: 12px 18px 18px;
+    }
+
+    .detail-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .detail-table th,
+    .detail-table td {
+        padding: 12px 10px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        font-size: 13px;
+    }
+
+    .detail-table th {
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: .8px;
+        font-weight: 800;
+    }
+
+    .qty-strong {
+        font-weight: 800;
+    }
+
+    .color-summary-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        margin-top: 18px;
+    }
+
+    .color-box {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: white;
+        padding: 12px 14px;
+    }
+
+    .color-box-name {
+        font-size: 12px;
+        color: var(--muted);
+        text-transform: uppercase;
+        font-weight: 800;
+        margin-bottom: 6px;
+    }
+
+    .color-box-value {
+        font-size: 20px;
+        font-weight: 900;
+        color: var(--text);
+    }
+
     .submit-row {
         display: flex;
         justify-content: flex-end;
@@ -117,8 +220,10 @@
         flex-wrap: wrap;
     }
 
-    @media (max-width: 700px) {
-        .detail-grid {
+    @media (max-width: 900px) {
+        .detail-grid,
+        .edit-grid,
+        .color-summary-grid {
             grid-template-columns: 1fr;
         }
     }
@@ -129,7 +234,7 @@
         <div class="form-head">
             <div>
                 <h3>Create Batch Expense</h3>
-                <p style="margin:8px 0 0; color:var(--muted);">Select batch, see detail, and save auto total.</p>
+                <p style="margin:8px 0 0; color:var(--muted);">Select batch, check cloth detail, edit fees, and save total.</p>
             </div>
             <a href="{% url back_url %}" class="btn">Back</a>
         </div>
@@ -150,34 +255,76 @@
                     </div>
 
                     <div class="detail-item">
-                        <div class="detail-title">Total Cloth</div>
+                        <div class="detail-title">Total Cloth Received</div>
                         <div class="detail-value" id="preview-total-cloth">0</div>
-                    </div>
-
-                    <div class="detail-item">
-                        <div class="detail-title">Cost</div>
-                        <div class="detail-value" id="preview-cost">$0.00</div>
-                    </div>
-
-                    <div class="detail-item">
-                        <div class="detail-title">Delivery Fee</div>
-                        <div class="detail-value" id="preview-delivery-fee">$0.00</div>
-                    </div>
-
-                    <div class="detail-item">
-                        <div class="detail-title">Other Fee</div>
-                        <div class="detail-value" id="preview-other-fee">$0.00</div>
                     </div>
 
                     <div class="detail-item">
                         <div class="detail-title">Selected Batch</div>
                         <div class="detail-value" id="preview-batch-name">-</div>
                     </div>
+
+                    <div class="detail-item">
+                        <div class="detail-title">Color Count</div>
+                        <div class="detail-value" id="preview-color-count">0</div>
+                    </div>
+                </div>
+
+                <div class="edit-grid">
+                    <div>
+                        <label class="field-label">Cost</label>
+                        <input type="number" step="0.01" min="0" name="batch_cost_manual" id="input-cost" class="money-input" value="0.00">
+                    </div>
+                    <div>
+                        <label class="field-label">Delivery Fee</label>
+                        <input type="number" step="0.01" min="0" name="batch_delivery_fee_manual" id="input-delivery-fee" class="money-input" value="0.00">
+                    </div>
+                    <div>
+                        <label class="field-label">Other Fee</label>
+                        <input type="number" step="0.01" min="0" name="batch_other_fee_manual" id="input-other-fee" class="money-input" value="0.00">
+                    </div>
                 </div>
 
                 <div class="detail-total">
                     <div class="detail-total-label">Auto Total Amount</div>
                     <div class="detail-total-value" id="preview-amount">$0.00</div>
+                </div>
+            </div>
+
+            <div class="table-card">
+                <div class="table-card-title">Batch Row Detail</div>
+                <div class="table-card-subtitle">How much cloth received, color, size, and quantity</div>
+
+                <div class="table-wrap">
+                    <table class="detail-table">
+                        <thead>
+                            <tr>
+                                <th>Item Code</th>
+                                <th>Item Name</th>
+                                <th>Color</th>
+                                <th>Size</th>
+                                <th>Qty Received</th>
+                            </tr>
+                        </thead>
+                        <tbody id="preview-rows-body">
+                            <tr>
+                                <td colspan="5" style="text-align:center; color:var(--muted);">Select batch first</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="table-card">
+                <div class="table-card-title">Color Summary</div>
+                <div class="table-card-subtitle">How much cloth by color</div>
+                <div style="padding: 12px 18px 18px;">
+                    <div class="color-summary-grid" id="preview-color-summary">
+                        <div class="color-box">
+                            <div class="color-box-name">No Data</div>
+                            <div class="color-box-value">0</div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -200,20 +347,88 @@
 
     const createdAtEl = document.getElementById("preview-created-at");
     const totalClothEl = document.getElementById("preview-total-cloth");
-    const costEl = document.getElementById("preview-cost");
-    const deliveryFeeEl = document.getElementById("preview-delivery-fee");
-    const otherFeeEl = document.getElementById("preview-other-fee");
     const amountEl = document.getElementById("preview-amount");
     const batchNameEl = document.getElementById("preview-batch-name");
+    const colorCountEl = document.getElementById("preview-color-count");
+
+    const costInput = document.getElementById("input-cost");
+    const deliveryFeeInput = document.getElementById("input-delivery-fee");
+    const otherFeeInput = document.getElementById("input-other-fee");
+
+    const rowsBody = document.getElementById("preview-rows-body");
+    const colorSummary = document.getElementById("preview-color-summary");
+
+    function toNumber(v) {
+        const n = parseFloat(v);
+        return isNaN(n) ? 0 : n;
+    }
+
+    function recalcAmount() {
+        const total = toNumber(costInput.value) + toNumber(deliveryFeeInput.value) + toNumber(otherFeeInput.value);
+        amountEl.textContent = `$${total.toFixed(2)}`;
+    }
 
     function resetPreview() {
         createdAtEl.textContent = "-";
         totalClothEl.textContent = "0";
-        costEl.textContent = "$0.00";
-        deliveryFeeEl.textContent = "$0.00";
-        otherFeeEl.textContent = "$0.00";
         amountEl.textContent = "$0.00";
         batchNameEl.textContent = "-";
+        colorCountEl.textContent = "0";
+        costInput.value = "0.00";
+        deliveryFeeInput.value = "0.00";
+        otherFeeInput.value = "0.00";
+        rowsBody.innerHTML = `
+            <tr>
+                <td colspan="5" style="text-align:center; color:var(--muted);">Select batch first</td>
+            </tr>
+        `;
+        colorSummary.innerHTML = `
+            <div class="color-box">
+                <div class="color-box-name">No Data</div>
+                <div class="color-box-value">0</div>
+            </div>
+        `;
+        recalcAmount();
+    }
+
+    function renderRows(rows) {
+        if (!rows || !rows.length) {
+            rowsBody.innerHTML = `
+                <tr>
+                    <td colspan="5" style="text-align:center; color:var(--muted);">No row detail found</td>
+                </tr>
+            `;
+            return;
+        }
+
+        rowsBody.innerHTML = rows.map(row => `
+            <tr>
+                <td>${row.item_code || "-"}</td>
+                <td>${row.item_name || "-"}</td>
+                <td>${row.color || "-"}</td>
+                <td>${row.size || "-"}</td>
+                <td class="qty-strong">${row.qty_received || "0"}</td>
+            </tr>
+        `).join("");
+    }
+
+    function renderColorSummary(colors) {
+        if (!colors || !colors.length) {
+            colorSummary.innerHTML = `
+                <div class="color-box">
+                    <div class="color-box-name">No Data</div>
+                    <div class="color-box-value">0</div>
+                </div>
+            `;
+            return;
+        }
+
+        colorSummary.innerHTML = colors.map(row => `
+            <div class="color-box">
+                <div class="color-box-name">${row.color || "-"}</div>
+                <div class="color-box-value">${row.qty || "0"}</div>
+            </div>
+        `).join("");
     }
 
     function loadPreview(batchId) {
@@ -232,14 +447,23 @@
 
                 createdAtEl.textContent = data.created_at || "-";
                 totalClothEl.textContent = data.total_cloth || "0";
-                costEl.textContent = `$${data.cost || "0.00"}`;
-                deliveryFeeEl.textContent = `$${data.delivery_fee || "0.00"}`;
-                otherFeeEl.textContent = `$${data.other_fee || "0.00"}`;
-                amountEl.textContent = `$${data.amount || "0.00"}`;
                 batchNameEl.textContent = data.batch_name || "-";
+                colorCountEl.textContent = data.color_count || "0";
+
+                costInput.value = data.cost || "0.00";
+                deliveryFeeInput.value = data.delivery_fee || "0.00";
+                otherFeeInput.value = data.other_fee || "0.00";
+
+                renderRows(data.rows || []);
+                renderColorSummary(data.color_summary || []);
+                recalcAmount();
             })
             .catch(() => resetPreview());
     }
+
+    costInput.addEventListener("input", recalcAmount);
+    deliveryFeeInput.addEventListener("input", recalcAmount);
+    otherFeeInput.addEventListener("input", recalcAmount);
 
     if (batchSelect) {
         batchSelect.addEventListener("change", function () {
@@ -248,7 +472,11 @@
 
         if (batchSelect.value) {
             loadPreview(batchSelect.value);
+        } else {
+            resetPreview();
         }
+    } else {
+        resetPreview();
     }
 })();
 </script>
