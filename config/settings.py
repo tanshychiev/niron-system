@@ -10,7 +10,8 @@ ALLOWED_HOSTS = [
     "localhost",
     "niron-system.com",      # change if needed
     "www.niron-system.com",  # change if needed
-    "your-server-ip",        # change if needed
+    "your-server-ip",
+    "5.223.90.183",        # change if needed
 ]
 
 INSTALLED_APPS = [
