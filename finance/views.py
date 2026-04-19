@@ -2,7 +2,7 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, permission_required
 from django.db.models import Q, Sum
 from django.db.models.functions import TruncDate
 from django.http import JsonResponse
@@ -237,6 +237,7 @@ def _get_revenue_chart_data():
 
 
 @login_required
+@permission_required("finance.view_expense", raise_exception=True)
 def expense_summary(request):
     qs = Expense.objects.select_related("created_by", "batch").all()
     form, qs = _apply_filters(request, qs)
@@ -256,6 +257,7 @@ def expense_summary(request):
 
 
 @login_required
+@permission_required("finance.view_expense", raise_exception=True)
 def other_expense_list(request):
     qs = Expense.objects.select_related("created_by", "batch").filter(expense_type=Expense.TYPE_OTHER)
     form, qs = _apply_filters(request, qs)
@@ -277,6 +279,7 @@ def other_expense_list(request):
 
 
 @login_required
+@permission_required("finance.view_expense", raise_exception=True)
 def batch_expense_list(request):
     qs = Expense.objects.select_related("created_by", "batch").filter(expense_type=Expense.TYPE_BATCH)
     form, qs = _apply_filters(request, qs)
@@ -298,6 +301,7 @@ def batch_expense_list(request):
 
 
 @login_required
+@permission_required("finance.view_expense", raise_exception=True)
 def operating_expense_list(request):
     qs = Expense.objects.select_related("created_by", "batch").filter(expense_type=Expense.TYPE_OPERATING)
     form, qs = _apply_filters(request, qs)
@@ -319,6 +323,7 @@ def operating_expense_list(request):
 
 
 @login_required
+@permission_required("finance.add_expense", raise_exception=True)
 def create_other_expense(request):
     if not _can_create_other(request.user):
         messages.error(request, "You do not have permission to create other expense.")
@@ -348,6 +353,7 @@ def create_other_expense(request):
 
 
 @login_required
+@permission_required("finance.add_expense", raise_exception=True)
 def create_batch_expense(request):
     if not _can_create_batch(request.user):
         messages.error(request, "You do not have permission to create batch expense.")
@@ -380,7 +386,7 @@ def create_batch_expense(request):
                 obj.amount = cost + delivery_fee + other_fee
             else:
                 obj.batch_created_at = None
-                obj.batch_total_cloth = 0
+                obj.batch_total_cloth = Decimal("0")
                 obj.batch_cost = Decimal("0.00")
                 obj.batch_delivery_fee = Decimal("0.00")
                 obj.batch_other_fee = Decimal("0.00")
@@ -404,6 +410,7 @@ def create_batch_expense(request):
 
 
 @login_required
+@permission_required("finance.add_expense", raise_exception=True)
 def create_operating_expense(request):
     if not _can_create_operating(request.user):
         messages.error(request, "You do not have permission to create operating expense.")
@@ -433,6 +440,7 @@ def create_operating_expense(request):
 
 
 @login_required
+@permission_required("finance.view_expense", raise_exception=True)
 def profit_dashboard(request):
     revenue_total = _get_revenue_total()
     expense_total = Expense.objects.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
@@ -471,6 +479,7 @@ def profit_dashboard(request):
 
 
 @login_required
+@permission_required("finance.add_expense", raise_exception=True)
 def batch_expense_preview(request):
     if not _can_create_batch(request.user):
         return JsonResponse({"error": "Permission denied"}, status=403)
