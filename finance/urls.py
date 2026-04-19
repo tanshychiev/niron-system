@@ -11,5 +11,7 @@ urlpatterns = [
     path("expenses/create-batch/", views.create_batch_expense, name="create_batch_expense"),
     path("expenses/create-operating/", views.create_operating_expense, name="create_operating_expense"),
 
+    path("expenses/batch-preview/", views.batch_expense_preview, name="batch_expense_preview"),
+
     path("profit-dashboard/", views.profit_dashboard, name="profit_dashboard"),
 ]
