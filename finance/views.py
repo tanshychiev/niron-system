@@ -12,41 +12,109 @@ from .forms import BatchExpenseForm, ExpenseFilterForm, OperatingExpenseForm, Ot
 from .models import Expense
 
 
+def _to_decimal(value):
+    if value in (None, ""):
+        return Decimal("0.00")
+    try:
+        return Decimal(str(value))
+    except Exception:
+        return Decimal("0.00")
+
+
+def _get_batch_rows(batch):
+    """
+    Try to find related row objects from InventoryBatch.
+    Adjust related names here if your actual related_name is different.
+    """
+    related_names = [
+        "rows",
+        "items",
+        "batch_rows",
+        "inventorybatchrow_set",
+        "inventorybatchitem_set",
+    ]
+
+    for name in related_names:
+        manager = getattr(batch, name, None)
+        if manager is not None:
+            try:
+                return manager.all()
+            except Exception:
+                continue
+    return []
+
+
+def _get_row_qty_received(row):
+    for field_name in ["qty_received", "quantity", "qty", "received_qty"]:
+        value = getattr(row, field_name, None)
+        if value is not None:
+            return _to_decimal(value)
+    return Decimal("0.00")
+
+
 def _get_batch_expense_data(batch):
+    """
+    Build preview/save data for batch expense.
+
+    Priority:
+    1) direct batch fields if they exist
+    2) sum from batch row quantities if totals live in related rows
+    """
     created_at = getattr(batch, "created_at", None)
 
+    # total cloth
     total_cloth = (
         getattr(batch, "total_cloth", None)
         or getattr(batch, "total_qty", None)
         or getattr(batch, "quantity", None)
-        or 0
+        or getattr(batch, "qty_received", None)
     )
 
+    if total_cloth in (None, "", 0):
+        rows = _get_batch_rows(batch)
+        total_qty = Decimal("0.00")
+        for row in rows:
+            total_qty += _get_row_qty_received(row)
+        total_cloth = int(total_qty) if total_qty else 0
+    else:
+        try:
+            total_cloth = int(total_cloth)
+        except Exception:
+            total_cloth = 0
+
+    # cost fields
     cost = (
         getattr(batch, "cost", None)
         or getattr(batch, "total_cost", None)
-        or Decimal("0.00")
+        or getattr(batch, "cloth_cost", None)
+        or getattr(batch, "item_cost", None)
     )
+    cost = _to_decimal(cost)
 
+    # delivery fee
     delivery_fee = (
         getattr(batch, "delivery_fee", None)
-        or Decimal("0.00")
+        or getattr(batch, "shipping_fee", None)
+        or getattr(batch, "transport_fee", None)
     )
+    delivery_fee = _to_decimal(delivery_fee)
 
+    # other fee
     other_fee = (
         getattr(batch, "other_fee", None)
         or getattr(batch, "additional_fee", None)
-        or Decimal("0.00")
+        or getattr(batch, "extra_fee", None)
     )
+    other_fee = _to_decimal(other_fee)
 
-    amount = (cost or Decimal("0.00")) + (delivery_fee or Decimal("0.00")) + (other_fee or Decimal("0.00"))
+    amount = cost + delivery_fee + other_fee
 
     return {
         "created_at": created_at,
-        "total_cloth": total_cloth or 0,
-        "cost": cost or Decimal("0.00"),
-        "delivery_fee": delivery_fee or Decimal("0.00"),
-        "other_fee": other_fee or Decimal("0.00"),
+        "total_cloth": total_cloth,
+        "cost": cost,
+        "delivery_fee": delivery_fee,
+        "other_fee": other_fee,
         "amount": amount,
     }
 
