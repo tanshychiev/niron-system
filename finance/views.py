@@ -8,7 +8,12 @@ from django.db.models.functions import TruncDate
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
 
-from .forms import BatchExpenseForm, ExpenseFilterForm, OperatingExpenseForm, OtherExpenseForm
+from .forms import (
+    BatchExpenseForm,
+    ExpenseFilterForm,
+    OperatingExpenseForm,
+    OtherExpenseForm,
+)
 from .models import Expense
 
 
@@ -21,11 +26,11 @@ def _to_decimal(value):
         return Decimal("0.00")
 
 
+def _safe_text(value):
+    return "" if value is None else str(value)
+
+
 def _get_batch_rows(batch):
-    """
-    Try to find related row objects from InventoryBatch.
-    Adjust related names here if your actual related_name is different.
-    """
     related_names = [
         "rows",
         "items",
@@ -52,17 +57,69 @@ def _get_row_qty_received(row):
     return Decimal("0.00")
 
 
-def _get_batch_expense_data(batch):
-    """
-    Build preview/save data for batch expense.
+def _get_row_item_code(row):
+    item = getattr(row, "item", None)
+    if item is not None:
+        for field_name in ["code", "item_code", "sku", "name"]:
+            value = getattr(item, field_name, None)
+            if value not in (None, ""):
+                return str(value)
 
-    Priority:
-    1) direct batch fields if they exist
-    2) sum from batch row quantities if totals live in related rows
-    """
+    for field_name in ["item_code", "code", "sku"]:
+        value = getattr(row, field_name, None)
+        if value not in (None, ""):
+            return str(value)
+    return ""
+
+
+def _get_row_item_name(row):
+    item = getattr(row, "item", None)
+    if item is not None:
+        for field_name in ["name", "title"]:
+            value = getattr(item, field_name, None)
+            if value not in (None, ""):
+                return str(value)
+
+    for field_name in ["item_name", "name", "title"]:
+        value = getattr(row, field_name, None)
+        if value not in (None, ""):
+            return str(value)
+    return ""
+
+
+def _get_row_color_name(row):
+    color_obj = getattr(row, "color", None)
+    if color_obj is not None:
+        for field_name in ["name", "title"]:
+            value = getattr(color_obj, field_name, None)
+            if value not in (None, ""):
+                return str(value)
+
+    for field_name in ["color_name", "color"]:
+        value = getattr(row, field_name, None)
+        if value not in (None, ""):
+            return str(value)
+    return ""
+
+
+def _get_row_size_name(row):
+    size_obj = getattr(row, "size", None)
+    if size_obj is not None:
+        for field_name in ["name", "title"]:
+            value = getattr(size_obj, field_name, None)
+            if value not in (None, ""):
+                return str(value)
+
+    for field_name in ["size_name", "size"]:
+        value = getattr(row, field_name, None)
+        if value not in (None, ""):
+            return str(value)
+    return ""
+
+
+def _get_batch_expense_data(batch):
     created_at = getattr(batch, "created_at", None)
 
-    # total cloth
     total_cloth = (
         getattr(batch, "total_cloth", None)
         or getattr(batch, "total_qty", None)
@@ -82,7 +139,6 @@ def _get_batch_expense_data(batch):
         except Exception:
             total_cloth = 0
 
-    # cost fields
     cost = (
         getattr(batch, "cost", None)
         or getattr(batch, "total_cost", None)
@@ -91,7 +147,6 @@ def _get_batch_expense_data(batch):
     )
     cost = _to_decimal(cost)
 
-    # delivery fee
     delivery_fee = (
         getattr(batch, "delivery_fee", None)
         or getattr(batch, "shipping_fee", None)
@@ -99,7 +154,6 @@ def _get_batch_expense_data(batch):
     )
     delivery_fee = _to_decimal(delivery_fee)
 
-    # other fee
     other_fee = (
         getattr(batch, "other_fee", None)
         or getattr(batch, "additional_fee", None)
@@ -424,6 +478,7 @@ def create_batch_expense(request):
         },
     )
 
+
 @login_required
 def create_operating_expense(request):
     if not _can_create_operating(request.user):
@@ -536,65 +591,3 @@ def batch_expense_preview(request):
         "color_summary": color_summary,
         "color_count": len(color_summary),
     })
-def _safe_text(value):
-    return "" if value is None else str(value)
-
-
-def _get_row_item_code(row):
-    item = getattr(row, "item", None)
-    if item is not None:
-        for field_name in ["code", "item_code", "sku", "name"]:
-            value = getattr(item, field_name, None)
-            if value not in (None, ""):
-                return str(value)
-
-    for field_name in ["item_code", "code", "sku"]:
-        value = getattr(row, field_name, None)
-        if value not in (None, ""):
-            return str(value)
-    return ""
-
-
-def _get_row_item_name(row):
-    item = getattr(row, "item", None)
-    if item is not None:
-        for field_name in ["name", "title"]:
-            value = getattr(item, field_name, None)
-            if value not in (None, ""):
-                return str(value)
-
-    for field_name in ["item_name", "name", "title"]:
-        value = getattr(row, field_name, None)
-        if value not in (None, ""):
-            return str(value)
-    return ""
-
-
-def _get_row_color_name(row):
-    color_obj = getattr(row, "color", None)
-    if color_obj is not None:
-        for field_name in ["name", "title"]:
-            value = getattr(color_obj, field_name, None)
-            if value not in (None, ""):
-                return str(value)
-
-    for field_name in ["color_name", "color"]:
-        value = getattr(row, field_name, None)
-        if value not in (None, ""):
-            return str(value)
-    return ""
-
-
-def _get_row_size_name(row):
-    size_obj = getattr(row, "size", None)
-    if size_obj is not None:
-        for field_name in ["name", "title"]:
-            value = getattr(size_obj, field_name, None)
-            if value not in (None, ""):
-                return str(value)
-
-    for field_name in ["size_name", "size"]:
-        value = getattr(row, field_name, None)
-        if value not in (None, ""):
-            return str(value)
-    return ""
