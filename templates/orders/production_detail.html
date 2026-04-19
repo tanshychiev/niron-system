@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+
+{% block page_title %}{{ order.order_no }}{% endblock %}
+{% block page_subtitle %}Production detail and progress update{% endblock %}
+
+{% block top_actions %}
+<a href="{% url 'production_list' %}" class="btn btn-light">Back to Production</a>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-2">
+    <div class="card">
+        <h2 class="section-title">Order Info</h2>
+        <p><strong>Customer:</strong> {{ order.customer_name }}</p>
+        <p><strong>Phone:</strong> {{ order.phone }}</p>
+
+        {% if order.status == "PENDING" %}
+            <p><strong>Status:</strong> <span class="badge badge-pending">Pending</span></p>
+        {% elif order.status == "PROCESSING" %}
+            <p><strong>Status:</strong> <span class="badge badge-processing">Processing</span></p>
+        {% elif order.status == "DONE" %}
+            <p><strong>Status:</strong> <span class="badge badge-done">Done</span></p>
+        {% elif order.status == "CANCELLED" %}
+            <p><strong>Status:</strong> <span class="badge badge-cancelled">Cancelled</span></p>
+        {% endif %}
+
+        <p><strong>Deadline:</strong> {{ order.deadline|date:"Y-m-d H:i" }}</p>
+        <p><strong>Progress:</strong> {{ order.done_pcs }} / {{ order.total_pcs }} pcs</p>
+        <p><strong>Remaining:</strong> {{ order.remaining_pcs }} pcs</p>
+
+        {% if order.status != "DONE" %}
+        <div style="margin-top:18px;">
+            <form method="post" action="{% url 'production_update' order.pk %}">
+                {% csrf_token %}
+                <input type="hidden" name="complete_all" value="1">
+                <button type="submit" class="btn btn-primary" style="background:#16a34a;border-color:#16a34a;">
+                    Complete All
+                </button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <h2 class="section-title">Design Files</h2>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:14px;">
+            {% for img in order.design_files.all %}
+            <div style="border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#fff;">
+                <img
+                    src="{{ img.image.url }}"
+                    data-src="{{ img.image.url }}"
+                    class="design-preview-img"
+                    style="width:100%;height:160px;object-fit:cover;display:block;cursor:pointer;"
+                >
+            </div>
+            {% empty %}
+            <p>No design files uploaded.</p>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h2 class="section-title">Items Progress</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Mode</th>
+                <th>Cloth Type</th>
+                <th>Color</th>
+                <th>Size</th>
+                <th>Film</th>
+                <th>Ordered</th>
+                <th>Done</th>
+                <th>Remaining</th>
+                <th>Update</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in order.items.all %}
+            <tr>
+                <td>{{ item.get_item_mode_display }}</td>
+                <td>{{ item.shirt_item|default:"-" }}</td>
+                <td>{{ item.color|default:"-" }}</td>
+                <td>{{ item.size|default:"-" }}</td>
+                <td>{{ item.film_item|default:"-" }}</td>
+                <td>{{ item.quantity }}</td>
+                <td>{{ item.done_qty }}</td>
+                <td>{{ item.remaining_qty }}</td>
+                <td>
+                    {% if item.remaining_qty > 0 %}
+                    <form method="post" action="{% url 'production_update' order.pk %}" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                        {% csrf_token %}
+                        <input type="hidden" name="item_id" value="{{ item.pk }}">
+                        <input type="number" step="0.01" name="qty_done" placeholder="qty" style="width:90px;" required>
+                        <input type="text" name="remark" placeholder="remark" style="width:160px;">
+                        <button type="submit" class="btn btn-primary">Save</button>
+                    </form>
+                    {% else %}
+                    <span class="badge badge-done">Done</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <h2 class="section-title">Progress History</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Item</th>
+                <th>Qty Done</th>
+                <th>Remark</th>
+                <th>Date</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in order.progress_logs.all %}
+            <tr>
+                <td>
+                    {% if log.order_item %}
+                        {% if log.order_item.shirt_item %}
+                            {{ log.order_item.shirt_item }}
+                        {% elif log.order_item.film_item %}
+                            {{ log.order_item.film_item }}
+                        {% else %}
+                            -
+                        {% endif %}
+                        {% if log.order_item.color %} / {{ log.order_item.color }}{% endif %}
+                        {% if log.order_item.size %} / {{ log.order_item.size }}{% endif %}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td>{{ log.qty_done }}</td>
+                <td>{{ log.remark }}</td>
+                <td>{{ log.created_at|date:"Y-m-d H:i" }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="4">No progress history yet.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div id="imageModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.78);z-index:9999;align-items:center;justify-content:center;padding:24px;">
+    <div style="position:relative;max-width:95vw;max-height:95vh;width:100%;display:flex;justify-content:center;align-items:center;">
+        <div style="position:absolute;top:-54px;right:0;display:flex;gap:10px;">
+            <button type="button" class="btn btn-light" id="zoomOutBtn">-</button>
+            <button type="button" class="btn btn-light" id="zoomInBtn">+</button>
+            <button type="button" class="btn btn-primary" id="closeModalBtn">Close</button>
+        </div>
+
+        <div id="imageModalInner" style="max-width:95vw;max-height:90vh;overflow:auto;background:#fff;border-radius:18px;padding:12px;">
+            <img id="modalImage" src="" style="display:block;max-width:none;transform:scale(1);transform-origin:center center;">
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const modal = document.getElementById("imageModal");
+    const modalImage = document.getElementById("modalImage");
+    const closeBtn = document.getElementById("closeModalBtn");
+    const zoomInBtn = document.getElementById("zoomInBtn");
+    const zoomOutBtn = document.getElementById("zoomOutBtn");
+
+    let currentScale = 1;
+
+    document.querySelectorAll(".design-preview-img").forEach(img => {
+        img.addEventListener("click", function () {
+            modal.style.display = "flex";
+            modalImage.src = this.dataset.src;
+            currentScale = 1;
+            modalImage.style.transform = "scale(1)";
+        });
+    });
+
+    zoomInBtn.addEventListener("click", function () {
+        currentScale += 0.2;
+        modalImage.style.transform = `scale(${currentScale})`;
+    });
+
+    zoomOutBtn.addEventListener("click", function () {
+        currentScale = Math.max(0.2, currentScale - 0.2);
+        modalImage.style.transform = `scale(${currentScale})`;
+    });
+
+    closeBtn.addEventListener("click", function () {
+        modal.style.display = "none";
+        modalImage.src = "";
+    });
+
+    modal.addEventListener("click", function (e) {
+        if (e.target === modal) {
+            modal.style.display = "none";
+            modalImage.src = "";
+        }
+    });
+});
+</script>
+{% endblock %}

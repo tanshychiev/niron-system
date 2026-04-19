@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block page_title %}Adjust Stock{% endblock %}
+{% block page_subtitle %}Show total available inventory and adjust final balance{% endblock %}
+
+{% block content %}
+<div class="form-card">
+  <div class="section-head">
+    <h2>Find Inventory</h2>
+    <p class="section-sub">Choose item, color and size.</p>
+  </div>
+
+  <form method="get">
+    <div class="grid-3">
+      <div class="field">
+        <label for="{{ form.item.id_for_label }}">Item</label>
+        {{ form.item }}
+      </div>
+
+      <div class="field">
+        <label for="{{ form.color.id_for_label }}">Color</label>
+        {{ form.color }}
+      </div>
+
+      <div class="field">
+        <label for="{{ form.size.id_for_label }}">Size</label>
+        {{ form.size }}
+      </div>
+    </div>
+
+    <div class="actions" style="justify-content:flex-start;">
+      <button type="submit" class="btn-primary">Search</button>
+      <a href="{% url 'inventory_adjust_stock_select' %}" class="btn-secondary">Clear</a>
+    </div>
+  </form>
+</div>
+
+{% if selected_item %}
+  <div class="info-card">
+    <h2 class="card-title">Current Available Inventory</h2>
+    <p>
+      <strong>Item:</strong> {{ selected_item.name }}
+      &nbsp; | &nbsp;
+      <strong>Color:</strong> {{ selected_color.name|default:"-" }}
+      &nbsp; | &nbsp;
+      <strong>Size:</strong> {{ selected_size.name|default:"-" }}
+    </p>
+    <div class="stat" style="max-width:280px;margin-top:14px;">
+      <div class="stat-label">Total Available</div>
+      <div class="stat-value">{{ total_available }}</div>
+    </div>
+  </div>
+
+  <div class="form-card">
+    <h2 class="card-title">Adjust Total Stock</h2>
+
+    {% if adjust_form.errors %}
+      <div class="alert alert-danger">{{ adjust_form.errors }}</div>
+    {% endif %}
+
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="item" value="{{ selected_item.id }}">
+      {% if selected_color %}<input type="hidden" name="color" value="{{ selected_color.id }}">{% endif %}
+      {% if selected_size %}<input type="hidden" name="size" value="{{ selected_size.id }}">{% endif %}
+
+      <div class="grid-3">
+        <div class="field">
+          <label>Adjustment Type</label>
+          {{ adjust_form.adjustment_type }}
+        </div>
+
+        <div class="field">
+          <label>Qty</label>
+          {{ adjust_form.qty }}
+        </div>
+
+        <div class="field">
+          <label>Final Total Qty</label>
+          {{ adjust_form.final_qty }}
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Reason</label>
+        {{ adjust_form.reason }}
+      </div>
+
+      <div class="actions">
+        <button type="submit" class="btn-primary">Save Adjustment</button>
+      </div>
+    </form>
+  </div>
+{% endif %}
+{% endblock %}

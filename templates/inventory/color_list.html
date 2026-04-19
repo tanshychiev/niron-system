@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block page_title %}Color List{% endblock %}
+{% block page_subtitle %}Manage colors{% endblock %}
+
+{% block content %}
+<div class="top-actions">
+  <a href="{% url 'color_create' %}" class="btn-primary">+ Create Color</a>
+</div>
+
+<div class="table-card">
+  <table class="app-table">
+    <thead>
+      <tr>
+        <th>Code</th>
+        <th>Name</th>
+        <th>Preview</th>
+        <th>Hex</th>
+        <th>Active</th>
+        <th>Edit</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for color in colors %}
+        <tr>
+          <td>{{ color.code }}</td>
+          <td>{{ color.name }}</td>
+          <td>
+            <span style="display:inline-block;width:20px;height:20px;border-radius:999px;background:{{ color.hex_code }};border:1px solid #ccc;"></span>
+          </td>
+          <td>{{ color.hex_code }}</td>
+          <td>{% if color.is_active %}Yes{% else %}No{% endif %}</td>
+          <td>
+            <a href="{% url 'color_edit' color.id %}" class="btn-light">Edit</a>
+          </td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="6">No colors found.</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block page_title %}Item List{% endblock %}
+{% block page_subtitle %}Manage inventory items{% endblock %}
+
+{% block content %}
+<div class="top-actions">
+  <a href="{% url 'inventory_item_create' %}" class="btn-primary">+ Create Item</a>
+</div>
+
+<div class="table-card">
+  <table class="app-table">
+    <thead>
+      <tr>
+        <th>Code</th>
+        <th>Name</th>
+        <th>Style</th>
+        <th>Active</th>
+        <th>Edit</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in items %}
+        <tr>
+          <td>{{ item.code }}</td>
+          <td>{{ item.name }}</td>
+          <td>{{ item.get_sample_style_display }}</td>
+          <td>{% if item.is_active %}Yes{% else %}No{% endif %}</td>
+          <td>
+            <a href="{% url 'inventory_item_edit' item.id %}" class="btn-light">Edit</a>
+          </td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="5">No items found.</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

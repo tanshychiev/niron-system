@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block page_title %}Adjustment History{% endblock %}
+{% block page_subtitle %}All stock corrections and stock take logs{% endblock %}
+
+{% block content %}
+<div class="table-card">
+  <table class="app-table">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Batch</th>
+        <th>Item</th>
+        <th>Color</th>
+        <th>Size</th>
+        <th>Type</th>
+        <th>Qty</th>
+        <th>Before</th>
+        <th>After</th>
+        <th>Reason</th>
+        <th>By</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for a in adjustments %}
+        <tr>
+          <td>{{ a.created_at|date:"d/m/Y H:i" }}</td>
+          <td>{{ a.batch_item.batch.batch_no }}</td>
+          <td>{{ a.batch_item.item.name }}</td>
+          <td>{{ a.batch_item.color.name|default:"-" }}</td>
+          <td>{{ a.batch_item.size.name|default:"-" }}</td>
+          <td>{{ a.get_adjustment_type_display }}</td>
+          <td>{{ a.qty }}</td>
+          <td>{{ a.qty_before }}</td>
+          <td>{{ a.qty_after }}</td>
+          <td>{{ a.reason|default:"-" }}</td>
+          <td>{% if a.created_by %}{{ a.created_by.username }}{% else %}-{% endif %}</td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="11">No adjustments found.</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

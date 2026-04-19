@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Invoice {{ order.order_no }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <style>
+        body {
+            margin: 0;
+            padding: 24px;
+            background: #f7f3e8;
+            font-family: Arial, sans-serif;
+            color: #1f2937;
+        }
+
+        .toolbar {
+            max-width: 980px;
+            margin: 0 auto 18px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .btn {
+            border: none;
+            border-radius: 10px;
+            padding: 10px 16px;
+            cursor: pointer;
+            font-weight: 700;
+        }
+
+        .btn-primary {
+            background: #E89B14;
+            color: white;
+        }
+
+        .btn-light {
+            background: white;
+            border: 1px solid #ddd;
+        }
+
+        .invoice-wrap {
+            max-width: 980px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 28px;
+            box-shadow: 0 10px 30px rgba(0,0,0,.08);
+        }
+
+        .head {
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+            border-bottom: 2px solid #111827;
+            padding-bottom: 18px;
+            margin-bottom: 20px;
+        }
+
+        .brand {
+            font-size: 34px;
+            font-weight: 800;
+            color: #1f2937;
+        }
+
+        .sub {
+            color: #6b7280;
+            font-size: 13px;
+            margin-top: 4px;
+        }
+
+        .invoice-title {
+            text-align: right;
+        }
+
+        .invoice-title h1 {
+            margin: 0;
+            font-size: 30px;
+        }
+
+        .meta-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 18px;
+            margin-bottom: 22px;
+        }
+
+        .box {
+            border: 1px solid #e5e7eb;
+            border-radius: 16px;
+            padding: 16px;
+        }
+
+        .box h3 {
+            margin: 0 0 10px;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: .8px;
+            color: #6b7280;
+        }
+
+        .line {
+            margin-bottom: 6px;
+            font-size: 14px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 8px;
+        }
+
+        th, td {
+            padding: 12px 10px;
+            border-bottom: 1px solid #e5e7eb;
+            text-align: left;
+            font-size: 14px;
+        }
+
+        th {
+            font-size: 12px;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: .8px;
+        }
+
+        .summary {
+            margin-top: 24px;
+            margin-left: auto;
+            width: 320px;
+        }
+
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .summary-total {
+            display: flex;
+            justify-content: space-between;
+            padding-top: 14px;
+            margin-top: 10px;
+            border-top: 2px solid #111827;
+            font-size: 24px;
+            font-weight: 800;
+        }
+
+        .designs {
+            margin-top: 24px;
+        }
+
+        .design-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 14px;
+        }
+
+        .design-grid img {
+            width: 100%;
+            height: 160px;
+            object-fit: cover;
+            border-radius: 14px;
+            border: 1px solid #e5e7eb;
+        }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <button class="btn btn-light" onclick="window.close()">Close</button>
+        <button class="btn btn-primary" onclick="downloadPNG()">Download PNG</button>
+    </div>
+
+    <div class="invoice-wrap" id="invoice-area">
+        <div class="head">
+            <div>
+                <div class="brand">Niron</div>
+                <div class="sub">Custom Printing Invoice</div>
+            </div>
+            <div class="invoice-title">
+                <h1>Invoice</h1>
+                <div class="sub">{{ order.order_no }}</div>
+            </div>
+        </div>
+
+        <div class="meta-grid">
+            <div class="box">
+                <h3>Customer</h3>
+                <div class="line"><strong>Name:</strong> {{ order.customer_name|default:"-" }}</div>
+                <div class="line"><strong>Phone:</strong> {{ order.phone|default:"-" }}</div>
+                <div class="line"><strong>Location:</strong> {{ order.customer_location|default:"-" }}</div>
+                <div class="line"><strong>Remark:</strong> {{ order.remark|default:"-" }}</div>
+            </div>
+
+            <div class="box">
+                <h3>Order Info</h3>
+                <div class="line"><strong>Type:</strong> {{ order.get_order_type_display }}</div>
+                <div class="line"><strong>Status:</strong> {{ order.get_status_display }}</div>
+                <div class="line"><strong>Deadline:</strong> {{ order.deadline }}</div>
+                <div class="line"><strong>Created:</strong> {{ order.created_at }}</div>
+            </div>
+        </div>
+
+        <div class="box">
+            <h3>Items</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Description</th>
+                        <th>Item</th>
+                        <th>Color</th>
+                        <th>Size</th>
+                        <th>Qty</th>
+                        <th>Unit Price</th>
+                        <th>Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in order.items.all %}
+                    <tr>
+                        <td>{{ item.description|default:"-" }}</td>
+                        <td>
+                            {% if item.item_mode == "FILM" %}
+                                {{ item.film_item|default:"-" }}
+                            {% else %}
+                                {{ item.shirt_item|default:"-" }}
+                            {% endif %}
+                        </td>
+                        <td>{{ item.color|default:"-" }}</td>
+                        <td>{{ item.size|default:"-" }}</td>
+                        <td>{{ item.quantity }}</td>
+                        <td>${{ item.unit_price }}</td>
+                        <td>${{ item.line_total }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7">No items</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <div class="summary">
+                <div class="summary-row">
+                    <span>Subtotal</span>
+                    <span>${{ order.total_amount }}</span>
+                </div>
+                <div class="summary-row">
+                    <span>Deposit</span>
+                    <span>${{ order.deposit_amount }}</span>
+                </div>
+                <div class="summary-row">
+                    <span>Paid</span>
+                    <span>${{ order.paid_amount }}</span>
+                </div>
+                <div class="summary-total">
+                    <span>Balance</span>
+                    <span>${{ order.balance_amount }}</span>
+                </div>
+            </div>
+        </div>
+
+        {% if order.design_files.all %}
+        <div class="designs">
+            <div class="box">
+                <h3>Design Images</h3>
+                <div class="design-grid">
+                    {% for img in order.design_files.all %}
+                    <img src="{{ img.image.url }}" alt="Design">
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script>
+        function downloadPNG() {
+            const area = document.getElementById("invoice-area");
+            html2canvas(area, {
+                scale: 2,
+                useCORS: true,
+                backgroundColor: "#ffffff"
+            }).then(canvas => {
+                const link = document.createElement("a");
+                link.download = "{{ order.order_no }}.png";
+                link.href = canvas.toDataURL("image/png");
+                link.click();
+            });
+        }
+    </script>
+</body>
+</html>

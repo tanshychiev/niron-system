@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block page_title %}Delete Batch{% endblock %}
+{% block page_subtitle %}Soft delete and keep history{% endblock %}
+
+{% block content %}
+<div class="form-card" style="max-width:760px;margin:0 auto;">
+  <h2 class="card-title">Delete Batch</h2>
+  <p>Are you sure you want to delete batch <strong>{{ batch.batch_no }}</strong>?</p>
+  <p>This will soft delete the batch and keep all history logs.</p>
+
+  <form method="post">
+    {% csrf_token %}
+    <div class="actions">
+      <button type="submit" class="btn-danger">Yes, Delete</button>
+      <a href="{% url 'inventory_batch_detail' batch.id %}" class="btn-secondary">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

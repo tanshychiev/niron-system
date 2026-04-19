@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block page_title %}Size List{% endblock %}
+{% block page_subtitle %}Manage sizes{% endblock %}
+
+{% block content %}
+<div class="top-actions">
+  <a href="{% url 'size_create' %}" class="btn-primary">+ Create Size</a>
+</div>
+
+<div class="table-card">
+  <table class="app-table">
+    <thead>
+      <tr>
+        <th>Code</th>
+        <th>Name</th>
+        <th>Sort Order</th>
+        <th>Active</th>
+        <th>Edit</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for size in sizes %}
+        <tr>
+          <td>{{ size.code }}</td>
+          <td>{{ size.name }}</td>
+          <td>{{ size.sort_order }}</td>
+          <td>{% if size.is_active %}Yes{% else %}No{% endif %}</td>
+          <td>
+            <a href="{% url 'size_edit' size.id %}" class="btn-light">Edit</a>
+          </td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="5">No sizes found.</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

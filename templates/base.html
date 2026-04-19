@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}Niron System{% endblock %}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <style>
+        :root {
+            --bg: #F7F3E8;
+            --bg-soft: #FBFAF5;
+            --panel: #FFFDF8;
+            --line: #ECE6D8;
+            --text: #1F2937;
+            --muted: #6B7280;
+            --accent: #E89B14;
+            --accent-dark: #C97D00;
+            --accent-soft: #FFF3D6;
+            --shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+            --danger-bg: #FDECEC;
+            --danger-line: #F5C2C7;
+            --danger-text: #B42318;
+        }
+
+        * { box-sizing: border-box; }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: Inter, "Segoe UI", Arial, sans-serif;
+        }
+
+        body { min-height: 100vh; }
+        a { color: inherit; }
+
+        .layout {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            width: 270px;
+            background: var(--panel);
+            border-right: 1px solid var(--line);
+            padding: 24px 18px;
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+
+        .logo {
+            font-size: 28px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 6px;
+        }
+
+        .logo::before {
+            content: "";
+            width: 10px;
+            height: 24px;
+            border-radius: 3px;
+            background: var(--accent);
+            box-shadow: 14px 0 0 var(--accent), 28px 0 0 var(--accent);
+            display: inline-block;
+            margin-right: 26px;
+        }
+
+        .logo-sub {
+            font-size: 11px;
+            letter-spacing: 2px;
+            color: var(--muted);
+            text-transform: uppercase;
+            margin-bottom: 22px;
+            padding-left: 52px;
+        }
+
+        .nav-group {
+            margin-bottom: 10px;
+        }
+
+        .nav-toggle {
+            width: 100%;
+            border: 0;
+            background: transparent;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 14px;
+            border-radius: 14px;
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text);
+            cursor: pointer;
+            transition: 0.2s ease;
+        }
+
+        .nav-toggle:hover {
+            background: var(--accent-soft);
+            color: var(--accent-dark);
+        }
+
+        .nav-toggle.active {
+            background: var(--accent-soft);
+            color: var(--accent-dark);
+        }
+
+        .nav-arrow {
+            font-size: 12px;
+            transition: transform 0.2s ease;
+        }
+
+        .nav-toggle.active .nav-arrow {
+            transform: rotate(180deg);
+        }
+
+        .nav-submenu {
+            max-height: 0;
+            overflow: hidden;
+            padding: 0 0 0 10px;
+            opacity: 0;
+            transition: max-height 0.25s ease, opacity 0.2s ease, padding 0.2s ease;
+        }
+
+        .nav-submenu.show {
+            max-height: 420px;
+            opacity: 1;
+            padding: 8px 0 4px 10px;
+        }
+
+        .nav-link {
+            display: block;
+            text-decoration: none;
+            color: var(--muted);
+            padding: 10px 14px;
+            border-radius: 12px;
+            margin-bottom: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            transition: 0.2s ease;
+        }
+
+        .nav-link:hover {
+            background: var(--bg-soft);
+            color: var(--accent-dark);
+        }
+
+        .nav-link.current {
+            background: var(--accent-soft);
+            color: var(--accent-dark);
+            font-weight: 700;
+        }
+
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .topbar {
+            min-height: 76px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding: 14px 34px;
+            border-bottom: 1px solid var(--line);
+            background: rgba(255,255,255,.82);
+            backdrop-filter: blur(10px);
+            gap: 12px;
+        }
+
+        .content-wrap {
+            padding: 32px 34px 40px;
+        }
+
+        .hero {
+            background: linear-gradient(180deg, #F8F3E6 0%, #F7F3E8 100%);
+            border: 1px solid var(--line);
+            border-radius: 28px;
+            padding: 42px 40px;
+            margin-bottom: 28px;
+            box-shadow: var(--shadow);
+        }
+
+        .hero-title {
+            text-align: center;
+            font-size: 42px;
+            line-height: 1.08;
+            letter-spacing: -1.2px;
+            color: var(--text);
+            margin: 0;
+            font-weight: 800;
+        }
+
+        .hero-subtitle {
+            text-align: center;
+            margin-top: 12px;
+            color: var(--muted);
+            font-size: 15px;
+            max-width: 720px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .card, .form-card, .info-card, .table-card {
+            background: rgba(255,255,255,.82);
+            border: 1px solid var(--line);
+            border-radius: 22px;
+            padding: 24px;
+            margin-bottom: 22px;
+            box-shadow: var(--shadow);
+        }
+
+        .btn, .btn-primary, .btn-light, .btn-secondary, .btn-danger {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            border-radius: 12px;
+            padding: 12px 18px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: .3px;
+            transition: .2s ease;
+            border: none;
+        }
+
+        .btn, .btn-light, .btn-secondary {
+            background: white;
+            color: var(--text);
+            border: 1px solid var(--line);
+        }
+
+        .btn:hover, .btn-light:hover, .btn-secondary:hover {
+            background: var(--bg-soft);
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+            box-shadow: 0 8px 20px rgba(232,155,20,.28);
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-dark);
+        }
+
+        .btn-danger {
+            background: #DC2626;
+            color: white;
+        }
+
+        .actions, .top-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .actions {
+            justify-content: flex-end;
+            margin-top: 18px;
+        }
+
+        input, select, textarea, .form-control, .form-select {
+            width: 100%;
+            padding: 13px 14px;
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            background: white;
+            font-size: 14px;
+            color: var(--text);
+            outline: none;
+        }
+
+        input, select, .form-control, .form-select {
+            height: 44px;
+        }
+
+        textarea, textarea.form-control {
+            height: auto;
+            padding: 12px 14px;
+            min-height: 110px;
+        }
+
+        input:focus, select:focus, textarea:focus, .form-control:focus, .form-select:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 4px rgba(232,155,20,.12);
+        }
+
+        .msg, .alert {
+            border-radius: 16px;
+            padding: 14px 18px;
+            margin-bottom: 18px;
+            font-weight: 600;
+        }
+
+        .msg {
+            background: var(--accent-soft);
+            border: 1px solid #F4D38A;
+            color: var(--accent-dark);
+        }
+
+        .alert-danger {
+            background: var(--danger-bg);
+            border: 1px solid var(--danger-line);
+            color: var(--danger-text);
+            font-weight: 700;
+        }
+
+        .app-table, table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .app-table th, .app-table td, table th, table td {
+            text-align: left;
+            vertical-align: top;
+            padding: 14px 10px;
+            border-bottom: 1px solid var(--line);
+            font-size: 14px;
+            color: var(--text);
+        }
+
+        .app-table thead th, table thead th, table th {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            color: var(--muted);
+            font-weight: 700;
+        }
+
+        @media (max-width: 980px) {
+            .layout { flex-direction: column; }
+
+            .sidebar {
+                width: 100%;
+                height: auto;
+                position: relative;
+                border-right: none;
+                border-bottom: 1px solid var(--line);
+            }
+
+            .topbar {
+                padding: 16px 20px;
+                min-height: auto;
+                justify-content: flex-end;
+            }
+
+            .content-wrap { padding: 20px; }
+            .hero-title { font-size: 32px; }
+        }
+    </style>
+
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <div class="layout">
+        <aside class="sidebar">
+            <div class="logo">Niron</div>
+            <div class="logo-sub">Custom Printing</div>
+
+            {% if perms.inventory.view_inventorybatch %}
+            <div class="nav-group">
+                <button class="nav-toggle" type="button" data-target="menu-inventory">
+                    <span>Inventory</span>
+                    <span class="nav-arrow">▼</span>
+                </button>
+                <div class="nav-submenu" id="menu-inventory">
+                    <a class="nav-link" href="/inventory/">Finished Tshirt Inventory</a>
+
+                    {% if perms.inventory.add_inventorybatch %}
+                    <a class="nav-link" href="/inventory/batches/new/">Stock In</a>
+                    {% endif %}
+
+                    {% if perms.inventory.add_inventoryadjustment %}
+                    <a class="nav-link" href="/inventory/adjust-stock/">Adjust Stock</a>
+                    {% endif %}
+
+                    {% if perms.inventory.view_inventoryadjustment %}
+                    <a class="nav-link" href="/inventory/adjustments/">Adjustment History</a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if perms.orders.view_order or perms.orders.add_order %}
+            <div class="nav-group">
+                <button class="nav-toggle" type="button" data-target="menu-orders">
+                    <span>Orders</span>
+                    <span class="nav-arrow">▼</span>
+                </button>
+                <div class="nav-submenu" id="menu-orders">
+                    {% if perms.orders.view_order %}
+                    <a class="nav-link" href="/orders/">Order List</a>
+                    {% endif %}
+
+                    {% if perms.orders.add_order %}
+                    <a class="nav-link" href="/orders/new/">Create Order</a>
+                    {% endif %}
+
+                    {% if perms.orders.view_order %}
+                    <a class="nav-link" href="/orders/production/">Production List</a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if perms.inventory.view_inventoryitem or perms.inventory.view_color or perms.inventory.view_size %}
+            <div class="nav-group">
+                <button class="nav-toggle" type="button" data-target="menu-setup">
+                    <span>Setup</span>
+                    <span class="nav-arrow">▼</span>
+                </button>
+                <div class="nav-submenu" id="menu-setup">
+                    {% if perms.inventory.view_inventoryitem %}
+                    <a class="nav-link" href="/inventory/items/">Item List</a>
+                    {% endif %}
+
+                    {% if perms.inventory.view_color %}
+                    <a class="nav-link" href="/inventory/colors/">Color List</a>
+                    {% endif %}
+
+                    {% if perms.inventory.view_size %}
+                    <a class="nav-link" href="/inventory/sizes/">Size List</a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if perms.auth.view_user or perms.auth.add_user or perms.auth.view_group or perms.auth.view_permission %}
+            <div class="nav-group">
+                <button class="nav-toggle" type="button" data-target="menu-users">
+                    <span>Users & Permissions</span>
+                    <span class="nav-arrow">▼</span>
+                </button>
+                <div class="nav-submenu" id="menu-users">
+                    {% if perms.auth.view_user %}
+                    <a class="nav-link" href="/users/">User List</a>
+                    {% endif %}
+
+                    {% if perms.auth.add_user %}
+                    <a class="nav-link" style="font-size:12px; padding-left:28px; opacity:.85;" href="/users/new/">
+                        + Create User
+                    </a>
+                    {% endif %}
+
+                    {% if perms.auth.view_group %}
+                    <a class="nav-link" href="/users/roles/">Roles</a>
+                    {% endif %}
+
+                    {% if perms.auth.add_group %}
+                    <a class="nav-link" style="font-size:12px; padding-left:28px; opacity:.85;" href="/users/roles/create/">
+                        + Create Role
+                    </a>
+                    {% endif %}
+
+                    {% if perms.auth.view_permission %}
+                    <a class="nav-link" href="/users/permissions/">Permissions</a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if user.is_superuser %}
+            <div class="nav-group">
+                <button class="nav-toggle" type="button" data-target="menu-system">
+                    <span>System</span>
+                    <span class="nav-arrow">▼</span>
+                </button>
+                <div class="nav-submenu" id="menu-system">
+                    <a class="nav-link" href="/admin/">Admin Panel</a>
+                    <a class="nav-link" href="/logout/">Logout</a>
+                </div>
+            </div>
+            {% elif user.is_authenticated %}
+            <div class="nav-group">
+                <button class="nav-toggle" type="button" data-target="menu-account">
+                    <span>Account</span>
+                    <span class="nav-arrow">▼</span>
+                </button>
+                <div class="nav-submenu" id="menu-account">
+                    <a class="nav-link" href="/logout/">Logout</a>
+                </div>
+            </div>
+            {% endif %}
+        </aside>
+
+        <div class="main">
+            <div class="topbar">
+                <div>
+                    {% block top_actions %}{% endblock %}
+                </div>
+            </div>
+
+            <div class="content-wrap">
+                <div class="hero">
+                    <h1 class="hero-title">{% block page_title %}Niron System{% endblock %}</h1>
+                    <div class="hero-subtitle">{% block page_subtitle %}Clean custom printing management{% endblock %}</div>
+                </div>
+
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="msg">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+
+                {% block content %}{% endblock %}
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            const toggles = document.querySelectorAll(".nav-toggle");
+            const currentPath = window.location.pathname;
+
+            function closeAll() {
+                toggles.forEach((btn) => {
+                    const id = btn.getAttribute("data-target");
+                    const menu = document.getElementById(id);
+                    btn.classList.remove("active");
+                    if (menu) menu.classList.remove("show");
+                });
+            }
+
+            toggles.forEach((toggle) => {
+                toggle.addEventListener("click", function () {
+                    const targetId = this.getAttribute("data-target");
+                    const currentMenu = document.getElementById(targetId);
+                    if (!currentMenu) return;
+
+                    const isOpen = currentMenu.classList.contains("show");
+                    closeAll();
+
+                    if (!isOpen) {
+                        currentMenu.classList.add("show");
+                        this.classList.add("active");
+                    }
+                });
+            });
+
+            toggles.forEach((toggle) => {
+                const targetId = toggle.getAttribute("data-target");
+                const menu = document.getElementById(targetId);
+                if (!menu) return;
+
+                const links = menu.querySelectorAll(".nav-link");
+                links.forEach((link) => {
+                    const href = link.getAttribute("href");
+                    if (!href) return;
+
+                    if (href !== "/" && currentPath.startsWith(href)) {
+                        closeAll();
+                        menu.classList.add("show");
+                        toggle.classList.add("active");
+                        link.classList.add("current");
+                    }
+                });
+            });
+        })();
+    </script>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

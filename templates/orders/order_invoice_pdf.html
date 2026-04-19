@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Invoice PDF {{ order.order_no }}</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 30px;
+            font-family: Arial, sans-serif;
+            color: #111827;
+            background: white;
+        }
+
+        .toolbar {
+            margin-bottom: 20px;
+            text-align: right;
+        }
+
+        .btn {
+            border: none;
+            border-radius: 8px;
+            padding: 10px 14px;
+            cursor: pointer;
+            font-weight: 700;
+            background: #E89B14;
+            color: white;
+        }
+
+        .head {
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 2px solid #111827;
+            padding-bottom: 14px;
+            margin-bottom: 18px;
+        }
+
+        .brand {
+            font-size: 30px;
+            font-weight: 800;
+        }
+
+        .sub {
+            color: #6b7280;
+            font-size: 13px;
+        }
+
+        .meta-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 18px;
+            margin-bottom: 20px;
+        }
+
+        .box {
+            border: 1px solid #ddd;
+            border-radius: 12px;
+            padding: 14px;
+        }
+
+        .box h3 {
+            margin: 0 0 10px;
+            font-size: 13px;
+            text-transform: uppercase;
+            color: #6b7280;
+        }
+
+        .line {
+            margin-bottom: 6px;
+            font-size: 14px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 6px;
+        }
+
+        th, td {
+            padding: 10px 8px;
+            border-bottom: 1px solid #ddd;
+            text-align: left;
+            font-size: 13px;
+        }
+
+        th {
+            font-size: 11px;
+            text-transform: uppercase;
+            color: #6b7280;
+        }
+
+        .summary {
+            width: 300px;
+            margin-left: auto;
+            margin-top: 20px;
+        }
+
+        .summary-row,
+        .summary-total {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+        }
+
+        .summary-row {
+            border-bottom: 1px solid #ddd;
+        }
+
+        .summary-total {
+            border-top: 2px solid #111827;
+            margin-top: 10px;
+            font-size: 24px;
+            font-weight: 800;
+        }
+
+        @media print {
+            .toolbar {
+                display: none;
+            }
+
+            body {
+                padding: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <button class="btn" onclick="window.print()">Save as PDF</button>
+    </div>
+
+    <div class="head">
+        <div>
+            <div class="brand">Niron</div>
+            <div class="sub">Custom Printing Invoice</div>
+        </div>
+        <div style="text-align:right;">
+            <div style="font-size:28px;font-weight:800;">Invoice</div>
+            <div class="sub">{{ order.order_no }}</div>
+        </div>
+    </div>
+
+    <div class="meta-grid">
+        <div class="box">
+            <h3>Customer</h3>
+            <div class="line"><strong>Name:</strong> {{ order.customer_name|default:"-" }}</div>
+            <div class="line"><strong>Phone:</strong> {{ order.phone|default:"-" }}</div>
+            <div class="line"><strong>Location:</strong> {{ order.customer_location|default:"-" }}</div>
+            <div class="line"><strong>Remark:</strong> {{ order.remark|default:"-" }}</div>
+        </div>
+
+        <div class="box">
+            <h3>Order Info</h3>
+            <div class="line"><strong>Type:</strong> {{ order.get_order_type_display }}</div>
+            <div class="line"><strong>Status:</strong> {{ order.get_status_display }}</div>
+            <div class="line"><strong>Deadline:</strong> {{ order.deadline }}</div>
+            <div class="line"><strong>Created:</strong> {{ order.created_at }}</div>
+        </div>
+    </div>
+
+    <div class="box">
+        <h3>Items</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Description</th>
+                    <th>Item</th>
+                    <th>Color</th>
+                    <th>Size</th>
+                    <th>Qty</th>
+                    <th>Unit Price</th>
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in order.items.all %}
+                <tr>
+                    <td>{{ item.description|default:"-" }}</td>
+                    <td>
+                        {% if item.item_mode == "FILM" %}
+                            {{ item.film_item|default:"-" }}
+                        {% else %}
+                            {{ item.shirt_item|default:"-" }}
+                        {% endif %}
+                    </td>
+                    <td>{{ item.color|default:"-" }}</td>
+                    <td>{{ item.size|default:"-" }}</td>
+                    <td>{{ item.quantity }}</td>
+                    <td>${{ item.unit_price }}</td>
+                    <td>${{ item.line_total }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7">No items</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="summary">
+            <div class="summary-row">
+                <span>Subtotal</span>
+                <span>${{ order.total_amount }}</span>
+            </div>
+            <div class="summary-row">
+                <span>Deposit</span>
+                <span>${{ order.deposit_amount }}</span>
+            </div>
+            <div class="summary-row">
+                <span>Paid</span>
+                <span>${{ order.paid_amount }}</span>
+            </div>
+            <div class="summary-total">
+                <span>Balance</span>
+                <span>${{ order.balance_amount }}</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        window.onload = function () {
+            setTimeout(function () {
+                window.print();
+            }, 300);
+        };
+    </script>
+</body>
+</html>

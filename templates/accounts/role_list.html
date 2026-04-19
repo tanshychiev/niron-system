@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Roles{% endblock %}
+{% block page_title %}Roles{% endblock %}
+{% block page_subtitle %}Manage role permissions{% endblock %}
+
+{% block top_actions %}
+<a href="{% url 'role_create' %}" class="btn-primary">+ Create Role</a>
+{% endblock %}
+
+{% block content %}
+<div class="table-card">
+    <table class="app-table">
+        <thead>
+            <tr>
+                <th>Role</th>
+                <th>Total Permissions</th>
+                <th>Edit</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for role in roles %}
+            <tr>
+                <td><strong>{{ role.name }}</strong></td>
+                <td>{{ role.permissions.count }}</td>
+                <td>
+                    <a href="{% url 'role_edit' role.id %}" class="btn-secondary">Edit</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="3">No roles found.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

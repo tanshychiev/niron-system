@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}Access Denied | Niron System{% endblock %}
+{% block page_title %}Access Denied{% endblock %}
+{% block page_subtitle %}You do not have permission to open this page.{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h3 style="margin-top:0;">You don't have permission</h3>
+    <p style="color: var(--muted); margin-bottom: 18px;">
+        Please contact your administrator if you need access to this section.
+    </p>
+    <div class="actions" style="justify-content:flex-start;">
+        <a href="/" class="btn btn-light">Back to Home</a>
+    </div>
+</div>
+{% endblock %}

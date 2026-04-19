@@ -1,0 +1,669 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="inventory-page">
+  <div class="inventory-head">
+    <div>
+      <h1>Inventory</h1>
+      <p class="sub">Visual stock overview by shirt style, color and size.</p>
+    </div>
+    <div class="head-actions">
+      <a href="{% url 'inventory_item_create' %}" class="btn-dark">+ Create Item</a>
+      <a href="{% url 'color_create' %}" class="btn-light">+ Create Color</a>
+      <a href="{% url 'size_create' %}" class="btn-light">+ Create Size</a>
+      <a href="{% url 'inventory_batch_create' %}" class="btn-light">+ Stock In</a>
+    </div>
+  </div>
+
+  {% for style_group in style_groups %}
+    <section class="style-section">
+      <div class="section-head">
+        <div class="section-title-row">
+          <h2>{{ style_group.style_label }}</h2>
+          <span class="count-pill">{{ style_group.cards|length }} color{{ style_group.cards|length|pluralize }}</span>
+        </div>
+      </div>
+
+      <div class="card-grid">
+        {% for card in style_group.cards %}
+          <div class="shirt-card">
+            <div class="shirt-card-top">
+              <div class="shirt-preview-wrap">
+                <div class="shirt-preview style-{{ card.item_style }}">
+                  <svg viewBox="0 0 220 220" class="shirt-svg" aria-hidden="true">
+                    <path
+                      class="shape shape-oversize"
+                      fill="{{ card.color_hex|default:'#D1D5DB' }}"
+                      d="M55 48 L82 30 L138 30 L165 48 L190 83 L170 96 L160 78 L160 190 L60 190 L60 78 L50 96 L30 83 Z">
+                    </path>
+
+                    <path
+                      class="shape shape-polo"
+                      fill="{{ card.color_hex|default:'#D1D5DB' }}"
+                      d="M65 46 L88 28 L132 28 L155 46 L178 80 L160 92 L150 74 L150 190 L70 190 L70 74 L60 92 L42 80 Z">
+                    </path>
+
+                    <path
+                      class="collar collar-polo"
+                      fill="#E5E7EB"
+                      d="M92 30 L110 48 L128 30 L118 62 L102 62 Z">
+                    </path>
+
+                    <path
+                      class="shape shape-boxy"
+                      fill="{{ card.color_hex|default:'#D1D5DB' }}"
+                      d="M48 58 L75 34 L145 34 L172 58 L188 86 L168 97 L158 80 L158 175 L62 175 L62 80 L52 97 L32 86 Z">
+                    </path>
+                  </svg>
+                </div>
+              </div>
+
+              <div class="card-title-block">
+                <div class="top-meta-row">
+                  <span class="item-code">{{ card.item_code }}</span>
+                </div>
+
+                <h3>{{ card.item_name }}</h3>
+
+                <div class="meta-row">
+                  <span class="color-dot" style="background: {{ card.color_hex|default:'#D1D5DB' }}"></span>
+                  <span>{{ card.color_name }}</span>
+                  <span class="sep">•</span>
+                  <span>{{ card.item_style_label }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="size-wrap">
+              {% for size_row in card.sizes %}
+                <div class="size-chip">
+                  <div class="size-name">{{ size_row.size_name }}</div>
+                  <div class="size-values">
+  <div class="size-line available">
+    <span class="size-label">Available</span>
+    <span class="size-number">{{ size_row.available_qty }}</span>
+  </div>
+
+  <div class="size-line pending">
+    <span class="size-label">Processing</span>
+    <span class="size-number small">{{ size_row.in_progress_qty }}</span>
+  </div>
+
+  <div class="size-line total">
+    <span class="size-label">Total</span>
+    <span class="size-number small">{{ size_row.total_qty }}</span>
+  </div>
+</div>
+                </div>
+              {% empty %}
+                <div class="empty-size">No sizes</div>
+              {% endfor %}
+            </div>
+
+            <div class="totals-row">
+              <div class="metric metric-available">
+                <div class="metric-label">Available</div>
+                <div class="metric-value">{{ card.available_qty }}</div>
+              </div>
+              <div class="metric metric-progress">
+                <div class="metric-label">PROCESSING</div>
+                <div class="metric-value">{{ card.in_progress_qty }}</div>
+              </div>
+              <div class="metric metric-total">
+                <div class="metric-label">Total</div>
+                <div class="metric-value">{{ card.total_qty }}</div>
+              </div>
+            </div>
+          </div>
+        {% empty %}
+          <div class="empty-block">No inventory found for this style.</div>
+        {% endfor %}
+      </div>
+    </section>
+  {% empty %}
+    <div class="empty-main">No inventory data found.</div>
+  {% endfor %}
+
+  <section class="batch-section">
+    <div class="section-head">
+      <div class="section-title-row">
+        <h2>Batch List</h2>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-wrap">
+        <table class="batch-table">
+          <thead>
+            <tr>
+              <th>Batch No</th>
+              <th>Supplier</th>
+              <th>Created By</th>
+              <th>Received Date</th>
+              <th class="text-end">Total Cloth</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for batch in batches %}
+              <tr>
+                <td>
+                  <a href="{% url 'inventory_batch_detail' batch.id %}" class="batch-link">
+                    {{ batch.batch_no }}
+                  </a>
+                </td>
+                <td>{{ batch.supplier|default:"-" }}</td>
+                <td>{{ batch.created_by|default:"-" }}</td>
+                <td>{{ batch.received_date|date:"d/m/Y" }}</td>
+                <td class="text-end">{{ batch.total_cloth }}</td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="5" class="empty-td">No batches found.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</div>
+
+<style>
+  .inventory-page{
+    max-width: 1480px;
+    margin: 26px auto;
+    padding: 0 18px 42px;
+  }
+
+  .inventory-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:18px;
+    flex-wrap:wrap;
+    margin-bottom:30px;
+  }
+
+  .inventory-head h1{
+    margin:0;
+    font-size:40px;
+    line-height:1.05;
+    font-weight:900;
+    letter-spacing:-0.03em;
+    color:#0f172a;
+  }
+
+  .sub{
+    margin-top:10px;
+    color:#64748b;
+    font-size:16px;
+  }
+
+  .head-actions{
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+
+  .btn-dark,
+  .btn-light{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    text-decoration:none;
+    padding:13px 18px;
+    border-radius:16px;
+    font-weight:800;
+    font-size:14px;
+    transition:.22s ease;
+  }
+
+  .btn-dark{
+    background:#0f172a;
+    color:#fff;
+    border:1px solid #0f172a;
+    box-shadow:0 10px 24px rgba(15,23,42,.16);
+  }
+
+  .btn-dark:hover{
+    transform:translateY(-1px);
+    color:#fff;
+    background:#020617;
+  }
+
+  .btn-light{
+    background:rgba(255,255,255,.82);
+    color:#0f172a;
+    border:1px solid #dbe2ea;
+    box-shadow:0 4px 14px rgba(15,23,42,.05);
+    backdrop-filter: blur(8px);
+  }
+
+  .btn-light:hover{
+    transform:translateY(-1px);
+    background:#fff;
+    color:#0f172a;
+  }
+
+  .style-section,
+  .batch-section{
+    margin-top:34px;
+  }
+
+  .section-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    margin-bottom:18px;
+  }
+
+  .section-title-row{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+
+  .section-head h2{
+    margin:0;
+    font-size:22px;
+    font-weight:900;
+    letter-spacing:-0.02em;
+    color:#0f172a;
+  }
+
+  .count-pill{
+    display:inline-flex;
+    padding:8px 13px;
+    border-radius:999px;
+    background:linear-gradient(180deg,#ffffff,#f8fafc);
+    border:1px solid #e2e8f0;
+    color:#475569;
+    font-weight:800;
+    font-size:13px;
+    box-shadow:0 6px 16px rgba(15,23,42,.05);
+  }
+
+  .card-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(340px,1fr));
+    gap:22px;
+  }
+
+  .shirt-card{
+    position:relative;
+    background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(248,250,252,.96));
+    border:1px solid rgba(226,232,240,.95);
+    border-radius:30px;
+    padding:18px;
+    box-shadow:
+      0 14px 35px rgba(15,23,42,.06),
+      0 2px 8px rgba(15,23,42,.04);
+    transition:.25s ease;
+    overflow:hidden;
+  }
+
+  .shirt-card::before{
+    content:"";
+    position:absolute;
+    top:0;
+    left:0;
+    right:0;
+    height:1px;
+    background:linear-gradient(90deg,transparent,rgba(255,255,255,.95),transparent);
+  }
+
+  .shirt-card:hover{
+    transform:translateY(-4px);
+    box-shadow:
+      0 20px 42px rgba(15,23,42,.09),
+      0 8px 20px rgba(15,23,42,.06);
+  }
+
+  .shirt-card-top{
+    display:flex;
+    gap:16px;
+    align-items:center;
+  }
+
+  .shirt-preview-wrap{
+    width:132px;
+    height:132px;
+    border-radius:26px;
+    background:
+      radial-gradient(circle at top, rgba(255,255,255,.9), rgba(241,245,249,.85)),
+      linear-gradient(180deg,#f8fafc,#eef2f7);
+    border:1px solid #dde4ec;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex-shrink:0;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.9);
+  }
+
+  .shirt-preview{
+    width:96px;
+    height:96px;
+    filter: drop-shadow(0 8px 12px rgba(15,23,42,.12));
+  }
+
+  .shirt-svg{
+    width:100%;
+    height:100%;
+  }
+
+  .shape,
+  .collar{
+    display:none;
+  }
+
+  .style-OVERSIZE .shape-oversize{
+    display:block;
+  }
+
+  .style-POLO .shape-polo,
+  .style-POLO .collar-polo{
+    display:block;
+  }
+
+  .style-BOXY .shape-boxy{
+    display:block;
+  }
+
+  .top-meta-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:8px;
+  }
+
+  .item-code{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    padding:5px 10px;
+    border-radius:999px;
+    background:linear-gradient(180deg,#f8fafc,#eef2f7);
+    border:1px solid #e2e8f0;
+    color:#475569;
+    font-size:12px;
+    font-weight:900;
+    letter-spacing:.05em;
+    box-shadow:0 4px 12px rgba(15,23,42,.04);
+  }
+
+  .card-title-block h3{
+    margin:0 0 8px;
+    font-size:18px;
+    line-height:1.2;
+    font-weight:900;
+    letter-spacing:-0.02em;
+    color:#0f172a;
+  }
+
+  .meta-row{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    color:#64748b;
+    font-size:15px;
+    flex-wrap:wrap;
+  }
+
+  .color-dot{
+    width:14px;
+    height:14px;
+    border-radius:999px;
+    border:2px solid rgba(255,255,255,.92);
+    box-shadow:0 0 0 1px rgba(15,23,42,.12);
+    display:inline-block;
+    flex-shrink:0;
+  }
+
+  .sep{
+    opacity:.5;
+  }
+
+  .divider{
+    height:1px;
+    margin:18px 0 16px;
+    background:linear-gradient(90deg,transparent,#e2e8f0,transparent);
+  }
+
+  .size-wrap{
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+
+  .size-chip{
+    min-width:96px;
+    padding:12px 12px 11px;
+    border-radius:22px;
+    background:linear-gradient(180deg,#fbfdff,#f4f7fb);
+    border:1px solid #e2e8f0;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.9),
+      0 6px 14px rgba(15,23,42,.04);
+  }
+
+  .size-name{
+    font-size:20px;
+    font-weight:900;
+    line-height:1;
+    color:#0f172a;
+    margin-bottom:10px;
+    letter-spacing:-0.03em;
+  }
+
+  .size-values{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+
+/* shared */
+.size-line{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+
+/* labels */
+.size-label{
+  font-size:11px;
+  font-weight:800;
+  letter-spacing:.08em;
+}
+
+/* main number */
+.size-number{
+  font-weight:900;
+  font-size:16px;
+}
+
+/* smaller numbers */
+.size-number.small{
+  font-size:13px;
+  font-weight:700;
+}
+
+/* colors */
+.size-line.available .size-label{
+  color:#16a34a; /* green */
+}
+.size-line.available .size-number{
+  color:#166534;
+}
+
+.size-line.pending .size-label{
+  color:#f59e0b; /* orange */
+}
+.size-line.pending .size-number{
+  color:#92400e;
+}
+
+.size-line.total .size-label{
+  color:#64748b; /* gray */
+}
+.size-line.total .size-number{
+  color:#334155;
+}
+
+  .empty-size{
+    color:#94a3b8;
+    font-size:14px;
+  }
+
+  .totals-row{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:12px;
+    margin-top:18px;
+  }
+
+  .metric{
+    border-radius:22px;
+    padding:14px 14px 13px;
+    border:1px solid #e2e8f0;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.9),
+      0 8px 18px rgba(15,23,42,.04);
+  }
+
+  .metric-available{
+    background:linear-gradient(180deg,#ffffff,#f8fbff);
+  }
+
+  .metric-progress{
+    background:linear-gradient(180deg,#ffffff,#f9fafb);
+  }
+
+  .metric-total{
+    background:linear-gradient(180deg,#ffffff,#f8fafc);
+  }
+
+  .metric-label{
+    font-size:11px;
+    color:#64748b;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    font-weight:900;
+  }
+
+  .metric-value{
+    font-size:19px;
+    font-weight:900;
+    color:#0f172a;
+    margin-top:6px;
+    line-height:1.1;
+    letter-spacing:-0.03em;
+  }
+
+  .table-card{
+    background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(248,250,252,.96));
+    border:1px solid rgba(226,232,240,.95);
+    border-radius:28px;
+    overflow:hidden;
+    box-shadow:
+      0 14px 35px rgba(15,23,42,.06),
+      0 2px 8px rgba(15,23,42,.04);
+  }
+
+  .table-wrap{
+    overflow:auto;
+  }
+
+  .batch-table{
+    width:100%;
+    border-collapse:collapse;
+  }
+
+  .batch-table th,
+  .batch-table td{
+    padding:17px 18px;
+    border-bottom:1px solid #edf2f7;
+    text-align:left;
+    white-space:nowrap;
+    vertical-align:middle;
+  }
+
+  .batch-table thead th{
+    background:linear-gradient(180deg,#fbfdff,#f7fafc);
+    font-size:12px;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:#64748b;
+    font-weight:900;
+  }
+
+  .batch-link{
+    color:#0f172a;
+    font-weight:800;
+    text-decoration:none;
+  }
+
+  .batch-link:hover{
+    text-decoration:underline;
+  }
+
+  .text-end{
+    text-align:right !important;
+  }
+
+  .empty-block,
+  .empty-main{
+    padding:24px;
+    border-radius:24px;
+    background:linear-gradient(180deg,#ffffff,#f8fafc);
+    border:1px dashed #cbd5e1;
+    color:#64748b;
+  }
+
+  .empty-td{
+    text-align:center !important;
+    color:#64748b;
+  }
+
+  @media (max-width: 768px){
+    .inventory-page{
+      padding:0 12px 32px;
+    }
+
+    .inventory-head h1{
+      font-size:32px;
+    }
+
+    .shirt-card{
+      border-radius:24px;
+      padding:16px;
+    }
+
+    .shirt-card-top{
+      align-items:flex-start;
+    }
+
+    .shirt-preview-wrap{
+      width:104px;
+      height:104px;
+      border-radius:22px;
+    }
+
+    .shirt-preview{
+      width:76px;
+      height:76px;
+    }
+
+    .card-grid{
+      grid-template-columns:1fr;
+      gap:16px;
+    }
+
+    .totals-row{
+      grid-template-columns:1fr;
+    }
+  }
+</style>
+{% endblock %}

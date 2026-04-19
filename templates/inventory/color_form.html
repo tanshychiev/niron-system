@@ -1,0 +1,296 @@
+{% extends "base.html" %}
+
+{% block page_title %}{{ page_title|default:"Create Color" }}{% endblock %}
+{% block page_subtitle %}Create color with real hex preview for shirt display{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+  <div class="page-head">
+    <div>
+      <h1>{{ page_title|default:"Create Color" }}</h1>
+      <p class="sub">Create color with real hex preview for shirt display.</p>
+    </div>
+
+    <div class="page-head-actions">
+      <a href="{% url 'color_list' %}" class="btn-secondary">Color List</a>
+    </div>
+  </div>
+
+  <div class="form-card">
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+        <div class="alert alert-danger">
+          {{ form.non_field_errors }}
+        </div>
+      {% endif %}
+
+      <div class="field">
+        <label for="{{ form.name.id_for_label }}">Color Name</label>
+        {{ form.name }}
+        {% for e in form.name.errors %}<div class="error">{{ e }}</div>{% endfor %}
+      </div>
+
+      <div class="grid-color">
+        <div class="field">
+          <label for="{{ form.hex_code.id_for_label }}">Pick Color</label>
+          {{ form.hex_code }}
+          {% for e in form.hex_code.errors %}<div class="error">{{ e }}</div>{% endfor %}
+        </div>
+
+        <div class="live-preview-box">
+          <div class="live-preview-title">Live Preview</div>
+          <div class="color-chip-preview">
+            <span id="colorSwatch" class="swatch"></span>
+            <span id="colorText">#000000</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Status</label>
+
+        <div class="status-choice-wrap">
+          {{ form.is_active }}
+
+          <button type="button" id="activeBtn" class="status-btn active-state">
+            Active
+          </button>
+
+          <button type="button" id="inactiveBtn" class="status-btn inactive-state">
+            Inactive
+          </button>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button type="submit" class="btn-primary">{{ submit_label|default:"Save Color" }}</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  .page-wrap{
+    max-width:880px;
+    margin:24px auto;
+    padding:0 16px;
+  }
+
+  .page-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:16px;
+    flex-wrap:wrap;
+  }
+
+  .page-head h1{
+    margin:0;
+    font-size:32px;
+    font-weight:800;
+  }
+
+  .sub{
+    margin-top:6px;
+    color:#6b7280;
+  }
+
+  .page-head-actions{
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+
+  .form-card{
+    margin-top:20px;
+    background:#fff;
+    border:1px solid #e5e7eb;
+    border-radius:24px;
+    padding:24px;
+    box-shadow:0 10px 30px rgba(0,0,0,.05);
+  }
+
+  .field{
+    margin-bottom:16px;
+  }
+
+  .field label{
+    display:block;
+    margin-bottom:8px;
+    font-weight:700;
+    color:#111827;
+  }
+
+  .form-control{
+    width:100%;
+    height:46px;
+    border:1px solid #d1d5db;
+    border-radius:14px;
+    padding:0 14px;
+    background:#fff;
+  }
+
+  input[type="color"]{
+    width:100%;
+    height:52px;
+    border:1px solid #d1d5db;
+    border-radius:14px;
+    padding:6px;
+    background:#fff;
+  }
+
+  .grid-color{
+    display:grid;
+    grid-template-columns:1.1fr .9fr;
+    gap:18px;
+    align-items:end;
+  }
+
+  .live-preview-box{
+    background:#f8fafc;
+    border:1px solid #e5e7eb;
+    border-radius:18px;
+    padding:18px;
+  }
+
+  .live-preview-title{
+    font-size:13px;
+    font-weight:800;
+    color:#374151;
+    margin-bottom:10px;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+  }
+
+  .color-chip-preview{
+    display:flex;
+    align-items:center;
+    gap:12px;
+  }
+
+  .swatch{
+    display:inline-block;
+    width:56px;
+    height:56px;
+    border-radius:16px;
+    border:1px solid rgba(0,0,0,.12);
+    background:#000000;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.25);
+  }
+
+  .status-choice-wrap{
+    display:flex;
+    gap:10px;
+    align-items:center;
+    flex-wrap:wrap;
+  }
+
+  .status-choice-wrap input[type="checkbox"]{
+    display:none;
+  }
+
+  .status-btn{
+    min-width:120px;
+    height:46px;
+    border-radius:14px;
+    border:1px solid #d1d5db;
+    background:#fff;
+    color:#374151;
+    font-weight:800;
+    cursor:pointer;
+    transition:.2s ease;
+    padding:0 18px;
+  }
+
+  .status-btn:hover{
+    transform:translateY(-1px);
+  }
+
+  .status-btn.is-selected.active-state{
+    background:#166534;
+    border-color:#166534;
+    color:#fff;
+    box-shadow:0 8px 20px rgba(22,101,52,.18);
+  }
+
+  .status-btn.is-selected.inactive-state{
+    background:#475569;
+    border-color:#475569;
+    color:#fff;
+    box-shadow:0 8px 20px rgba(71,85,105,.16);
+  }
+
+  .actions{
+    margin-top:10px;
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    justify-content:flex-end;
+  }
+
+  .error{
+    margin-top:6px;
+    color:#dc2626;
+    font-size:13px;
+  }
+
+  @media (max-width: 768px){
+    .grid-color{
+      grid-template-columns:1fr;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  (function(){
+    const colorInput = document.getElementById("{{ form.hex_code.id_for_label }}");
+    const swatch = document.getElementById("colorSwatch");
+    const text = document.getElementById("colorText");
+
+    if (colorInput && swatch && text) {
+      function syncColor() {
+        swatch.style.background = colorInput.value || "#000000";
+        text.textContent = (colorInput.value || "#000000").toUpperCase();
+      }
+
+      colorInput.addEventListener("input", syncColor);
+      colorInput.addEventListener("change", syncColor);
+      syncColor();
+    }
+
+    const hiddenCheckbox = document.getElementById("{{ form.is_active.id_for_label }}");
+    const activeBtn = document.getElementById("activeBtn");
+    const inactiveBtn = document.getElementById("inactiveBtn");
+
+    if (hiddenCheckbox && activeBtn && inactiveBtn) {
+      function syncStatus() {
+        if (hiddenCheckbox.checked) {
+          activeBtn.classList.add("is-selected");
+          inactiveBtn.classList.remove("is-selected");
+        } else {
+          inactiveBtn.classList.add("is-selected");
+          activeBtn.classList.remove("is-selected");
+        }
+      }
+
+      activeBtn.addEventListener("click", function(){
+        hiddenCheckbox.checked = true;
+        syncStatus();
+      });
+
+      inactiveBtn.addEventListener("click", function(){
+        hiddenCheckbox.checked = false;
+        syncStatus();
+      });
+
+      syncStatus();
+    }
+  })();
+</script>
+{% endblock %}

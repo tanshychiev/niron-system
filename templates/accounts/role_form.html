@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }}{% endblock %}
+{% block page_title %}{{ page_title }}{% endblock %}
+{% block page_subtitle %}Role permissions{% endblock %}
+
+{% block top_actions %}
+<a href="{% url 'role_list' %}" class="btn-secondary">Back</a>
+{% endblock %}
+
+{% block content %}
+<div class="role-wrap">
+    <form method="post">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        <div class="form-card">
+            <div class="field-row">
+                <div class="field-grow">
+                    <label for="{{ form.name.id_for_label }}">Role name</label>
+                    {{ form.name }}
+                    {% for e in form.name.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+                </div>
+                <div class="field-tip">
+                    Tip: Use “Select All” per section.
+                </div>
+            </div>
+        </div>
+
+        {% for app_label, perms in grouped_permissions.items %}
+        <div class="perm-section">
+            <div class="perm-section-head">
+                <h3>{{ app_label }}</h3>
+                <button type="button" class="select-all-btn" data-target="group-{{ forloop.counter }}">
+                    Select All
+                </button>
+            </div>
+
+            <div class="perm-grid group-{{ forloop.counter }}">
+                {% for perm in perms %}
+                <label class="perm-card">
+                    <input
+                        type="checkbox"
+                        name="permissions"
+                        value="{{ perm.id }}"
+                        {% if perm in form.instance.permissions.all %}checked{% endif %}
+                    >
+                    <span class="perm-name">{{ perm.codename }}</span>
+                </label>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+
+        <div class="actions">
+            <button type="submit" class="btn-primary">{{ submit_label }}</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .role-wrap{
+        max-width: 1100px;
+        margin: 0 auto;
+    }
+
+    .field-row{
+        display:grid;
+        grid-template-columns: minmax(0, 1fr) 260px;
+        gap: 16px;
+        align-items:end;
+    }
+
+    .field-grow label{
+        display:block;
+        margin-bottom:8px;
+        font-size:14px;
+        font-weight:800;
+        color:#1f2937;
+    }
+
+    .field-tip{
+        color:#6b7280;
+        font-size:14px;
+        font-weight:600;
+        padding-bottom:10px;
+    }
+
+    .perm-section{
+        background: rgba(255,255,255,.82);
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        padding: 18px;
+        margin-bottom: 18px;
+        box-shadow: var(--shadow);
+    }
+
+    .perm-section-head{
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:12px;
+        margin-bottom:14px;
+    }
+
+    .perm-section-head h3{
+        margin:0;
+        font-size:16px;
+        font-weight:900;
+        letter-spacing:.02em;
+    }
+
+    .select-all-btn{
+        border:1px solid var(--line);
+        background:#fff;
+        color:var(--text);
+        border-radius:10px;
+        padding:8px 12px;
+        font-size:12px;
+        font-weight:800;
+        cursor:pointer;
+    }
+
+    .select-all-btn:hover{
+        background:var(--accent-soft);
+        color:var(--accent-dark);
+    }
+
+    .perm-grid{
+        display:grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap:12px;
+    }
+
+    .perm-card{
+        display:flex;
+        align-items:center;
+        gap:12px;
+        background:#fff;
+        border:1px solid var(--line);
+        border-radius:14px;
+        padding:14px 14px;
+        cursor:pointer;
+        transition:.2s ease;
+        min-height:54px;
+    }
+
+    .perm-card:hover{
+        background:var(--bg-soft);
+        border-color:#e6d2aa;
+    }
+
+    .perm-card input{
+        width:18px;
+        height:18px;
+        flex:0 0 auto;
+        accent-color: var(--accent);
+    }
+
+    .perm-name{
+        font-size:13px;
+        font-weight:700;
+        color:#111827;
+        word-break:break-word;
+    }
+
+    .field-error{
+        margin-top:6px;
+        color:#dc2626;
+        font-size:13px;
+        font-weight:700;
+    }
+
+    @media (max-width: 980px){
+        .perm-grid{
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .field-row{
+            grid-template-columns:1fr;
+        }
+    }
+
+    @media (max-width: 640px){
+        .perm-grid{
+            grid-template-columns:1fr;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function () {
+        const buttons = document.querySelectorAll(".select-all-btn");
+
+        buttons.forEach((btn) => {
+            btn.addEventListener("click", function () {
+                const targetClass = this.getAttribute("data-target");
+                const wrapper = document.querySelector("." + targetClass);
+                if (!wrapper) return;
+
+                const checkboxes = wrapper.querySelectorAll('input[type="checkbox"]');
+                const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+
+                checkboxes.forEach(cb => {
+                    cb.checked = !allChecked;
+                });
+
+                this.textContent = allChecked ? "Select All" : "Clear All";
+            });
+        });
+    })();
+</script>
+{% endblock %}

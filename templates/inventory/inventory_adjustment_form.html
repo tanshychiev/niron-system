@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block page_title %}Adjust Stock{% endblock %}
+{% block page_subtitle %}Create stock correction record{% endblock %}
+
+{% block content %}
+<div class="grid-2">
+  <div class="info-card">
+    <h3 class="card-title">Stock Row</h3>
+    <p><strong>Batch:</strong> {{ batch_item.batch.batch_no }}</p>
+    <p><strong>Item:</strong> {{ batch_item.item.name }}</p>
+    <p><strong>Color:</strong> {{ batch_item.color.name|default:"-" }}</p>
+    <p><strong>Size:</strong> {{ batch_item.size.name|default:"-" }}</p>
+    <p><strong>Qty Received:</strong> {{ batch_item.qty_received }}</p>
+    <p><strong>Qty Remaining:</strong> {{ batch_item.qty_remaining }}</p>
+  </div>
+
+  <div class="form-card">
+    <h3 class="card-title">Adjustment Form</h3>
+
+    {% if form.errors %}
+      <div class="alert alert-danger">{{ form.errors }}</div>
+    {% endif %}
+
+    <form method="post">
+      {% csrf_token %}
+
+      <div class="field">
+        <label>Adjustment Type</label>
+        {{ form.adjustment_type }}
+      </div>
+
+      <div class="field">
+        <label>Qty</label>
+        {{ form.qty }}
+      </div>
+
+      <div class="field">
+        <label>Stock Take Final Qty</label>
+        {{ form.stocktake_final_qty }}
+        <small style="display:block;margin-top:6px;color:var(--muted);">
+          Use this only for stock take.
+        </small>
+      </div>
+
+      <div class="field">
+        <label>Reason</label>
+        {{ form.reason }}
+      </div>
+
+      <div class="actions">
+        <button type="submit" class="btn-primary">Save Adjustment</button>
+        <a href="{% url 'inventory_batch_detail' batch_item.batch.id %}" class="btn-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

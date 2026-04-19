@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block page_title %}Batch History - {{ batch.batch_no }}{% endblock %}
+{% block page_subtitle %}Track create, update and delete logs{% endblock %}
+
+{% block content %}
+<div class="table-card">
+  <table class="app-table">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Action</th>
+        <th>Changed By</th>
+        <th>Note</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for log in history_logs %}
+        <tr>
+          <td>{{ log.changed_at|date:"d/m/Y H:i" }}</td>
+          <td>{{ log.get_action_display }}</td>
+          <td>{% if log.changed_by %}{{ log.changed_by.username }}{% else %}-{% endif %}</td>
+          <td>{{ log.note|default:"-" }}</td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="4">No history found.</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

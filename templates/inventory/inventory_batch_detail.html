@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block page_title %}Batch {{ batch.batch_no }}{% endblock %}
+{% block page_subtitle %}Batch detail and stock rows{% endblock %}
+
+{% block content %}
+<div class="top-actions">
+  <a href="{% url 'inventory_batch_edit' batch.id %}" class="btn-primary">Edit Batch</a>
+  <a href="{% url 'inventory_batch_history' batch.id %}" class="btn-light">View History</a>
+  <a href="{% url 'inventory_batch_delete' batch.id %}" class="btn-danger">Delete Batch</a>
+  <a href="{% url 'inventory_list' %}" class="btn-light">Back to Inventory</a>
+</div>
+
+<div class="grid-2">
+  <div class="info-card">
+    <h3 class="card-title">Batch Info</h3>
+    <p><strong>Batch No:</strong> {{ batch.batch_no }}</p>
+    <p><strong>Supplier:</strong> {{ batch.supplier|default:"-" }}</p>
+    <p><strong>Received Date:</strong> {{ batch.received_date|date:"d/m/Y" }}</p>
+    <p><strong>Status:</strong> {{ batch.get_status_display }}</p>
+    <p><strong>Created By:</strong> {% if batch.created_by %}{{ batch.created_by.username }}{% else %}-{% endif %}</p>
+    <p><strong>Updated By:</strong> {% if batch.updated_by %}{{ batch.updated_by.username }}{% else %}-{% endif %}</p>
+    <p><strong>Note:</strong> {{ batch.note|default:"-" }}</p>
+  </div>
+
+  <div class="info-card">
+    <h3 class="card-title">Summary</h3>
+    <p><strong>Total Cloth:</strong> {{ batch.total_cloth }}</p>
+    <p><strong>Received At:</strong> {{ batch.created_at|date:"d/m/Y H:i" }}</p>
+    <p><strong>Last Updated:</strong> {{ batch.updated_at|date:"d/m/Y H:i" }}</p>
+    {% if batch.is_deleted %}
+      <p><strong>Deleted:</strong> Yes</p>
+      <p><strong>Deleted At:</strong> {{ batch.deleted_at|date:"d/m/Y H:i" }}</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="table-card">
+  <div class="section-head">
+    <h2>Batch Rows</h2>
+  </div>
+
+  <table class="app-table">
+    <thead>
+      <tr>
+        <th>Item Code</th>
+        <th>Item Name</th>
+        <th>Color</th>
+        <th>Size</th>
+        <th>Qty Received</th>
+        <th>Qty Remaining</th>
+        <th>Qty Used</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in batch.items.all %}
+        <tr>
+          <td>{{ row.item.code }}</td>
+          <td>{{ row.item.name }}</td>
+          <td>{{ row.color.name|default:"-" }}</td>
+          <td>{{ row.size.name|default:"-" }}</td>
+          <td>{{ row.qty_received }}</td>
+          <td>{{ row.qty_remaining }}</td>
+          <td>{{ row.qty_used }}</td>
+          <td>
+            <a href="{% url 'inventory_adjustment_create' row.id %}" class="btn-light">Adjust</a>
+          </td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="8">No rows found.</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

@@ -1,0 +1,961 @@
+{% extends "base.html" %}
+
+{% block title %}Create Order{% endblock %}
+{% block page_title %}Create Order{% endblock %}
+{% block page_subtitle %}Add a new custom printing order{% endblock %}
+
+{% block top_actions %}
+<a href="{% url 'order_list' %}" class="btn btn-light">Back to Orders</a>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .order-shell {
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    .qb-card {
+        background: rgba(255,255,255,.92);
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        box-shadow: var(--shadow);
+        padding: 24px;
+        margin-bottom: 22px;
+    }
+
+    .qb-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 14px;
+        margin-bottom: 18px;
+        flex-wrap: wrap;
+    }
+
+    .qb-title {
+        margin: 0;
+        font-size: 20px;
+        font-weight: 800;
+        color: var(--text);
+    }
+
+    .qb-sub {
+        margin-top: 5px;
+        font-size: 13px;
+        color: var(--muted);
+    }
+
+    .niron-alert-error {
+        background: var(--danger-bg);
+        border: 1px solid var(--danger-line);
+        color: var(--danger-text);
+        border-radius: 16px;
+        padding: 14px 16px;
+        font-weight: 700;
+        margin-bottom: 18px;
+    }
+
+    .field {
+        margin-bottom: 16px;
+    }
+
+    .field label {
+        display: block;
+        font-size: 12px;
+        font-weight: 800;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: .8px;
+        margin-bottom: 8px;
+    }
+
+    .field small {
+        display: block;
+        margin-top: 7px;
+        color: var(--muted);
+        font-size: 12px;
+    }
+
+    .field ul.errorlist {
+        margin: 8px 0 0;
+        padding-left: 18px;
+        color: var(--danger-text);
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    .order-shell select,
+    .order-shell input,
+    .order-shell textarea {
+        font-size: 14px;
+        line-height: 1.35;
+    }
+
+    .order-shell select {
+        height: 42px;
+        padding-top: 9px;
+        padding-bottom: 9px;
+    }
+
+    .top-grid-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+    }
+
+    .top-grid-4 {
+        display: grid;
+        grid-template-columns: 1.1fr 1.1fr 1fr 1fr;
+        gap: 16px;
+    }
+
+    .remark-inline textarea,
+    .remark-inline input {
+        min-height: 42px !important;
+        height: 42px !important;
+    }
+
+    .preview-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 14px;
+        margin-top: 12px;
+    }
+
+    .preview-card {
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        overflow: hidden;
+        background: #fff;
+    }
+
+    .preview-open-btn {
+        display: block;
+        width: 100%;
+        padding: 0;
+        border: none;
+        background: none;
+        cursor: pointer;
+    }
+
+    .preview-card img {
+        width: 100%;
+        height: 150px;
+        object-fit: cover;
+        display: block;
+        background: var(--bg-soft);
+    }
+
+    .preview-meta {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        align-items: center;
+        padding: 8px 10px;
+        font-size: 12px;
+        color: var(--muted);
+    }
+
+    .preview-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .preview-remove {
+        border: none;
+        background: transparent;
+        color: #c62828;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    .items-toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 14px;
+        flex-wrap: wrap;
+    }
+
+    .item-board {
+        overflow-x: auto;
+        padding-bottom: 6px;
+    }
+
+    .item-header-row,
+    .item-input-row {
+        min-width: 1200px;
+        display: grid;
+        grid-template-columns:
+            100px
+            180px
+            170px
+            110px
+            90px
+            80px
+            100px
+            110px
+            90px
+            70px;
+        gap: 10px;
+        align-items: center;
+    }
+
+    .item-header-row {
+        padding: 0 2px 10px;
+        border-bottom: 1px solid var(--line);
+        margin-bottom: 12px;
+    }
+
+    .item-header-row div {
+        font-size: 11px;
+        font-weight: 800;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: .8px;
+    }
+
+    .item-row {
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        background: linear-gradient(180deg, rgba(255,255,255,.96), rgba(251,250,245,.9));
+        padding: 10px;
+        margin-bottom: 12px;
+    }
+
+    .item-row .field {
+        margin-bottom: 0;
+    }
+
+    .item-row input,
+    .item-row select,
+    .item-row textarea {
+        height: 40px;
+        border-radius: 12px;
+    }
+
+    .line-total-view {
+        background: #F8F6EF;
+        font-weight: 700;
+    }
+
+    .remove-inline {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 40px;
+    }
+
+    .trash-btn {
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+        border: 1px solid #F1C6C6;
+        background: #FFF5F5;
+        color: #C62828;
+        cursor: pointer;
+        font-size: 18px;
+        line-height: 1;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: .2s ease;
+    }
+
+    .trash-btn:hover {
+        background: #FDECEC;
+        border-color: #E7A9A9;
+    }
+
+    .summary-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 360px;
+        gap: 22px;
+        align-items: start;
+    }
+
+    .summary-note {
+        min-height: 100%;
+        border: 1px dashed var(--line);
+        border-radius: 20px;
+        background: linear-gradient(180deg, rgba(251,250,245,.9), rgba(247,243,232,.65));
+        padding: 18px;
+    }
+
+    .summary-note-title {
+        font-size: 16px;
+        font-weight: 800;
+        margin-bottom: 8px;
+        color: var(--text);
+    }
+
+    .summary-note-text {
+        font-size: 13px;
+        color: var(--muted);
+        line-height: 1.6;
+    }
+
+    .invoice-summary {
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        background: #fff;
+        padding: 18px 18px 16px;
+    }
+
+    .invoice-summary-title {
+        font-size: 16px;
+        font-weight: 800;
+        margin: 0 0 14px;
+        color: var(--text);
+    }
+
+    .summary-line {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--line);
+    }
+
+    .summary-line:last-of-type {
+        border-bottom: none;
+    }
+
+    .summary-line label {
+        font-size: 12px;
+        font-weight: 800;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: .8px;
+        margin: 0;
+        min-width: 110px;
+    }
+
+    .summary-line input {
+        max-width: 170px;
+        text-align: right;
+        font-weight: 700;
+        height: 40px;
+    }
+
+    .summary-total {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 14px;
+        padding-top: 16px;
+        margin-top: 12px;
+        border-top: 2px solid #1f2937;
+    }
+
+    .summary-total-label {
+        font-size: 24px;
+        font-weight: 800;
+        color: var(--text);
+    }
+
+    .summary-total input {
+        width: 170px;
+        text-align: right;
+        font-size: 20px;
+        font-weight: 800;
+        height: 48px;
+        background: #F8F6EF;
+    }
+
+    .submit-row {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 18px;
+    }
+
+    .image-preview-modal {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.72);
+        z-index: 9999;
+        align-items: center;
+        justify-content: center;
+        padding: 30px;
+    }
+
+    .image-preview-modal.show {
+        display: flex;
+    }
+
+    .image-preview-box {
+        position: relative;
+        max-width: 90vw;
+        max-height: 90vh;
+    }
+
+    .image-preview-close {
+        position: absolute;
+        top: -14px;
+        right: -14px;
+        width: 38px;
+        height: 38px;
+        border: none;
+        border-radius: 999px;
+        background: white;
+        color: #111827;
+        font-size: 20px;
+        font-weight: 700;
+        cursor: pointer;
+        box-shadow: 0 10px 30px rgba(0,0,0,.18);
+    }
+
+    .image-preview-large {
+        display: block;
+        max-width: 90vw;
+        max-height: 90vh;
+        border-radius: 18px;
+        background: white;
+        box-shadow: 0 20px 60px rgba(0,0,0,.28);
+    }
+
+    @media (max-width: 1200px) {
+        .top-grid-4 {
+            grid-template-columns: 1fr 1fr;
+        }
+    }
+
+    @media (max-width: 1100px) {
+        .top-grid-2,
+        .summary-layout {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 700px) {
+        .top-grid-4 {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="order-shell">
+    <form method="post" enctype="multipart/form-data" id="order-form">
+        {% csrf_token %}
+
+        {% if form.errors or formset.errors %}
+        <div class="niron-alert-error">
+            Please fix the errors below and try again.
+        </div>
+        {% endif %}
+
+        <div class="qb-card">
+            <div class="qb-head">
+                <div>
+                    <h2 class="qb-title">Order Information</h2>
+                    <div class="qb-sub">Customer info, deadline and design images</div>
+                </div>
+            </div>
+
+            <div class="top-grid-2">
+                <div class="field">
+                    <label>Order Type</label>
+                    {{ form.order_type }}
+                    {{ form.order_type.errors }}
+                </div>
+
+                <div class="field">
+                    <label>Deadline</label>
+                    {{ form.deadline }}
+                    {{ form.deadline.errors }}
+                </div>
+            </div>
+
+            <div class="top-grid-4">
+                <div class="field">
+                    <label>Customer Name</label>
+                    {{ form.customer_name }}
+                    {{ form.customer_name.errors }}
+                </div>
+
+                <div class="field">
+                    <label>Phone</label>
+                    {{ form.phone }}
+                    {{ form.phone.errors }}
+                </div>
+
+                <div class="field">
+                    <label>Customer Location <span style="text-transform:none;font-weight:600;color:var(--muted);">(optional)</span></label>
+                    {{ form.customer_location }}
+                    {{ form.customer_location.errors }}
+                </div>
+
+                <div class="field remark-inline">
+                    <label>Remark</label>
+                    {{ form.remark }}
+                    {{ form.remark.errors }}
+                </div>
+            </div>
+
+            <div class="field">
+                <label>Design Images</label>
+                {{ form.design_files }}
+                {{ form.design_files.errors }}
+                <small>You can add more images many times before saving.</small>
+            </div>
+
+            <div class="field" style="margin-bottom:0;">
+                <label>Image Preview</label>
+                <div id="preview-area" class="preview-grid"></div>
+            </div>
+        </div>
+
+        <div class="qb-card">
+            <div class="items-toolbar">
+                <div>
+                    <h2 class="qb-title" style="font-size:18px;">Items</h2>
+                    <div class="qb-sub">Each item stays in one row for faster data entry</div>
+                </div>
+                <button type="button" class="btn btn-primary" id="add-row-btn">Add Row</button>
+            </div>
+
+            {{ formset.management_form }}
+
+            <div class="item-board">
+                <div class="item-header-row" id="item-header-row">
+                    <div>Mode</div>
+                    <div>Description</div>
+                    <div id="header-item-name">Cloth Item</div>
+                    <div id="header-color">Color</div>
+                    <div id="header-size">Size</div>
+                    <div>Qty</div>
+                    <div id="header-meter">Film Meter</div>
+                    <div>Unit Price</div>
+                    <div>Total</div>
+                    <div>Action</div>
+                </div>
+
+                <div id="items-container">
+                    {% for f in formset %}
+                    <div class="item-row">
+                        {% for hidden in f.hidden_fields %}
+                            {{ hidden }}
+                        {% endfor %}
+
+                        <div class="item-input-row">
+                            <div class="field">
+                                {{ f.item_mode }}
+                                {{ f.item_mode.errors }}
+                            </div>
+
+                            <div class="field">
+                                {{ f.description }}
+                                {{ f.description.errors }}
+                            </div>
+
+                            <div class="field shirt-item-cell">
+                                {{ f.shirt_item }}
+                                {{ f.shirt_item.errors }}
+                            </div>
+
+                            <div class="field film-item-cell" style="display:none;">
+                                {{ f.film_item }}
+                                {{ f.film_item.errors }}
+                            </div>
+
+                            <div class="field color-cell">
+                                {{ f.color }}
+                                {{ f.color.errors }}
+                            </div>
+
+                            <div class="field size-cell">
+                                {{ f.size }}
+                                {{ f.size.errors }}
+                            </div>
+
+                            <div class="field">
+                                {{ f.quantity }}
+                                {{ f.quantity.errors }}
+                            </div>
+
+                            <div class="field meter-cell">
+                                {{ f.manual_film_meter }}
+                                {{ f.manual_film_meter.errors }}
+                            </div>
+
+                            <div class="field">
+                                {{ f.unit_price }}
+                                {{ f.unit_price.errors }}
+                            </div>
+
+                            <div class="field">
+                                <input type="text" class="line-total-view" value="0.00" readonly>
+                            </div>
+
+                            <div class="remove-inline">
+                                <button type="button" class="trash-btn remove-row-btn" title="Remove row" aria-label="Remove row">🗑</button>
+                                {% if f.DELETE %}{{ f.DELETE.as_hidden }}{% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="qb-card">
+            <div class="qb-head" style="margin-bottom:16px;">
+                <div>
+                    <h2 class="qb-title" style="font-size:18px;">Payment Summary</h2>
+                    <div class="qb-sub">Quick invoice-style total calculation</div>
+                </div>
+            </div>
+
+            <div class="summary-layout">
+                <div class="summary-note">
+                    <div class="summary-note-title">Order Summary</div>
+                    <div class="summary-note-text">
+                        Review the totals before saving. After the order is created, you can add buttons on the detail page to download invoice as PNG or PDF.
+                    </div>
+                </div>
+
+                <div class="invoice-summary">
+                    <h3 class="invoice-summary-title">Invoice Total</h3>
+
+                    <div class="summary-line">
+                        <label>Items Total</label>
+                        <input type="text" id="items-total" value="0.00" readonly>
+                    </div>
+
+                    <div class="summary-line">
+                        <label>Discount</label>
+                        {{ form.discount_amount }}
+                    </div>
+
+                    <div class="summary-line">
+                        <label>Shipping</label>
+                        {{ form.shipping_fee }}
+                    </div>
+
+                    <div class="summary-line">
+                        <label>Deposit</label>
+                        <input type="number" step="0.01" name="deposit_amount" id="deposit-amount" value="{{ request.POST.deposit_amount|default:'0' }}">
+                    </div>
+
+                    <div class="summary-line">
+                        <label>Payment</label>
+                        <input type="number" step="0.01" name="paid_amount" id="paid-amount" value="{{ request.POST.paid_amount|default:'0' }}">
+                    </div>
+
+                    <div class="summary-total">
+                        <div class="summary-total-label">Total</div>
+                        <input type="text" id="amount-due" value="0.00" readonly>
+                    </div>
+                </div>
+            </div>
+
+            <div class="submit-row">
+                <button class="btn btn-primary" type="submit">Save Order</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<div id="image-preview-modal" class="image-preview-modal">
+    <div class="image-preview-box">
+        <button type="button" id="close-image-preview" class="image-preview-close">×</button>
+        <img id="modal-preview-image" src="" alt="Preview" class="image-preview-large">
+    </div>
+</div>
+
+<template id="empty-form-template">
+    <div class="item-row">
+        <div class="item-input-row">
+            <div class="field">
+                {{ formset.empty_form.item_mode }}
+            </div>
+
+            <div class="field">
+                {{ formset.empty_form.description }}
+            </div>
+
+            <div class="field shirt-item-cell">
+                {{ formset.empty_form.shirt_item }}
+            </div>
+
+            <div class="field film-item-cell" style="display:none;">
+                {{ formset.empty_form.film_item }}
+            </div>
+
+            <div class="field color-cell">
+                {{ formset.empty_form.color }}
+            </div>
+
+            <div class="field size-cell">
+                {{ formset.empty_form.size }}
+            </div>
+
+            <div class="field">
+                {{ formset.empty_form.quantity }}
+            </div>
+
+            <div class="field meter-cell">
+                {{ formset.empty_form.manual_film_meter }}
+            </div>
+
+            <div class="field">
+                {{ formset.empty_form.unit_price }}
+            </div>
+
+            <div class="field">
+                <input type="text" class="line-total-view" value="0.00" readonly>
+            </div>
+
+            <div class="remove-inline">
+                <button type="button" class="trash-btn remove-row-btn" title="Remove row" aria-label="Remove row">🗑</button>
+                {% if formset.empty_form.DELETE %}{{ formset.empty_form.DELETE.as_hidden }}{% endif %}
+            </div>
+        </div>
+    </div>
+</template>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const addRowBtn = document.getElementById("add-row-btn");
+    const itemsContainer = document.getElementById("items-container");
+    const template = document.getElementById("empty-form-template").innerHTML;
+    const designInput = document.querySelector('input[name="design_files"]');
+    const previewArea = document.getElementById("preview-area");
+    const dt = new DataTransfer();
+
+    const headerItemName = document.getElementById("header-item-name");
+    const headerColor = document.getElementById("header-color");
+    const headerSize = document.getElementById("header-size");
+    const headerMeter = document.getElementById("header-meter");
+
+    const imagePreviewModal = document.getElementById("image-preview-modal");
+    const modalPreviewImage = document.getElementById("modal-preview-image");
+    const closeImagePreviewBtn = document.getElementById("close-image-preview");
+
+    function getTotalFormsInput() {
+        return document.querySelector('[name$="-TOTAL_FORMS"]');
+    }
+
+    function num(v) {
+        const n = parseFloat(v);
+        return isNaN(n) ? 0 : n;
+    }
+
+    function openPreviewModal(src) {
+        modalPreviewImage.src = src;
+        imagePreviewModal.classList.add("show");
+    }
+
+    function closePreviewModal() {
+        imagePreviewModal.classList.remove("show");
+        modalPreviewImage.src = "";
+    }
+
+    function updateTotals() {
+        let itemsTotal = 0;
+
+        document.querySelectorAll(".item-row").forEach(row => {
+            const qtyInput = row.querySelector('input[name$="-quantity"]');
+            const unitPriceInput = row.querySelector('input[name$="-unit_price"]');
+            const lineTotalView = row.querySelector(".line-total-view");
+
+            const lineTotal = num(qtyInput?.value) * num(unitPriceInput?.value);
+            if (lineTotalView) lineTotalView.value = lineTotal.toFixed(2);
+            itemsTotal += lineTotal;
+        });
+
+        const itemsTotalEl = document.getElementById("items-total");
+        const discountEl = document.querySelector('input[name="discount_amount"]');
+        const shippingEl = document.querySelector('input[name="shipping_fee"]');
+        const depositEl = document.getElementById("deposit-amount");
+        const paidEl = document.getElementById("paid-amount");
+        const amountDueEl = document.getElementById("amount-due");
+
+        const grandTotal = itemsTotal - num(discountEl?.value) + num(shippingEl?.value);
+        const amountDue = grandTotal - num(depositEl?.value) - num(paidEl?.value);
+
+        if (itemsTotalEl) itemsTotalEl.value = itemsTotal.toFixed(2);
+        if (amountDueEl) amountDueEl.value = amountDue.toFixed(2);
+    }
+
+    function updateGlobalHeaders() {
+        const firstMode = document.querySelector('.item-row select[name$="-item_mode"]');
+        const isFilm = firstMode && firstMode.value === "FILM";
+
+        headerItemName.textContent = isFilm ? "Film Item" : "Cloth Item";
+        headerColor.textContent = isFilm ? "Width / Type" : "Color";
+        headerSize.textContent = isFilm ? "Variant" : "Size";
+        headerMeter.textContent = isFilm ? "Used Meter" : "Film Meter";
+    }
+
+    function toggleRowMode(row) {
+        const modeSelect = row.querySelector('select[name$="-item_mode"]');
+        const shirtCell = row.querySelector(".shirt-item-cell");
+        const filmCell = row.querySelector(".film-item-cell");
+
+        function applyMode() {
+            if (!modeSelect) return;
+            const isFilm = modeSelect.value === "FILM";
+
+            if (shirtCell) shirtCell.style.display = isFilm ? "none" : "";
+            if (filmCell) filmCell.style.display = isFilm ? "" : "none";
+
+            updateGlobalHeaders();
+        }
+
+        if (modeSelect) {
+            modeSelect.addEventListener("change", applyMode);
+            applyMode();
+        }
+    }
+
+    function bindRowEvents(row) {
+        toggleRowMode(row);
+
+        row.querySelectorAll('input[name$="-quantity"], input[name$="-unit_price"]').forEach(el => {
+            el.addEventListener("input", updateTotals);
+        });
+
+        const removeBtn = row.querySelector(".remove-row-btn");
+        if (removeBtn) {
+            removeBtn.addEventListener("click", function () {
+                const rows = document.querySelectorAll(".item-row");
+                if (rows.length <= 1) return;
+
+                row.remove();
+                reindexForms();
+                updateGlobalHeaders();
+                updateTotals();
+            });
+        }
+    }
+
+    function reindexForms() {
+        const rows = document.querySelectorAll("#items-container .item-row");
+        const totalInput = getTotalFormsInput();
+
+        rows.forEach((row, index) => {
+            row.querySelectorAll("input, select, textarea, label, button").forEach(el => {
+                ["name", "id", "for"].forEach(attr => {
+                    if (el.hasAttribute && el.hasAttribute(attr)) {
+                        const current = el.getAttribute(attr);
+                        if (current) {
+                            el.setAttribute(
+                                attr,
+                                current
+                                    .replace(/orderitem_set-\d+-/g, `orderitem_set-${index}-`)
+                                    .replace(/__prefix__/g, index)
+                            );
+                        }
+                    }
+                });
+            });
+        });
+
+        if (totalInput) totalInput.value = rows.length;
+    }
+
+    function renderPreview() {
+        previewArea.innerHTML = "";
+        Array.from(dt.files).forEach((file, index) => {
+            if (!file.type.startsWith("image/")) return;
+
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                const box = document.createElement("div");
+                box.className = "preview-card";
+                box.innerHTML = `
+                    <button type="button" class="preview-open-btn" data-src="${e.target.result}">
+                        <img src="${e.target.result}" alt="">
+                    </button>
+                    <div class="preview-meta">
+                        <span class="preview-name">${file.name}</span>
+                        <button type="button" data-index="${index}" class="preview-remove">x</button>
+                    </div>
+                `;
+                previewArea.appendChild(box);
+
+                previewArea.querySelectorAll(".preview-remove").forEach(btn => {
+                    btn.onclick = function () {
+                        const removeIndex = parseInt(this.dataset.index, 10);
+                        const newDt = new DataTransfer();
+                        Array.from(dt.files).forEach((f, i) => {
+                            if (i !== removeIndex) newDt.items.add(f);
+                        });
+                        dt.items.clear();
+                        Array.from(newDt.files).forEach(f => dt.items.add(f));
+                        designInput.files = dt.files;
+                        renderPreview();
+                    };
+                });
+
+                previewArea.querySelectorAll(".preview-open-btn").forEach(btn => {
+                    btn.onclick = function () {
+                        openPreviewModal(this.dataset.src);
+                    };
+                });
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    addRowBtn.addEventListener("click", function () {
+        const totalInput = getTotalFormsInput();
+        const formIndex = parseInt(totalInput.value, 10);
+        const html = template.replace(/__prefix__/g, formIndex);
+        itemsContainer.insertAdjacentHTML("beforeend", html);
+        totalInput.value = formIndex + 1;
+
+        const newRow = itemsContainer.lastElementChild;
+        bindRowEvents(newRow);
+        updateGlobalHeaders();
+        updateTotals();
+    });
+
+    document.querySelectorAll(".item-row").forEach(bindRowEvents);
+
+    document.querySelectorAll(
+        'input[name="discount_amount"], input[name="shipping_fee"], #deposit-amount, #paid-amount'
+    ).forEach(el => {
+        el.addEventListener("input", updateTotals);
+    });
+
+    if (designInput) {
+        designInput.addEventListener("change", function () {
+            Array.from(this.files).forEach(file => dt.items.add(file));
+            designInput.files = dt.files;
+            renderPreview();
+        });
+    }
+
+    if (closeImagePreviewBtn) {
+        closeImagePreviewBtn.addEventListener("click", closePreviewModal);
+    }
+
+    if (imagePreviewModal) {
+        imagePreviewModal.addEventListener("click", function (e) {
+            if (e.target === imagePreviewModal) {
+                closePreviewModal();
+            }
+        });
+    }
+
+    document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape") {
+            closePreviewModal();
+        }
+    });
+
+    updateGlobalHeaders();
+    updateTotals();
+});
+</script>
+{% endblock %}

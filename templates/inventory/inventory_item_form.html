@@ -1,0 +1,334 @@
+{% extends "base.html" %}
+
+{% block page_title %}{{ page_title|default:"Create Item" }}{% endblock %}
+{% block page_subtitle %}Create inventory item and choose shirt style template{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+  <div class="page-head">
+    <div>
+      <h1>{{ page_title|default:"Create Item" }}</h1>
+      <p class="sub">Create inventory item and choose shirt style template.</p>
+    </div>
+
+    <div class="page-head-actions">
+      <a href="{% url 'inventory_item_list' %}" class="btn-secondary">Item List</a>
+    </div>
+  </div>
+
+  <div class="form-card">
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+        <div class="alert alert-danger">
+          {{ form.non_field_errors }}
+        </div>
+      {% endif %}
+
+      <div class="field">
+        <label for="{{ form.name.id_for_label }}">Item Name</label>
+        {{ form.name }}
+        {% for e in form.name.errors %}<div class="error">{{ e }}</div>{% endfor %}
+      </div>
+
+      <div class="field">
+        <label for="{{ form.sample_style.id_for_label }}">Shirt Style</label>
+        {{ form.sample_style }}
+        {% for e in form.sample_style.errors %}<div class="error">{{ e }}</div>{% endfor %}
+      </div>
+
+      <div class="preview-panel">
+        <div class="preview-title">Style Preview</div>
+
+        <div class="shirt-preview-card">
+          <div id="stylePreview" class="shirt-preview style-OVERSIZE">
+            <svg viewBox="0 0 220 220" class="shirt-svg" aria-hidden="true">
+              <path class="shape shape-oversize" d="M55 48 L82 30 L138 30 L165 48 L190 83 L170 96 L160 78 L160 190 L60 190 L60 78 L50 96 L30 83 Z"></path>
+              <path class="shape shape-polo" d="M65 46 L88 28 L132 28 L155 46 L178 80 L160 92 L150 74 L150 190 L70 190 L70 74 L60 92 L42 80 Z"></path>
+              <path class="collar collar-polo" d="M92 30 L110 48 L128 30 L118 62 L102 62 Z"></path>
+              <path class="shape shape-boxy" d="M48 58 L75 34 L145 34 L172 58 L188 86 L168 97 L158 80 L158 175 L62 175 L62 80 L52 97 L32 86 Z"></path>
+            </svg>
+          </div>
+
+          <div class="preview-labels">
+            <span class="badge-soft">Oversize</span>
+            <span class="badge-soft">Polo</span>
+            <span class="badge-soft">Boxy</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Status</label>
+
+        <div class="status-choice-wrap">
+          {{ form.is_active }}
+
+          <button type="button" id="activeBtn" class="status-btn active-state">
+            Active
+          </button>
+
+          <button type="button" id="inactiveBtn" class="status-btn inactive-state">
+            Inactive
+          </button>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button type="submit" class="btn-primary">{{ submit_label|default:"Save Item" }}</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  .page-wrap{
+    max-width:980px;
+    margin:24px auto;
+    padding:0 16px;
+  }
+
+  .page-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:16px;
+    flex-wrap:wrap;
+  }
+
+  .page-head h1{
+    margin:0;
+    font-size:32px;
+    font-weight:800;
+  }
+
+  .sub{
+    margin-top:6px;
+    color:#6b7280;
+  }
+
+  .page-head-actions{
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+
+  .form-card{
+    margin-top:20px;
+    background:#fff;
+    border:1px solid #e5e7eb;
+    border-radius:24px;
+    padding:24px;
+    box-shadow:0 10px 30px rgba(0,0,0,.05);
+  }
+
+  .field{
+    margin-bottom:16px;
+  }
+
+  .field label{
+    display:block;
+    margin-bottom:8px;
+    font-weight:700;
+    color:#111827;
+  }
+
+  .form-control,
+  .form-select{
+    width:100%;
+    height:46px;
+    border:1px solid #d1d5db;
+    border-radius:14px;
+    padding:0 14px;
+    background:#fff;
+  }
+
+  .form-control:focus,
+  .form-select:focus{
+    outline:none;
+    border-color:#111827;
+  }
+
+  .preview-panel{
+    margin:22px 0;
+    padding:20px;
+    border-radius:20px;
+    background:#f8fafc;
+    border:1px solid #e5e7eb;
+  }
+
+  .preview-title{
+    font-size:14px;
+    font-weight:800;
+    color:#374151;
+    margin-bottom:12px;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+  }
+
+  .shirt-preview-card{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    padding:18px;
+    border-radius:20px;
+    background:#fff;
+    border:1px solid #e5e7eb;
+  }
+
+  .shirt-preview{
+    width:220px;
+    height:220px;
+  }
+
+  .shirt-svg{
+    width:100%;
+    height:100%;
+  }
+
+  .shape,
+  .collar{
+    display:none;
+    fill:#111827;
+  }
+
+  .style-OVERSIZE .shape-oversize{
+    display:block;
+  }
+
+  .style-POLO .shape-polo,
+  .style-POLO .collar-polo{
+    display:block;
+  }
+
+  .style-BOXY .shape-boxy{
+    display:block;
+  }
+
+  .style-POLO .collar-polo{
+    fill:#e5e7eb;
+  }
+
+  .preview-labels{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    margin-top:10px;
+  }
+
+  .badge-soft{
+    padding:6px 10px;
+    border-radius:999px;
+    background:#f3f4f6;
+    color:#374151;
+    font-size:12px;
+    font-weight:700;
+  }
+
+  .status-choice-wrap{
+    display:flex;
+    gap:10px;
+    align-items:center;
+    flex-wrap:wrap;
+  }
+
+  .status-choice-wrap input[type="checkbox"]{
+    display:none;
+  }
+
+  .status-btn{
+    min-width:120px;
+    height:46px;
+    border-radius:14px;
+    border:1px solid #d1d5db;
+    background:#fff;
+    color:#374151;
+    font-weight:800;
+    cursor:pointer;
+    transition:.2s ease;
+    padding:0 18px;
+  }
+
+  .status-btn:hover{
+    transform:translateY(-1px);
+  }
+
+  .status-btn.is-selected.active-state{
+    background:#166534;
+    border-color:#166534;
+    color:#fff;
+    box-shadow:0 8px 20px rgba(22,101,52,.18);
+  }
+
+  .status-btn.is-selected.inactive-state{
+    background:#475569;
+    border-color:#475569;
+    color:#fff;
+    box-shadow:0 8px 20px rgba(71,85,105,.16);
+  }
+
+  .actions{
+    margin-top:10px;
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    justify-content:flex-end;
+  }
+
+  .error{
+    margin-top:6px;
+    color:#dc2626;
+    font-size:13px;
+  }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  (function(){
+    const select = document.getElementById("{{ form.sample_style.id_for_label }}");
+    const preview = document.getElementById("stylePreview");
+
+    if (select && preview) {
+      function updatePreview() {
+        preview.className = "shirt-preview style-" + select.value;
+      }
+
+      select.addEventListener("change", updatePreview);
+      updatePreview();
+    }
+
+    const hiddenCheckbox = document.getElementById("{{ form.is_active.id_for_label }}");
+    const activeBtn = document.getElementById("activeBtn");
+    const inactiveBtn = document.getElementById("inactiveBtn");
+
+    if (hiddenCheckbox && activeBtn && inactiveBtn) {
+      function syncStatus() {
+        if (hiddenCheckbox.checked) {
+          activeBtn.classList.add("is-selected");
+          inactiveBtn.classList.remove("is-selected");
+        } else {
+          inactiveBtn.classList.add("is-selected");
+          activeBtn.classList.remove("is-selected");
+        }
+      }
+
+      activeBtn.addEventListener("click", function(){
+        hiddenCheckbox.checked = true;
+        syncStatus();
+      });
+
+      inactiveBtn.addEventListener("click", function(){
+        hiddenCheckbox.checked = false;
+        syncStatus();
+      });
+
+      syncStatus();
+    }
+  })();
+</script>
+{% endblock %}

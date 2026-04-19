@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Niron Login</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <style>
+        :root{
+            --bg-1:#fff9ea;
+            --bg-2:#f9edd2;
+            --bg-3:#efd9b3;
+            --bg-4:#ddb88c;
+            --bg-5:#bf9166;
+
+            --text:#382a20;
+            --muted:#7d6a58;
+            --white:#ffffff;
+
+            --card-bg:rgba(255,255,255,.28);
+            --card-border:rgba(255,255,255,.48);
+            --card-shadow:0 30px 80px rgba(105,74,41,.16);
+
+            --input-bg:rgba(255,255,255,.58);
+            --input-border:rgba(185,146,107,.22);
+
+            --brand:#9e7957;
+            --brand-dark:#7f6147;
+            --brand-soft:#f5e4ca;
+
+            --btn:#f0b31b;
+            --btn-hover:#dd9f12;
+
+            --danger-bg:rgba(190,72,59,.14);
+            --danger-text:#9c352b;
+        }
+
+        *{
+            box-sizing:border-box;
+        }
+
+        html,body{
+            margin:0;
+            min-height:100%;
+            font-family:Inter, "Segoe UI", Arial, sans-serif;
+        }
+
+        body{
+            overflow:hidden;
+            background:
+                radial-gradient(circle at 10% 18%, rgba(255,255,255,.72), transparent 22%),
+                radial-gradient(circle at 88% 12%, rgba(255,255,255,.38), transparent 18%),
+                radial-gradient(circle at 16% 86%, rgba(255,240,213,.72), transparent 22%),
+                radial-gradient(circle at 88% 82%, rgba(214,171,120,.22), transparent 18%),
+                linear-gradient(135deg, var(--bg-1) 0%, var(--bg-2) 32%, var(--bg-3) 67%, var(--bg-4) 100%);
+            position:relative;
+        }
+
+        .scene{
+            position:relative;
+            min-height:100vh;
+            display:grid;
+            place-items:center;
+            padding:28px;
+            overflow:hidden;
+            isolation:isolate;
+        }
+
+        .back-circle{
+            position:absolute;
+            border-radius:50%;
+            border:1px solid rgba(255,255,255,.18);
+            z-index:0;
+            animation:spinSlow 18s linear infinite;
+        }
+
+        .back-circle.one{
+            width:420px;
+            height:420px;
+            left:-120px;
+            top:-60px;
+        }
+
+        .back-circle.two{
+            width:320px;
+            height:320px;
+            right:70px;
+            bottom:-60px;
+            animation-direction:reverse;
+        }
+
+        .back-circle::before{
+            content:"";
+            position:absolute;
+            inset:24px;
+            border-radius:50%;
+            border:1px solid rgba(255,255,255,.12);
+        }
+
+        .stripe-ball{
+            position:absolute;
+            width:118px;
+            height:118px;
+            border-radius:50%;
+            opacity:.18;
+            background:
+                repeating-linear-gradient(
+                    180deg,
+                    rgba(255,255,255,.92) 0 3px,
+                    transparent 3px 9px
+                );
+            z-index:0;
+            animation:floatMini 8s ease-in-out infinite alternate;
+        }
+
+        .stripe-ball.left{
+            left:72px;
+            top:88px;
+        }
+
+        .stripe-ball.right{
+            right:88px;
+            top:74px;
+            animation-delay:1s;
+        }
+
+        .stripe-ball.bottom{
+            right:112px;
+            bottom:76px;
+            animation-delay:1.5s;
+        }
+
+        .blob{
+            position:absolute;
+            filter:blur(1px);
+            z-index:0;
+            animation-timing-function:ease-in-out;
+            animation-iteration-count:infinite;
+            animation-direction:alternate;
+        }
+
+        .blob-a{
+            width:430px;
+            height:300px;
+            left:8%;
+            top:14%;
+            border-radius:52% 48% 60% 40% / 44% 44% 56% 56%;
+            background:linear-gradient(135deg, #b8e6ff 0%, #9fd4ff 40%, #f8d9a9 100%);
+            opacity:.95;
+            animation:floatA 8s infinite;
+        }
+
+        .blob-b{
+            width:260px;
+            height:200px;
+            right:18%;
+            top:20%;
+            border-radius:46% 54% 43% 57% / 62% 41% 59% 38%;
+            background:linear-gradient(135deg, rgba(255,255,255,.78), rgba(255,255,255,.22));
+            opacity:.85;
+            backdrop-filter:blur(8px);
+            animation:floatB 9s infinite;
+        }
+
+        .blob-c{
+            width:300px;
+            height:220px;
+            left:12%;
+            bottom:10%;
+            border-radius:60% 40% 54% 46% / 45% 57% 43% 55%;
+            background:linear-gradient(135deg, #fffdf6 0%, #f3e2c0 55%, #dcb17b 100%);
+            opacity:.78;
+            animation:floatC 7s infinite;
+        }
+
+        .blob-d{
+            width:280px;
+            height:220px;
+            right:10%;
+            bottom:16%;
+            border-radius:42% 58% 62% 38% / 52% 42% 58% 48%;
+            background:linear-gradient(135deg, #f7dfba 0%, #d9af7f 48%, #a97a56 100%);
+            opacity:.72;
+            animation:floatD 10s infinite;
+        }
+
+        .orb{
+            position:absolute;
+            border-radius:50%;
+            z-index:0;
+            box-shadow:
+                inset -8px -12px 20px rgba(0,0,0,.12),
+                inset 10px 10px 18px rgba(255,255,255,.26),
+                0 14px 24px rgba(0,0,0,.12);
+            animation:orbFloat 6s ease-in-out infinite alternate;
+        }
+
+        .orb-1{
+            width:84px;height:84px;left:38%;top:14%;
+            background:radial-gradient(circle at 30% 30%, #d9f1ff, #6bc5ee 58%, #9e7957 100%);
+        }
+
+        .orb-2{
+            width:46px;height:46px;left:56%;top:15%;
+            background:radial-gradient(circle at 30% 30%, #fff8dd, #f0c97e 58%, #9e7957 100%);
+            animation-delay:.9s;
+        }
+
+        .orb-3{
+            width:72px;height:72px;right:26%;top:26%;
+            background:radial-gradient(circle at 30% 30%, #d9f1ff, #8cbcff 56%, #9e7957 100%);
+            animation-delay:1.3s;
+        }
+
+        .orb-4{
+            width:90px;height:90px;right:8%;bottom:24%;
+            background:radial-gradient(circle at 30% 30%, #ffe3bc, #d69d68 56%, #8f6447 100%);
+            animation-delay:.3s;
+        }
+
+        .orb-5{
+            width:54px;height:54px;left:9%;bottom:26%;
+            background:radial-gradient(circle at 30% 30%, #d8f2ff, #67c6ee 56%, #9e7957 100%);
+            animation-delay:1.8s;
+        }
+
+        .orb-6{
+            width:36px;height:36px;left:34%;bottom:10%;
+            background:radial-gradient(circle at 30% 30%, #fff6db, #efc77c 55%, #9e7957 100%);
+            animation-delay:2.4s;
+        }
+
+        .login-card{
+            position:relative;
+            z-index:2;
+            width:100%;
+            max-width:760px;
+            min-height:520px;
+            border-radius:34px;
+            background:var(--card-bg);
+            border:1px solid var(--card-border);
+            backdrop-filter:blur(18px);
+            -webkit-backdrop-filter:blur(18px);
+            box-shadow:var(--card-shadow);
+            overflow:hidden;
+        }
+
+        .login-card::before{
+            content:"";
+            position:absolute;
+            inset:0;
+            background:
+                linear-gradient(135deg, rgba(255,255,255,.22), transparent 28%, transparent 72%, rgba(255,255,255,.08));
+            pointer-events:none;
+        }
+
+        .shine{
+            content:"";
+            position:absolute;
+            inset:-40% auto auto -20%;
+            width:220px;
+            height:180%;
+            transform:rotate(18deg);
+            background:linear-gradient(90deg, transparent, rgba(255,255,255,.22), transparent);
+            animation:shineMove 7s linear infinite;
+            pointer-events:none;
+            z-index:1;
+        }
+
+        .card-grid{
+            position:relative;
+            z-index:2;
+            display:grid;
+            grid-template-columns: 1.05fr .95fr;
+            min-height:520px;
+        }
+
+        .left-pane{
+            padding:38px 34px 34px;
+            display:flex;
+            flex-direction:column;
+            justify-content:space-between;
+            border-right:1px solid rgba(255,255,255,.14);
+        }
+
+        .right-pane{
+            padding:40px 34px 34px;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+        }
+
+        .brand-top{
+            display:flex;
+            align-items:center;
+            gap:12px;
+        }
+
+        .logo-box{
+            width:48px;
+            height:48px;
+            border-radius:14px;
+            background:linear-gradient(135deg, #c79f74, #9e7957);
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            color:#fff;
+            font-size:20px;
+            font-weight:900;
+            box-shadow:0 10px 18px rgba(158,121,87,.22);
+        }
+
+        .brand-name{
+            font-size:18px;
+            font-weight:900;
+            color:var(--text);
+            line-height:1.1;
+        }
+
+        .brand-sub{
+            font-size:11px;
+            letter-spacing:.18em;
+            text-transform:uppercase;
+            color:var(--brand);
+            margin-top:4px;
+        }
+
+        .tag{
+            display:inline-flex;
+            align-items:center;
+            gap:8px;
+            padding:8px 14px;
+            border-radius:999px;
+            background:rgba(255,255,255,.44);
+            border:1px solid rgba(158,121,87,.14);
+            color:var(--brand-dark);
+            font-size:12px;
+            font-weight:800;
+            margin-top:22px;
+            text-transform:uppercase;
+            letter-spacing:.06em;
+        }
+
+        .tag-dot{
+            width:8px;
+            height:8px;
+            border-radius:50%;
+            background:#5f9b6f;
+            box-shadow:0 0 0 5px rgba(95,155,111,.12);
+        }
+
+        .headline{
+            margin:22px 0 0;
+            font-size:52px;
+            line-height:1.02;
+            letter-spacing:-.05em;
+            font-weight:900;
+            color:var(--text);
+            max-width:360px;
+        }
+
+        .headline .accent{
+            color:var(--brand);
+        }
+
+        .desc{
+            margin-top:18px;
+            max-width:380px;
+            color:var(--muted);
+            font-size:15px;
+            line-height:1.75;
+        }
+
+        .feature-list{
+            display:grid;
+            gap:12px;
+            margin-top:28px;
+        }
+
+        .feature{
+            background:rgba(255,255,255,.42);
+            border:1px solid rgba(158,121,87,.10);
+            border-radius:20px;
+            padding:15px 16px;
+        }
+
+        .feature-title{
+            margin:0 0 6px;
+            font-size:15px;
+            font-weight:800;
+            color:var(--text);
+        }
+
+        .feature-text{
+            margin:0;
+            color:var(--muted);
+            font-size:13px;
+            line-height:1.6;
+        }
+
+        .login-panel{
+            width:100%;
+            max-width:320px;
+        }
+
+        .panel-top{
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap:12px;
+            margin-bottom:12px;
+        }
+
+        .panel-mini{
+            display:flex;
+            align-items:center;
+            gap:10px;
+        }
+
+        .panel-logo{
+            width:40px;
+            height:40px;
+            border-radius:12px;
+            background:linear-gradient(135deg, #d2aa81, #9e7957);
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            color:#fff;
+            font-size:17px;
+            font-weight:900;
+        }
+
+        .panel-mini-title{
+            font-size:15px;
+            font-weight:900;
+            color:var(--text);
+            line-height:1.1;
+        }
+
+        .panel-mini-sub{
+            font-size:12px;
+            color:var(--muted);
+            margin-top:3px;
+        }
+
+        .secure-pill{
+            padding:7px 12px;
+            border-radius:999px;
+            background:rgba(255,255,255,.45);
+            border:1px solid rgba(158,121,87,.14);
+            color:var(--brand-dark);
+            font-size:11px;
+            font-weight:800;
+        }
+
+        .title{
+            margin:12px 0 8px;
+            font-size:42px;
+            line-height:1.04;
+            letter-spacing:-.04em;
+            color:var(--text);
+            font-weight:900;
+        }
+
+        .text{
+            margin:0 0 18px;
+            color:var(--muted);
+            font-size:14px;
+            line-height:1.7;
+        }
+
+        .field{
+            margin-bottom:14px;
+        }
+
+        .field label{
+            display:block;
+            margin-bottom:7px;
+            color:var(--muted);
+            font-size:12px;
+            font-weight:800;
+            text-transform:uppercase;
+            letter-spacing:.07em;
+        }
+
+        .field input{
+            width:100%;
+            height:52px;
+            border-radius:16px;
+            border:1px solid var(--input-border);
+            background:var(--input-bg);
+            color:var(--text);
+            padding:0 16px;
+            font-size:15px;
+            outline:none;
+            transition:.22s ease;
+        }
+
+        .field input::placeholder{
+            color:#a69280;
+        }
+
+        .field input:focus{
+            border-color:rgba(158,121,87,.34);
+            box-shadow:0 0 0 4px rgba(158,121,87,.08);
+            transform:translateY(-1px);
+        }
+
+        .meta{
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap:10px;
+            font-size:12px;
+            color:var(--muted);
+            margin:2px 0 16px;
+        }
+
+        .remember{
+            display:flex;
+            align-items:center;
+            gap:8px;
+        }
+
+        .remember input{
+            width:15px;
+            height:15px;
+            accent-color:var(--brand);
+        }
+
+        .forgot{
+            text-decoration:none;
+            color:var(--brand-dark);
+            font-weight:800;
+        }
+
+        .forgot:hover{
+            text-decoration:underline;
+        }
+
+        .login-btn{
+            width:100%;
+            height:56px;
+            border:none;
+            border-radius:18px;
+            background:linear-gradient(180deg, #f4bf26, #f0b31b);
+            color:#fff;
+            font-size:18px;
+            font-weight:900;
+            cursor:pointer;
+            box-shadow:0 16px 28px rgba(240,179,27,.18);
+            transition:.22s ease;
+        }
+
+        .login-btn:hover{
+            transform:translateY(-1px);
+            background:linear-gradient(180deg, #f6c839, #e4a313);
+        }
+
+        .footer-note{
+            margin-top:16px;
+            padding-top:16px;
+            border-top:1px solid rgba(158,121,87,.12);
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap:10px;
+            color:var(--muted);
+            font-size:12px;
+            font-weight:700;
+        }
+
+        .alert{
+            border-radius:14px;
+            padding:12px 14px;
+            margin-bottom:14px;
+            font-size:13px;
+            line-height:1.55;
+        }
+
+        .alert-danger{
+            background:var(--danger-bg);
+            color:var(--danger-text);
+            border:1px solid rgba(156,53,43,.12);
+        }
+
+        .field-error{
+            margin-top:6px;
+            color:var(--danger-text);
+            font-size:12px;
+            font-weight:700;
+        }
+
+        @keyframes floatA{
+            0%{transform:translate(0,0) rotate(0deg)}
+            100%{transform:translate(22px,-14px) rotate(8deg)}
+        }
+
+        @keyframes floatB{
+            0%{transform:translate(0,0)}
+            100%{transform:translate(-20px,14px)}
+        }
+
+        @keyframes floatC{
+            0%{transform:translate(0,0)}
+            100%{transform:translate(18px,-16px)}
+        }
+
+        @keyframes floatD{
+            0%{transform:translate(0,0)}
+            100%{transform:translate(-24px,18px)}
+        }
+
+        @keyframes orbFloat{
+            0%{transform:translateY(0) scale(1)}
+            100%{transform:translateY(-14px) scale(1.05)}
+        }
+
+        @keyframes spinSlow{
+            0%{transform:rotate(0deg)}
+            100%{transform:rotate(360deg)}
+        }
+
+        @keyframes floatMini{
+            0%{transform:translateY(0)}
+            100%{transform:translateY(-10px)}
+        }
+
+        @keyframes shineMove{
+            0%{transform:translateX(-180%) rotate(18deg)}
+            100%{transform:translateX(520%) rotate(18deg)}
+        }
+
+        @media (max-width: 980px){
+            body{
+                overflow:auto;
+            }
+
+            .scene{
+                padding:18px;
+            }
+
+            .login-card{
+                max-width:560px;
+                min-height:auto;
+            }
+
+            .card-grid{
+                grid-template-columns:1fr;
+            }
+
+            .left-pane{
+                border-right:none;
+                border-bottom:1px solid rgba(255,255,255,.14);
+            }
+
+            .headline{
+                font-size:40px;
+                max-width:none;
+            }
+
+            .right-pane{
+                padding-top:28px;
+            }
+        }
+
+        @media (max-width: 640px){
+            .blob,.orb,.back-circle,.stripe-ball{
+                display:none;
+            }
+
+            .login-card{
+                border-radius:24px;
+            }
+
+            .left-pane,
+            .right-pane{
+                padding:24px 20px;
+            }
+
+            .title{
+                font-size:34px;
+            }
+
+            .headline{
+                font-size:34px;
+            }
+
+            .footer-note,
+            .meta,
+            .panel-top{
+                flex-direction:column;
+                align-items:flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="scene">
+        <div class="back-circle one"></div>
+        <div class="back-circle two"></div>
+
+        <div class="stripe-ball left"></div>
+        <div class="stripe-ball right"></div>
+        <div class="stripe-ball bottom"></div>
+
+        <div class="blob blob-a"></div>
+        <div class="blob blob-b"></div>
+        <div class="blob blob-c"></div>
+        <div class="blob blob-d"></div>
+
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+        <div class="orb orb-4"></div>
+        <div class="orb orb-5"></div>
+        <div class="orb orb-6"></div>
+
+        <div class="login-card">
+            <div class="shine"></div>
+
+            <div class="card-grid">
+                <div class="left-pane">
+                    <div>
+                        <div class="brand-top">
+                            <div class="logo-box">N</div>
+                            <div>
+                                <div class="brand-name">Niron</div>
+                                <div class="brand-sub">Custom Printing</div>
+                            </div>
+                        </div>
+
+                        <div class="tag">
+                            <span class="tag-dot"></span>
+                            Internal Staff Access
+                        </div>
+
+                        <h1 class="headline">
+                            Smarter access for <span class="accent">inventory, production, expense,</span> and daily workflow.
+                        </h1>
+
+                        <div class="desc">
+                            Secure login for Niron staff. Manage tshirt inventory, film materials, cutting, print jobs, expenses, and reports in one clean system.
+                        </div>
+                    </div>
+
+                    <div class="feature-list">
+                        <div class="feature">
+                            <h3 class="feature-title">Inventory Control</h3>
+                            <p class="feature-text">Track finished tshirts, stock in, and inventory adjustment in one place.</p>
+                        </div>
+
+                        <div class="feature">
+                            <h3 class="feature-title">Production Flow</h3>
+                            <p class="feature-text">Manage tshirt production and print job workflow more clearly.</p>
+                        </div>
+
+                        <div class="feature">
+                            <h3 class="feature-title">Expense & Dashboard</h3>
+                            <p class="feature-text">Keep batch cost, salary, and operational expense organized with reports.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="right-pane">
+                    <div class="login-panel">
+                        <div class="panel-top">
+                            <div class="panel-mini">
+                                <div class="panel-logo">N</div>
+                                <div>
+                                    <div class="panel-mini-title">Niron</div>
+                                    <div class="panel-mini-sub">Staff Login</div>
+                                </div>
+                            </div>
+
+                            <div class="secure-pill">Secure Login</div>
+                        </div>
+
+                        <h2 class="title">Welcome back</h2>
+                        <p class="text">
+                            Sign in to continue to the internal Niron management system.
+                        </p>
+
+                        <form method="post">
+                            {% csrf_token %}
+
+                            {% if form.non_field_errors %}
+                                <div class="alert alert-danger">
+                                    {{ form.non_field_errors }}
+                                </div>
+                            {% endif %}
+
+                            <div class="field">
+                                <label for="{{ form.username.id_for_label }}">Username</label>
+                                {{ form.username }}
+                                {% for e in form.username.errors %}
+                                    <div class="field-error">{{ e }}</div>
+                                {% endfor %}
+                            </div>
+
+                            <div class="field">
+                                <label for="{{ form.password.id_for_label }}">Password</label>
+                                {{ form.password }}
+                                {% for e in form.password.errors %}
+                                    <div class="field-error">{{ e }}</div>
+                                {% endfor %}
+                            </div>
+
+                            <div class="meta">
+                                <label class="remember">
+                                    <input type="checkbox" name="remember_me">
+                                    <span>Remember me</span>
+                                </label>
+
+                                <a href="#" class="forgot">Forgot password?</a>
+                            </div>
+
+                            <button type="submit" class="login-btn">Login to System</button>
+                        </form>
+
+                        <div class="footer-note">
+                            <span>Module: Internal System</span>
+                            <span>Status: Active</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

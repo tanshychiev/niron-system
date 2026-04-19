@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}User List{% endblock %}
+{% block page_title %}User List{% endblock %}
+{% block page_subtitle %}Manage users and roles{% endblock %}
+
+{% block content %}
+<div class="top-actions">
+  <a href="{% url 'user_create' %}" class="btn-primary">+ Create User</a>
+</div>
+
+<div class="table-card">
+  <table class="app-table">
+    <thead>
+      <tr>
+        <th>Username</th>
+        <th>Name</th>
+        <th>Email</th>
+        <th>Groups</th>
+        <th>Active</th>
+        <th>Edit</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in users %}
+        <tr>
+          <td>{{ u.username }}</td>
+          <td>{{ u.first_name }} {{ u.last_name }}</td>
+          <td>{{ u.email|default:"-" }}</td>
+          <td>
+            {% for g in u.groups.all %}
+              {{ g.name }}{% if not forloop.last %}, {% endif %}
+            {% empty %}
+              -
+            {% endfor %}
+          </td>
+          <td>{% if u.is_active %}Yes{% else %}No{% endif %}</td>
+          <td>
+            <a href="{% url 'user_edit' u.id %}" class="btn-light">Edit</a>
+          </td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="6">No users found.</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
