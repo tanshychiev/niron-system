@@ -1,5 +1,4 @@
 from django.contrib import admin
-
 from .models import Expense
 
 
@@ -9,9 +8,10 @@ class ExpenseAdmin(admin.ModelAdmin):
         "id",
         "created_at",
         "expense_type",
-        "display_title",
         "amount",
         "created_by",
+        "batch",
+        "category",
     )
     list_filter = ("expense_type", "category", "created_at")
-    search_fields = ("note", "batch_label", "batch_ref", "created_by__username")
+    search_fields = ("note", "created_by__username")

@@ -1,0 +1,255 @@
+{% extends "base.html" %}
+
+{% block title %}Create Batch Expense{% endblock %}
+{% block page_title %}Create Batch Expense{% endblock %}
+{% block page_subtitle %}Select batch and auto calculate expense{% endblock %}
+{% block topbar_title %}Finance{% endblock %}
+{% block topbar_subtitle %}Create batch expense record{% endblock %}
+
+{% block content %}
+<style>
+    .form-shell {
+        max-width: 860px;
+        margin: 0 auto;
+    }
+
+    .expense-form-card {
+        background: rgba(255,255,255,.90);
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        box-shadow: var(--shadow);
+        padding: 28px;
+    }
+
+    .form-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 14px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+
+    .form-head h3 {
+        margin: 0;
+        font-size: 26px;
+        font-weight: 800;
+    }
+
+    .field-row {
+        margin-bottom: 16px;
+    }
+
+    .field-label {
+        display: block;
+        font-size: 12px;
+        font-weight: 800;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: .8px;
+        margin-bottom: 8px;
+    }
+
+    .detail-box {
+        margin-top: 20px;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 18px;
+        background: #fffdf8;
+    }
+
+    .detail-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 14px 18px;
+    }
+
+    .detail-item {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: white;
+        padding: 14px;
+    }
+
+    .detail-title {
+        font-size: 12px;
+        color: var(--muted);
+        font-weight: 800;
+        text-transform: uppercase;
+        margin-bottom: 6px;
+    }
+
+    .detail-value {
+        font-size: 18px;
+        font-weight: 800;
+        color: var(--text);
+    }
+
+    .detail-total {
+        margin-top: 14px;
+        border: 1px solid #f2d089;
+        background: #fff5de;
+        border-radius: 16px;
+        padding: 16px 18px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .detail-total-label {
+        font-size: 14px;
+        font-weight: 800;
+        color: #8a5a00;
+        text-transform: uppercase;
+    }
+
+    .detail-total-value {
+        font-size: 26px;
+        font-weight: 900;
+        color: #b06c00;
+    }
+
+    .submit-row {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        margin-top: 22px;
+        flex-wrap: wrap;
+    }
+
+    @media (max-width: 700px) {
+        .detail-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<div class="form-shell">
+    <div class="expense-form-card">
+        <div class="form-head">
+            <div>
+                <h3>Create Batch Expense</h3>
+                <p style="margin:8px 0 0; color:var(--muted);">Select batch, see detail, and save auto total.</p>
+            </div>
+            <a href="{% url back_url %}" class="btn">Back</a>
+        </div>
+
+        <form method="post">
+            {% csrf_token %}
+
+            <div class="field-row">
+                <label class="field-label">{{ form.batch.label }}</label>
+                {{ form.batch }}
+            </div>
+
+            <div class="detail-box">
+                <div class="detail-grid">
+                    <div class="detail-item">
+                        <div class="detail-title">Batch Date</div>
+                        <div class="detail-value" id="preview-created-at">-</div>
+                    </div>
+
+                    <div class="detail-item">
+                        <div class="detail-title">Total Cloth</div>
+                        <div class="detail-value" id="preview-total-cloth">0</div>
+                    </div>
+
+                    <div class="detail-item">
+                        <div class="detail-title">Cost</div>
+                        <div class="detail-value" id="preview-cost">$0.00</div>
+                    </div>
+
+                    <div class="detail-item">
+                        <div class="detail-title">Delivery Fee</div>
+                        <div class="detail-value" id="preview-delivery-fee">$0.00</div>
+                    </div>
+
+                    <div class="detail-item">
+                        <div class="detail-title">Other Fee</div>
+                        <div class="detail-value" id="preview-other-fee">$0.00</div>
+                    </div>
+
+                    <div class="detail-item">
+                        <div class="detail-title">Selected Batch</div>
+                        <div class="detail-value" id="preview-batch-name">-</div>
+                    </div>
+                </div>
+
+                <div class="detail-total">
+                    <div class="detail-total-label">Auto Total Amount</div>
+                    <div class="detail-total-value" id="preview-amount">$0.00</div>
+                </div>
+            </div>
+
+            <div class="field-row" style="margin-top:18px;">
+                <label class="field-label">{{ form.note.label }}</label>
+                {{ form.note }}
+            </div>
+
+            <div class="submit-row">
+                <a href="{% url back_url %}" class="btn">Cancel</a>
+                <button type="submit" class="btn-primary">Save Expense</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+(function () {
+    const batchSelect = document.getElementById("id_batch");
+
+    const createdAtEl = document.getElementById("preview-created-at");
+    const totalClothEl = document.getElementById("preview-total-cloth");
+    const costEl = document.getElementById("preview-cost");
+    const deliveryFeeEl = document.getElementById("preview-delivery-fee");
+    const otherFeeEl = document.getElementById("preview-other-fee");
+    const amountEl = document.getElementById("preview-amount");
+    const batchNameEl = document.getElementById("preview-batch-name");
+
+    function resetPreview() {
+        createdAtEl.textContent = "-";
+        totalClothEl.textContent = "0";
+        costEl.textContent = "$0.00";
+        deliveryFeeEl.textContent = "$0.00";
+        otherFeeEl.textContent = "$0.00";
+        amountEl.textContent = "$0.00";
+        batchNameEl.textContent = "-";
+    }
+
+    function loadPreview(batchId) {
+        if (!batchId) {
+            resetPreview();
+            return;
+        }
+
+        fetch(`/expenses/batch-preview/?batch_id=${batchId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    resetPreview();
+                    return;
+                }
+
+                createdAtEl.textContent = data.created_at || "-";
+                totalClothEl.textContent = data.total_cloth || "0";
+                costEl.textContent = `$${data.cost || "0.00"}`;
+                deliveryFeeEl.textContent = `$${data.delivery_fee || "0.00"}`;
+                otherFeeEl.textContent = `$${data.other_fee || "0.00"}`;
+                amountEl.textContent = `$${data.amount || "0.00"}`;
+                batchNameEl.textContent = data.batch_name || "-";
+            })
+            .catch(() => resetPreview());
+    }
+
+    if (batchSelect) {
+        batchSelect.addEventListener("change", function () {
+            loadPreview(this.value);
+        });
+
+        if (batchSelect.value) {
+            loadPreview(batchSelect.value);
+        }
+    }
+})();
+</script>
+{% endblock %}

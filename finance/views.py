@@ -5,10 +5,50 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q, Sum
 from django.db.models.functions import TruncDate
+from django.http import JsonResponse
 from django.shortcuts import redirect, render
 
 from .forms import BatchExpenseForm, ExpenseFilterForm, OperatingExpenseForm, OtherExpenseForm
 from .models import Expense
+
+
+def _get_batch_expense_data(batch):
+    created_at = getattr(batch, "created_at", None)
+
+    total_cloth = (
+        getattr(batch, "total_cloth", None)
+        or getattr(batch, "total_qty", None)
+        or getattr(batch, "quantity", None)
+        or 0
+    )
+
+    cost = (
+        getattr(batch, "cost", None)
+        or getattr(batch, "total_cost", None)
+        or Decimal("0.00")
+    )
+
+    delivery_fee = (
+        getattr(batch, "delivery_fee", None)
+        or Decimal("0.00")
+    )
+
+    other_fee = (
+        getattr(batch, "other_fee", None)
+        or getattr(batch, "additional_fee", None)
+        or Decimal("0.00")
+    )
+
+    amount = (cost or Decimal("0.00")) + (delivery_fee or Decimal("0.00")) + (other_fee or Decimal("0.00"))
+
+    return {
+        "created_at": created_at,
+        "total_cloth": total_cloth or 0,
+        "cost": cost or Decimal("0.00"),
+        "delivery_fee": delivery_fee or Decimal("0.00"),
+        "other_fee": other_fee or Decimal("0.00"),
+        "amount": amount,
+    }
 
 
 def _can_create_other(user):
@@ -273,13 +313,31 @@ def create_batch_expense(request):
             obj = form.save(commit=False)
             obj.expense_type = Expense.TYPE_BATCH
             obj.created_by = request.user
+
+            batch = obj.batch
+            if batch:
+                detail = _get_batch_expense_data(batch)
+                obj.batch_created_at = detail["created_at"]
+                obj.batch_total_cloth = detail["total_cloth"]
+                obj.batch_cost = detail["cost"]
+                obj.batch_delivery_fee = detail["delivery_fee"]
+                obj.batch_other_fee = detail["other_fee"]
+                obj.amount = detail["amount"]
+            else:
+                obj.batch_created_at = None
+                obj.batch_total_cloth = 0
+                obj.batch_cost = Decimal("0.00")
+                obj.batch_delivery_fee = Decimal("0.00")
+                obj.batch_other_fee = Decimal("0.00")
+                obj.amount = Decimal("0.00")
+
             obj.save()
             messages.success(request, "Batch expense created successfully.")
             return redirect("batch_expense_list")
     else:
         form = BatchExpenseForm()
 
-    return render(request, "finance/expense_form.html", {
+    return render(request, "finance/create_batch_expense.html", {
         "title": "Create Batch Expense",
         "form": form,
         "back_url": "batch_expense_list",
@@ -342,4 +400,33 @@ def profit_dashboard(request):
         "revenue_values": revenue_values,
         "expense_labels": expense_labels,
         "expense_values": expense_values,
+    })
+
+
+@login_required
+def batch_expense_preview(request):
+    if not _can_create_batch(request.user):
+        return JsonResponse({"error": "Permission denied"}, status=403)
+
+    batch_id = request.GET.get("batch_id")
+    if not batch_id:
+        return JsonResponse({"error": "Missing batch_id"}, status=400)
+
+    from inventory.models import InventoryBatch
+
+    try:
+        batch = InventoryBatch.objects.get(pk=batch_id)
+    except InventoryBatch.DoesNotExist:
+        return JsonResponse({"error": "Batch not found"}, status=404)
+
+    data = _get_batch_expense_data(batch)
+
+    return JsonResponse({
+        "batch_name": str(batch),
+        "created_at": data["created_at"].strftime("%d %b %Y %H:%M") if data["created_at"] else "",
+        "total_cloth": data["total_cloth"],
+        "cost": f"{data['cost']:.2f}",
+        "delivery_fee": f"{data['delivery_fee']:.2f}",
+        "other_fee": f"{data['other_fee']:.2f}",
+        "amount": f"{data['amount']:.2f}",
     })

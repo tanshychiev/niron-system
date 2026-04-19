@@ -43,7 +43,6 @@ class Expense(models.Model):
     amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
     note = models.TextField(blank=True, default="")
 
-    # operating
     category = models.CharField(
         max_length=30,
         choices=OPERATING_CATEGORY_CHOICES,
@@ -51,7 +50,6 @@ class Expense(models.Model):
         default="",
     )
 
-    # batch
     batch = models.ForeignKey(
         "inventory.InventoryBatch",
         null=True,
@@ -60,27 +58,14 @@ class Expense(models.Model):
         related_name="expense_rows",
     )
 
+    batch_created_at = models.DateTimeField(null=True, blank=True)
+    batch_total_cloth = models.PositiveIntegerField(default=0)
+    batch_cost = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    batch_delivery_fee = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    batch_other_fee = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+
     class Meta:
         ordering = ["-created_at", "-id"]
-        permissions = [
-            ("can_create_other_expense", "Can create other expense"),
-            ("can_create_batch_expense", "Can create batch expense"),
-            ("can_create_operating_expense", "Can create operating expense"),
-        ]
 
     def __str__(self):
         return f"{self.get_expense_type_display()} - ${self.amount}"
-
-    @property
-    def display_title(self):
-        if self.expense_type == self.TYPE_BATCH:
-            if self.batch:
-                return f"Batch Expense - {self.batch}"
-            return "Batch Expense"
-        if self.expense_type == self.TYPE_OPERATING:
-            return self.get_category_display() or "Operating Expense"
-        return "Other Expense"
-
-    @property
-    def display_type_badge(self):
-        return self.get_expense_type_display()

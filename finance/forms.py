@@ -51,9 +51,8 @@ class OperatingExpenseForm(forms.ModelForm):
 class BatchExpenseForm(forms.ModelForm):
     class Meta:
         model = Expense
-        fields = ["batch", "amount", "note"]
+        fields = ["batch", "note"]
         widgets = {
-            "batch": forms.Select(attrs={"class": "form-select"}),
-            "amount": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
+            "batch": forms.Select(attrs={"class": "form-select", "id": "id_batch"}),
             "note": forms.Textarea(attrs={"class": "form-control", "rows": 4}),
         }
