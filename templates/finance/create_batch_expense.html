@@ -2,7 +2,7 @@
 
 {% block title %}Create Batch Expense{% endblock %}
 {% block page_title %}Create Batch Expense{% endblock %}
-{% block page_subtitle %}Select batch and auto calculate expense{% endblock %}
+{% block page_subtitle %}Select batch, check cloth detail, edit fees, and save total{% endblock %}
 {% block topbar_title %}Finance{% endblock %}
 {% block topbar_subtitle %}Create batch expense record{% endblock %}
 
@@ -50,7 +50,8 @@
         margin-bottom: 8px;
     }
 
-    .detail-box {
+    .detail-box,
+    .table-card {
         margin-top: 20px;
         border: 1px solid var(--line);
         border-radius: 18px;
@@ -85,6 +86,25 @@
         color: var(--text);
     }
 
+    .edit-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 14px;
+        margin-top: 18px;
+    }
+
+    .money-input {
+        width: 100%;
+        padding: 12px 14px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: white;
+        font-size: 15px;
+        font-weight: 700;
+        color: var(--text);
+        outline: none;
+    }
+
     .detail-total {
         margin-top: 14px;
         border: 1px solid #f2d089;
@@ -109,55 +129,21 @@
         color: #b06c00;
     }
 
-    .edit-grid {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 14px;
-        margin-top: 18px;
-    }
-
-    .money-input {
-        width: 100%;
-        padding: 12px 14px;
-        border: 1px solid var(--line);
-        border-radius: 14px;
-        background: white;
-        font-size: 15px;
-        font-weight: 700;
-        color: var(--text);
-        outline: none;
-    }
-
-    .money-input:focus {
-        border-color: var(--accent);
-        box-shadow: 0 0 0 4px rgba(232,155,20,.12);
-    }
-
-    .table-card {
-        margin-top: 18px;
-        background: white;
-        border: 1px solid var(--line);
-        border-radius: 16px;
-        overflow: hidden;
-    }
-
     .table-card-title {
-        padding: 16px 18px 0;
-        font-size: 18px;
+        font-size: 22px;
         font-weight: 800;
-        color: var(--text);
+        margin-bottom: 4px;
     }
 
     .table-card-subtitle {
-        padding: 6px 18px 0;
         color: var(--muted);
         font-size: 12px;
         font-weight: 700;
+        margin-bottom: 14px;
     }
 
     .table-wrap {
         overflow-x: auto;
-        padding: 12px 18px 18px;
     }
 
     .detail-table {
@@ -180,15 +166,11 @@
         font-weight: 800;
     }
 
-    .qty-strong {
-        font-weight: 800;
-    }
-
     .color-summary-grid {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
         gap: 12px;
-        margin-top: 18px;
+        margin-top: 8px;
     }
 
     .color-box {
@@ -218,6 +200,12 @@
         gap: 10px;
         margin-top: 22px;
         flex-wrap: wrap;
+    }
+
+    .debug-box {
+        margin-top: 12px;
+        font-size: 12px;
+        color: var(--muted);
     }
 
     @media (max-width: 900px) {
@@ -289,6 +277,8 @@
                     <div class="detail-total-label">Auto Total Amount</div>
                     <div class="detail-total-value" id="preview-amount">$0.00</div>
                 </div>
+
+                <div class="debug-box" id="preview-debug"></div>
             </div>
 
             <div class="table-card">
@@ -308,7 +298,7 @@
                         </thead>
                         <tbody id="preview-rows-body">
                             <tr>
-                                <td colspan="5" style="text-align:center; color:var(--muted);">Select batch first</td>
+                                <td colspan="5" style="text-align:center; color:var(--muted);">Loading...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -318,12 +308,10 @@
             <div class="table-card">
                 <div class="table-card-title">Color Summary</div>
                 <div class="table-card-subtitle">How much cloth by color</div>
-                <div style="padding: 12px 18px 18px;">
-                    <div class="color-summary-grid" id="preview-color-summary">
-                        <div class="color-box">
-                            <div class="color-box-name">No Data</div>
-                            <div class="color-box-value">0</div>
-                        </div>
+                <div class="color-summary-grid" id="preview-color-summary">
+                    <div class="color-box">
+                        <div class="color-box-name">Loading</div>
+                        <div class="color-box-value">...</div>
                     </div>
                 </div>
             </div>
@@ -342,14 +330,15 @@
 </div>
 
 <script>
-(function () {
+document.addEventListener("DOMContentLoaded", function () {
     const batchSelect = document.getElementById("id_batch");
 
     const createdAtEl = document.getElementById("preview-created-at");
     const totalClothEl = document.getElementById("preview-total-cloth");
-    const amountEl = document.getElementById("preview-amount");
     const batchNameEl = document.getElementById("preview-batch-name");
     const colorCountEl = document.getElementById("preview-color-count");
+    const amountEl = document.getElementById("preview-amount");
+    const debugEl = document.getElementById("preview-debug");
 
     const costInput = document.getElementById("input-cost");
     const deliveryFeeInput = document.getElementById("input-delivery-fee");
@@ -365,21 +354,21 @@
 
     function recalcAmount() {
         const total = toNumber(costInput.value) + toNumber(deliveryFeeInput.value) + toNumber(otherFeeInput.value);
-        amountEl.textContent = `$${total.toFixed(2)}`;
+        amountEl.textContent = "$" + total.toFixed(2);
     }
 
-    function resetPreview() {
+    function resetPreview(message) {
         createdAtEl.textContent = "-";
         totalClothEl.textContent = "0";
-        amountEl.textContent = "$0.00";
         batchNameEl.textContent = "-";
         colorCountEl.textContent = "0";
         costInput.value = "0.00";
         deliveryFeeInput.value = "0.00";
         otherFeeInput.value = "0.00";
+        amountEl.textContent = "$0.00";
         rowsBody.innerHTML = `
             <tr>
-                <td colspan="5" style="text-align:center; color:var(--muted);">Select batch first</td>
+                <td colspan="5" style="text-align:center; color:var(--muted);">${message || "No data"}</td>
             </tr>
         `;
         colorSummary.innerHTML = `
@@ -388,7 +377,7 @@
                 <div class="color-box-value">0</div>
             </div>
         `;
-        recalcAmount();
+        debugEl.textContent = "";
     }
 
     function renderRows(rows) {
@@ -407,7 +396,7 @@
                 <td>${row.item_name || "-"}</td>
                 <td>${row.color || "-"}</td>
                 <td>${row.size || "-"}</td>
-                <td class="qty-strong">${row.qty_received || "0"}</td>
+                <td>${row.qty_received || "0"}</td>
             </tr>
         `).join("");
     }
@@ -431,34 +420,60 @@
         `).join("");
     }
 
-    function loadPreview(batchId) {
+    async function loadPreview(batchId) {
         if (!batchId) {
-            resetPreview();
+            resetPreview("Select batch first");
             return;
         }
 
-        fetch(`/expenses/batch-preview/?batch_id=${batchId}`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    resetPreview();
-                    return;
+        rowsBody.innerHTML = `
+            <tr>
+                <td colspan="5" style="text-align:center; color:var(--muted);">Loading batch detail...</td>
+            </tr>
+        `;
+        debugEl.textContent = "Loading...";
+
+        try {
+            const response = await fetch(`/expenses/batch-preview/?batch_id=${batchId}`, {
+                headers: {
+                    "X-Requested-With": "XMLHttpRequest"
                 }
+            });
 
-                createdAtEl.textContent = data.created_at || "-";
-                totalClothEl.textContent = data.total_cloth || "0";
-                batchNameEl.textContent = data.batch_name || "-";
-                colorCountEl.textContent = data.color_count || "0";
+            const text = await response.text();
+            let data = {};
 
-                costInput.value = data.cost || "0.00";
-                deliveryFeeInput.value = data.delivery_fee || "0.00";
-                otherFeeInput.value = data.other_fee || "0.00";
+            try {
+                data = JSON.parse(text);
+            } catch (e) {
+                resetPreview("Preview response is not JSON");
+                debugEl.textContent = text.slice(0, 200);
+                return;
+            }
 
-                renderRows(data.rows || []);
-                renderColorSummary(data.color_summary || []);
-                recalcAmount();
-            })
-            .catch(() => resetPreview());
+            if (!response.ok || data.error) {
+                resetPreview(data.error || "Preview load failed");
+                debugEl.textContent = JSON.stringify(data);
+                return;
+            }
+
+            createdAtEl.textContent = data.created_at || "-";
+            totalClothEl.textContent = data.total_cloth || "0";
+            batchNameEl.textContent = data.batch_name || "-";
+            colorCountEl.textContent = data.color_count || "0";
+
+            costInput.value = data.cost || "0.00";
+            deliveryFeeInput.value = data.delivery_fee || "0.00";
+            otherFeeInput.value = data.other_fee || "0.00";
+
+            renderRows(data.rows || []);
+            renderColorSummary(data.color_summary || []);
+            recalcAmount();
+            debugEl.textContent = "";
+        } catch (error) {
+            resetPreview("Cannot load preview");
+            debugEl.textContent = String(error);
+        }
     }
 
     costInput.addEventListener("input", recalcAmount);
@@ -470,14 +485,12 @@
             loadPreview(this.value);
         });
 
-        if (batchSelect.value) {
+        setTimeout(() => {
             loadPreview(batchSelect.value);
-        } else {
-            resetPreview();
-        }
+        }, 50);
     } else {
-        resetPreview();
+        resetPreview("Batch select not found");
     }
-})();
+});
 </script>
 {% endblock %}
