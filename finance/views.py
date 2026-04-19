@@ -76,18 +76,6 @@ def _get_batch_expense_data(batch):
     }
 
 
-def _can_create_other(user):
-    return user.is_staff or user.is_superuser or user.has_perm("finance.can_create_other_expense")
-
-
-def _can_create_batch(user):
-    return user.is_superuser or user.has_perm("finance.can_create_batch_expense")
-
-
-def _can_create_operating(user):
-    return user.is_superuser or user.has_perm("finance.can_create_operating_expense")
-
-
 def _apply_filters(request, qs):
     form = ExpenseFilterForm(request.GET or None)
     if form.is_valid():
@@ -274,6 +262,7 @@ def other_expense_list(request):
             "page_subtitle_text": "Other expense records",
             "create_url_name": "create_other_expense",
             "create_label": "+ Create Other Expense",
+            "can_create": request.user.has_perm("finance.add_other_expense"),
         },
     )
 
@@ -296,6 +285,7 @@ def batch_expense_list(request):
             "page_subtitle_text": "Batch expense records linked to inventory batch",
             "create_url_name": "create_batch_expense",
             "create_label": "+ Create Batch Expense",
+            "can_create": request.user.has_perm("finance.add_batch_expense"),
         },
     )
 
@@ -318,17 +308,14 @@ def operating_expense_list(request):
             "page_subtitle_text": "Salary, commission, boosting, rent and other operating expense",
             "create_url_name": "create_operating_expense",
             "create_label": "+ Create Operating Expense",
+            "can_create": request.user.has_perm("finance.add_operating_expense"),
         },
     )
 
 
 @login_required
-@permission_required("finance.add_expense", raise_exception=True)
+@permission_required("finance.add_other_expense", raise_exception=True)
 def create_other_expense(request):
-    if not _can_create_other(request.user):
-        messages.error(request, "You do not have permission to create other expense.")
-        return redirect("other_expense_list")
-
     if request.method == "POST":
         form = OtherExpenseForm(request.POST)
         if form.is_valid():
@@ -353,12 +340,8 @@ def create_other_expense(request):
 
 
 @login_required
-@permission_required("finance.add_expense", raise_exception=True)
+@permission_required("finance.add_batch_expense", raise_exception=True)
 def create_batch_expense(request):
-    if not _can_create_batch(request.user):
-        messages.error(request, "You do not have permission to create batch expense.")
-        return redirect("batch_expense_list")
-
     if request.method == "POST":
         form = BatchExpenseForm(request.POST)
         if form.is_valid():
@@ -410,12 +393,8 @@ def create_batch_expense(request):
 
 
 @login_required
-@permission_required("finance.add_expense", raise_exception=True)
+@permission_required("finance.add_operating_expense", raise_exception=True)
 def create_operating_expense(request):
-    if not _can_create_operating(request.user):
-        messages.error(request, "You do not have permission to create operating expense.")
-        return redirect("operating_expense_list")
-
     if request.method == "POST":
         form = OperatingExpenseForm(request.POST)
         if form.is_valid():
@@ -479,11 +458,8 @@ def profit_dashboard(request):
 
 
 @login_required
-@permission_required("finance.add_expense", raise_exception=True)
+@permission_required("finance.add_batch_expense", raise_exception=True)
 def batch_expense_preview(request):
-    if not _can_create_batch(request.user):
-        return JsonResponse({"error": "Permission denied"}, status=403)
-
     batch_id = request.GET.get("batch_id")
     if not batch_id:
         return JsonResponse({"error": "Missing batch_id"}, status=400)
