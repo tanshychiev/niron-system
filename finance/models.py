@@ -66,6 +66,14 @@ class Expense(models.Model):
 
     class Meta:
         ordering = ["-created_at", "-id"]
+        permissions = [
+            ("view_finance_nav", "Can view finance navbar"),
+            ("view_expense_summary_nav", "Can view expense summary navbar"),
+            ("view_other_expense_nav", "Can view other expense navbar"),
+            ("view_batch_expense_nav", "Can view batch expense navbar"),
+            ("view_operating_expense_nav", "Can view operating expense navbar"),
+            ("view_profit_dashboard_nav", "Can view profit dashboard navbar"),
+        ]
 
     def __str__(self):
         return f"{self.get_expense_type_display()} - ${self.amount}"
