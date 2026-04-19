@@ -26,141 +26,44 @@ def _to_decimal(value):
         return Decimal("0.00")
 
 
-def _safe_text(value):
-    return "" if value is None else str(value)
+def _format_qty(value):
+    qty = _to_decimal(value)
+    if qty == qty.to_integral_value():
+        return str(int(qty))
+    return format(qty.normalize(), "f")
 
 
 def _get_batch_rows(batch):
-    related_names = [
-        "rows",
-        "items",
-        "batch_rows",
-        "inventorybatchrow_set",
-        "inventorybatchitem_set",
-    ]
-
-    for name in related_names:
-        manager = getattr(batch, name, None)
-        if manager is not None:
-            try:
-                return manager.all()
-            except Exception:
-                continue
-    return []
+    return batch.items.select_related("item", "color", "size").filter(is_active=True)
 
 
 def _get_row_qty_received(row):
-    for field_name in ["qty_received", "quantity", "qty", "received_qty"]:
-        value = getattr(row, field_name, None)
-        if value is not None:
-            return _to_decimal(value)
-    return Decimal("0.00")
+    return _to_decimal(row.qty_received)
 
 
 def _get_row_item_code(row):
-    item = getattr(row, "item", None)
-    if item is not None:
-        for field_name in ["code", "item_code", "sku", "name"]:
-            value = getattr(item, field_name, None)
-            if value not in (None, ""):
-                return str(value)
-
-    for field_name in ["item_code", "code", "sku"]:
-        value = getattr(row, field_name, None)
-        if value not in (None, ""):
-            return str(value)
-    return ""
+    return row.item.code if row.item else ""
 
 
 def _get_row_item_name(row):
-    item = getattr(row, "item", None)
-    if item is not None:
-        for field_name in ["name", "title"]:
-            value = getattr(item, field_name, None)
-            if value not in (None, ""):
-                return str(value)
-
-    for field_name in ["item_name", "name", "title"]:
-        value = getattr(row, field_name, None)
-        if value not in (None, ""):
-            return str(value)
-    return ""
+    return row.item.name if row.item else ""
 
 
 def _get_row_color_name(row):
-    color_obj = getattr(row, "color", None)
-    if color_obj is not None:
-        for field_name in ["name", "title"]:
-            value = getattr(color_obj, field_name, None)
-            if value not in (None, ""):
-                return str(value)
-
-    for field_name in ["color_name", "color"]:
-        value = getattr(row, field_name, None)
-        if value not in (None, ""):
-            return str(value)
-    return ""
+    return row.color.name if row.color else ""
 
 
 def _get_row_size_name(row):
-    size_obj = getattr(row, "size", None)
-    if size_obj is not None:
-        for field_name in ["name", "title"]:
-            value = getattr(size_obj, field_name, None)
-            if value not in (None, ""):
-                return str(value)
-
-    for field_name in ["size_name", "size"]:
-        value = getattr(row, field_name, None)
-        if value not in (None, ""):
-            return str(value)
-    return ""
+    return row.size.name if row.size else ""
 
 
 def _get_batch_expense_data(batch):
-    created_at = getattr(batch, "created_at", None)
+    created_at = batch.received_date
+    total_cloth = _to_decimal(batch.total_cloth or 0)
 
-    total_cloth = (
-        getattr(batch, "total_cloth", None)
-        or getattr(batch, "total_qty", None)
-        or getattr(batch, "quantity", None)
-        or getattr(batch, "qty_received", None)
-    )
-
-    if total_cloth in (None, "", 0):
-        rows = _get_batch_rows(batch)
-        total_qty = Decimal("0.00")
-        for row in rows:
-            total_qty += _get_row_qty_received(row)
-        total_cloth = int(total_qty) if total_qty else 0
-    else:
-        try:
-            total_cloth = int(total_cloth)
-        except Exception:
-            total_cloth = 0
-
-    cost = (
-        getattr(batch, "cost", None)
-        or getattr(batch, "total_cost", None)
-        or getattr(batch, "cloth_cost", None)
-        or getattr(batch, "item_cost", None)
-    )
-    cost = _to_decimal(cost)
-
-    delivery_fee = (
-        getattr(batch, "delivery_fee", None)
-        or getattr(batch, "shipping_fee", None)
-        or getattr(batch, "transport_fee", None)
-    )
-    delivery_fee = _to_decimal(delivery_fee)
-
-    other_fee = (
-        getattr(batch, "other_fee", None)
-        or getattr(batch, "additional_fee", None)
-        or getattr(batch, "extra_fee", None)
-    )
-    other_fee = _to_decimal(other_fee)
-
+    cost = _to_decimal(batch.total_goods_cost)
+    delivery_fee = _to_decimal(batch.shipping_cost)
+    other_fee = _to_decimal(batch.extra_cost)
     amount = cost + delivery_fee + other_fee
 
     return {
@@ -207,7 +110,7 @@ def _apply_filters(request, qs):
             qs = qs.filter(
                 Q(note__icontains=keyword)
                 | Q(category__icontains=keyword)
-                | Q(batch__batch_code__icontains=keyword)
+                | Q(batch__batch_no__icontains=keyword)
             )
 
     return form, qs
@@ -247,16 +150,17 @@ def _get_total_cloth_sold():
 
 def _get_total_inventory():
     try:
-        from inventory.models import Inventory
-        value = Inventory.objects.aggregate(total=Sum("quantity"))["total"]
-        return value or 0
-    except Exception:
-        pass
+        from inventory.models import InventoryBatchItem, InventoryItem
 
-    try:
-        from inventory.models import InventoryItem
-        value = InventoryItem.objects.aggregate(total=Sum("quantity"))["total"]
-        return value or 0
+        value = (
+            InventoryBatchItem.objects.filter(
+                is_active=True,
+                batch__is_deleted=False,
+                item__item_type=InventoryItem.TYPE_SHIRT,
+            ).aggregate(total=Sum("qty_remaining"))["total"]
+            or 0
+        )
+        return value
     except Exception:
         return 0
 
@@ -338,13 +242,17 @@ def expense_summary(request):
     form, qs = _apply_filters(request, qs)
     total_expense = qs.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
 
-    return render(request, "finance/expense_summary.html", {
-        "form": form,
-        "expenses": qs[:300],
-        "total_expense": total_expense,
-        "page_title_text": "Expense Summary",
-        "page_subtitle_text": "All expense activity in one page",
-    })
+    return render(
+        request,
+        "finance/expense_summary.html",
+        {
+            "form": form,
+            "expenses": qs[:300],
+            "total_expense": total_expense,
+            "page_title_text": "Expense Summary",
+            "page_subtitle_text": "All expense activity in one page",
+        },
+    )
 
 
 @login_required
@@ -353,15 +261,19 @@ def other_expense_list(request):
     form, qs = _apply_filters(request, qs)
     total_expense = qs.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
 
-    return render(request, "finance/expense_type_list.html", {
-        "form": form,
-        "expenses": qs[:300],
-        "total_expense": total_expense,
-        "page_title_text": "Other Expense",
-        "page_subtitle_text": "Other expense records",
-        "create_url_name": "create_other_expense",
-        "create_label": "+ Create Other Expense",
-    })
+    return render(
+        request,
+        "finance/expense_type_list.html",
+        {
+            "form": form,
+            "expenses": qs[:300],
+            "total_expense": total_expense,
+            "page_title_text": "Other Expense",
+            "page_subtitle_text": "Other expense records",
+            "create_url_name": "create_other_expense",
+            "create_label": "+ Create Other Expense",
+        },
+    )
 
 
 @login_required
@@ -370,15 +282,19 @@ def batch_expense_list(request):
     form, qs = _apply_filters(request, qs)
     total_expense = qs.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
 
-    return render(request, "finance/expense_type_list.html", {
-        "form": form,
-        "expenses": qs[:300],
-        "total_expense": total_expense,
-        "page_title_text": "Batch Expense",
-        "page_subtitle_text": "Batch expense records linked to inventory batch",
-        "create_url_name": "create_batch_expense",
-        "create_label": "+ Create Batch Expense",
-    })
+    return render(
+        request,
+        "finance/expense_type_list.html",
+        {
+            "form": form,
+            "expenses": qs[:300],
+            "total_expense": total_expense,
+            "page_title_text": "Batch Expense",
+            "page_subtitle_text": "Batch expense records linked to inventory batch",
+            "create_url_name": "create_batch_expense",
+            "create_label": "+ Create Batch Expense",
+        },
+    )
 
 
 @login_required
@@ -387,15 +303,19 @@ def operating_expense_list(request):
     form, qs = _apply_filters(request, qs)
     total_expense = qs.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
 
-    return render(request, "finance/expense_type_list.html", {
-        "form": form,
-        "expenses": qs[:300],
-        "total_expense": total_expense,
-        "page_title_text": "Operating Expense",
-        "page_subtitle_text": "Salary, commission, boosting, rent and other operating expense",
-        "create_url_name": "create_operating_expense",
-        "create_label": "+ Create Operating Expense",
-    })
+    return render(
+        request,
+        "finance/expense_type_list.html",
+        {
+            "form": form,
+            "expenses": qs[:300],
+            "total_expense": total_expense,
+            "page_title_text": "Operating Expense",
+            "page_subtitle_text": "Salary, commission, boosting, rent and other operating expense",
+            "create_url_name": "create_operating_expense",
+            "create_label": "+ Create Operating Expense",
+        },
+    )
 
 
 @login_required
@@ -416,11 +336,15 @@ def create_other_expense(request):
     else:
         form = OtherExpenseForm()
 
-    return render(request, "finance/expense_form.html", {
-        "title": "Create Other Expense",
-        "form": form,
-        "back_url": "other_expense_list",
-    })
+    return render(
+        request,
+        "finance/expense_form.html",
+        {
+            "title": "Create Other Expense",
+            "form": form,
+            "back_url": "other_expense_list",
+        },
+    )
 
 
 @login_required
@@ -448,7 +372,7 @@ def create_batch_expense(request):
                 delivery_fee = _to_decimal(manual_delivery_fee) if manual_delivery_fee not in (None, "") else detail["delivery_fee"]
                 other_fee = _to_decimal(manual_other_fee) if manual_other_fee not in (None, "") else detail["other_fee"]
 
-                obj.batch_created_at = detail["created_at"]
+                obj.batch_created_at = batch.created_at
                 obj.batch_total_cloth = detail["total_cloth"]
                 obj.batch_cost = cost
                 obj.batch_delivery_fee = delivery_fee
@@ -497,11 +421,15 @@ def create_operating_expense(request):
     else:
         form = OperatingExpenseForm()
 
-    return render(request, "finance/expense_form.html", {
-        "title": "Create Operating Expense",
-        "form": form,
-        "back_url": "operating_expense_list",
-    })
+    return render(
+        request,
+        "finance/expense_form.html",
+        {
+            "title": "Create Operating Expense",
+            "form": form,
+            "back_url": "operating_expense_list",
+        },
+    )
 
 
 @login_required
@@ -523,19 +451,23 @@ def profit_dashboard(request):
     revenue_labels, revenue_values = _get_revenue_chart_data()
     expense_labels, expense_values = _get_expense_chart_data()
 
-    return render(request, "finance/profit_dashboard.html", {
-        "revenue_total": revenue_total,
-        "expense_total": expense_total,
-        "profit_total": profit_total,
-        "cloth_sold": cloth_sold,
-        "total_inventory": total_inventory,
-        "expense_by_type": expense_by_type,
-        "recent_expenses": recent_expenses,
-        "revenue_labels": revenue_labels,
-        "revenue_values": revenue_values,
-        "expense_labels": expense_labels,
-        "expense_values": expense_values,
-    })
+    return render(
+        request,
+        "finance/profit_dashboard.html",
+        {
+            "revenue_total": revenue_total,
+            "expense_total": expense_total,
+            "profit_total": profit_total,
+            "cloth_sold": cloth_sold,
+            "total_inventory": total_inventory,
+            "expense_by_type": expense_by_type,
+            "recent_expenses": recent_expenses,
+            "revenue_labels": revenue_labels,
+            "revenue_values": revenue_values,
+            "expense_labels": expense_labels,
+            "expense_values": expense_values,
+        },
+    )
 
 
 @login_required
@@ -547,10 +479,14 @@ def batch_expense_preview(request):
     if not batch_id:
         return JsonResponse({"error": "Missing batch_id"}, status=400)
 
-    from inventory.models import InventoryBatch
+    from inventory.models import InventoryBatch, InventoryItem
 
     try:
-        batch = InventoryBatch.objects.get(pk=batch_id)
+        batch = InventoryBatch.objects.prefetch_related(
+            "items__item",
+            "items__color",
+            "items__size",
+        ).get(pk=batch_id, is_deleted=False)
     except InventoryBatch.DoesNotExist:
         return JsonResponse({"error": "Batch not found"}, status=404)
 
@@ -561,33 +497,40 @@ def batch_expense_preview(request):
     color_map = {}
 
     for row in rows:
+        if not row.item or row.item.item_type != InventoryItem.TYPE_SHIRT:
+            continue
+
         qty_received = _get_row_qty_received(row)
         color_name = _get_row_color_name(row) or "-"
 
-        rows_data.append({
-            "item_code": _get_row_item_code(row) or "-",
-            "item_name": _get_row_item_name(row) or "-",
-            "color": color_name,
-            "size": _get_row_size_name(row) or "-",
-            "qty_received": f"{qty_received:.2f}",
-        })
+        rows_data.append(
+            {
+                "item_code": _get_row_item_code(row) or "-",
+                "item_name": _get_row_item_name(row) or "-",
+                "color": color_name,
+                "size": _get_row_size_name(row) or "-",
+                "qty_received": _format_qty(qty_received),
+            }
+        )
 
-        color_map[color_name] = color_map.get(color_name, Decimal("0.00")) + qty_received
+        color_map[color_name] = color_map.get(color_name, Decimal("0")) + qty_received
 
     color_summary = [
-        {"color": color, "qty": f"{qty:.2f}"}
+        {"color": color, "qty": _format_qty(qty)}
         for color, qty in color_map.items()
     ]
 
-    return JsonResponse({
-        "batch_name": str(batch),
-        "created_at": data["created_at"].strftime("%d %b %Y %H:%M") if data["created_at"] else "",
-        "total_cloth": data["total_cloth"],
-        "cost": f"{data['cost']:.2f}",
-        "delivery_fee": f"{data['delivery_fee']:.2f}",
-        "other_fee": f"{data['other_fee']:.2f}",
-        "amount": f"{data['amount']:.2f}",
-        "rows": rows_data,
-        "color_summary": color_summary,
-        "color_count": len(color_summary),
-    })
+    return JsonResponse(
+        {
+            "batch_name": batch.batch_no,
+            "created_at": data["created_at"].strftime("%d/%m/%Y") if data["created_at"] else "",
+            "total_cloth": _format_qty(data["total_cloth"]),
+            "cost": f"{data['cost']:.2f}",
+            "delivery_fee": f"{data['delivery_fee']:.2f}",
+            "other_fee": f"{data['other_fee']:.2f}",
+            "amount": f"{data['amount']:.2f}",
+            "rows": rows_data,
+            "color_summary": color_summary,
+            "color_count": len(color_summary),
+        }
+    )
