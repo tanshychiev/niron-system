@@ -49,7 +49,8 @@
         display: block;
     }
 
-    .roles-panel, .status-panel {
+    .roles-panel,
+    .status-panel {
         background: var(--bg-soft);
         border: 1px solid var(--line);
         border-radius: 18px;
@@ -86,6 +87,13 @@
         height: 18px;
     }
 
+    .error-text {
+        color: #B42318;
+        font-size: 12px;
+        font-weight: 700;
+        margin-top: 6px;
+    }
+
     .actions {
         display: flex;
         justify-content: flex-end;
@@ -108,77 +116,101 @@
             {% csrf_token %}
 
             {% if form.non_field_errors %}
-                <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                <div class="alert alert-danger">
+                    {{ form.non_field_errors }}
+                </div>
             {% endif %}
 
-            <!-- BASIC INFO -->
             <div class="section-title">Basic Information</div>
             <div class="section-subtitle">User account details</div>
 
             <div class="grid-2">
                 <div class="field">
-                    <label>Username</label>
+                    <label for="{{ form.username.id_for_label }}">Username</label>
                     {{ form.username }}
+                    {% if form.username.errors %}
+                        <div class="error-text">{{ form.username.errors|join:", " }}</div>
+                    {% endif %}
                 </div>
 
                 <div class="field">
-                    <label>Email</label>
+                    <label for="{{ form.email.id_for_label }}">Email</label>
                     {{ form.email }}
+                    {% if form.email.errors %}
+                        <div class="error-text">{{ form.email.errors|join:", " }}</div>
+                    {% endif %}
                 </div>
 
                 <div class="field">
-                    <label>First Name</label>
+                    <label for="{{ form.first_name.id_for_label }}">First Name</label>
                     {{ form.first_name }}
+                    {% if form.first_name.errors %}
+                        <div class="error-text">{{ form.first_name.errors|join:", " }}</div>
+                    {% endif %}
                 </div>
 
                 <div class="field">
-                    <label>Last Name</label>
+                    <label for="{{ form.last_name.id_for_label }}">Last Name</label>
                     {{ form.last_name }}
+                    {% if form.last_name.errors %}
+                        <div class="error-text">{{ form.last_name.errors|join:", " }}</div>
+                    {% endif %}
                 </div>
             </div>
 
-            <!-- PASSWORD -->
             <div class="section-title">Security</div>
             <div class="section-subtitle">Set or update password</div>
 
             {% if form.password %}
                 <div class="grid-2">
                     <div class="field">
-                        <label>Password</label>
+                        <label for="{{ form.password.id_for_label }}">Password</label>
                         {{ form.password }}
+                        {% if form.password.errors %}
+                            <div class="error-text">{{ form.password.errors|join:", " }}</div>
+                        {% endif %}
                     </div>
 
                     <div class="field">
-                        <label>Confirm Password</label>
+                        <label for="{{ form.confirm_password.id_for_label }}">Confirm Password</label>
                         {{ form.confirm_password }}
+                        {% if form.confirm_password.errors %}
+                            <div class="error-text">{{ form.confirm_password.errors|join:", " }}</div>
+                        {% endif %}
                     </div>
                 </div>
             {% else %}
                 <div class="grid-2">
                     <div class="field">
-                        <label>New Password</label>
+                        <label for="{{ form.new_password.id_for_label }}">New Password</label>
                         {{ form.new_password }}
+                        {% if form.new_password.errors %}
+                            <div class="error-text">{{ form.new_password.errors|join:", " }}</div>
+                        {% endif %}
                     </div>
 
                     <div class="field">
-                        <label>Confirm New Password</label>
+                        <label for="{{ form.confirm_password.id_for_label }}">Confirm New Password</label>
                         {{ form.confirm_password }}
+                        {% if form.confirm_password.errors %}
+                            <div class="error-text">{{ form.confirm_password.errors|join:", " }}</div>
+                        {% endif %}
                     </div>
                 </div>
             {% endif %}
 
-            <!-- ROLE -->
             <div class="roles-panel">
                 <div class="section-title">Role</div>
                 <div class="section-subtitle">Select one role for this user</div>
 
                 <div class="field">
                     {{ form.groups }}
-                    {{ form.groups.errors }}
+                    {% if form.groups.errors %}
+                        <div class="error-text">{{ form.groups.errors|join:", " }}</div>
+                    {% endif %}
                 </div>
             </div>
 
-            <!-- STATUS -->
             <div class="status-panel">
                 <div class="section-title">Status</div>
 
@@ -191,9 +223,12 @@
                         </span>
                     </div>
                 </label>
+
+                {% if form.is_active.errors %}
+                    <div class="error-text">{{ form.is_active.errors|join:", " }}</div>
+                {% endif %}
             </div>
 
-            <!-- ACTION -->
             <div class="actions">
                 <button type="submit" class="btn-primary">
                     {{ submit_label }}
