@@ -62,6 +62,7 @@ class OrderForm(forms.ModelForm):
         model = Order
         fields = [
             "order_type",
+            "service_type",
             "customer_name",
             "phone",
             "customer_location",
@@ -69,34 +70,19 @@ class OrderForm(forms.ModelForm):
             "remark",
         ]
         widgets = {
-            "order_type": forms.Select(
-                attrs={
-                    "class": "form-select",
-                }
-            ),
+            "order_type": forms.Select(attrs={"class": "form-select"}),
+            "service_type": forms.Select(attrs={"class": "form-select", "id": "id_service_type"}),
             "customer_name": forms.TextInput(
-                attrs={
-                    "class": "form-control",
-                    "placeholder": "Customer name",
-                }
+                attrs={"class": "form-control", "placeholder": "Customer name"}
             ),
             "phone": forms.TextInput(
-                attrs={
-                    "class": "form-control",
-                    "placeholder": "Phone",
-                }
+                attrs={"class": "form-control", "placeholder": "Phone"}
             ),
             "customer_location": forms.TextInput(
-                attrs={
-                    "class": "form-control",
-                    "placeholder": "Location",
-                }
+                attrs={"class": "form-control", "placeholder": "Location"}
             ),
             "remark": forms.TextInput(
-                attrs={
-                    "class": "form-control",
-                    "placeholder": "Remark",
-                }
+                attrs={"class": "form-control", "placeholder": "Remark"}
             ),
         }
 
@@ -123,16 +109,10 @@ class OrderDesignForm(forms.ModelForm):
         fields = ["name", "remark"]
         widgets = {
             "name": forms.TextInput(
-                attrs={
-                    "class": "form-control",
-                    "placeholder": "Design name",
-                }
+                attrs={"class": "form-control", "placeholder": "Design name"}
             ),
             "remark": forms.TextInput(
-                attrs={
-                    "class": "form-control",
-                    "placeholder": "Design remark",
-                }
+                attrs={"class": "form-control", "placeholder": "Design remark"}
             ),
         }
 
@@ -151,57 +131,48 @@ class OrderItemForm(forms.ModelForm):
     class Meta:
         model = OrderItem
         fields = [
-            "item_mode",
             "description",
             "shirt_item",
             "color",
             "size",
             "film_item",
+            "film_meter",
             "quantity",
             "unit_price",
-            "film_meter_per_piece",
-            "manual_film_meter",
         ]
         widgets = {
-            "item_mode": forms.Select(attrs={"class": "form-select"}),
-            "shirt_item": forms.Select(attrs={"class": "form-select"}),
-            "color": forms.Select(attrs={"class": "form-select"}),
-            "size": forms.Select(attrs={"class": "form-select"}),
-            "film_item": forms.Select(attrs={"class": "form-select"}),
+            "shirt_item": forms.Select(attrs={"class": "form-select shirt-select"}),
+            "color": forms.Select(attrs={"class": "form-select color-select"}),
+            "size": forms.Select(attrs={"class": "form-select size-select"}),
+            "film_item": forms.Select(attrs={"class": "form-select film-select"}),
+            "film_meter": forms.NumberInput(
+                attrs={
+                    "class": "form-control film-meter-input",
+                    "placeholder": "Film meter",
+                    "step": "0.0001",
+                    "min": "0",
+                }
+            ),
             "quantity": forms.NumberInput(
                 attrs={
-                    "class": "form-control",
+                    "class": "form-control qty-input",
                     "placeholder": "Qty",
+                    "step": "0.01",
                     "min": "0",
                 }
             ),
             "unit_price": forms.NumberInput(
                 attrs={
-                    "class": "form-control",
+                    "class": "form-control unit-price-input",
                     "placeholder": "0.00",
                     "step": "0.01",
-                    "min": "0",
-                }
-            ),
-            "film_meter_per_piece": forms.NumberInput(
-                attrs={
-                    "class": "form-control",
-                    "placeholder": "Meter / piece",
-                    "step": "0.0001",
-                    "min": "0",
-                }
-            ),
-            "manual_film_meter": forms.NumberInput(
-                attrs={
-                    "class": "form-control",
-                    "placeholder": "Film meter",
-                    "step": "0.0001",
                     "min": "0",
                 }
             ),
         }
 
     def __init__(self, *args, **kwargs):
+        self.order = kwargs.pop("order", None)
         super().__init__(*args, **kwargs)
 
         self.fields["shirt_item"].queryset = InventoryItem.objects.filter(
@@ -222,15 +193,47 @@ class OrderItemForm(forms.ModelForm):
             is_active=True
         ).order_by("sort_order", "id")
 
-        self.fields["quantity"].required = False
-        self.fields["unit_price"].required = False
-        self.fields["film_meter_per_piece"].required = False
-        self.fields["manual_film_meter"].required = False
+        for name in [
+            "shirt_item",
+            "color",
+            "size",
+            "film_item",
+            "film_meter",
+            "quantity",
+            "unit_price",
+        ]:
+            self.fields[name].required = False
 
-        self.fields["shirt_item"].required = False
-        self.fields["film_item"].required = False
-        self.fields["color"].required = False
-        self.fields["size"].required = False
+    def clean(self):
+        cleaned = super().clean()
+
+        service_type = None
+        if self.order:
+            service_type = self.order.service_type
+        elif self.instance and self.instance.order_id:
+            service_type = self.instance.order.service_type
+
+        shirt_item = cleaned.get("shirt_item")
+        color = cleaned.get("color")
+        size = cleaned.get("size")
+        film_item = cleaned.get("film_item")
+        film_meter = cleaned.get("film_meter")
+
+        if service_type == Order.SERVICE_FULL:
+            if not shirt_item:
+                self.add_error("shirt_item", "Please choose shirt item.")
+            if not color:
+                self.add_error("color", "Please choose color.")
+            if not size:
+                self.add_error("size", "Please choose size.")
+
+        elif service_type == Order.SERVICE_FILM_ONLY:
+            if not film_item:
+                self.add_error("film_item", "Please choose film item.")
+            if not film_meter or film_meter <= 0:
+                self.add_error("film_meter", "Please enter film meter.")
+
+        return cleaned
 
 
 OrderItemFormSet = inlineformset_factory(

@@ -23,7 +23,7 @@
         border: 1px solid var(--line);
         border-radius: 24px;
         box-shadow: var(--shadow);
-        padding: 24px;
+        padding: 22px;
         margin-bottom: 22px;
     }
 
@@ -32,7 +32,7 @@
         justify-content: space-between;
         align-items: flex-start;
         gap: 14px;
-        margin-bottom: 18px;
+        margin-bottom: 14px;
         flex-wrap: wrap;
     }
 
@@ -44,39 +44,57 @@
     }
 
     .qb-sub {
-        margin-top: 5px;
+        margin-top: 4px;
         font-size: 13px;
         color: var(--muted);
     }
 
+    .niron-alert-success,
+    .niron-alert-warning,
     .niron-alert-error {
-        background: var(--danger-bg);
-        border: 1px solid var(--danger-line);
-        color: var(--danger-text);
         border-radius: 16px;
         padding: 14px 16px;
         font-weight: 700;
         margin-bottom: 18px;
+    }
+
+    .niron-alert-success {
+        background: #E8F8EE;
+        border: 1px solid #B7E4C7;
+        color: #1B5E20;
+    }
+
+    .niron-alert-warning {
+        background: #FFF4E5;
+        border: 1px solid #FFD59E;
+        color: #8A5B00;
+    }
+
+    .niron-alert-error {
+        background: #FDECEA;
+        border: 1px solid #F5C2C0;
+        color: #B42318;
         white-space: pre-line;
     }
 
     .field {
-        margin-bottom: 16px;
+        margin-bottom: 14px;
+        min-width: 0;
     }
 
     .field label {
         display: block;
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 800;
         color: var(--muted);
         text-transform: uppercase;
         letter-spacing: .8px;
-        margin-bottom: 8px;
+        margin-bottom: 7px;
     }
 
     .field small {
         display: block;
-        margin-top: 7px;
+        margin-top: 6px;
         color: var(--muted);
         font-size: 12px;
     }
@@ -94,6 +112,8 @@
     .order-shell textarea {
         font-size: 14px;
         line-height: 1.35;
+        width: 100%;
+        box-sizing: border-box;
     }
 
     .order-shell select {
@@ -102,43 +122,50 @@
         padding-bottom: 9px;
     }
 
-    .top-grid-2 {
+    .service-top-grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 16px;
+        gap: 14px;
+        align-items: start;
+        margin-bottom: 8px;
     }
 
-    .top-grid-4 {
+    .customer-row-grid {
         display: grid;
-        grid-template-columns: 1.1fr 1fr 1fr 1fr;
-        gap: 16px;
+        grid-template-columns: 1.15fr .95fr 1fr 1fr .95fr;
+        gap: 12px;
+        align-items: end;
     }
 
-    .remark-inline textarea,
-    .remark-inline input {
-        min-height: 42px !important;
-        height: 42px !important;
+    .service-note {
+        border-radius: 14px;
+        background: #F8F6EF;
+        border: 1px solid var(--line);
+        padding: 10px 12px;
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 8px;
     }
 
     .design-stack {
         display: grid;
-        gap: 20px;
+        gap: 18px;
     }
 
     .design-block {
         border: 1px solid var(--line);
         border-radius: 24px;
         background: linear-gradient(180deg, rgba(255,255,255,.98), rgba(249,247,240,.88));
-        padding: 20px;
+        padding: 18px;
     }
 
     .design-top {
         display: flex;
         justify-content: space-between;
-        align-items: flex-start;
+        align-items: center;
         gap: 14px;
         flex-wrap: wrap;
-        margin-bottom: 16px;
+        margin-bottom: 14px;
     }
 
     .design-badge {
@@ -160,18 +187,25 @@
         flex-wrap: wrap;
     }
 
-    .design-grid {
+    .design-row-grid {
         display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 16px;
-        margin-bottom: 14px;
+        grid-template-columns: 1.15fr 1fr 1fr;
+        gap: 14px;
+        align-items: start;
+        margin-bottom: 8px;
+    }
+
+    .design-upload-field input[type="file"] {
+        padding: 7px 10px;
+        height: auto;
+        min-height: 42px;
     }
 
     .preview-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-        gap: 14px;
-        margin-top: 12px;
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        gap: 12px;
+        margin-top: 8px;
     }
 
     .preview-card {
@@ -192,7 +226,7 @@
 
     .preview-card img {
         width: 100%;
-        height: 150px;
+        height: 120px;
         object-fit: cover;
         display: block;
         background: var(--bg-soft);
@@ -204,7 +238,7 @@
         gap: 8px;
         align-items: center;
         padding: 8px 10px;
-        font-size: 12px;
+        font-size: 11px;
         color: var(--muted);
     }
 
@@ -219,7 +253,7 @@
         background: transparent;
         color: #c62828;
         cursor: pointer;
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 700;
     }
 
@@ -228,27 +262,27 @@
         justify-content: space-between;
         align-items: center;
         gap: 12px;
-        margin-bottom: 14px;
+        margin: 10px 0 12px;
         flex-wrap: wrap;
     }
 
     .item-board {
         overflow-x: auto;
-        padding-bottom: 6px;
+        padding-bottom: 4px;
     }
 
     .item-header-row,
     .item-input-row {
-        min-width: 1220px;
+        min-width: 1180px;
         display: grid;
         grid-template-columns:
-            100px
-            170px
+            220px
             170px
             120px
             100px
             90px
-            110px
+            170px
+            120px
             110px
             90px
             70px;
@@ -289,10 +323,6 @@
         border-radius: 12px;
     }
 
-    .item-select-cell select[hidden] {
-        display: none !important;
-    }
-
     .line-total-view {
         background: #F8F6EF;
         font-weight: 700;
@@ -324,6 +354,10 @@
     .trash-btn:hover {
         background: #FDECEC;
         border-color: #E7A9A9;
+    }
+
+    .is-hidden {
+        display: none !important;
     }
 
     .summary-layout {
@@ -476,54 +510,30 @@
         background: white;
         box-shadow: 0 20px 60px rgba(0,0,0,.28);
     }
-    .niron-alert-success {
-        background: #E8F8EE;
-        border: 1px solid #B7E4C7;
-        color: #1B5E20;
-        border-radius: 16px;
-        padding: 14px 16px;
-        font-weight: 700;
-        margin-bottom: 18px;
-    }
 
-    .niron-alert-warning {
-        background: #FFF4E5;
-        border: 1px solid #FFD59E;
-        color: #8A5B00;
-        border-radius: 16px;
-        padding: 14px 16px;
-        font-weight: 700;
-        margin-bottom: 18px;
-    }
+    @media (max-width: 1280px) {
+        .customer-row-grid {
+            grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
+        }
 
-    .niron-alert-error {
-        background: #FDECEA;
-        border: 1px solid #F5C2C0;
-        color: #B42318;
-        border-radius: 16px;
-        padding: 14px 16px;
-        font-weight: 700;
-        margin-bottom: 18px;
-    }
-
-    @media (max-width: 1200px) {
-        .top-grid-4,
-        .design-grid {
-            grid-template-columns: 1fr 1fr;
+        .design-row-grid {
+            grid-template-columns: 1.1fr 1fr 1fr;
         }
     }
 
     @media (max-width: 1100px) {
-        .top-grid-2,
-        .summary-layout,
-        .design-grid {
+        .service-top-grid,
+        .customer-row-grid,
+        .design-row-grid,
+        .summary-layout {
             grid-template-columns: 1fr;
         }
     }
 
     @media (max-width: 700px) {
-        .top-grid-4 {
-            grid-template-columns: 1fr;
+        .qb-card,
+        .design-block {
+            padding: 16px;
         }
     }
 </style>
@@ -538,20 +548,20 @@
         <input type="hidden" name="confirm_shortage" id="confirm-shortage" value="0">
 
         {% if messages %}
-    {% for message in messages %}
-        <div class="
-            {% if message.tags == 'success' %}
-                niron-alert-success
-            {% elif message.tags == 'warning' %}
-                niron-alert-warning
-            {% else %}
-                niron-alert-error
-            {% endif %}
-        ">
-            {{ message }}
-        </div>
-    {% endfor %}
-{% endif %}
+            {% for message in messages %}
+                <div class="
+                    {% if message.tags == 'success' %}
+                        niron-alert-success
+                    {% elif message.tags == 'warning' %}
+                        niron-alert-warning
+                    {% else %}
+                        niron-alert-error
+                    {% endif %}
+                ">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
 
         {% if form.errors %}
         <div class="niron-alert-error">
@@ -563,11 +573,11 @@
             <div class="qb-head">
                 <div>
                     <h2 class="qb-title">Order Information</h2>
-                    <div class="qb-sub">Customer info and deadline</div>
+                    <div class="qb-sub">Customer info and service type</div>
                 </div>
             </div>
 
-            <div class="top-grid-2">
+            <div class="service-top-grid">
                 <div class="field">
                     <label>Order Type</label>
                     {{ form.order_type }}
@@ -575,13 +585,14 @@
                 </div>
 
                 <div class="field">
-                    <label>Deadline</label>
-                    {{ form.deadline }}
-                    {{ form.deadline.errors }}
+                    <label>Service Type</label>
+                    {{ form.service_type }}
+                    {{ form.service_type.errors }}
+                    <div class="service-note" id="service-help-text"></div>
                 </div>
             </div>
 
-            <div class="top-grid-4">
+            <div class="customer-row-grid">
                 <div class="field">
                     <label>Customer Name</label>
                     {{ form.customer_name }}
@@ -600,10 +611,16 @@
                     {{ form.customer_location.errors }}
                 </div>
 
-                <div class="field remark-inline">
+                <div class="field">
                     <label>Remark</label>
                     {{ form.remark }}
                     {{ form.remark.errors }}
+                </div>
+
+                <div class="field">
+                    <label>Deadline</label>
+                    {{ form.deadline }}
+                    {{ form.deadline.errors }}
                 </div>
             </div>
         </div>
@@ -634,21 +651,22 @@
                             </div>
                         </div>
 
-                        <div class="design-grid">
+                        <div class="design-row-grid">
+                            <div class="field design-upload-field">
+                                <label>Upload Design Images</label>
+                                <input type="file" name="design-{{ forloop.counter0 }}-design_files" class="form-control design-file-input" accept="image/*" multiple>
+                                <small>You can upload images for this design only.</small>
+                            </div>
+
                             <div class="field">
                                 <label>Design Name</label>
                                 <input type="text" name="design-{{ forloop.counter0 }}-name" class="form-control" value="{{ design.name }}">
                             </div>
+
                             <div class="field">
                                 <label>Design Remark</label>
                                 <input type="text" name="design-{{ forloop.counter0 }}-remark" class="form-control" value="{{ design.remark }}">
                             </div>
-                        </div>
-
-                        <div class="field">
-                            <label>Upload Design Images</label>
-                            <input type="file" name="design-{{ forloop.counter0 }}-design_files" class="form-control design-file-input" accept="image/*" multiple>
-                            <small>You can upload images for this design only.</small>
                         </div>
 
                         <div class="field">
@@ -678,16 +696,16 @@
 
                         <div class="item-board">
                             <div class="item-header-row">
-                                <div>Mode</div>
-                                <div>Description</div>
-                                <div>Item</div>
-                                <div>Color</div>
-                                <div>Size</div>
-                                <div>Qty</div>
-                                <div>Film Meter</div>
-                                <div>Unit Price</div>
-                                <div>Total</div>
-                                <div>Action</div>
+                                <div class="col-description">Description</div>
+                                <div class="col-shirt service-full-only">Shirt Item</div>
+                                <div class="col-color service-full-only">Color</div>
+                                <div class="col-size service-full-only">Size</div>
+                                <div class="col-qty">Qty</div>
+                                <div class="col-film-item service-film-only">Film Item</div>
+                                <div class="col-film-meter service-film-only">Film Meter</div>
+                                <div class="col-unit-price">Unit Price</div>
+                                <div class="col-total">Total</div>
+                                <div class="col-action">Action</div>
                             </div>
 
                             <div class="items-container">
@@ -697,35 +715,21 @@
                                     <input type="hidden" name="design-{{ forloop.parentloop.counter0 }}-item-{{ forloop.counter0 }}-DELETE" value="0" class="item-delete-input">
 
                                     <div class="item-input-row">
-                                        <div class="field">
-                                            <select name="design-{{ forloop.parentloop.counter0 }}-item-{{ forloop.counter0 }}-item_mode" class="form-select item-mode-select">
-                                                <option value="CLOTH" {% if item.item_mode == "CLOTH" %}selected{% endif %}>Cloth</option>
-                                                <option value="FILM" {% if item.item_mode == "FILM" %}selected{% endif %}>Film</option>
-                                            </select>
-                                        </div>
-
-                                        <div class="field">
+                                        <div class="field col-description">
                                             <input type="text" name="design-{{ forloop.parentloop.counter0 }}-item-{{ forloop.counter0 }}-description" class="form-control" value="{{ item.description }}">
                                         </div>
 
-                                        <div class="field item-select-cell">
-                                            <select name="design-{{ forloop.parentloop.counter0 }}-item-{{ forloop.counter0 }}-shirt_item" class="form-select shirt-select" {% if item.item_mode == "FILM" %}hidden{% endif %}>
+                                        <div class="field col-shirt service-full-only">
+                                            <select name="design-{{ forloop.parentloop.counter0 }}-item-{{ forloop.counter0 }}-shirt_item" class="form-select shirt-select">
                                                 <option value="">---------</option>
                                                 {% for opt in shirt_items %}
                                                 <option value="{{ opt.id }}" {% if item.shirt_item_id == opt.id %}selected{% endif %}>{{ opt }}</option>
                                                 {% endfor %}
                                             </select>
-
-                                            <select name="design-{{ forloop.parentloop.counter0 }}-item-{{ forloop.counter0 }}-film_item" class="form-select film-select" {% if item.item_mode != "FILM" %}hidden{% endif %}>
-                                                <option value="">---------</option>
-                                                {% for opt in film_items %}
-                                                <option value="{{ opt.id }}" {% if item.film_item_id == opt.id %}selected{% endif %}>{{ opt }}</option>
-                                                {% endfor %}
-                                            </select>
                                         </div>
 
-                                        <div class="field">
-                                            <select name="design-{{ forloop.parentloop.counter0 }}-item-{{ forloop.counter0 }}-color" class="form-select">
+                                        <div class="field col-color service-full-only">
+                                            <select name="design-{{ forloop.parentloop.counter0 }}-item-{{ forloop.counter0 }}-color" class="form-select color-select">
                                                 <option value="">---------</option>
                                                 {% for opt in colors %}
                                                 <option value="{{ opt.id }}" {% if item.color_id == opt.id %}selected{% endif %}>{{ opt }}</option>
@@ -733,8 +737,8 @@
                                             </select>
                                         </div>
 
-                                        <div class="field">
-                                            <select name="design-{{ forloop.parentloop.counter0 }}-item-{{ forloop.counter0 }}-size" class="form-select">
+                                        <div class="field col-size service-full-only">
+                                            <select name="design-{{ forloop.parentloop.counter0 }}-item-{{ forloop.counter0 }}-size" class="form-select size-select">
                                                 <option value="">---------</option>
                                                 {% for opt in sizes %}
                                                 <option value="{{ opt.id }}" {% if item.size_id == opt.id %}selected{% endif %}>{{ opt }}</option>
@@ -742,63 +746,57 @@
                                             </select>
                                         </div>
 
-                                        <div class="field">
+                                        <div class="field col-qty">
                                             <input type="number" step="0.01" min="0" name="design-{{ forloop.parentloop.counter0 }}-item-{{ forloop.counter0 }}-quantity" class="form-control qty-input" value="{{ item.quantity }}">
                                         </div>
 
-                                        <div class="field">
-                                            <input type="number" step="0.0001" min="0" name="design-{{ forloop.parentloop.counter0 }}-item-{{ forloop.counter0 }}-manual_film_meter" class="form-control" value="{{ item.manual_film_meter }}">
-                                            <input type="hidden" name="design-{{ forloop.parentloop.counter0 }}-item-{{ forloop.counter0 }}-film_meter_per_piece" value="{{ item.film_meter_per_piece|default:'0' }}">
+                                        <div class="field col-film-item service-film-only">
+                                            <select name="design-{{ forloop.parentloop.counter0 }}-item-{{ forloop.counter0 }}-film_item" class="form-select film-select">
+                                                <option value="">---------</option>
+                                                {% for opt in film_items %}
+                                                <option value="{{ opt.id }}" {% if item.film_item_id == opt.id %}selected{% endif %}>{{ opt }}</option>
+                                                {% endfor %}
+                                            </select>
                                         </div>
 
-                                        <div class="field">
+                                        <div class="field col-film-meter service-film-only">
+                                            <input type="number" step="0.0001" min="0" name="design-{{ forloop.parentloop.counter0 }}-item-{{ forloop.counter0 }}-film_meter" class="form-control film-meter-input" value="{{ item.film_meter }}">
+                                        </div>
+
+                                        <div class="field col-unit-price">
                                             <input type="number" step="0.01" min="0" name="design-{{ forloop.parentloop.counter0 }}-item-{{ forloop.counter0 }}-unit_price" class="form-control unit-price-input" value="{{ item.unit_price }}">
                                         </div>
 
-                                        <div class="field">
+                                        <div class="field col-total">
                                             <input type="text" class="line-total-view" value="{{ item.line_total }}" readonly>
                                         </div>
 
-                                        <div class="remove-inline">
+                                        <div class="remove-inline col-action">
                                             <button type="button" class="trash-btn remove-row-btn">🗑</button>
                                         </div>
                                     </div>
                                 </div>
                                 {% empty %}
                                 <div class="item-row" data-item-index="0">
-                                    <input type="hidden" name="design-{{ forloop.parentloop.counter0|default:0 }}-item-0-id" value="">
-                                    <input type="hidden" name="design-{{ forloop.parentloop.counter0|default:0 }}-item-0-DELETE" value="0" class="item-delete-input">
+                                    <input type="hidden" name="design-0-item-0-id" value="">
+                                    <input type="hidden" name="design-0-item-0-DELETE" value="0" class="item-delete-input">
 
                                     <div class="item-input-row">
-                                        <div class="field">
-                                            <select name="design-{{ forloop.parentloop.counter0|default:0 }}-item-0-item_mode" class="form-select item-mode-select">
-                                                <option value="CLOTH" selected>Cloth</option>
-                                                <option value="FILM">Film</option>
-                                            </select>
+                                        <div class="field col-description">
+                                            <input type="text" name="design-0-item-0-description" class="form-control" value="">
                                         </div>
 
-                                        <div class="field">
-                                            <input type="text" name="design-{{ forloop.parentloop.counter0|default:0 }}-item-0-description" class="form-control" value="">
-                                        </div>
-
-                                        <div class="field item-select-cell">
-                                            <select name="design-{{ forloop.parentloop.counter0|default:0 }}-item-0-shirt_item" class="form-select shirt-select">
+                                        <div class="field col-shirt service-full-only">
+                                            <select name="design-0-item-0-shirt_item" class="form-select shirt-select">
                                                 <option value="">---------</option>
                                                 {% for opt in shirt_items %}
                                                 <option value="{{ opt.id }}">{{ opt }}</option>
                                                 {% endfor %}
                                             </select>
-
-                                            <select name="design-{{ forloop.parentloop.counter0|default:0 }}-item-0-film_item" class="form-select film-select" hidden>
-                                                <option value="">---------</option>
-                                                {% for opt in film_items %}
-                                                <option value="{{ opt.id }}">{{ opt }}</option>
-                                                {% endfor %}
-                                            </select>
                                         </div>
 
-                                        <div class="field">
-                                            <select name="design-{{ forloop.parentloop.counter0|default:0 }}-item-0-color" class="form-select">
+                                        <div class="field col-color service-full-only">
+                                            <select name="design-0-item-0-color" class="form-select color-select">
                                                 <option value="">---------</option>
                                                 {% for opt in colors %}
                                                 <option value="{{ opt.id }}">{{ opt }}</option>
@@ -806,8 +804,8 @@
                                             </select>
                                         </div>
 
-                                        <div class="field">
-                                            <select name="design-{{ forloop.parentloop.counter0|default:0 }}-item-0-size" class="form-select">
+                                        <div class="field col-size service-full-only">
+                                            <select name="design-0-item-0-size" class="form-select size-select">
                                                 <option value="">---------</option>
                                                 {% for opt in sizes %}
                                                 <option value="{{ opt.id }}">{{ opt }}</option>
@@ -815,24 +813,32 @@
                                             </select>
                                         </div>
 
-                                        <div class="field">
-                                            <input type="number" step="0.01" min="0" name="design-{{ forloop.parentloop.counter0|default:0 }}-item-0-quantity" class="form-control qty-input" value="">
+                                        <div class="field col-qty">
+                                            <input type="number" step="0.01" min="0" name="design-0-item-0-quantity" class="form-control qty-input" value="">
                                         </div>
 
-                                        <div class="field">
-                                            <input type="number" step="0.0001" min="0" name="design-{{ forloop.parentloop.counter0|default:0 }}-item-0-manual_film_meter" class="form-control" value="">
-                                            <input type="hidden" name="design-{{ forloop.parentloop.counter0|default:0 }}-item-0-film_meter_per_piece" value="0">
+                                        <div class="field col-film-item service-film-only">
+                                            <select name="design-0-item-0-film_item" class="form-select film-select">
+                                                <option value="">---------</option>
+                                                {% for opt in film_items %}
+                                                <option value="{{ opt.id }}">{{ opt }}</option>
+                                                {% endfor %}
+                                            </select>
                                         </div>
 
-                                        <div class="field">
-                                            <input type="number" step="0.01" min="0" name="design-{{ forloop.parentloop.counter0|default:0 }}-item-0-unit_price" class="form-control unit-price-input" value="">
+                                        <div class="field col-film-meter service-film-only">
+                                            <input type="number" step="0.0001" min="0" name="design-0-item-0-film_meter" class="form-control film-meter-input" value="">
                                         </div>
 
-                                        <div class="field">
+                                        <div class="field col-unit-price">
+                                            <input type="number" step="0.01" min="0" name="design-0-item-0-unit_price" class="form-control unit-price-input" value="">
+                                        </div>
+
+                                        <div class="field col-total">
                                             <input type="text" class="line-total-view" value="0.00" readonly>
                                         </div>
 
-                                        <div class="remove-inline">
+                                        <div class="remove-inline col-action">
                                             <button type="button" class="trash-btn remove-row-btn">🗑</button>
                                         </div>
                                     </div>
@@ -857,21 +863,22 @@
                             </div>
                         </div>
 
-                        <div class="design-grid">
+                        <div class="design-row-grid">
+                            <div class="field design-upload-field">
+                                <label>Upload Design Images</label>
+                                <input type="file" name="design-0-design_files" class="form-control design-file-input" accept="image/*" multiple>
+                                <small>You can upload images for this design only.</small>
+                            </div>
+
                             <div class="field">
                                 <label>Design Name</label>
                                 <input type="text" name="design-0-name" class="form-control">
                             </div>
+
                             <div class="field">
                                 <label>Design Remark</label>
                                 <input type="text" name="design-0-remark" class="form-control">
                             </div>
-                        </div>
-
-                        <div class="field">
-                            <label>Upload Design Images</label>
-                            <input type="file" name="design-0-design_files" class="form-control design-file-input" accept="image/*" multiple>
-                            <small>You can upload images for this design only.</small>
                         </div>
 
                         <div class="field">
@@ -890,16 +897,16 @@
 
                         <div class="item-board">
                             <div class="item-header-row">
-                                <div>Mode</div>
-                                <div>Description</div>
-                                <div>Item</div>
-                                <div>Color</div>
-                                <div>Size</div>
-                                <div>Qty</div>
-                                <div>Film Meter</div>
-                                <div>Unit Price</div>
-                                <div>Total</div>
-                                <div>Action</div>
+                                <div class="col-description">Description</div>
+                                <div class="col-shirt service-full-only">Shirt Item</div>
+                                <div class="col-color service-full-only">Color</div>
+                                <div class="col-size service-full-only">Size</div>
+                                <div class="col-qty">Qty</div>
+                                <div class="col-film-item service-film-only">Film Item</div>
+                                <div class="col-film-meter service-film-only">Film Meter</div>
+                                <div class="col-unit-price">Unit Price</div>
+                                <div class="col-total">Total</div>
+                                <div class="col-action">Action</div>
                             </div>
 
                             <div class="items-container">
@@ -908,35 +915,21 @@
                                     <input type="hidden" name="design-0-item-0-DELETE" value="0" class="item-delete-input">
 
                                     <div class="item-input-row">
-                                        <div class="field">
-                                            <select name="design-0-item-0-item_mode" class="form-select item-mode-select">
-                                                <option value="CLOTH" selected>Cloth</option>
-                                                <option value="FILM">Film</option>
-                                            </select>
-                                        </div>
-
-                                        <div class="field">
+                                        <div class="field col-description">
                                             <input type="text" name="design-0-item-0-description" class="form-control" value="">
                                         </div>
 
-                                        <div class="field item-select-cell">
+                                        <div class="field col-shirt service-full-only">
                                             <select name="design-0-item-0-shirt_item" class="form-select shirt-select">
                                                 <option value="">---------</option>
                                                 {% for opt in shirt_items %}
                                                 <option value="{{ opt.id }}">{{ opt }}</option>
                                                 {% endfor %}
                                             </select>
-
-                                            <select name="design-0-item-0-film_item" class="form-select film-select" hidden>
-                                                <option value="">---------</option>
-                                                {% for opt in film_items %}
-                                                <option value="{{ opt.id }}">{{ opt }}</option>
-                                                {% endfor %}
-                                            </select>
                                         </div>
 
-                                        <div class="field">
-                                            <select name="design-0-item-0-color" class="form-select">
+                                        <div class="field col-color service-full-only">
+                                            <select name="design-0-item-0-color" class="form-select color-select">
                                                 <option value="">---------</option>
                                                 {% for opt in colors %}
                                                 <option value="{{ opt.id }}">{{ opt }}</option>
@@ -944,8 +937,8 @@
                                             </select>
                                         </div>
 
-                                        <div class="field">
-                                            <select name="design-0-item-0-size" class="form-select">
+                                        <div class="field col-size service-full-only">
+                                            <select name="design-0-item-0-size" class="form-select size-select">
                                                 <option value="">---------</option>
                                                 {% for opt in sizes %}
                                                 <option value="{{ opt.id }}">{{ opt }}</option>
@@ -953,24 +946,32 @@
                                             </select>
                                         </div>
 
-                                        <div class="field">
+                                        <div class="field col-qty">
                                             <input type="number" step="0.01" min="0" name="design-0-item-0-quantity" class="form-control qty-input" value="">
                                         </div>
 
-                                        <div class="field">
-                                            <input type="number" step="0.0001" min="0" name="design-0-item-0-manual_film_meter" class="form-control" value="">
-                                            <input type="hidden" name="design-0-item-0-film_meter_per_piece" value="0">
+                                        <div class="field col-film-item service-film-only">
+                                            <select name="design-0-item-0-film_item" class="form-select film-select">
+                                                <option value="">---------</option>
+                                                {% for opt in film_items %}
+                                                <option value="{{ opt.id }}">{{ opt }}</option>
+                                                {% endfor %}
+                                            </select>
                                         </div>
 
-                                        <div class="field">
+                                        <div class="field col-film-meter service-film-only">
+                                            <input type="number" step="0.0001" min="0" name="design-0-item-0-film_meter" class="form-control film-meter-input" value="">
+                                        </div>
+
+                                        <div class="field col-unit-price">
                                             <input type="number" step="0.01" min="0" name="design-0-item-0-unit_price" class="form-control unit-price-input" value="">
                                         </div>
 
-                                        <div class="field">
+                                        <div class="field col-total">
                                             <input type="text" class="line-total-view" value="0.00" readonly>
                                         </div>
 
-                                        <div class="remove-inline">
+                                        <div class="remove-inline col-action">
                                             <button type="button" class="trash-btn remove-row-btn">🗑</button>
                                         </div>
                                     </div>
@@ -994,7 +995,7 @@
                 <div class="summary-note">
                     <div class="summary-note-title">Order Summary</div>
                     <div class="summary-note-text">
-                        Each design is separated for easier production reading. Save after checking all design boxes and totals.
+                        Full = shirt inventory only. Film Only = film inventory only. Print & Heat Press = service only, no inventory deduction.
                     </div>
                 </div>
 
@@ -1062,21 +1063,22 @@
             </div>
         </div>
 
-        <div class="design-grid">
+        <div class="design-row-grid">
+            <div class="field design-upload-field">
+                <label>Upload Design Images</label>
+                <input type="file" name="design-__DESIGN_INDEX__-design_files" class="form-control design-file-input" accept="image/*" multiple>
+                <small>You can upload images for this design only.</small>
+            </div>
+
             <div class="field">
                 <label>Design Name</label>
                 <input type="text" name="design-__DESIGN_INDEX__-name" class="form-control">
             </div>
+
             <div class="field">
                 <label>Design Remark</label>
                 <input type="text" name="design-__DESIGN_INDEX__-remark" class="form-control">
             </div>
-        </div>
-
-        <div class="field">
-            <label>Upload Design Images</label>
-            <input type="file" name="design-__DESIGN_INDEX__-design_files" class="form-control design-file-input" accept="image/*" multiple>
-            <small>You can upload images for this design only.</small>
         </div>
 
         <div class="field">
@@ -1095,16 +1097,16 @@
 
         <div class="item-board">
             <div class="item-header-row">
-                <div>Mode</div>
-                <div>Description</div>
-                <div>Item</div>
-                <div>Color</div>
-                <div>Size</div>
-                <div>Qty</div>
-                <div>Film Meter</div>
-                <div>Unit Price</div>
-                <div>Total</div>
-                <div>Action</div>
+                <div class="col-description">Description</div>
+                <div class="col-shirt service-full-only">Shirt Item</div>
+                <div class="col-color service-full-only">Color</div>
+                <div class="col-size service-full-only">Size</div>
+                <div class="col-qty">Qty</div>
+                <div class="col-film-item service-film-only">Film Item</div>
+                <div class="col-film-meter service-film-only">Film Meter</div>
+                <div class="col-unit-price">Unit Price</div>
+                <div class="col-total">Total</div>
+                <div class="col-action">Action</div>
             </div>
 
             <div class="items-container">
@@ -1120,35 +1122,21 @@
         <input type="hidden" name="design-__DESIGN_INDEX__-item-__ITEM_INDEX__-DELETE" value="0" class="item-delete-input">
 
         <div class="item-input-row">
-            <div class="field">
-                <select name="design-__DESIGN_INDEX__-item-__ITEM_INDEX__-item_mode" class="form-select item-mode-select">
-                    <option value="CLOTH" selected>Cloth</option>
-                    <option value="FILM">Film</option>
-                </select>
-            </div>
-
-            <div class="field">
+            <div class="field col-description">
                 <input type="text" name="design-__DESIGN_INDEX__-item-__ITEM_INDEX__-description" class="form-control" value="">
             </div>
 
-            <div class="field item-select-cell">
+            <div class="field col-shirt service-full-only">
                 <select name="design-__DESIGN_INDEX__-item-__ITEM_INDEX__-shirt_item" class="form-select shirt-select">
                     <option value="">---------</option>
                     {% for opt in shirt_items %}
                     <option value="{{ opt.id }}">{{ opt }}</option>
                     {% endfor %}
                 </select>
-
-                <select name="design-__DESIGN_INDEX__-item-__ITEM_INDEX__-film_item" class="form-select film-select" hidden>
-                    <option value="">---------</option>
-                    {% for opt in film_items %}
-                    <option value="{{ opt.id }}">{{ opt }}</option>
-                    {% endfor %}
-                </select>
             </div>
 
-            <div class="field">
-                <select name="design-__DESIGN_INDEX__-item-__ITEM_INDEX__-color" class="form-select">
+            <div class="field col-color service-full-only">
+                <select name="design-__DESIGN_INDEX__-item-__ITEM_INDEX__-color" class="form-select color-select">
                     <option value="">---------</option>
                     {% for opt in colors %}
                     <option value="{{ opt.id }}">{{ opt }}</option>
@@ -1156,8 +1144,8 @@
                 </select>
             </div>
 
-            <div class="field">
-                <select name="design-__DESIGN_INDEX__-item-__ITEM_INDEX__-size" class="form-select">
+            <div class="field col-size service-full-only">
+                <select name="design-__DESIGN_INDEX__-item-__ITEM_INDEX__-size" class="form-select size-select">
                     <option value="">---------</option>
                     {% for opt in sizes %}
                     <option value="{{ opt.id }}">{{ opt }}</option>
@@ -1165,24 +1153,32 @@
                 </select>
             </div>
 
-            <div class="field">
+            <div class="field col-qty">
                 <input type="number" step="0.01" min="0" name="design-__DESIGN_INDEX__-item-__ITEM_INDEX__-quantity" class="form-control qty-input" value="">
             </div>
 
-            <div class="field">
-                <input type="number" step="0.0001" min="0" name="design-__DESIGN_INDEX__-item-__ITEM_INDEX__-manual_film_meter" class="form-control" value="">
-                <input type="hidden" name="design-__DUQDgwqVE-6aMBLYLbQv6i5N5y7bC5SajqSjHPzt8UJUqbZ8a_piece" value="0">
+            <div class="field col-film-item service-film-only">
+                <select name="design-__DESIGN_INDEX__-item-__ITEM_INDEX__-film_item" class="form-select film-select">
+                    <option value="">---------</option>
+                    {% for opt in film_items %}
+                    <option value="{{ opt.id }}">{{ opt }}</option>
+                    {% endfor %}
+                </select>
             </div>
 
-            <div class="field">
+            <div class="field col-film-meter service-film-only">
+                <input type="number" step="0.0001" min="0" name="design-__DESIGN_INDEX__-item-__ITEM_INDEX__-film_meter" class="form-control film-meter-input" value="">
+            </div>
+
+            <div class="field col-unit-price">
                 <input type="number" step="0.01" min="0" name="design-__DESIGN_INDEX__-item-__ITEM_INDEX__-unit_price" class="form-control unit-price-input" value="">
             </div>
 
-            <div class="field">
+            <div class="field col-total">
                 <input type="text" class="line-total-view" value="0.00" readonly>
             </div>
 
-            <div class="remove-inline">
+            <div class="remove-inline col-action">
                 <button type="button" class="trash-btn remove-row-btn">🗑</button>
             </div>
         </div>
@@ -1197,6 +1193,8 @@ document.addEventListener("DOMContentLoaded", function () {
     const designTemplate = document.getElementById("design-template").innerHTML;
     const itemRowTemplate = document.getElementById("item-row-template").innerHTML;
     const designTotalInput = document.getElementById("design-total");
+    const serviceTypeSelect = document.getElementById("id_service_type");
+    const serviceHelpText = document.getElementById("service-help-text");
 
     const imagePreviewModal = document.getElementById("image-preview-modal");
     const modalPreviewImage = document.getElementById("modal-preview-image");
@@ -1219,6 +1217,10 @@ document.addEventListener("DOMContentLoaded", function () {
         if (!imagePreviewModal || !modalPreviewImage) return;
         imagePreviewModal.classList.remove("show");
         modalPreviewImage.src = "";
+    }
+
+    function getServiceType() {
+        return serviceTypeSelect ? serviceTypeSelect.value : "FULL";
     }
 
     function getVisibleDesigns() {
@@ -1314,44 +1316,6 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
-    function toggleItemMode(row) {
-        const modeSelect = row.querySelector(".item-mode-select");
-        const shirtSelect = row.querySelector(".shirt-select");
-        const filmSelect = row.querySelector(".film-select");
-        const colorSelect = row.querySelector('select[name*="-color"]');
-        const sizeSelect = row.querySelector('select[name*="-size"]');
-
-        function applyMode() {
-            if (!modeSelect) return;
-            const isFilm = modeSelect.value === "FILM";
-
-            if (shirtSelect) {
-                shirtSelect.hidden = isFilm;
-                if (isFilm) shirtSelect.value = "";
-            }
-
-            if (filmSelect) {
-                filmSelect.hidden = !isFilm;
-                if (!isFilm) filmSelect.value = "";
-            }
-
-            if (colorSelect) {
-                colorSelect.disabled = isFilm;
-                if (isFilm) colorSelect.value = "";
-            }
-
-            if (sizeSelect) {
-                sizeSelect.disabled = isFilm;
-                if (isFilm) sizeSelect.value = "";
-            }
-        }
-
-        if (modeSelect) {
-            modeSelect.addEventListener("change", applyMode);
-            applyMode();
-        }
-    }
-
     function updateTotals() {
         let itemsTotal = 0;
 
@@ -1409,9 +1373,57 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
-    function bindRowEvents(row) {
-        toggleItemMode(row);
+    function applyServiceTypeLayout() {
+        const serviceType = getServiceType();
 
+        if (serviceHelpText) {
+            if (serviceType === "FULL") {
+                serviceHelpText.textContent = "Full Order: show shirt columns only.";
+            } else if (serviceType === "FILM_ONLY") {
+                serviceHelpText.textContent = "Film Only: show film columns only.";
+            } else if (serviceType === "PRINT_HEATPRESS") {
+                serviceHelpText.textContent = "Print & Heat Press: service only, no inventory deduction.";
+            } else {
+                serviceHelpText.textContent = "";
+            }
+        }
+
+        const showFull = serviceType === "FULL";
+        const showFilm = serviceType === "FILM_ONLY";
+
+        document.querySelectorAll(".service-full-only").forEach(el => {
+            el.classList.toggle("is-hidden", !showFull);
+        });
+
+        document.querySelectorAll(".service-film-only").forEach(el => {
+            el.classList.toggle("is-hidden", !showFilm);
+        });
+
+        document.querySelectorAll(".item-row").forEach(row => {
+            const shirtSelect = row.querySelector(".shirt-select");
+            const colorSelect = row.querySelector(".color-select");
+            const sizeSelect = row.querySelector(".size-select");
+            const filmSelect = row.querySelector(".film-select");
+            const filmMeterInput = row.querySelector(".film-meter-input");
+
+            if (serviceType === "FULL") {
+                if (filmSelect) filmSelect.value = "";
+                if (filmMeterInput) filmMeterInput.value = "";
+            } else if (serviceType === "FILM_ONLY") {
+                if (shirtSelect) shirtSelect.value = "";
+                if (colorSelect) colorSelect.value = "";
+                if (sizeSelect) sizeSelect.value = "";
+            } else if (serviceType === "PRINT_HEATPRESS") {
+                if (shirtSelect) shirtSelect.value = "";
+                if (colorSelect) colorSelect.value = "";
+                if (sizeSelect) sizeSelect.value = "";
+                if (filmSelect) filmSelect.value = "";
+                if (filmMeterInput) filmMeterInput.value = "";
+            }
+        });
+    }
+
+    function bindRowEvents(row) {
         row.querySelectorAll(".qty-input, .unit-price-input").forEach(el => {
             el.addEventListener("input", updateTotals);
         });
@@ -1445,8 +1457,8 @@ document.addEventListener("DOMContentLoaded", function () {
                         deleteInput.value = "0";
                     }
 
-                    toggleItemMode(row);
                     refreshItemNames(designBlock);
+                    applyServiceTypeLayout();
                     updateTotals();
                     return;
                 }
@@ -1462,6 +1474,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 }
 
                 refreshItemNames(designBlock);
+                applyServiceTypeLayout();
                 updateTotals();
             });
         }
@@ -1535,6 +1548,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
                 refreshItemNames(designBlock);
                 bindRowEvents(row);
+                applyServiceTypeLayout();
                 updateTotals();
             });
         }
@@ -1570,7 +1584,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
             let html = designTemplate
                 .replaceAll("__DESIGN_INDEX__", designIndex)
-                .replaceAll("__DESIGN_NUMBER__", designIndex + 1)
+                .replaceAll("__DESIGN_NUMBER__", getVisibleDesigns().length + 1)
                 .replace("__ITEM_ROW__", rowHtml);
 
             const wrapper = document.createElement("div");
@@ -1581,11 +1595,19 @@ document.addEventListener("DOMContentLoaded", function () {
 
             bindDesignEvents(block);
             updateDesignMeta();
+            applyServiceTypeLayout();
             updateTotals();
         });
     }
 
     document.querySelectorAll(".design-block").forEach(bindDesignEvents);
+
+    if (serviceTypeSelect) {
+        serviceTypeSelect.addEventListener("change", function () {
+            applyServiceTypeLayout();
+            updateTotals();
+        });
+    }
 
     document.querySelectorAll(
         'input[name="discount_amount"], input[name="shipping_fee"], #deposit-amount, #paid-amount'
@@ -1607,14 +1629,13 @@ document.addEventListener("DOMContentLoaded", function () {
 
     if (orderForm) {
         orderForm.addEventListener("submit", function () {
-            document.querySelectorAll(".design-block").forEach(designBlock => {
-                if (designBlock.style.display === "none") return;
-                rebuildDesignInputFiles(designBlock);
-            });
+            updateTotals();
         });
     }
 
     updateDesignMeta();
+    applyServiceTypeLayout();
+    bindPreviewOpens(document);
     updateTotals();
 });
 </script>

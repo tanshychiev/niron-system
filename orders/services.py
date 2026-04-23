@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 
 from inventory.models import InventoryBatchItem
-from .models import StockConsumption
+from .models import Order, StockConsumption
 
 
 def _get_fifo_rows(item, color=None, size=None):
@@ -42,47 +42,50 @@ def _available_fifo_qty(item, color=None, size=None):
 def get_order_shortages(order):
     shortages = []
 
-    for line in order.items.select_related("shirt_item", "film_item", "color", "size"):
-        if line.shirt_item:
-            needed = Decimal(line.quantity or 0)
-            available = _available_fifo_qty(
-                line.shirt_item,
-                color=line.color,
-                size=line.size,
-            )
-            shortage = needed - available
-            if shortage > 0:
-                shortages.append(
-                    {
-                        "type": "shirt",
-                        "label": _variant_text(line.shirt_item, line.color, line.size),
-                        "needed": needed,
-                        "available": available,
-                        "shortage": shortage,
-                    }
+    lines = order.items.select_related(
+        "shirt_item",
+        "film_item",
+        "color",
+        "size",
+    )
+
+    if order.service_type == Order.SERVICE_FULL:
+        for line in lines:
+            if line.shirt_item:
+                needed = Decimal(line.quantity or 0)
+                available = _available_fifo_qty(
+                    line.shirt_item,
+                    color=line.color,
+                    size=line.size,
                 )
+                shortage = needed - available
+                if shortage > 0:
+                    shortages.append(
+                        {
+                            "type": "shirt",
+                            "label": _variant_text(line.shirt_item, line.color, line.size),
+                            "needed": needed,
+                            "available": available,
+                            "shortage": shortage,
+                        }
+                    )
 
-        film_qty = Decimal("0")
-
-        if line.manual_film_meter and line.manual_film_meter > 0:
-            film_qty += Decimal(line.manual_film_meter)
-
-        if line.film_item and line.film_meter_per_piece and line.quantity:
-            film_qty += Decimal(line.film_meter_per_piece) * Decimal(line.quantity)
-
-        if line.film_item and film_qty > 0:
-            available = _available_fifo_qty(line.film_item)
-            shortage = film_qty - available
-            if shortage > 0:
-                shortages.append(
-                    {
-                        "type": "film",
-                        "label": str(line.film_item),
-                        "needed": film_qty,
-                        "available": available,
-                        "shortage": shortage,
-                    }
-                )
+    elif order.service_type == Order.SERVICE_FILM_ONLY:
+        for line in lines:
+            if line.film_item and line.film_meter and line.film_meter > 0:
+                needed = Decimal(line.film_meter or 0)
+                available = _available_fifo_qty(line.film_item)
+                shortage = needed - available
+                if shortage > 0:
+                    shortages.append(
+                        {
+                            "type": "film",
+                            "label": str(line.film_item),
+                            "needed": needed,
+                            "available": available,
+                            "shortage": shortage,
+                        }
+                    )
 
     return shortages
 
@@ -145,50 +148,72 @@ def deduct_stock_for_order(order, allow_shortage=False):
 
     unresolved = []
 
-    for line in order.items.select_related("shirt_item", "film_item", "color", "size"):
-        if line.shirt_item:
-            shirt_remaining = _consume_fifo(
-                line.shirt_item,
-                line.quantity,
-                order,
-                line,
-                color=line.color,
-                size=line.size,
-                allow_shortage=allow_shortage,
-            )
-            if shirt_remaining > 0:
-                unresolved.append(
-                    {
-                        "label": _variant_text(line.shirt_item, line.color, line.size),
-                        "shortage": shirt_remaining,
-                    }
+    lines = order.items.select_related(
+        "shirt_item",
+        "film_item",
+        "color",
+        "size",
+    )
+
+    if order.service_type == Order.SERVICE_FULL:
+        for line in lines:
+            if line.shirt_item:
+                shirt_remaining = _consume_fifo(
+                    line.shirt_item,
+                    line.quantity,
+                    order,
+                    line,
+                    color=line.color,
+                    size=line.size,
+                    allow_shortage=allow_shortage,
                 )
+                if shirt_remaining > 0:
+                    unresolved.append(
+                        {
+                            "type": "shirt",
+                            "label": _variant_text(line.shirt_item, line.color, line.size),
+                            "shortage": shirt_remaining,
+                        }
+                    )
 
-        film_qty = Decimal("0")
-
-        if line.manual_film_meter and line.manual_film_meter > 0:
-            film_qty += Decimal(line.manual_film_meter)
-
-        if line.film_item and line.film_meter_per_piece and line.quantity:
-            film_qty += Decimal(line.film_meter_per_piece) * Decimal(line.quantity)
-
-        if line.film_item and film_qty > 0:
-            film_remaining = _consume_fifo(
-                line.film_item,
-                film_qty,
-                order,
-                line,
-                allow_shortage=allow_shortage,
-            )
-            if film_remaining > 0:
-                unresolved.append(
-                    {
-                        "label": str(line.film_item),
-                        "shortage": film_remaining,
-                    }
+    elif order.service_type == Order.SERVICE_FILM_ONLY:
+        for line in lines:
+            if line.film_item and line.film_meter and line.film_meter > 0:
+                film_remaining = _consume_fifo(
+                    line.film_item,
+                    line.film_meter,
+                    order,
+                    line,
+                    allow_shortage=allow_shortage,
                 )
+                if film_remaining > 0:
+                    unresolved.append(
+                        {
+                            "type": "film",
+                            "label": str(line.film_item),
+                            "shortage": film_remaining,
+                        }
+                    )
+
+    elif order.service_type in [Order.SERVICE_PRINT_ONLY, Order.SERVICE_HEATPRESS_ONLY]:
+        pass
 
     order.stock_deducted = True
     order.save(update_fields=["stock_deducted"])
 
     return unresolved
+
+
+@transaction.atomic
+def restore_stock_for_order(order):
+    consumptions = order.stock_consumptions.select_related("batch_item").order_by("-id")
+
+    for consume in consumptions:
+        row = consume.batch_item
+        row.qty_remaining = Decimal(row.qty_remaining or 0) + Decimal(consume.consumed_qty or 0)
+        row.save(update_fields=["qty_remaining"])
+
+    consumptions.delete()
+
+    order.stock_deducted = False
+    order.save(update_fields=["stock_deducted"])

@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models
 
@@ -26,8 +27,24 @@ class Order(models.Model):
         (TYPE_KAMPU, "Kampu"),
     ]
 
+    SERVICE_FULL = "FULL"
+    SERVICE_FILM_ONLY = "FILM_ONLY"
+    SERVICE_PRINT_HEATPRESS = "PRINT_HEATPRESS"
+
+    SERVICE_CHOICES = [
+        (SERVICE_FULL, "Full Order"),
+        (SERVICE_FILM_ONLY, "Film Only"),
+        (SERVICE_PRINT_HEATPRESS, "Print & Heat Press"),
+    ]
+
     order_no = models.CharField(max_length=50, unique=True, blank=True)
     order_type = models.CharField(max_length=20, choices=TYPE_CHOICES, default=TYPE_NIRON)
+    service_type = models.CharField(
+        max_length=30,
+        choices=SERVICE_CHOICES,
+        default=SERVICE_FULL,
+        db_index=True,
+    )
 
     customer_name = models.CharField(max_length=120)
     phone = models.CharField(max_length=30, blank=True, default="")
@@ -63,7 +80,9 @@ class Order(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.order_no:
-            last_id = (Order.objects.order_by("-id").values_list("id", flat=True).first() or 0) + 1
+            last_id = (
+                Order.objects.order_by("-id").values_list("id", flat=True).first() or 0
+            ) + 1
             self.order_no = f"NR-{last_id:06d}"
         super().save(*args, **kwargs)
 
@@ -116,21 +135,11 @@ class OrderDesign(models.Model):
 
 
 class OrderItem(models.Model):
-    MODE_CLOTH = "CLOTH"
-    MODE_FILM = "FILM"
-
-    MODE_CHOICES = [
-        (MODE_CLOTH, "Cloth"),
-        (MODE_FILM, "Film"),
-    ]
-
-    # keep order for easier querying/report/progress compatibility
     order = models.ForeignKey(
         Order,
         on_delete=models.CASCADE,
         related_name="items",
     )
-    # keep nullable for migration safety first
     design = models.ForeignKey(
         OrderDesign,
         on_delete=models.CASCADE,
@@ -139,11 +148,7 @@ class OrderItem(models.Model):
         blank=True,
     )
 
-    item_mode = models.CharField(
-        max_length=20,
-        choices=MODE_CHOICES,
-        default=MODE_CLOTH,
-    )
+    description = models.CharField(max_length=200, blank=True, default="")
 
     shirt_item = models.ForeignKey(
         InventoryItem,
@@ -174,8 +179,8 @@ class OrderItem(models.Model):
         blank=True,
         null=True,
     )
+    film_meter = models.DecimalField(max_digits=12, decimal_places=4, default=0)
 
-    description = models.CharField(max_length=200, blank=True, default="")
     quantity = models.DecimalField(
         max_digits=12,
         decimal_places=2,
@@ -184,10 +189,6 @@ class OrderItem(models.Model):
     )
     done_qty = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     unit_price = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-
-    film_meter_per_piece = models.DecimalField(max_digits=12, decimal_places=4, default=0)
-    manual_film_meter = models.DecimalField(max_digits=12, decimal_places=4, default=0)
-
     line_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
     class Meta:
@@ -195,16 +196,57 @@ class OrderItem(models.Model):
 
     def __str__(self):
         base_name = self.description or (
-            str(self.film_item) if self.item_mode == self.MODE_FILM and self.film_item
-            else str(self.shirt_item) if self.shirt_item
+            str(self.shirt_item)
+            if self.shirt_item
+            else str(self.film_item)
+            if self.film_item
             else f"Item {self.pk}"
         )
         return f"{self.order.order_no} - {base_name}"
 
+    def clean(self):
+        if self.design_id:
+            self.order = self.design.order
+
+        if not self.order_id:
+            return
+
+        service_type = self.order.service_type
+
+        if service_type == Order.SERVICE_FULL:
+            if not self.shirt_item:
+                raise ValidationError({"shirt_item": "Full Order requires shirt item."})
+            if not self.color:
+                raise ValidationError({"color": "Full Order requires color."})
+            if not self.size:
+                raise ValidationError({"size": "Full Order requires size."})
+
+            self.film_item = None
+            self.film_meter = Decimal("0")
+
+        elif service_type == Order.SERVICE_FILM_ONLY:
+            if not self.film_item:
+                raise ValidationError({"film_item": "Film Only requires film item."})
+            if not self.film_meter or self.film_meter <= 0:
+                raise ValidationError({"film_meter": "Film Only requires film meter."})
+
+            self.shirt_item = None
+            self.color = None
+            self.size = None
+
+        elif service_type == Order.SERVICE_PRINT_HEATPRESS:
+            self.shirt_item = None
+            self.color = None
+            self.size = None
+            self.film_item = None
+            self.film_meter = Decimal("0")
+
     def save(self, *args, **kwargs):
         if self.design_id:
             self.order = self.design.order
+
         self.line_total = (self.quantity or Decimal("0")) * (self.unit_price or Decimal("0"))
+        self.full_clean()
         super().save(*args, **kwargs)
 
     @property
@@ -240,13 +282,11 @@ class StockConsumption(models.Model):
 
 
 class OrderDesignFile(models.Model):
-    # keep order for easier compatibility
     order = models.ForeignKey(
         Order,
         on_delete=models.CASCADE,
         related_name="design_files",
     )
-    # keep nullable for migration safety first
     design = models.ForeignKey(
         OrderDesign,
         on_delete=models.CASCADE,
