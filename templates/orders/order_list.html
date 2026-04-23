@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 
+{% block title %}Orders{% endblock %}
 {% block page_title %}Orders{% endblock %}
 {% block page_subtitle %}Manage orders, payments and production deadlines{% endblock %}
 
@@ -8,58 +9,350 @@
 {% endblock %}
 
 {% block content %}
-<div class="grid grid-4">
-    <div class="stat">
-        <div class="stat-label">Total Orders</div>
-        <div class="stat-value">{{ orders|length }}</div>
+<style>
+    .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 18px;
+        margin-bottom: 22px;
+    }
+
+    .kpi-card,
+    .list-card,
+    .filter-card {
+        background: rgba(255,255,255,.90);
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        box-shadow: var(--shadow);
+    }
+
+    .kpi-card {
+        padding: 20px 22px;
+    }
+
+    .kpi-label {
+        font-size: 12px;
+        font-weight: 800;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: .8px;
+        margin-bottom: 8px;
+    }
+
+    .kpi-value {
+        font-size: 30px;
+        font-weight: 900;
+        letter-spacing: -.8px;
+        color: var(--text);
+    }
+
+    .filter-card,
+    .list-card {
+        padding: 22px;
+        margin-bottom: 22px;
+    }
+
+    .filter-grid {
+        display: grid;
+        grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr auto auto;
+        gap: 14px;
+        align-items: end;
+    }
+
+    .field label {
+        display: block;
+        font-size: 12px;
+        font-weight: 800;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: .8px;
+        margin-bottom: 8px;
+    }
+
+    .list-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+    }
+
+    .list-title {
+        margin: 0;
+        font-size: 20px;
+        font-weight: 900;
+        color: var(--text);
+    }
+
+    .list-subtitle {
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 13px;
+    }
+
+    .table-wrap {
+        overflow-x: auto;
+    }
+
+    .order-table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 1460px;
+    }
+
+    .order-table th,
+    .order-table td {
+        padding: 14px 10px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: middle;
+        font-size: 14px;
+    }
+
+    .order-table th {
+        font-size: 12px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: .8px;
+        color: var(--muted);
+    }
+
+    .order-link {
+        font-weight: 800;
+        text-decoration: none;
+    }
+
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 6px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 800;
+        border: 1px solid transparent;
+        white-space: nowrap;
+    }
+
+    .status-pending {
+        background: #FFF7E8;
+        color: #B54708;
+        border-color: #F7D08A;
+    }
+
+    .status-processing {
+        background: #EEF4FF;
+        color: #1D4ED8;
+        border-color: #BFD3FF;
+    }
+
+    .status-done {
+        background: #ECFDF3;
+        color: #067647;
+        border-color: #ABEFC6;
+    }
+
+    .status-cancelled,
+    .status-void {
+        background: #FDECEC;
+        color: #B42318;
+        border-color: #F5C2C7;
+    }
+
+    .type-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: #f8f6ef;
+        border: 1px solid var(--line);
+        font-size: 12px;
+        font-weight: 800;
+    }
+
+    .late-text {
+        color: #B42318;
+        font-weight: 800;
+    }
+
+    .late-row {
+        background: rgba(180, 35, 24, 0.03);
+    }
+
+    .muted-text {
+        color: var(--muted);
+        font-size: 12px;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 26px 0 10px;
+        color: var(--muted);
+        font-weight: 700;
+    }
+
+    @media (max-width: 1200px) {
+        .kpi-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .filter-grid {
+            grid-template-columns: 1fr 1fr;
+        }
+    }
+
+    @media (max-width: 700px) {
+        .kpi-grid,
+        .filter-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<div class="kpi-grid">
+    <div class="kpi-card">
+        <div class="kpi-label">Total Orders</div>
+        <div class="kpi-value">{{ total_orders }}</div>
     </div>
-    <div class="stat">
-        <div class="stat-label">Pending</div>
-        <div class="stat-value">-</div>
+    <div class="kpi-card">
+        <div class="kpi-label">Pending</div>
+        <div class="kpi-value">{{ pending_count }}</div>
     </div>
-    <div class="stat">
-        <div class="stat-label">Done</div>
-        <div class="stat-value">-</div>
+    <div class="kpi-card">
+        <div class="kpi-label">Done</div>
+        <div class="kpi-value">{{ done_count }}</div>
     </div>
-    <div class="stat">
-        <div class="stat-label">Revenue</div>
-        <div class="stat-value">-</div>
+    <div class="kpi-card">
+        <div class="kpi-label">Revenue</div>
+        <div class="kpi-value">${{ revenue_total|floatformat:2 }}</div>
     </div>
 </div>
 
-<div class="card">
-    <h2 class="section-title">Order List</h2>
-    <div class="section-sub">Overview of customer orders and payment balance</div>
+<div class="filter-card">
+    <form method="get" class="filter-grid">
+        <div class="field">
+            <label>Search</label>
+            <input type="text" name="keyword" value="{{ keyword }}" placeholder="Order no, customer, phone, location, remark">
+        </div>
 
-    <table>
-        <thead>
-            <tr>
-                <th>Order No</th>
-                <th>Customer</th>
-                <th>Total</th>
-                <th>Paid</th>
-                <th>Balance</th>
-                <th>Status</th>
-                <th>Deadline</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for o in orders %}
-            <tr>
-                <td><a class="table-link" href="{% url 'order_detail' o.pk %}">{{ o.order_no }}</a></td>
-                <td>{{ o.customer_name }}</td>
-                <td>${{ o.total_amount }}</td>
-                <td>${{ o.paid_amount }}</td>
-                <td>${{ o.balance_amount }}</td>
-                <td><span class="badge">{{ o.get_status_display }}</span></td>
-                <td>{{ o.deadline }}</td>
-            </tr>
-            {% empty %}
-            <tr>
-                <td colspan="7">No orders yet.</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+        <div class="field">
+            <label>Status</label>
+            <select name="status">
+                <option value="">All Status</option>
+                {% for value, label in status_choices %}
+                <option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="field">
+            <label>Order Type</label>
+            <select name="order_type">
+                <option value="">All Type</option>
+                {% for value, label in order_type_choices %}
+                <option value="{{ value }}" {% if order_type == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="field">
+            <label>Created From</label>
+            <input type="date" name="created_date_from" value="{{ created_date_from }}">
+        </div>
+
+        <div class="field">
+            <label>Created To</label>
+            <input type="date" name="created_date_to" value="{{ created_date_to }}">
+        </div>
+
+        <button type="submit" class="btn btn-primary">Search</button>
+
+        <a href="{% url 'order_list_export_excel' %}?keyword={{ keyword|urlencode }}&status={{ status|urlencode }}&order_type={{ order_type|urlencode }}&created_date_from={{ created_date_from|urlencode }}&created_date_to={{ created_date_to|urlencode }}" class="btn btn-light">
+            Download Excel
+        </a>
+    </form>
+</div>
+
+<div class="list-card">
+    <div class="list-head">
+        <div>
+            <h3 class="list-title">Order List</h3>
+            <div class="list-subtitle">Latest created orders appear first. Search, filter, highlight late deadlines, and export the current result.</div>
+        </div>
+    </div>
+
+    <div class="table-wrap">
+        <table class="order-table">
+            <thead>
+                <tr>
+                    <th>Order No</th>
+                    <th>Created</th>
+                    <th>Customer</th>
+                    <th>Type</th>
+                    <th>Cloth Qty</th>
+                    <th>Film Meter</th>
+                    <th>Total</th>
+                    <th>Deposit</th>
+                    <th>Paid</th>
+                    <th>Balance</th>
+                    <th>Status</th>
+                    <th>Deadline</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                <tr class="{% if row.is_late %}late-row{% endif %}">
+                    <td>
+                        <a href="{% url 'order_detail' row.obj.pk %}" class="order-link">{{ row.obj.order_no }}</a>
+                    </td>
+                    <td>{{ row.obj.created_at|date:"d M Y H:i" }}</td>
+                    <td>
+                        <div>{{ row.obj.customer_name|default:"-" }}</div>
+                        <div class="muted-text">{{ row.obj.phone|default:"-" }}</div>
+                    </td>
+                    <td>
+                        <span class="type-badge">{{ row.obj.get_order_type_display }}</span>
+                    </td>
+                    <td>{{ row.cloth_qty|floatformat:0 }}</td>
+                    <td>{{ row.film_meter|floatformat:2 }}</td>
+                    <td>${{ row.obj.total_amount|floatformat:2 }}</td>
+                    <td>${{ row.obj.deposit_amount|floatformat:2 }}</td>
+                    <td>${{ row.obj.paid_amount|floatformat:2 }}</td>
+                    <td>${{ row.balance_amount|floatformat:2 }}</td>
+                    <td>
+                        {% with s=row.obj.status|lower %}
+                        <span class="status-badge
+                            {% if s == 'pending' %}status-pending
+                            {% elif s == 'processing' %}status-processing
+                            {% elif s == 'done' %}status-done
+                            {% elif s == 'cancelled' or s == 'void' %}status-cancelled
+                            {% else %}status-void{% endif %}
+                        ">
+                            {{ row.obj.get_status_display }}
+                        </span>
+                        {% endwith %}
+                    </td>
+                    <td>
+                        {% if row.obj.deadline %}
+                            <div class="{% if row.is_late %}late-text{% endif %}">
+                                {{ row.obj.deadline|date:"d M Y H:i" }}
+                            </div>
+                            {% if row.is_late %}
+                            <div class="muted-text">Late</div>
+                            {% endif %}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="12" class="empty-state">No orders found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
 {% endblock %}

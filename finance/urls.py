@@ -12,6 +12,7 @@ urlpatterns = [
     path("expenses/create-operating/", views.create_operating_expense, name="create_operating_expense"),
 
     path("expenses/batch-preview/", views.batch_expense_preview, name="batch_expense_preview"),
+    path("expenses/export-excel/", views.expense_summary_export_excel, name="expense_summary_export_excel"),
 
     path("profit-dashboard/", views.profit_dashboard, name="profit_dashboard"),
 ]

@@ -14,6 +14,9 @@ from inventory.models import Color, InventoryItem, Size
 from .forms import OrderForm, ProductionFilterForm
 from .models import Order, OrderDesign, OrderDesignFile, OrderHistory, OrderItem, OrderProgress
 from .services import deduct_stock_for_order, get_order_shortages, build_shortage_message
+from django.db.models import Prefetch, Q, Sum
+from django.http import HttpResponse
+from openpyxl import Workbook
 
 
 def _stringify(value):
@@ -440,9 +443,194 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
 @login_required
 @permission_required("orders.view_order", raise_exception=True)
 def order_list(request):
-    orders = Order.objects.all().order_by("-created_at", "-id")
-    return render(request, "orders/order_list.html", {"orders": orders})
+    keyword = (request.GET.get("keyword") or "").strip()
+    status = (request.GET.get("status") or "").strip()
+    order_type = (request.GET.get("order_type") or "").strip()
+    created_date_from = (request.GET.get("created_date_from") or "").strip()
+    created_date_to = (request.GET.get("created_date_to") or "").strip()
 
+    qs = (
+        Order.objects.all()
+        .prefetch_related("items")
+        .order_by("-created_at", "-id")
+    )
+
+    if keyword:
+        qs = qs.filter(
+            Q(order_no__icontains=keyword)
+            | Q(customer_name__icontains=keyword)
+            | Q(phone__icontains=keyword)
+            | Q(customer_location__icontains=keyword)
+            | Q(remark__icontains=keyword)
+        )
+
+    if status:
+        qs = qs.filter(status=status)
+
+    if order_type:
+        qs = qs.filter(order_type=order_type)
+
+    if created_date_from:
+        qs = qs.filter(created_at__date__gte=created_date_from)
+
+    if created_date_to:
+        qs = qs.filter(created_at__date__lte=created_date_to)
+
+    rows = []
+    total_orders = qs.count()
+    pending_count = qs.filter(status=Order.STATUS_PENDING).count() if hasattr(Order, "STATUS_PENDING") else 0
+    done_count = qs.filter(status=Order.STATUS_DONE).count() if hasattr(Order, "STATUS_DONE") else 0
+    revenue_total = qs.aggregate(total=Sum("total_amount"))["total"] or Decimal("0.00")
+
+    now = timezone.now()
+
+    for order in qs:
+        cloth_qty = (
+            order.items.filter(item_mode="CLOTH").aggregate(total=Sum("quantity"))["total"]
+            or Decimal("0")
+        )
+        film_meter = (
+            order.items.filter(item_mode="FILM").aggregate(total=Sum("manual_film_meter"))["total"]
+            or Decimal("0")
+        )
+
+        total_amount = Decimal(order.total_amount or 0)
+        paid_amount = Decimal(order.paid_amount or 0)
+        deposit_amount = Decimal(order.deposit_amount or 0)
+        balance_amount = total_amount - deposit_amount - paid_amount
+
+        is_late = False
+        if order.deadline:
+            if hasattr(Order, "STATUS_DONE") and order.status != Order.STATUS_DONE:
+                is_late = order.deadline < now
+            elif not hasattr(Order, "STATUS_DONE"):
+                is_late = order.deadline < now
+
+        rows.append(
+            {
+                "obj": order,
+                "cloth_qty": cloth_qty,
+                "film_meter": film_meter,
+                "balance_amount": balance_amount,
+                "is_late": is_late,
+            }
+        )
+
+    context = {
+        "rows": rows,
+        "keyword": keyword,
+        "status": status,
+        "order_type": order_type,
+        "created_date_from": created_date_from,
+        "created_date_to": created_date_to,
+        "total_orders": total_orders,
+        "pending_count": pending_count,
+        "done_count": done_count,
+        "revenue_total": revenue_total,
+        "status_choices": getattr(Order, "STATUS_CHOICES", []),
+        "order_type_choices": getattr(Order, "ORDER_TYPE_CHOICES", []),
+    }
+    return render(request, "orders/order_list.html", context)
+
+
+@login_required
+@permission_required("orders.view_order", raise_exception=True)
+def order_list_export_excel(request):
+    keyword = (request.GET.get("keyword") or "").strip()
+    status = (request.GET.get("status") or "").strip()
+    order_type = (request.GET.get("order_type") or "").strip()
+    created_date_from = (request.GET.get("created_date_from") or "").strip()
+    created_date_to = (request.GET.get("created_date_to") or "").strip()
+
+    qs = (
+        Order.objects.all()
+        .prefetch_related("items")
+        .order_by("-created_at", "-id")
+    )
+
+    if keyword:
+        qs = qs.filter(
+            Q(order_no__icontains=keyword)
+            | Q(customer_name__icontains=keyword)
+            | Q(phone__icontains=keyword)
+            | Q(customer_location__icontains=keyword)
+            | Q(remark__icontains=keyword)
+        )
+
+    if status:
+        qs = qs.filter(status=status)
+
+    if order_type:
+        qs = qs.filter(order_type=order_type)
+
+    if created_date_from:
+        qs = qs.filter(created_at__date__gte=created_date_from)
+
+    if created_date_to:
+        qs = qs.filter(created_at__date__lte=created_date_to)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Orders"
+
+    headers = [
+        "Order No",
+        "Created At",
+        "Customer",
+        "Phone",
+        "Location",
+        "Order Type",
+        "Status",
+        "Cloth Qty",
+        "Film Meter",
+        "Total Amount",
+        "Deposit Amount",
+        "Paid Amount",
+        "Balance",
+        "Deadline",
+        "Remark",
+    ]
+    ws.append(headers)
+
+    for order in qs:
+        cloth_qty = (
+            order.items.filter(item_mode="CLOTH").aggregate(total=Sum("quantity"))["total"]
+            or Decimal("0")
+        )
+        film_meter = (
+            order.items.filter(item_mode="FILM").aggregate(total=Sum("manual_film_meter"))["total"]
+            or Decimal("0")
+        )
+
+        total_amount = Decimal(order.total_amount or 0)
+        deposit_amount = Decimal(order.deposit_amount or 0)
+        paid_amount = Decimal(order.paid_amount or 0)
+        balance_amount = total_amount - deposit_amount - paid_amount
+
+        ws.append([
+            order.order_no,
+            order.created_at.strftime("%Y-%m-%d %H:%M") if order.created_at else "",
+            order.customer_name or "",
+            order.phone or "",
+            order.customer_location or "",
+            getattr(order, "get_order_type_display", lambda: order.order_type)(),
+            getattr(order, "get_status_display", lambda: order.status)(),
+            float(cloth_qty),
+            float(film_meter),
+            float(total_amount),
+            float(deposit_amount),
+            float(paid_amount),
+            float(balance_amount),
+            order.deadline.strftime("%Y-%m-%d %H:%M") if order.deadline else "",
+            order.remark or "",
+        ])
+
+    response = HttpResponse(
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response["Content-Disposition"] = 'attachment; filename="orders_filtered.xlsx"'
+    wb.save(response)
+    return response
 @login_required
 @permission_required("orders.add_order", raise_exception=True)
 @transaction.atomic

@@ -6,6 +6,7 @@ urlpatterns = [
     path("new/", views.order_create, name="order_create"),
     path("<int:pk>/", views.order_detail, name="order_detail"),
     path("<int:pk>/edit/", views.order_edit, name="order_edit"),
+    path("export-excel/", views.order_list_export_excel, name="order_list_export_excel"),
     path("<int:pk>/invoice/", views.order_invoice, name="order_invoice"),
     path("<int:pk>/invoice/pdf/", views.order_invoice_pdf, name="order_invoice_pdf"),
 

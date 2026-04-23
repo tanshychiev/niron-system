@@ -16,6 +16,8 @@ from .forms import (
     OtherExpenseForm,
 )
 from .models import Expense
+from django.http import HttpResponse
+from openpyxl import Workbook
 
 
 def _to_decimal(value):
@@ -79,22 +81,27 @@ def _get_batch_expense_data(batch):
 
 def _apply_filters(request, qs):
     form = ExpenseFilterForm(request.GET or None)
+
     if form.is_valid():
         date_from = form.cleaned_data.get("date_from")
         date_to = form.cleaned_data.get("date_to")
         created_by = (form.cleaned_data.get("created_by") or "").strip()
         keyword = (form.cleaned_data.get("keyword") or "").strip()
+        expense_type = (form.cleaned_data.get("expense_type") or "").strip()
 
         if date_from:
             qs = qs.filter(created_at__date__gte=date_from)
+
         if date_to:
             qs = qs.filter(created_at__date__lte=date_to)
+
         if created_by:
             qs = qs.filter(
                 Q(created_by__username__icontains=created_by)
                 | Q(created_by__first_name__icontains=created_by)
                 | Q(created_by__last_name__icontains=created_by)
             )
+
         if keyword:
             qs = qs.filter(
                 Q(note__icontains=keyword)
@@ -102,8 +109,11 @@ def _apply_filters(request, qs):
                 | Q(batch__batch_no__icontains=keyword)
             )
 
-    return form, qs
+        # ✅ THIS IS WHAT YOU WERE MISSING
+        if expense_type:
+            qs = qs.filter(expense_type=expense_type)
 
+    return form, qs
 
 def _get_total_inventory():
     try:
@@ -550,3 +560,51 @@ def batch_expense_preview(request):
             "color_count": len(color_summary),
         }
     )
+@login_required
+@permission_required("finance.view_expense", raise_exception=True)
+def expense_summary_export_excel(request):
+    qs = Expense.objects.select_related("created_by", "batch").all()
+    form, qs = _apply_filters(request, qs)
+    qs = qs.order_by("-created_at", "-id")
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Expense Summary"
+
+    ws.append([
+        "Date",
+        "Type",
+        "Title",
+        "Amount",
+        "Record By",
+        "Note",
+    ])
+
+    for row in qs:
+        if row.expense_type == Expense.TYPE_BATCH and row.batch:
+            title = row.batch.batch_no
+        elif row.expense_type == Expense.TYPE_OPERATING:
+            title = row.get_category_display() if hasattr(row, "get_category_display") else (row.category or "")
+        else:
+            title = "Other Expense"
+
+        record_by = ""
+        if row.created_by:
+            record_by = row.created_by.get_full_name() or row.created_by.username
+
+        ws.append([
+            row.created_at.strftime("%Y-%m-%d %H:%M") if row.created_at else "",
+            row.get_expense_type_display(),
+            title,
+            float(row.amount or 0),
+            record_by,
+            row.note or "",
+        ])
+
+    response = HttpResponse(
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response["Content-Disposition"] = 'attachment; filename="expense_summary.xlsx"'
+
+    wb.save(response)
+    return response
