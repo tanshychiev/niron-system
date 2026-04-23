@@ -1,22 +1,25 @@
 {% extends "base.html" %}
 
-{% block title %}Create Order{% endblock %}
-{% block page_title %}Create Order{% endblock %}
-{% block page_subtitle %}Add a new custom printing order{% endblock %}
+{% block title %}{% if is_edit %}Edit Order{% else %}Create Order{% endif %}{% endblock %}
+{% block page_title %}{% if is_edit %}Edit Order{% else %}Create Order{% endif %}{% endblock %}
+{% block page_subtitle %}Manage customer order by separated design blocks{% endblock %}
 
 {% block top_actions %}
 <a href="{% url 'order_list' %}" class="btn btn-light">Back to Orders</a>
+{% if is_edit and order %}
+<a href="{% url 'order_detail' order.pk %}" class="btn btn-light">View Detail</a>
+{% endif %}
 {% endblock %}
 
 {% block extra_css %}
 <style>
     .order-shell {
-        max-width: 1400px;
+        max-width: 1450px;
         margin: 0 auto;
     }
 
     .qb-card {
-        background: rgba(255,255,255,.92);
+        background: rgba(255,255,255,.94);
         border: 1px solid var(--line);
         border-radius: 24px;
         box-shadow: var(--shadow);
@@ -54,6 +57,7 @@
         padding: 14px 16px;
         font-weight: 700;
         margin-bottom: 18px;
+        white-space: pre-line;
     }
 
     .field {
@@ -106,7 +110,7 @@
 
     .top-grid-4 {
         display: grid;
-        grid-template-columns: 1.1fr 1.1fr 1fr 1fr;
+        grid-template-columns: 1.1fr 1fr 1fr 1fr;
         gap: 16px;
     }
 
@@ -114,6 +118,53 @@
     .remark-inline input {
         min-height: 42px !important;
         height: 42px !important;
+    }
+
+    .design-stack {
+        display: grid;
+        gap: 20px;
+    }
+
+    .design-block {
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        background: linear-gradient(180deg, rgba(255,255,255,.98), rgba(249,247,240,.88));
+        padding: 20px;
+    }
+
+    .design-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 14px;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+    }
+
+    .design-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: #f8f6ef;
+        border: 1px solid var(--line);
+        font-size: 12px;
+        font-weight: 800;
+        color: var(--text);
+    }
+
+    .design-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .design-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        margin-bottom: 14px;
     }
 
     .preview-grid {
@@ -188,16 +239,16 @@
 
     .item-header-row,
     .item-input-row {
-        min-width: 1200px;
+        min-width: 1220px;
         display: grid;
         grid-template-columns:
             100px
-            180px
             170px
-            110px
-            90px
-            80px
+            170px
+            120px
             100px
+            90px
+            110px
             110px
             90px
             70px;
@@ -236,6 +287,10 @@
     .item-row textarea {
         height: 40px;
         border-radius: 12px;
+    }
+
+    .item-select-cell select[hidden] {
+        display: none !important;
     }
 
     .line-total-view {
@@ -371,7 +426,9 @@
     .submit-row {
         display: flex;
         justify-content: flex-end;
+        gap: 10px;
         margin-top: 18px;
+        flex-wrap: wrap;
     }
 
     .image-preview-modal {
@@ -419,16 +476,47 @@
         background: white;
         box-shadow: 0 20px 60px rgba(0,0,0,.28);
     }
+    .niron-alert-success {
+        background: #E8F8EE;
+        border: 1px solid #B7E4C7;
+        color: #1B5E20;
+        border-radius: 16px;
+        padding: 14px 16px;
+        font-weight: 700;
+        margin-bottom: 18px;
+    }
+
+    .niron-alert-warning {
+        background: #FFF4E5;
+        border: 1px solid #FFD59E;
+        color: #8A5B00;
+        border-radius: 16px;
+        padding: 14px 16px;
+        font-weight: 700;
+        margin-bottom: 18px;
+    }
+
+    .niron-alert-error {
+        background: #FDECEA;
+        border: 1px solid #F5C2C0;
+        color: #B42318;
+        border-radius: 16px;
+        padding: 14px 16px;
+        font-weight: 700;
+        margin-bottom: 18px;
+    }
 
     @media (max-width: 1200px) {
-        .top-grid-4 {
+        .top-grid-4,
+        .design-grid {
             grid-template-columns: 1fr 1fr;
         }
     }
 
     @media (max-width: 1100px) {
         .top-grid-2,
-        .summary-layout {
+        .summary-layout,
+        .design-grid {
             grid-template-columns: 1fr;
         }
     }
@@ -446,7 +534,26 @@
     <form method="post" enctype="multipart/form-data" id="order-form">
         {% csrf_token %}
 
-        {% if form.errors or formset.errors %}
+        <input type="hidden" name="design_total" id="design-total" value="{% if is_edit and order and order.designs.all %}{{ order.designs.all|length }}{% else %}1{% endif %}">
+        <input type="hidden" name="confirm_shortage" id="confirm-shortage" value="0">
+
+        {% if messages %}
+    {% for message in messages %}
+        <div class="
+            {% if message.tags == 'success' %}
+                niron-alert-success
+            {% elif message.tags == 'warning' %}
+                niron-alert-warning
+            {% else %}
+                niron-alert-error
+            {% endif %}
+        ">
+            {{ message }}
+        </div>
+    {% endfor %}
+{% endif %}
+
+        {% if form.errors %}
         <div class="niron-alert-error">
             Please fix the errors below and try again.
         </div>
@@ -456,7 +563,7 @@
             <div class="qb-head">
                 <div>
                     <h2 class="qb-title">Order Information</h2>
-                    <div class="qb-sub">Customer info, deadline and design images</div>
+                    <div class="qb-sub">Customer info and deadline</div>
                 </div>
             </div>
 
@@ -488,7 +595,7 @@
                 </div>
 
                 <div class="field">
-                    <label>Customer Location <span style="text-transform:none;font-weight:600;color:var(--muted);">(optional)</span></label>
+                    <label>Customer Location</label>
                     {{ form.customer_location }}
                     {{ form.customer_location.errors }}
                 </div>
@@ -499,110 +606,379 @@
                     {{ form.remark.errors }}
                 </div>
             </div>
-
-            <div class="field">
-                <label>Design Images</label>
-                {{ form.design_files }}
-                {{ form.design_files.errors }}
-                <small>You can add more images many times before saving.</small>
-            </div>
-
-            <div class="field" style="margin-bottom:0;">
-                <label>Image Preview</label>
-                <div id="preview-area" class="preview-grid"></div>
-            </div>
         </div>
 
         <div class="qb-card">
-            <div class="items-toolbar">
+            <div class="qb-head">
                 <div>
-                    <h2 class="qb-title" style="font-size:18px;">Items</h2>
-                    <div class="qb-sub">Each item stays in one row for faster data entry</div>
+                    <h2 class="qb-title">Design Blocks</h2>
+                    <div class="qb-sub">Each design has its own images and rows</div>
                 </div>
-                <button type="button" class="btn btn-primary" id="add-row-btn">Add Row</button>
+                <button type="button" class="btn btn-primary" id="add-design-btn">Add Design</button>
             </div>
 
-            {{ formset.management_form }}
+            <div id="designs-container" class="design-stack">
+                {% if is_edit and order and order.designs.all %}
+                    {% for design in order.designs.all %}
+                    <div class="design-block" data-design-index="{{ forloop.counter0 }}">
+                        <input type="hidden" name="design-{{ forloop.counter0 }}-id" value="{{ design.id }}">
+                        <input type="hidden" name="design-{{ forloop.counter0 }}-DELETE" value="0" class="design-delete-input">
 
-            <div class="item-board">
-                <div class="item-header-row" id="item-header-row">
-                    <div>Mode</div>
-                    <div>Description</div>
-                    <div id="header-item-name">Cloth Item</div>
-                    <div id="header-color">Color</div>
-                    <div id="header-size">Size</div>
-                    <div>Qty</div>
-                    <div id="header-meter">Film Meter</div>
-                    <div>Unit Price</div>
-                    <div>Total</div>
-                    <div>Action</div>
-                </div>
+                        <div class="design-top">
+                            <div>
+                                <div class="design-badge">Design <span class="design-number">{{ forloop.counter }}</span></div>
+                            </div>
+                            <div class="design-actions">
+                                <button type="button" class="btn btn-light add-row-btn">Add Row</button>
+                                <button type="button" class="btn btn-danger remove-design-btn">Remove Design</button>
+                            </div>
+                        </div>
 
-                <div id="items-container">
-                    {% for f in formset %}
-                    <div class="item-row">
-                        {% for hidden in f.hidden_fields %}
-                            {{ hidden }}
-                        {% endfor %}
-
-                        <div class="item-input-row">
+                        <div class="design-grid">
                             <div class="field">
-                                {{ f.item_mode }}
-                                {{ f.item_mode.errors }}
+                                <label>Design Name</label>
+                                <input type="text" name="design-{{ forloop.counter0 }}-name" class="form-control" value="{{ design.name }}">
                             </div>
-
                             <div class="field">
-                                {{ f.description }}
-                                {{ f.description.errors }}
+                                <label>Design Remark</label>
+                                <input type="text" name="design-{{ forloop.counter0 }}-remark" class="form-control" value="{{ design.remark }}">
+                            </div>
+                        </div>
+
+                        <div class="field">
+                            <label>Upload Design Images</label>
+                            <input type="file" name="design-{{ forloop.counter0 }}-design_files" class="form-control design-file-input" accept="image/*" multiple>
+                            <small>You can upload images for this design only.</small>
+                        </div>
+
+                        <div class="field">
+                            <label>Image Preview</label>
+                            <div class="preview-grid design-preview-grid">
+                                {% for file in design.files.all %}
+                                <div class="preview-card existing-file-card">
+                                    <button type="button" class="preview-open-btn" data-src="{{ file.image.url }}">
+                                        <img src="{{ file.image.url }}" alt="Design image">
+                                    </button>
+                                    <div class="preview-meta">
+                                        <span class="preview-name">{{ file.image.name }}</span>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <input type="hidden" name="design-{{ forloop.counter0 }}-item_total" class="item-total" value="{{ design.items.all|length|default:1 }}">
+
+                        <div class="items-toolbar">
+                            <div>
+                                <h3 class="qb-title" style="font-size:18px;">Items</h3>
+                                <div class="qb-sub">Rows only for this design</div>
+                            </div>
+                        </div>
+
+                        <div class="item-board">
+                            <div class="item-header-row">
+                                <div>Mode</div>
+                                <div>Description</div>
+                                <div>Item</div>
+                                <div>Color</div>
+                                <div>Size</div>
+                                <div>Qty</div>
+                                <div>Film Meter</div>
+                                <div>Unit Price</div>
+                                <div>Total</div>
+                                <div>Action</div>
                             </div>
 
-                            <div class="field shirt-item-cell">
-                                {{ f.shirt_item }}
-                                {{ f.shirt_item.errors }}
-                            </div>
+                            <div class="items-container">
+                                {% for item in design.items.all %}
+                                <div class="item-row" data-item-index="{{ forloop.counter0 }}">
+                                    <input type="hidden" name="design-{{ forloop.parentloop.counter0 }}-item-{{ forloop.counter0 }}-id" value="{{ item.id }}">
+                                    <input type="hidden" name="design-{{ forloop.parentloop.counter0 }}-item-{{ forloop.counter0 }}-DELETE" value="0" class="item-delete-input">
 
-                            <div class="field film-item-cell" style="display:none;">
-                                {{ f.film_item }}
-                                {{ f.film_item.errors }}
-                            </div>
+                                    <div class="item-input-row">
+                                        <div class="field">
+                                            <select name="design-{{ forloop.parentloop.counter0 }}-item-{{ forloop.counter0 }}-item_mode" class="form-select item-mode-select">
+                                                <option value="CLOTH" {% if item.item_mode == "CLOTH" %}selected{% endif %}>Cloth</option>
+                                                <option value="FILM" {% if item.item_mode == "FILM" %}selected{% endif %}>Film</option>
+                                            </select>
+                                        </div>
 
-                            <div class="field color-cell">
-                                {{ f.color }}
-                                {{ f.color.errors }}
-                            </div>
+                                        <div class="field">
+                                            <input type="text" name="design-{{ forloop.parentloop.counter0 }}-item-{{ forloop.counter0 }}-description" class="form-control" value="{{ item.description }}">
+                                        </div>
 
-                            <div class="field size-cell">
-                                {{ f.size }}
-                                {{ f.size.errors }}
-                            </div>
+                                        <div class="field item-select-cell">
+                                            <select name="design-{{ forloop.parentloop.counter0 }}-item-{{ forloop.counter0 }}-shirt_item" class="form-select shirt-select" {% if item.item_mode == "FILM" %}hidden{% endif %}>
+                                                <option value="">---------</option>
+                                                {% for opt in shirt_items %}
+                                                <option value="{{ opt.id }}" {% if item.shirt_item_id == opt.id %}selected{% endif %}>{{ opt }}</option>
+                                                {% endfor %}
+                                            </select>
 
-                            <div class="field">
-                                {{ f.quantity }}
-                                {{ f.quantity.errors }}
-                            </div>
+                                            <select name="design-{{ forloop.parentloop.counter0 }}-item-{{ forloop.counter0 }}-film_item" class="form-select film-select" {% if item.item_mode != "FILM" %}hidden{% endif %}>
+                                                <option value="">---------</option>
+                                                {% for opt in film_items %}
+                                                <option value="{{ opt.id }}" {% if item.film_item_id == opt.id %}selected{% endif %}>{{ opt }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
 
-                            <div class="field meter-cell">
-                                {{ f.manual_film_meter }}
-                                {{ f.manual_film_meter.errors }}
-                            </div>
+                                        <div class="field">
+                                            <select name="design-{{ forloop.parentloop.counter0 }}-item-{{ forloop.counter0 }}-color" class="form-select">
+                                                <option value="">---------</option>
+                                                {% for opt in colors %}
+                                                <option value="{{ opt.id }}" {% if item.color_id == opt.id %}selected{% endif %}>{{ opt }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
 
-                            <div class="field">
-                                {{ f.unit_price }}
-                                {{ f.unit_price.errors }}
-                            </div>
+                                        <div class="field">
+                                            <select name="design-{{ forloop.parentloop.counter0 }}-item-{{ forloop.counter0 }}-size" class="form-select">
+                                                <option value="">---------</option>
+                                                {% for opt in sizes %}
+                                                <option value="{{ opt.id }}" {% if item.size_id == opt.id %}selected{% endif %}>{{ opt }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
 
-                            <div class="field">
-                                <input type="text" class="line-total-view" value="0.00" readonly>
-                            </div>
+                                        <div class="field">
+                                            <input type="number" step="0.01" min="0" name="design-{{ forloop.parentloop.counter0 }}-item-{{ forloop.counter0 }}-quantity" class="form-control qty-input" value="{{ item.quantity }}">
+                                        </div>
 
-                            <div class="remove-inline">
-                                <button type="button" class="trash-btn remove-row-btn" title="Remove row" aria-label="Remove row">🗑</button>
-                                {% if f.DELETE %}{{ f.DELETE.as_hidden }}{% endif %}
+                                        <div class="field">
+                                            <input type="number" step="0.0001" min="0" name="design-{{ forloop.parentloop.counter0 }}-item-{{ forloop.counter0 }}-manual_film_meter" class="form-control" value="{{ item.manual_film_meter }}">
+                                            <input type="hidden" name="design-{{ forloop.parentloop.counter0 }}-item-{{ forloop.counter0 }}-film_meter_per_piece" value="{{ item.film_meter_per_piece|default:'0' }}">
+                                        </div>
+
+                                        <div class="field">
+                                            <input type="number" step="0.01" min="0" name="design-{{ forloop.parentloop.counter0 }}-item-{{ forloop.counter0 }}-unit_price" class="form-control unit-price-input" value="{{ item.unit_price }}">
+                                        </div>
+
+                                        <div class="field">
+                                            <input type="text" class="line-total-view" value="{{ item.line_total }}" readonly>
+                                        </div>
+
+                                        <div class="remove-inline">
+                                            <button type="button" class="trash-btn remove-row-btn">🗑</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% empty %}
+                                <div class="item-row" data-item-index="0">
+                                    <input type="hidden" name="design-{{ forloop.parentloop.counter0|default:0 }}-item-0-id" value="">
+                                    <input type="hidden" name="design-{{ forloop.parentloop.counter0|default:0 }}-item-0-DELETE" value="0" class="item-delete-input">
+
+                                    <div class="item-input-row">
+                                        <div class="field">
+                                            <select name="design-{{ forloop.parentloop.counter0|default:0 }}-item-0-item_mode" class="form-select item-mode-select">
+                                                <option value="CLOTH" selected>Cloth</option>
+                                                <option value="FILM">Film</option>
+                                            </select>
+                                        </div>
+
+                                        <div class="field">
+                                            <input type="text" name="design-{{ forloop.parentloop.counter0|default:0 }}-item-0-description" class="form-control" value="">
+                                        </div>
+
+                                        <div class="field item-select-cell">
+                                            <select name="design-{{ forloop.parentloop.counter0|default:0 }}-item-0-shirt_item" class="form-select shirt-select">
+                                                <option value="">---------</option>
+                                                {% for opt in shirt_items %}
+                                                <option value="{{ opt.id }}">{{ opt }}</option>
+                                                {% endfor %}
+                                            </select>
+
+                                            <select name="design-{{ forloop.parentloop.counter0|default:0 }}-item-0-film_item" class="form-select film-select" hidden>
+                                                <option value="">---------</option>
+                                                {% for opt in film_items %}
+                                                <option value="{{ opt.id }}">{{ opt }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+
+                                        <div class="field">
+                                            <select name="design-{{ forloop.parentloop.counter0|default:0 }}-item-0-color" class="form-select">
+                                                <option value="">---------</option>
+                                                {% for opt in colors %}
+                                                <option value="{{ opt.id }}">{{ opt }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+
+                                        <div class="field">
+                                            <select name="design-{{ forloop.parentloop.counter0|default:0 }}-item-0-size" class="form-select">
+                                                <option value="">---------</option>
+                                                {% for opt in sizes %}
+                                                <option value="{{ opt.id }}">{{ opt }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+
+                                        <div class="field">
+                                            <input type="number" step="0.01" min="0" name="design-{{ forloop.parentloop.counter0|default:0 }}-item-0-quantity" class="form-control qty-input" value="">
+                                        </div>
+
+                                        <div class="field">
+                                            <input type="number" step="0.0001" min="0" name="design-{{ forloop.parentloop.counter0|default:0 }}-item-0-manual_film_meter" class="form-control" value="">
+                                            <input type="hidden" name="design-{{ forloop.parentloop.counter0|default:0 }}-item-0-film_meter_per_piece" value="0">
+                                        </div>
+
+                                        <div class="field">
+                                            <input type="number" step="0.01" min="0" name="design-{{ forloop.parentloop.counter0|default:0 }}-item-0-unit_price" class="form-control unit-price-input" value="">
+                                        </div>
+
+                                        <div class="field">
+                                            <input type="text" class="line-total-view" value="0.00" readonly>
+                                        </div>
+
+                                        <div class="remove-inline">
+                                            <button type="button" class="trash-btn remove-row-btn">🗑</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
                             </div>
                         </div>
                     </div>
                     {% endfor %}
-                </div>
+                {% else %}
+                    <div class="design-block" data-design-index="0">
+                        <input type="hidden" name="design-0-id" value="">
+                        <input type="hidden" name="design-0-DELETE" value="0" class="design-delete-input">
+
+                        <div class="design-top">
+                            <div>
+                                <div class="design-badge">Design <span class="design-number">1</span></div>
+                            </div>
+                            <div class="design-actions">
+                                <button type="button" class="btn btn-light add-row-btn">Add Row</button>
+                                <button type="button" class="btn btn-danger remove-design-btn">Remove Design</button>
+                            </div>
+                        </div>
+
+                        <div class="design-grid">
+                            <div class="field">
+                                <label>Design Name</label>
+                                <input type="text" name="design-0-name" class="form-control">
+                            </div>
+                            <div class="field">
+                                <label>Design Remark</label>
+                                <input type="text" name="design-0-remark" class="form-control">
+                            </div>
+                        </div>
+
+                        <div class="field">
+                            <label>Upload Design Images</label>
+                            <input type="file" name="design-0-design_files" class="form-control design-file-input" accept="image/*" multiple>
+                            <small>You can upload images for this design only.</small>
+                        </div>
+
+                        <div class="field">
+                            <label>Image Preview</label>
+                            <div class="preview-grid design-preview-grid"></div>
+                        </div>
+
+                        <input type="hidden" name="design-0-item_total" class="item-total" value="1">
+
+                        <div class="items-toolbar">
+                            <div>
+                                <h3 class="qb-title" style="font-size:18px;">Items</h3>
+                                <div class="qb-sub">Rows only for this design</div>
+                            </div>
+                        </div>
+
+                        <div class="item-board">
+                            <div class="item-header-row">
+                                <div>Mode</div>
+                                <div>Description</div>
+                                <div>Item</div>
+                                <div>Color</div>
+                                <div>Size</div>
+                                <div>Qty</div>
+                                <div>Film Meter</div>
+                                <div>Unit Price</div>
+                                <div>Total</div>
+                                <div>Action</div>
+                            </div>
+
+                            <div class="items-container">
+                                <div class="item-row" data-item-index="0">
+                                    <input type="hidden" name="design-0-item-0-id" value="">
+                                    <input type="hidden" name="design-0-item-0-DELETE" value="0" class="item-delete-input">
+
+                                    <div class="item-input-row">
+                                        <div class="field">
+                                            <select name="design-0-item-0-item_mode" class="form-select item-mode-select">
+                                                <option value="CLOTH" selected>Cloth</option>
+                                                <option value="FILM">Film</option>
+                                            </select>
+                                        </div>
+
+                                        <div class="field">
+                                            <input type="text" name="design-0-item-0-description" class="form-control" value="">
+                                        </div>
+
+                                        <div class="field item-select-cell">
+                                            <select name="design-0-item-0-shirt_item" class="form-select shirt-select">
+                                                <option value="">---------</option>
+                                                {% for opt in shirt_items %}
+                                                <option value="{{ opt.id }}">{{ opt }}</option>
+                                                {% endfor %}
+                                            </select>
+
+                                            <select name="design-0-item-0-film_item" class="form-select film-select" hidden>
+                                                <option value="">---------</option>
+                                                {% for opt in film_items %}
+                                                <option value="{{ opt.id }}">{{ opt }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+
+                                        <div class="field">
+                                            <select name="design-0-item-0-color" class="form-select">
+                                                <option value="">---------</option>
+                                                {% for opt in colors %}
+                                                <option value="{{ opt.id }}">{{ opt }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+
+                                        <div class="field">
+                                            <select name="design-0-item-0-size" class="form-select">
+                                                <option value="">---------</option>
+                                                {% for opt in sizes %}
+                                                <option value="{{ opt.id }}">{{ opt }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+
+                                        <div class="field">
+                                            <input type="number" step="0.01" min="0" name="design-0-item-0-quantity" class="form-control qty-input" value="">
+                                        </div>
+
+                                        <div class="field">
+                                            <input type="number" step="0.0001" min="0" name="design-0-item-0-manual_film_meter" class="form-control" value="">
+                                            <input type="hidden" name="design-0-item-0-film_meter_per_piece" value="0">
+                                        </div>
+
+                                        <div class="field">
+                                            <input type="number" step="0.01" min="0" name="design-0-item-0-unit_price" class="form-control unit-price-input" value="">
+                                        </div>
+
+                                        <div class="field">
+                                            <input type="text" class="line-total-view" value="0.00" readonly>
+                                        </div>
+
+                                        <div class="remove-inline">
+                                            <button type="button" class="trash-btn remove-row-btn">🗑</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
             </div>
         </div>
 
@@ -618,7 +994,7 @@
                 <div class="summary-note">
                     <div class="summary-note-title">Order Summary</div>
                     <div class="summary-note-text">
-                        Review the totals before saving. After the order is created, you can add buttons on the detail page to download invoice as PNG or PDF.
+                        Each design is separated for easier production reading. Save after checking all design boxes and totals.
                     </div>
                 </div>
 
@@ -642,12 +1018,12 @@
 
                     <div class="summary-line">
                         <label>Deposit</label>
-                        <input type="number" step="0.01" name="deposit_amount" id="deposit-amount" value="{{ request.POST.deposit_amount|default:'0' }}">
+                        <input type="number" step="0.01" name="deposit_amount" id="deposit-amount" value="{% if order %}{{ order.deposit_amount }}{% else %}0{% endif %}">
                     </div>
 
                     <div class="summary-line">
                         <label>Payment</label>
-                        <input type="number" step="0.01" name="paid_amount" id="paid-amount" value="{{ request.POST.paid_amount|default:'0' }}">
+                        <input type="number" step="0.01" name="paid_amount" id="paid-amount" value="{% if order %}{{ order.paid_amount }}{% else %}0{% endif %}">
                     </div>
 
                     <div class="summary-total">
@@ -658,7 +1034,7 @@
             </div>
 
             <div class="submit-row">
-                <button class="btn btn-primary" type="submit">Save Order</button>
+                <button class="btn btn-primary" type="submit">{{ submit_label|default:"Save Order" }}</button>
             </div>
         </div>
     </form>
@@ -671,43 +1047,135 @@
     </div>
 </div>
 
-<template id="empty-form-template">
-    <div class="item-row">
+<template id="design-template">
+    <div class="design-block" data-design-index="__DESIGN_INDEX__">
+        <input type="hidden" name="design-__DESIGN_INDEX__-id" value="">
+        <input type="hidden" name="design-__DESIGN_INDEX__-DELETE" value="0" class="design-delete-input">
+
+        <div class="design-top">
+            <div>
+                <div class="design-badge">Design <span class="design-number">__DESIGN_NUMBER__</span></div>
+            </div>
+            <div class="design-actions">
+                <button type="button" class="btn btn-light add-row-btn">Add Row</button>
+                <button type="button" class="btn btn-danger remove-design-btn">Remove Design</button>
+            </div>
+        </div>
+
+        <div class="design-grid">
+            <div class="field">
+                <label>Design Name</label>
+                <input type="text" name="design-__DESIGN_INDEX__-name" class="form-control">
+            </div>
+            <div class="field">
+                <label>Design Remark</label>
+                <input type="text" name="design-__DESIGN_INDEX__-remark" class="form-control">
+            </div>
+        </div>
+
+        <div class="field">
+            <label>Upload Design Images</label>
+            <input type="file" name="design-__DESIGN_INDEX__-design_files" class="form-control design-file-input" accept="image/*" multiple>
+            <small>You can upload images for this design only.</small>
+        </div>
+
+        <div class="field">
+            <label>Image Preview</label>
+            <div class="preview-grid design-preview-grid"></div>
+        </div>
+
+        <input type="hidden" name="design-__DESIGN_INDEX__-item_total" class="item-total" value="1">
+
+        <div class="items-toolbar">
+            <div>
+                <h3 class="qb-title" style="font-size:18px;">Items</h3>
+                <div class="qb-sub">Rows only for this design</div>
+            </div>
+        </div>
+
+        <div class="item-board">
+            <div class="item-header-row">
+                <div>Mode</div>
+                <div>Description</div>
+                <div>Item</div>
+                <div>Color</div>
+                <div>Size</div>
+                <div>Qty</div>
+                <div>Film Meter</div>
+                <div>Unit Price</div>
+                <div>Total</div>
+                <div>Action</div>
+            </div>
+
+            <div class="items-container">
+                __ITEM_ROW__
+            </div>
+        </div>
+    </div>
+</template>
+
+<template id="item-row-template">
+    <div class="item-row" data-item-index="__ITEM_INDEX__">
+        <input type="hidden" name="design-__DESIGN_INDEX__-item-__ITEM_INDEX__-id" value="">
+        <input type="hidden" name="design-__DESIGN_INDEX__-item-__ITEM_INDEX__-DELETE" value="0" class="item-delete-input">
+
         <div class="item-input-row">
             <div class="field">
-                {{ formset.empty_form.item_mode }}
+                <select name="design-__DESIGN_INDEX__-item-__ITEM_INDEX__-item_mode" class="form-select item-mode-select">
+                    <option value="CLOTH" selected>Cloth</option>
+                    <option value="FILM">Film</option>
+                </select>
             </div>
 
             <div class="field">
-                {{ formset.empty_form.description }}
+                <input type="text" name="design-__DESIGN_INDEX__-item-__ITEM_INDEX__-description" class="form-control" value="">
             </div>
 
-            <div class="field shirt-item-cell">
-                {{ formset.empty_form.shirt_item }}
-            </div>
+            <div class="field item-select-cell">
+                <select name="design-__DESIGN_INDEX__-item-__ITEM_INDEX__-shirt_item" class="form-select shirt-select">
+                    <option value="">---------</option>
+                    {% for opt in shirt_items %}
+                    <option value="{{ opt.id }}">{{ opt }}</option>
+                    {% endfor %}
+                </select>
 
-            <div class="field film-item-cell" style="display:none;">
-                {{ formset.empty_form.film_item }}
-            </div>
-
-            <div class="field color-cell">
-                {{ formset.empty_form.color }}
-            </div>
-
-            <div class="field size-cell">
-                {{ formset.empty_form.size }}
-            </div>
-
-            <div class="field">
-                {{ formset.empty_form.quantity }}
-            </div>
-
-            <div class="field meter-cell">
-                {{ formset.empty_form.manual_film_meter }}
+                <select name="design-__DESIGN_INDEX__-item-__ITEM_INDEX__-film_item" class="form-select film-select" hidden>
+                    <option value="">---------</option>
+                    {% for opt in film_items %}
+                    <option value="{{ opt.id }}">{{ opt }}</option>
+                    {% endfor %}
+                </select>
             </div>
 
             <div class="field">
-                {{ formset.empty_form.unit_price }}
+                <select name="design-__DESIGN_INDEX__-item-__ITEM_INDEX__-color" class="form-select">
+                    <option value="">---------</option>
+                    {% for opt in colors %}
+                    <option value="{{ opt.id }}">{{ opt }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="field">
+                <select name="design-__DESIGN_INDEX__-item-__ITEM_INDEX__-size" class="form-select">
+                    <option value="">---------</option>
+                    {% for opt in sizes %}
+                    <option value="{{ opt.id }}">{{ opt }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="field">
+                <input type="number" step="0.01" min="0" name="design-__DESIGN_INDEX__-item-__ITEM_INDEX__-quantity" class="form-control qty-input" value="">
+            </div>
+
+            <div class="field">
+                <input type="number" step="0.0001" min="0" name="design-__DESIGN_INDEX__-item-__ITEM_INDEX__-manual_film_meter" class="form-control" value="">
+                <input type="hidden" name="design-__DUQDgwqVE-6aMBLYLbQv6i5N5y7bC5SajqSjHPzt8UJUqbZ8a_piece" value="0">
+            </div>
+
+            <div class="field">
+                <input type="number" step="0.01" min="0" name="design-__DESIGN_INDEX__-item-__ITEM_INDEX__-unit_price" class="form-control unit-price-input" value="">
             </div>
 
             <div class="field">
@@ -715,8 +1183,7 @@
             </div>
 
             <div class="remove-inline">
-                <button type="button" class="trash-btn remove-row-btn" title="Remove row" aria-label="Remove row">🗑</button>
-                {% if formset.empty_form.DELETE %}{{ formset.empty_form.DELETE.as_hidden }}{% endif %}
+                <button type="button" class="trash-btn remove-row-btn">🗑</button>
             </div>
         </div>
     </div>
@@ -724,25 +1191,18 @@
 
 <script>
 document.addEventListener("DOMContentLoaded", function () {
-    const addRowBtn = document.getElementById("add-row-btn");
-    const itemsContainer = document.getElementById("items-container");
-    const template = document.getElementById("empty-form-template").innerHTML;
-    const designInput = document.querySelector('input[name="design_files"]');
-    const previewArea = document.getElementById("preview-area");
-    const dt = new DataTransfer();
-
-    const headerItemName = document.getElementById("header-item-name");
-    const headerColor = document.getElementById("header-color");
-    const headerSize = document.getElementById("header-size");
-    const headerMeter = document.getElementById("header-meter");
+    const orderForm = document.getElementById("order-form");
+    const addDesignBtn = document.getElementById("add-design-btn");
+    const designsContainer = document.getElementById("designs-container");
+    const designTemplate = document.getElementById("design-template").innerHTML;
+    const itemRowTemplate = document.getElementById("item-row-template").innerHTML;
+    const designTotalInput = document.getElementById("design-total");
 
     const imagePreviewModal = document.getElementById("image-preview-modal");
     const modalPreviewImage = document.getElementById("modal-preview-image");
     const closeImagePreviewBtn = document.getElementById("close-image-preview");
 
-    function getTotalFormsInput() {
-        return document.querySelector('[name$="-TOTAL_FORMS"]');
-    }
+    const designFileStore = new Map();
 
     function num(v) {
         const n = parseFloat(v);
@@ -750,25 +1210,164 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     function openPreviewModal(src) {
+        if (!imagePreviewModal || !modalPreviewImage) return;
         modalPreviewImage.src = src;
         imagePreviewModal.classList.add("show");
     }
 
     function closePreviewModal() {
+        if (!imagePreviewModal || !modalPreviewImage) return;
         imagePreviewModal.classList.remove("show");
         modalPreviewImage.src = "";
+    }
+
+    function getVisibleDesigns() {
+        return Array.from(document.querySelectorAll(".design-block")).filter(
+            block => block.style.display !== "none"
+        );
+    }
+
+    function updateDesignMeta() {
+        const allDesigns = document.querySelectorAll(".design-block");
+        const visibleDesigns = getVisibleDesigns();
+
+        if (designTotalInput) {
+            designTotalInput.value = allDesigns.length;
+        }
+
+        visibleDesigns.forEach((block, idx) => {
+            const no = block.querySelector(".design-number");
+            if (no) no.textContent = idx + 1;
+        });
+    }
+
+    function getDesignKey(designBlock) {
+        return designBlock.dataset.designIndex;
+    }
+
+    function ensureDesignStore(designBlock) {
+        const key = getDesignKey(designBlock);
+        if (!designFileStore.has(key)) {
+            designFileStore.set(key, []);
+        }
+        return key;
+    }
+
+    function rebuildDesignInputFiles(designBlock) {
+        const fileInput = designBlock.querySelector(".design-file-input");
+        if (!fileInput) return;
+
+        const key = ensureDesignStore(designBlock);
+        const storedFiles = designFileStore.get(key) || [];
+
+        const dt = new DataTransfer();
+        storedFiles.forEach(file => dt.items.add(file));
+        fileInput.files = dt.files;
+    }
+
+    function renderDesignPreview(designBlock) {
+        const previewGrid = designBlock.querySelector(".design-preview-grid");
+        if (!previewGrid) return;
+
+        const key = ensureDesignStore(designBlock);
+        const storedFiles = designFileStore.get(key) || [];
+
+        previewGrid.querySelectorAll(".new-upload-card").forEach(el => el.remove());
+
+        storedFiles.forEach((file, index) => {
+            if (!file.type.startsWith("image/")) return;
+
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                const box = document.createElement("div");
+                box.className = "preview-card new-upload-card";
+                box.innerHTML = `
+                    <button type="button" class="preview-open-btn" data-src="${e.target.result}">
+                        <img src="${e.target.result}" alt="Preview">
+                    </button>
+                    <div class="preview-meta">
+                        <span class="preview-name">${file.name}</span>
+                        <button type="button" class="preview-remove" data-index="${index}">Remove</button>
+                    </div>
+                `;
+                previewGrid.appendChild(box);
+
+                const openBtn = box.querySelector(".preview-open-btn");
+                if (openBtn) {
+                    openBtn.addEventListener("click", function () {
+                        openPreviewModal(openBtn.dataset.src);
+                    });
+                }
+
+                const removeBtn = box.querySelector(".preview-remove");
+                if (removeBtn) {
+                    removeBtn.addEventListener("click", function () {
+                        const arr = designFileStore.get(key) || [];
+                        arr.splice(index, 1);
+                        designFileStore.set(key, arr);
+                        rebuildDesignInputFiles(designBlock);
+                        renderDesignPreview(designBlock);
+                    });
+                }
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    function toggleItemMode(row) {
+        const modeSelect = row.querySelector(".item-mode-select");
+        const shirtSelect = row.querySelector(".shirt-select");
+        const filmSelect = row.querySelector(".film-select");
+        const colorSelect = row.querySelector('select[name*="-color"]');
+        const sizeSelect = row.querySelector('select[name*="-size"]');
+
+        function applyMode() {
+            if (!modeSelect) return;
+            const isFilm = modeSelect.value === "FILM";
+
+            if (shirtSelect) {
+                shirtSelect.hidden = isFilm;
+                if (isFilm) shirtSelect.value = "";
+            }
+
+            if (filmSelect) {
+                filmSelect.hidden = !isFilm;
+                if (!isFilm) filmSelect.value = "";
+            }
+
+            if (colorSelect) {
+                colorSelect.disabled = isFilm;
+                if (isFilm) colorSelect.value = "";
+            }
+
+            if (sizeSelect) {
+                sizeSelect.disabled = isFilm;
+                if (isFilm) sizeSelect.value = "";
+            }
+        }
+
+        if (modeSelect) {
+            modeSelect.addEventListener("change", applyMode);
+            applyMode();
+        }
     }
 
     function updateTotals() {
         let itemsTotal = 0;
 
         document.querySelectorAll(".item-row").forEach(row => {
-            const qtyInput = row.querySelector('input[name$="-quantity"]');
-            const unitPriceInput = row.querySelector('input[name$="-unit_price"]');
+            if (row.style.display === "none") return;
+
+            const qtyInput = row.querySelector(".qty-input");
+            const unitPriceInput = row.querySelector(".unit-price-input");
             const lineTotalView = row.querySelector(".line-total-view");
 
             const lineTotal = num(qtyInput?.value) * num(unitPriceInput?.value);
-            if (lineTotalView) lineTotalView.value = lineTotal.toFixed(2);
+
+            if (lineTotalView) {
+                lineTotalView.value = lineTotal.toFixed(2);
+            }
+
             itemsTotal += lineTotal;
         });
 
@@ -786,155 +1385,213 @@ document.addEventListener("DOMContentLoaded", function () {
         if (amountDueEl) amountDueEl.value = amountDue.toFixed(2);
     }
 
-    function updateGlobalHeaders() {
-        const firstMode = document.querySelector('.item-row select[name$="-item_mode"]');
-        const isFilm = firstMode && firstMode.value === "FILM";
+    function refreshItemNames(designBlock) {
+        const designIndex = designBlock.dataset.designIndex;
+        const rows = Array.from(
+            designBlock.querySelectorAll(".items-container .item-row")
+        ).filter(row => row.style.display !== "none");
 
-        headerItemName.textContent = isFilm ? "Film Item" : "Cloth Item";
-        headerColor.textContent = isFilm ? "Width / Type" : "Color";
-        headerSize.textContent = isFilm ? "Variant" : "Size";
-        headerMeter.textContent = isFilm ? "Used Meter" : "Film Meter";
-    }
+        rows.forEach((row, itemIndex) => {
+            row.dataset.itemIndex = itemIndex;
 
-    function toggleRowMode(row) {
-        const modeSelect = row.querySelector('select[name$="-item_mode"]');
-        const shirtCell = row.querySelector(".shirt-item-cell");
-        const filmCell = row.querySelector(".film-item-cell");
+            row.querySelectorAll("input, select, textarea").forEach(el => {
+                if (!el.name) return;
+                el.name = el.name.replace(
+                    /design-\d+-item-\d+-/g,
+                    `design-${designIndex}-item-${itemIndex}-`
+                );
+            });
+        });
 
-        function applyMode() {
-            if (!modeSelect) return;
-            const isFilm = modeSelect.value === "FILM";
-
-            if (shirtCell) shirtCell.style.display = isFilm ? "none" : "";
-            if (filmCell) filmCell.style.display = isFilm ? "" : "none";
-
-            updateGlobalHeaders();
-        }
-
-        if (modeSelect) {
-            modeSelect.addEventListener("change", applyMode);
-            applyMode();
+        const itemTotal = designBlock.querySelector(".item-total");
+        if (itemTotal) {
+            itemTotal.value = rows.length;
         }
     }
 
     function bindRowEvents(row) {
-        toggleRowMode(row);
+        toggleItemMode(row);
 
-        row.querySelectorAll('input[name$="-quantity"], input[name$="-unit_price"]').forEach(el => {
+        row.querySelectorAll(".qty-input, .unit-price-input").forEach(el => {
             el.addEventListener("input", updateTotals);
         });
 
         const removeBtn = row.querySelector(".remove-row-btn");
         if (removeBtn) {
             removeBtn.addEventListener("click", function () {
-                const rows = document.querySelectorAll(".item-row");
-                if (rows.length <= 1) return;
+                const designBlock = row.closest(".design-block");
+                const visibleRows = Array.from(
+                    designBlock.querySelectorAll(".items-container .item-row")
+                ).filter(itemRow => itemRow.style.display !== "none");
 
-                row.remove();
-                reindexForms();
-                updateGlobalHeaders();
+                if (visibleRows.length <= 1) {
+                    row.querySelectorAll('input[type="text"], input[type="number"]').forEach(input => {
+                        if (!input.classList.contains("line-total-view")) {
+                            input.value = "";
+                        }
+                    });
+
+                    row.querySelectorAll("select").forEach(select => {
+                        select.selectedIndex = 0;
+                    });
+
+                    const deleteInput = row.querySelector(".item-delete-input");
+                    const idInput = row.querySelector('input[name$="-id"]');
+
+                    if (deleteInput && idInput && idInput.value) {
+                        deleteInput.value = "1";
+                        row.style.display = "none";
+                    } else if (deleteInput) {
+                        deleteInput.value = "0";
+                    }
+
+                    toggleItemMode(row);
+                    refreshItemNames(designBlock);
+                    updateTotals();
+                    return;
+                }
+
+                const deleteInput = row.querySelector(".item-delete-input");
+                const idInput = row.querySelector('input[name$="-id"]');
+
+                if (deleteInput && idInput && idInput.value) {
+                    deleteInput.value = "1";
+                    row.style.display = "none";
+                } else {
+                    row.remove();
+                }
+
+                refreshItemNames(designBlock);
                 updateTotals();
             });
         }
     }
 
-    function reindexForms() {
-        const rows = document.querySelectorAll("#items-container .item-row");
-        const totalInput = getTotalFormsInput();
+    function bindDesignFileInput(designBlock) {
+        const fileInput = designBlock.querySelector(".design-file-input");
+        if (!fileInput) return;
 
-        rows.forEach((row, index) => {
-            row.querySelectorAll("input, select, textarea, label, button").forEach(el => {
-                ["name", "id", "for"].forEach(attr => {
-                    if (el.hasAttribute && el.hasAttribute(attr)) {
-                        const current = el.getAttribute(attr);
-                        if (current) {
-                            el.setAttribute(
-                                attr,
-                                current
-                                    .replace(/orderitem_set-\d+-/g, `orderitem_set-${index}-`)
-                                    .replace(/__prefix__/g, index)
-                            );
-                        }
-                    }
-                });
+        const key = ensureDesignStore(designBlock);
+
+        fileInput.addEventListener("change", function () {
+            const arr = designFileStore.get(key) || [];
+
+            Array.from(fileInput.files || []).forEach(file => {
+                if (!file.type.startsWith("image/")) return;
+
+                const duplicate = arr.some(
+                    oldFile =>
+                        oldFile.name === file.name &&
+                        oldFile.size === file.size &&
+                        oldFile.lastModified === file.lastModified
+                );
+
+                if (!duplicate) {
+                    arr.push(file);
+                }
+            });
+
+            designFileStore.set(key, arr);
+            rebuildDesignInputFiles(designBlock);
+            renderDesignPreview(designBlock);
+        });
+    }
+
+    function bindPreviewOpens(scope) {
+        scope.querySelectorAll(".preview-open-btn").forEach(btn => {
+            btn.addEventListener("click", function () {
+                openPreviewModal(btn.dataset.src);
             });
         });
-
-        if (totalInput) totalInput.value = rows.length;
     }
 
-    function renderPreview() {
-        previewArea.innerHTML = "";
-        Array.from(dt.files).forEach((file, index) => {
-            if (!file.type.startsWith("image/")) return;
+    function bindDesignEvents(designBlock) {
+        const addRowBtn = designBlock.querySelector(".add-row-btn");
+        const removeDesignBtn = designBlock.querySelector(".remove-design-btn");
 
-            const reader = new FileReader();
-            reader.onload = function (e) {
-                const box = document.createElement("div");
-                box.className = "preview-card";
-                box.innerHTML = `
-                    <button type="button" class="preview-open-btn" data-src="${e.target.result}">
-                        <img src="${e.target.result}" alt="">
-                    </button>
-                    <div class="preview-meta">
-                        <span class="preview-name">${file.name}</span>
-                        <button type="button" data-index="${index}" class="preview-remove">x</button>
-                    </div>
-                `;
-                previewArea.appendChild(box);
+        ensureDesignStore(designBlock);
+        bindDesignFileInput(designBlock);
+        bindPreviewOpens(designBlock);
 
-                previewArea.querySelectorAll(".preview-remove").forEach(btn => {
-                    btn.onclick = function () {
-                        const removeIndex = parseInt(this.dataset.index, 10);
-                        const newDt = new DataTransfer();
-                        Array.from(dt.files).forEach((f, i) => {
-                            if (i !== removeIndex) newDt.items.add(f);
-                        });
-                        dt.items.clear();
-                        Array.from(newDt.files).forEach(f => dt.items.add(f));
-                        designInput.files = dt.files;
-                        renderPreview();
-                    };
-                });
+        designBlock.querySelectorAll(".item-row").forEach(bindRowEvents);
 
-                previewArea.querySelectorAll(".preview-open-btn").forEach(btn => {
-                    btn.onclick = function () {
-                        openPreviewModal(this.dataset.src);
-                    };
-                });
-            };
-            reader.readAsDataURL(file);
+        if (addRowBtn) {
+            addRowBtn.addEventListener("click", function () {
+                const designIndex = designBlock.dataset.designIndex;
+                const itemsContainer = designBlock.querySelector(".items-container");
+                const nextIndex = Array.from(
+                    itemsContainer.querySelectorAll(".item-row")
+                ).filter(row => row.style.display !== "none").length;
+
+                let html = itemRowTemplate
+                    .replaceAll("__DESIGN_INDEX__", designIndex)
+                    .replaceAll("__ITEM_INDEX__", nextIndex);
+
+                const wrapper = document.createElement("div");
+                wrapper.innerHTML = html.trim();
+
+                const row = wrapper.firstElementChild;
+                itemsContainer.appendChild(row);
+
+                refreshItemNames(designBlock);
+                bindRowEvents(row);
+                updateTotals();
+            });
+        }
+
+        if (removeDesignBtn) {
+            removeDesignBtn.addEventListener("click", function () {
+                const visibleBlocks = getVisibleDesigns();
+                if (visibleBlocks.length <= 1) return;
+
+                const deleteInput = designBlock.querySelector(".design-delete-input");
+                const idInput = designBlock.querySelector('input[name^="design-"][name$="-id"]');
+
+                if (deleteInput && idInput && idInput.value) {
+                    deleteInput.value = "1";
+                    designBlock.style.display = "none";
+                } else {
+                    designBlock.remove();
+                }
+
+                updateDesignMeta();
+                updateTotals();
+            });
+        }
+    }
+
+    if (addDesignBtn) {
+        addDesignBtn.addEventListener("click", function () {
+            const designIndex = document.querySelectorAll(".design-block").length;
+
+            let rowHtml = itemRowTemplate
+                .replaceAll("__DESIGN_INDEX__", designIndex)
+                .replaceAll("__ITEM_INDEX__", 0);
+
+            let html = designTemplate
+                .replaceAll("__DESIGN_INDEX__", designIndex)
+                .replaceAll("__DESIGN_NUMBER__", designIndex + 1)
+                .replace("__ITEM_ROW__", rowHtml);
+
+            const wrapper = document.createElement("div");
+            wrapper.innerHTML = html.trim();
+
+            const block = wrapper.firstElementChild;
+            designsContainer.appendChild(block);
+
+            bindDesignEvents(block);
+            updateDesignMeta();
+            updateTotals();
         });
     }
 
-    addRowBtn.addEventListener("click", function () {
-        const totalInput = getTotalFormsInput();
-        const formIndex = parseInt(totalInput.value, 10);
-        const html = template.replace(/__prefix__/g, formIndex);
-        itemsContainer.insertAdjacentHTML("beforeend", html);
-        totalInput.value = formIndex + 1;
-
-        const newRow = itemsContainer.lastElementChild;
-        bindRowEvents(newRow);
-        updateGlobalHeaders();
-        updateTotals();
-    });
-
-    document.querySelectorAll(".item-row").forEach(bindRowEvents);
+    document.querySelectorAll(".design-block").forEach(bindDesignEvents);
 
     document.querySelectorAll(
         'input[name="discount_amount"], input[name="shipping_fee"], #deposit-amount, #paid-amount'
     ).forEach(el => {
         el.addEventListener("input", updateTotals);
     });
-
-    if (designInput) {
-        designInput.addEventListener("change", function () {
-            Array.from(this.files).forEach(file => dt.items.add(file));
-            designInput.files = dt.files;
-            renderPreview();
-        });
-    }
 
     if (closeImagePreviewBtn) {
         closeImagePreviewBtn.addEventListener("click", closePreviewModal);
@@ -948,13 +1605,16 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
-    document.addEventListener("keydown", function (e) {
-        if (e.key === "Escape") {
-            closePreviewModal();
-        }
-    });
+    if (orderForm) {
+        orderForm.addEventListener("submit", function () {
+            document.querySelectorAll(".design-block").forEach(designBlock => {
+                if (designBlock.style.display === "none") return;
+                rebuildDesignInputFiles(designBlock);
+            });
+        });
+    }
 
-    updateGlobalHeaders();
+    updateDesignMeta();
     updateTotals();
 });
 </script>

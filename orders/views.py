@@ -5,19 +5,28 @@ from django.contrib.auth.decorators import login_required, permission_required
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Prefetch, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
-from .forms import OrderForm, OrderItemFormSet, ProductionFilterForm
-from .models import Order, OrderDesignFile, OrderHistory, OrderProgress
-from .services import deduct_stock_for_order
+from inventory.models import Color, InventoryItem, Size
+
+from .forms import OrderForm, ProductionFilterForm
+from .models import Order, OrderDesign, OrderDesignFile, OrderHistory, OrderItem, OrderProgress
+from .services import deduct_stock_for_order, get_order_shortages, build_shortage_message
 
 
 def _stringify(value):
     if value is None:
         return ""
     return str(value)
+
+
+def _decimal_or_zero(value):
+    try:
+        return Decimal(str(value or 0))
+    except Exception:
+        return Decimal("0")
 
 
 def _log_order_history(order, action, field_name="", old_value="", new_value="", user=None, remark=""):
@@ -51,6 +60,7 @@ def _snapshot_order(order):
 
 def _snapshot_item(item):
     return {
+        "design": item.design.display_name if getattr(item, "design", None) else "",
         "item_mode": item.item_mode,
         "description": item.description,
         "shirt_item": str(item.shirt_item) if item.shirt_item else "",
@@ -58,9 +68,19 @@ def _snapshot_item(item):
         "color": str(item.color) if item.color else "",
         "size": str(item.size) if item.size else "",
         "quantity": str(item.quantity or 0),
+        "done_qty": str(item.done_qty or 0),
         "unit_price": str(item.unit_price or 0),
+        "film_meter_per_piece": str(item.film_meter_per_piece or 0),
         "manual_film_meter": str(item.manual_film_meter or 0),
         "line_total": str(item.line_total or 0),
+    }
+
+
+def _snapshot_design(design):
+    return {
+        "name": design.name,
+        "remark": design.remark,
+        "sort_order": design.sort_order,
     }
 
 
@@ -98,12 +118,330 @@ def _status_badge(status):
     return "yellow"
 
 
+def _get_prefetched_order_queryset():
+    return Order.objects.prefetch_related(
+        Prefetch(
+            "designs",
+            queryset=OrderDesign.objects.prefetch_related(
+                Prefetch(
+                    "items",
+                    queryset=OrderItem.objects.select_related(
+                        "shirt_item",
+                        "film_item",
+                        "color",
+                        "size",
+                        "design",
+                        "order",
+                    ).prefetch_related("progress_logs"),
+                ),
+                "files",
+            ).order_by("sort_order", "id"),
+        ),
+        "items",
+        "design_files",
+        "history_logs",
+        "progress_logs__order_item__design",
+        "stock_consumptions__batch_item__item",
+    )
+
+
+def _order_form_context_base():
+    return {
+        "shirt_items": InventoryItem.objects.filter(
+            item_type=InventoryItem.TYPE_SHIRT,
+            is_active=True,
+        ).order_by("code", "name"),
+        "film_items": InventoryItem.objects.filter(
+            item_type=InventoryItem.TYPE_FILM,
+            is_active=True,
+        ).order_by("code", "name"),
+        "colors": Color.objects.filter(
+            is_active=True
+        ).order_by("name"),
+        "sizes": Size.objects.filter(
+            is_active=True
+        ).order_by("sort_order", "id"),
+    }
+
+
+def _build_design_payloads_from_post(request):
+    payloads = []
+    design_total = int(request.POST.get("design_total", 0) or 0)
+
+    for design_index in range(design_total):
+        prefix = f"design-{design_index}"
+
+        design_id = request.POST.get(f"{prefix}-id") or ""
+        design_name = (request.POST.get(f"{prefix}-name") or "").strip()
+        design_remark = (request.POST.get(f"{prefix}-remark") or "").strip()
+        delete_design = request.POST.get(f"{prefix}-DELETE") == "1"
+        item_total = int(request.POST.get(f"{prefix}-item_total", 0) or 0)
+
+        items = []
+        for item_index in range(item_total):
+            item_prefix = f"{prefix}-item-{item_index}"
+
+            delete_item = request.POST.get(f"{item_prefix}-DELETE") == "1"
+
+            payload = {
+                "id": request.POST.get(f"{item_prefix}-id") or "",
+                "item_mode": (request.POST.get(f"{item_prefix}-item_mode") or OrderItem.MODE_CLOTH).strip(),
+                "description": (request.POST.get(f"{item_prefix}-description") or "").strip(),
+                "shirt_item_id": request.POST.get(f"{item_prefix}-shirt_item") or None,
+                "film_item_id": request.POST.get(f"{item_prefix}-film_item") or None,
+                "color_id": request.POST.get(f"{item_prefix}-color") or None,
+                "size_id": request.POST.get(f"{item_prefix}-size") or None,
+                "quantity": _decimal_or_zero(request.POST.get(f"{item_prefix}-quantity")),
+                "unit_price": _decimal_or_zero(request.POST.get(f"{item_prefix}-unit_price")),
+                "film_meter_per_piece": _decimal_or_zero(request.POST.get(f"{item_prefix}-film_meter_per_piece")),
+                "manual_film_meter": _decimal_or_zero(request.POST.get(f"{item_prefix}-manual_film_meter")),
+                "delete": delete_item,
+            }
+            items.append(payload)
+
+        payloads.append(
+            {
+                "id": design_id,
+                "name": design_name,
+                "remark": design_remark,
+                "delete": delete_design,
+                "files": request.FILES.getlist(f"{prefix}-design_files"),
+                "items": items,
+            }
+        )
+
+    return payloads
+
+
+def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
+    total_amount = Decimal("0")
+    total_pcs = Decimal("0")
+
+    existing_designs = {str(d.pk): d for d in order.designs.all()}
+    existing_items = {str(i.pk): i for i in order.items.all()}
+
+    kept_design_ids = set()
+    kept_item_ids = set()
+
+    next_sort_order = 1
+
+    for design_data in design_payloads:
+        design_id = design_data["id"]
+        delete_design = design_data["delete"]
+
+        if design_id and design_id in existing_designs:
+            design = existing_designs[design_id]
+            before_design = _snapshot_design(design)
+        else:
+            design = None
+            before_design = None
+
+        if delete_design:
+            if design:
+                _log_order_history(
+                    order=order,
+                    action=OrderHistory.ACTION_ITEM_DELETE,
+                    field_name=f"design#{design.pk}",
+                    old_value=before_design,
+                    new_value="",
+                    user=user,
+                    remark=f"Design removed: {design.display_name}",
+                )
+                design.delete()
+            continue
+
+        if design is None:
+            design = OrderDesign.objects.create(
+                order=order,
+                name=design_data["name"],
+                remark=design_data["remark"],
+                sort_order=next_sort_order,
+            )
+            _log_order_history(
+                order=order,
+                action=OrderHistory.ACTION_DESIGN_ADD,
+                field_name="design",
+                old_value="",
+                new_value=_snapshot_design(design),
+                user=user,
+                remark=f"Design created: {design.display_name}",
+            )
+        else:
+            design.name = design_data["name"]
+            design.remark = design_data["remark"]
+            design.sort_order = next_sort_order
+            design.save(update_fields=["name", "remark", "sort_order"])
+
+            after_design = _snapshot_design(design)
+            for key, old_val in before_design.items():
+                new_val = after_design.get(key)
+                if _stringify(old_val) != _stringify(new_val):
+                    _log_order_history(
+                        order=order,
+                        action=OrderHistory.ACTION_EDIT,
+                        field_name=f"design#{design.pk}.{key}",
+                        old_value=old_val,
+                        new_value=new_val,
+                        user=user,
+                        remark=f"Design updated: {design.display_name}",
+                    )
+
+        kept_design_ids.add(str(design.pk))
+        next_sort_order += 1
+
+        has_item_or_file = False
+
+        for item_data in design_data["items"]:
+            item_id = item_data["id"]
+            delete_item = item_data["delete"]
+
+            if item_id and item_id in existing_items:
+                item = existing_items[item_id]
+                old_item_data = _snapshot_item(item)
+            else:
+                item = None
+                old_item_data = None
+
+            if delete_item:
+                if item:
+                    _log_order_history(
+                        order=order,
+                        action=OrderHistory.ACTION_ITEM_DELETE,
+                        field_name=f"item#{item.pk}",
+                        old_value=old_item_data,
+                        new_value="",
+                        user=user,
+                        remark=f"Item removed from {design.display_name}",
+                    )
+                    item.delete()
+                continue
+
+            if not item_data["description"] and not item_data["shirt_item_id"] and not item_data["film_item_id"]:
+                continue
+
+            if item is None:
+                item = OrderItem.objects.create(
+                    order=order,
+                    design=design,
+                    item_mode=item_data["item_mode"],
+                    description=item_data["description"],
+                    shirt_item_id=item_data["shirt_item_id"],
+                    film_item_id=item_data["film_item_id"],
+                    color_id=item_data["color_id"],
+                    size_id=item_data["size_id"],
+                    quantity=item_data["quantity"],
+                    unit_price=item_data["unit_price"],
+                    film_meter_per_piece=item_data["film_meter_per_piece"],
+                    manual_film_meter=item_data["manual_film_meter"],
+                )
+                _log_order_history(
+                    order=order,
+                    action=OrderHistory.ACTION_ITEM_ADD,
+                    field_name="item",
+                    old_value="",
+                    new_value=_snapshot_item(item),
+                    user=user,
+                    remark=f"Item added in {design.display_name}",
+                )
+            else:
+                item.order = order
+                item.design = design
+                item.item_mode = item_data["item_mode"]
+                item.description = item_data["description"]
+                item.shirt_item_id = item_data["shirt_item_id"]
+                item.film_item_id = item_data["film_item_id"]
+                item.color_id = item_data["color_id"]
+                item.size_id = item_data["size_id"]
+                item.quantity = item_data["quantity"]
+                item.unit_price = item_data["unit_price"]
+                item.film_meter_per_piece = item_data["film_meter_per_piece"]
+                item.manual_film_meter = item_data["manual_film_meter"]
+                item.save()
+
+                new_item_data = _snapshot_item(item)
+                for key, old_val in old_item_data.items():
+                    new_val = new_item_data.get(key)
+                    if _stringify(old_val) != _stringify(new_val):
+                        _log_order_history(
+                            order=order,
+                            action=OrderHistory.ACTION_ITEM_EDIT,
+                            field_name=f"item#{item.pk}.{key}",
+                            old_value=old_val,
+                            new_value=new_val,
+                            user=user,
+                            remark=f"Item updated in {design.display_name}",
+                        )
+
+            kept_item_ids.add(str(item.pk))
+            has_item_or_file = True
+            total_amount += Decimal(item.line_total or 0)
+            total_pcs += Decimal(item.quantity or 0)
+
+        for f in design_data["files"]:
+            OrderDesignFile.objects.create(
+                order=order,
+                design=design,
+                image=f,
+            )
+            _log_order_history(
+                order=order,
+                action=OrderHistory.ACTION_DESIGN_ADD,
+                field_name="design_file",
+                old_value="",
+                new_value=f.name,
+                user=user,
+                remark=f"Design file uploaded in {design.display_name}",
+            )
+            has_item_or_file = True
+
+        if not has_item_or_file:
+            _log_order_history(
+                order=order,
+                action=OrderHistory.ACTION_ITEM_DELETE,
+                field_name=f"design#{design.pk}",
+                old_value=_snapshot_design(design),
+                new_value="",
+                user=user,
+                remark=f"Empty design removed: {design.display_name}",
+            )
+            design.delete()
+            kept_design_ids.discard(str(design.pk))
+
+    if is_edit:
+        for item in order.items.all():
+            if str(item.pk) not in kept_item_ids:
+                _log_order_history(
+                    order=order,
+                    action=OrderHistory.ACTION_ITEM_DELETE,
+                    field_name=f"item#{item.pk}",
+                    old_value=_snapshot_item(item),
+                    new_value="",
+                    user=user,
+                    remark="Item removed during edit sync",
+                )
+                item.delete()
+
+        for design in order.designs.all():
+            if str(design.pk) not in kept_design_ids:
+                _log_order_history(
+                    order=order,
+                    action=OrderHistory.ACTION_ITEM_DELETE,
+                    field_name=f"design#{design.pk}",
+                    old_value=_snapshot_design(design),
+                    new_value="",
+                    user=user,
+                    remark="Design removed during edit sync",
+                )
+                design.delete()
+
+    return total_amount, total_pcs
+
+
 @login_required
 @permission_required("orders.view_order", raise_exception=True)
 def order_list(request):
     orders = Order.objects.all().order_by("-created_at", "-id")
     return render(request, "orders/order_list.html", {"orders": orders})
-
 
 @login_required
 @permission_required("orders.add_order", raise_exception=True)
@@ -111,70 +449,25 @@ def order_list(request):
 def order_create(request):
     if request.method == "POST":
         form = OrderForm(request.POST, request.FILES)
-        formset = OrderItemFormSet(request.POST, request.FILES)
 
-        if form.is_valid() and formset.is_valid():
+        if form.is_valid():
             try:
                 order = form.save(commit=False)
                 order.status = Order.STATUS_PENDING
                 order.save()
 
-                _log_order_history(
+                design_payloads = _build_design_payloads_from_post(request)
+                total_amount, total_pcs = _save_design_payloads(
                     order=order,
-                    action=OrderHistory.ACTION_CREATE,
-                    field_name="order",
-                    old_value="",
-                    new_value=order.order_no,
+                    design_payloads=design_payloads,
                     user=request.user,
-                    remark="Order created",
+                    is_edit=False,
                 )
 
-                formset.instance = order
-                items = formset.save(commit=False)
-
-                total_amount = Decimal("0")
-                total_pcs = Decimal("0")
-
-                for obj in formset.deleted_objects:
-                    obj.delete()
-
-                for item in items:
-                    if not item.description and not item.shirt_item and not item.film_item:
-                        continue
-
-                    item.order = order
-                    item.save()
-
-                    total_amount += Decimal(item.line_total or 0)
-                    total_pcs += Decimal(item.quantity or 0)
-
-                    _log_order_history(
-                        order=order,
-                        action=OrderHistory.ACTION_ITEM_ADD,
-                        field_name="item",
-                        old_value="",
-                        new_value=_snapshot_item(item),
-                        user=request.user,
-                        remark="Item added during create",
-                    )
-
-                uploaded_files = request.FILES.getlist("design_files")
-                for f in uploaded_files:
-                    OrderDesignFile.objects.create(order=order, image=f)
-                    _log_order_history(
-                        order=order,
-                        action=OrderHistory.ACTION_DESIGN_ADD,
-                        field_name="design_file",
-                        old_value="",
-                        new_value=f.name,
-                        user=request.user,
-                        remark="Design file uploaded",
-                    )
-
-                discount_amount = Decimal(request.POST.get("discount_amount") or 0)
-                shipping_fee = Decimal(request.POST.get("shipping_fee") or 0)
-                deposit_amount = Decimal(request.POST.get("deposit_amount") or 0)
-                paid_amount = Decimal(request.POST.get("paid_amount") or 0)
+                discount_amount = _decimal_or_zero(request.POST.get("discount_amount"))
+                shipping_fee = _decimal_or_zero(request.POST.get("shipping_fee"))
+                deposit_amount = _decimal_or_zero(request.POST.get("deposit_amount"))
+                paid_amount = _decimal_or_zero(request.POST.get("paid_amount"))
 
                 order.total_amount = total_amount - discount_amount + shipping_fee
                 order.deposit_amount = deposit_amount
@@ -193,9 +486,33 @@ def order_create(request):
                     ]
                 )
 
-                deduct_stock_for_order(order)
+                _log_order_history(
+                    order=order,
+                    action=OrderHistory.ACTION_CREATE,
+                    field_name="order",
+                    old_value="",
+                    new_value=order.order_no,
+                    user=request.user,
+                    remark="Order created",
+                )
 
-                messages.success(request, f"Order {order.order_no} created successfully.")
+                unresolved = deduct_stock_for_order(order, allow_shortage=True)
+
+                messages.success(
+                    request,
+                    f"Order {order.order_no} created successfully."
+                )
+
+                if unresolved:
+                    shortage_text = ", ".join(
+                        f"{row['label']} short {row['shortage']}"
+                        for row in unresolved
+                    )
+                    messages.warning(
+                        request,
+                        f"Order created, but stock is lacking: {shortage_text}"
+                    )
+
                 return redirect("order_detail", pk=order.pk)
 
             except ValidationError as e:
@@ -204,31 +521,19 @@ def order_create(request):
             messages.error(request, "Please fix the errors below and try again.")
     else:
         form = OrderForm()
-        formset = OrderItemFormSet()
 
-    return render(
-        request,
-        "orders/order_form.html",
-        {
-            "form": form,
-            "formset": formset,
-            "is_edit": False,
-            "submit_label": "Save Order",
-        },
-    )
-
+    context = {
+        "form": form,
+        "is_edit": False,
+        "submit_label": "Save Order",
+        **_order_form_context_base(),
+    }
+    return render(request, "orders/order_form.html", context)
 
 @login_required
 @permission_required("orders.view_order", raise_exception=True)
 def order_detail(request, pk):
-    order = get_object_or_404(
-        Order.objects.prefetch_related(
-            "items",
-            "design_files",
-            "stock_consumptions__batch_item__item",
-        ),
-        pk=pk,
-    )
+    order = get_object_or_404(_get_prefetched_order_queryset(), pk=pk)
     return render(request, "orders/order_detail.html", {"order": order})
 
 
@@ -316,14 +621,7 @@ def production_list(request):
 @login_required
 @permission_required("orders.view_order", raise_exception=True)
 def production_detail(request, pk):
-    order = get_object_or_404(
-        Order.objects.prefetch_related(
-            "items",
-            "design_files",
-            "progress_logs",
-        ),
-        pk=pk,
-    )
+    order = get_object_or_404(_get_prefetched_order_queryset(), pk=pk)
 
     remaining_pcs = Decimal(order.total_pcs or 0) - Decimal(order.done_pcs or 0)
     if remaining_pcs < 0:
@@ -343,7 +641,10 @@ def production_detail(request, pk):
 @permission_required("orders.change_order", raise_exception=True)
 @transaction.atomic
 def production_update(request, pk):
-    order = get_object_or_404(Order, pk=pk)
+    order = get_object_or_404(
+        Order.objects.prefetch_related("items", "designs__items"),
+        pk=pk,
+    )
 
     if request.method == "POST":
         if request.POST.get("cancel_order"):
@@ -374,7 +675,7 @@ def production_update(request, pk):
             return redirect("production_detail", pk=order.pk)
 
         item_id = request.POST.get("item_id")
-        qty_done = Decimal(request.POST.get("qty_done") or 0)
+        qty_done = _decimal_or_zero(request.POST.get("qty_done"))
         remark = (request.POST.get("remark") or "").strip()
 
         order_item = get_object_or_404(order.items, pk=item_id)
@@ -400,7 +701,7 @@ def production_update(request, pk):
         total_done = sum(Decimal(i.done_qty or 0) for i in order.items.all())
         order.done_pcs = total_done
 
-        if order.done_pcs >= order.total_pcs:
+        if order.done_pcs >= order.total_pcs and order.total_pcs > 0:
             order.done_pcs = order.total_pcs
             order.status = Order.STATUS_DONE
         elif order.done_pcs > 0:
@@ -417,26 +718,14 @@ def production_update(request, pk):
 @login_required
 @permission_required("orders.view_order", raise_exception=True)
 def order_invoice(request, pk):
-    order = get_object_or_404(
-        Order.objects.prefetch_related(
-            "items",
-            "design_files",
-        ),
-        pk=pk,
-    )
+    order = get_object_or_404(_get_prefetched_order_queryset(), pk=pk)
     return render(request, "orders/order_invoice.html", {"order": order})
 
 
 @login_required
 @permission_required("orders.view_order", raise_exception=True)
 def order_invoice_pdf(request, pk):
-    order = get_object_or_404(
-        Order.objects.prefetch_related(
-            "items",
-            "design_files",
-        ),
-        pk=pk,
-    )
+    order = get_object_or_404(_get_prefetched_order_queryset(), pk=pk)
     return render(
         request,
         "orders/order_invoice_pdf.html",
@@ -452,95 +741,32 @@ def order_invoice_pdf(request, pk):
 @transaction.atomic
 def order_edit(request, pk):
     order = get_object_or_404(
-        Order.objects.prefetch_related("items", "design_files", "history_logs"),
+        _get_prefetched_order_queryset(),
         pk=pk,
     )
 
     if request.method == "POST":
         before_order = _snapshot_order(order)
-        existing_items = {item.pk: _snapshot_item(item) for item in order.items.all()}
 
         form = OrderForm(request.POST, request.FILES, instance=order)
-        formset = OrderItemFormSet(request.POST, request.FILES, instance=order)
 
-        if form.is_valid() and formset.is_valid():
+        if form.is_valid():
             try:
                 order = form.save(commit=False)
                 order.save()
 
-                items = formset.save(commit=False)
+                design_payloads = _build_design_payloads_from_post(request)
+                total_amount, total_pcs = _save_design_payloads(
+                    order=order,
+                    design_payloads=design_payloads,
+                    user=request.user,
+                    is_edit=True,
+                )
 
-                total_amount = Decimal("0")
-                total_pcs = Decimal("0")
-
-                for obj in formset.deleted_objects:
-                    old_item = existing_items.get(obj.pk, {})
-                    _log_order_history(
-                        order=order,
-                        action=OrderHistory.ACTION_ITEM_DELETE,
-                        field_name=f"item#{obj.pk}",
-                        old_value=old_item,
-                        new_value="",
-                        user=request.user,
-                        remark="Item removed",
-                    )
-                    obj.delete()
-
-                for item in items:
-                    if not item.description and not item.shirt_item and not item.film_item:
-                        continue
-
-                    is_new = item.pk is None
-                    old_item_data = existing_items.get(item.pk, {}) if item.pk else {}
-
-                    item.order = order
-                    item.save()
-
-                    total_amount += Decimal(item.line_total or 0)
-                    total_pcs += Decimal(item.quantity or 0)
-
-                    if is_new:
-                        _log_order_history(
-                            order=order,
-                            action=OrderHistory.ACTION_ITEM_ADD,
-                            field_name="item",
-                            old_value="",
-                            new_value=_snapshot_item(item),
-                            user=request.user,
-                            remark="New item added",
-                        )
-                    else:
-                        new_item_data = _snapshot_item(item)
-                        for key, old_val in old_item_data.items():
-                            new_val = new_item_data.get(key)
-                            if _stringify(old_val) != _stringify(new_val):
-                                _log_order_history(
-                                    order=order,
-                                    action=OrderHistory.ACTION_ITEM_EDIT,
-                                    field_name=f"item#{item.pk}.{key}",
-                                    old_value=old_val,
-                                    new_value=new_val,
-                                    user=request.user,
-                                    remark="Item updated",
-                                )
-
-                uploaded_files = request.FILES.getlist("design_files")
-                for f in uploaded_files:
-                    OrderDesignFile.objects.create(order=order, image=f)
-                    _log_order_history(
-                        order=order,
-                        action=OrderHistory.ACTION_DESIGN_ADD,
-                        field_name="design_file",
-                        old_value="",
-                        new_value=f.name,
-                        user=request.user,
-                        remark="Design file uploaded on edit",
-                    )
-
-                discount_amount = Decimal(request.POST.get("discount_amount") or 0)
-                shipping_fee = Decimal(request.POST.get("shipping_fee") or 0)
-                deposit_amount = Decimal(request.POST.get("deposit_amount") or 0)
-                paid_amount = Decimal(request.POST.get("paid_amount") or 0)
+                discount_amount = _decimal_or_zero(request.POST.get("discount_amount"))
+                shipping_fee = _decimal_or_zero(request.POST.get("shipping_fee"))
+                deposit_amount = _decimal_or_zero(request.POST.get("deposit_amount"))
+                paid_amount = _decimal_or_zero(request.POST.get("paid_amount"))
 
                 order.total_amount = total_amount - discount_amount + shipping_fee
                 order.deposit_amount = deposit_amount
@@ -588,16 +814,12 @@ def order_edit(request, pk):
         form = OrderForm(instance=order)
         form.fields["discount_amount"].initial = Decimal("0")
         form.fields["shipping_fee"].initial = Decimal("0")
-        formset = OrderItemFormSet(instance=order)
 
-    return render(
-        request,
-        "orders/order_form.html",
-        {
-            "form": form,
-            "formset": formset,
-            "is_edit": True,
-            "submit_label": "Update Order",
-            "order": order,
-        },
-    )
+    context = {
+        "form": form,
+        "is_edit": True,
+        "submit_label": "Update Order",
+        "order": order,
+        **_order_form_context_base(),
+    }
+    return render(request, "orders/order_form.html", context)

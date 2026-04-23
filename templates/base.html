@@ -385,32 +385,6 @@
             box-shadow: 0 0 0 4px rgba(232,155,20,.12);
         }
 
-        .msg, .alert {
-            border-radius: 16px;
-            padding: 14px 18px;
-            margin-bottom: 18px;
-            font-weight: 600;
-        }
-
-        .msg {
-            background: var(--accent-soft);
-            border: 1px solid #F4D38A;
-            color: var(--accent-dark);
-        }
-
-        .alert-danger {
-            background: var(--danger-bg);
-            border: 1px solid var(--danger-line);
-            color: var(--danger-text);
-            font-weight: 700;
-        }
-
-        .alert-success {
-            background: var(--success-bg);
-            border: 1px solid var(--success-line);
-            color: var(--success-text);
-        }
-
         .app-table, table {
             width: 100%;
             border-collapse: collapse;
@@ -431,6 +405,86 @@
             letter-spacing: 1.2px;
             color: var(--muted);
             font-weight: 700;
+        }
+
+        .flash-stack {
+            display: grid;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .flash-message {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            border-radius: 18px;
+            padding: 14px 16px;
+            border: 1px solid transparent;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+        }
+
+        .flash-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 900;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        .flash-text {
+            font-size: 14px;
+            font-weight: 700;
+            line-height: 1.45;
+            white-space: pre-line;
+        }
+
+        .flash-success {
+            background: #ECFDF3;
+            border-color: #ABEFC6;
+            color: #067647;
+        }
+
+        .flash-success .flash-icon {
+            background: #D1FADF;
+            color: #067647;
+        }
+
+        .flash-warning {
+            background: #FFF7E8;
+            border-color: #F7D08A;
+            color: #B54708;
+        }
+
+        .flash-warning .flash-icon {
+            background: #FDE7C2;
+            color: #B54708;
+        }
+
+        .flash-error {
+            background: #FDECEC;
+            border-color: #F5C2C7;
+            color: #B42318;
+        }
+
+        .flash-error .flash-icon {
+            background: #FAD2D6;
+            color: #B42318;
+        }
+
+        .flash-info {
+            background: #F4F7FB;
+            border-color: #D7E3F4;
+            color: #1F4E79;
+        }
+
+        .flash-info .flash-icon {
+            background: #E3EDF9;
+            color: #1F4E79;
         }
 
         @media (max-width: 980px) {
@@ -645,9 +699,24 @@
                 </div>
 
                 {% if messages %}
+                <div class="flash-stack">
                     {% for message in messages %}
-                        <div class="msg">{{ message }}</div>
+                    <div class="flash-message {% if message.tags == 'success' %}flash-success{% elif message.tags == 'warning' %}flash-warning{% elif message.tags == 'error' %}flash-error{% else %}flash-info{% endif %}">
+                        <div class="flash-icon">
+                            {% if message.tags == 'success' %}
+                                ✓
+                            {% elif message.tags == 'warning' %}
+                                !
+                            {% elif message.tags == 'error' %}
+                                ✕
+                            {% else %}
+                                i
+                            {% endif %}
+                        </div>
+                        <div class="flash-text">{{ message }}</div>
+                    </div>
                     {% endfor %}
+                </div>
                 {% endif %}
 
                 {% block content %}{% endblock %}

@@ -176,14 +176,14 @@ def inventory_list(request):
 
     variant_cards = []
     for _, data in grouped.items():
-        data["total_qty"] = data["available_qty"] + data["in_progress_qty"]
+        data["total_qty"] = data["available_qty"] - data["in_progress_qty"]
 
         size_list = []
         for _, s in sorted(
             data["sizes"].items(),
             key=lambda x: (x[1]["size_sort"], x[1]["size_name"]),
         ):
-            s["total_qty"] = s["available_qty"] + s["in_progress_qty"]
+            s["total_qty"] = s["available_qty"] - s["in_progress_qty"]
             size_list.append(s)
 
         data["sizes"] = size_list
@@ -239,7 +239,6 @@ def inventory_list(request):
             "batches": batch_rows,
         },
     )
-
 
 @login_required
 @permission_required("inventory.view_inventoryitem", raise_exception=True)

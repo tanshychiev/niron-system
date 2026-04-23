@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block page_title %}{{ order.order_no }}{% endblock %}
-{% block page_subtitle %}Production detail and progress update{% endblock %}
+{% block page_subtitle %}Production detail grouped by design{% endblock %}
 
 {% block top_actions %}
 <a href="{% url 'production_list' %}" class="btn btn-light">Back to Production</a>
@@ -93,109 +93,159 @@
 </div>
 
 <div class="card">
-    <h2 class="section-title">Design Files</h2>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:14px;">
-        {% for img in order.design_files.all %}
-        <div style="border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#fff;">
-            <img
-                src="{{ img.image.url }}"
-                data-src="{{ img.image.url }}"
-                class="design-preview-img"
-                style="width:100%;height:160px;object-fit:cover;display:block;cursor:pointer;"
-            >
+    <h2 class="section-title">Designs For Production</h2>
+
+    <div class="production-design-stack">
+        {% for design in order.designs.all %}
+        <div class="production-design-card">
+            <div class="production-design-head">
+                <div>
+                    <div class="production-design-badge">{{ design.display_name }}</div>
+                    {% if design.remark %}
+                    <div class="production-design-remark">{{ design.remark }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="production-design-summary">
+                    <div class="summary-chip">PCS {{ design.total_pcs }}</div>
+                    <div class="summary-chip">Done {{ design.done_pcs }}</div>
+                    <div class="summary-chip">Remain {{ design.remaining_pcs }}</div>
+                </div>
+            </div>
+
+            <div class="production-design-grid">
+                <div class="production-image-box">
+                    <div class="production-box-title">Design Images</div>
+                    <div class="production-image-grid">
+                        {% for img in design.files.all %}
+                        <div class="production-image-card">
+                            <img
+                                src="{{ img.image.url }}"
+                                data-src="{{ img.image.url }}"
+                                class="design-preview-img"
+                                alt="Design image"
+                            >
+                        </div>
+                        {% empty %}
+                        <div class="empty-note">No design files uploaded.</div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="production-item-box">
+                    <div class="production-box-title">Items Progress</div>
+
+                    <div class="table-wrap">
+                        <table class="production-table">
+                            <thead>
+                                <tr>
+                                    <th>Mode</th>
+                                    <th>Description</th>
+                                    <th>Item</th>
+                                    <th>Color</th>
+                                    <th>Size</th>
+                                    <th>Ordered</th>
+                                    <th>Done</th>
+                                    <th>Remaining</th>
+                                    <th>Update</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in design.items.all %}
+                                <tr>
+                                    <td>{{ item.get_item_mode_display }}</td>
+                                    <td>{{ item.description|default:"-" }}</td>
+                                    <td>
+                                        {% if item.item_mode == "FILM" %}
+                                            {{ item.film_item|default:"-" }}
+                                        {% else %}
+                                            {{ item.shirt_item|default:"-" }}
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ item.color|default:"-" }}</td>
+                                    <td>{{ item.size|default:"-" }}</td>
+                                    <td>{{ item.quantity }}</td>
+                                    <td>{{ item.done_qty }}</td>
+                                    <td>{{ item.remaining_qty }}</td>
+                                    <td>
+                                        {% if item.remaining_qty > 0 and order.status != "CANCEL" and order.status != "CANCELLED" %}
+                                        <form method="post" action="{% url 'production_update' order.pk %}" class="update-inline-form">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="item_id" value="{{ item.pk }}">
+                                            <input type="number" step="0.01" name="qty_done" placeholder="qty" required>
+                                            <input type="text" name="remark" placeholder="remark">
+                                            <button type="submit" class="btn btn-primary">Save</button>
+                                        </form>
+                                        {% else %}
+                                        <span class="status-pill status-green">Done</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="9">No items in this design.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </div>
         {% empty %}
-        <p>No design files uploaded.</p>
+        <div class="empty-note">No designs found.</div>
         {% endfor %}
     </div>
 </div>
 
 <div class="card">
-    <h2 class="section-title">Items Progress</h2>
-    <table>
-        <thead>
-            <tr>
-                <th>Mode</th>
-                <th>Cloth Type</th>
-                <th>Color</th>
-                <th>Size</th>
-                <th>Film</th>
-                <th>Ordered</th>
-                <th>Done</th>
-                <th>Remaining</th>
-                <th>Update</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for item in order.items.all %}
-            <tr>
-                <td>{{ item.get_item_mode_display }}</td>
-                <td>{{ item.shirt_item|default:"-" }}</td>
-                <td>{{ item.color|default:"-" }}</td>
-                <td>{{ item.size|default:"-" }}</td>
-                <td>{{ item.film_item|default:"-" }}</td>
-                <td>{{ item.quantity }}</td>
-                <td>{{ item.done_qty }}</td>
-                <td>{{ item.remaining_qty }}</td>
-                <td>
-                    {% if item.remaining_qty > 0 and order.status != "CANCEL" and order.status != "CANCELLED" %}
-                    <form method="post" action="{% url 'production_update' order.pk %}" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-                        {% csrf_token %}
-                        <input type="hidden" name="item_id" value="{{ item.pk }}">
-                        <input type="number" step="0.01" name="qty_done" placeholder="qty" style="width:90px;" required>
-                        <input type="text" name="remark" placeholder="remark" style="width:160px;">
-                        <button type="submit" class="btn btn-primary">Save</button>
-                    </form>
-                    {% else %}
-                    <span class="status-pill status-green">Done</span>
-                    {% endif %}
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
-
-<div class="card">
     <h2 class="section-title">Progress History</h2>
-    <table>
-        <thead>
-            <tr>
-                <th>Item</th>
-                <th>Qty Done</th>
-                <th>Remark</th>
-                <th>Date</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for log in order.progress_logs.all %}
-            <tr>
-                <td>
-                    {% if log.order_item %}
-                        {% if log.order_item.shirt_item %}
-                            {{ log.order_item.shirt_item }}
-                        {% elif log.order_item.film_item %}
-                            {{ log.order_item.film_item }}
+    <div class="table-wrap">
+        <table class="production-table">
+            <thead>
+                <tr>
+                    <th>Design</th>
+                    <th>Item</th>
+                    <th>Qty Done</th>
+                    <th>Remark</th>
+                    <th>Date</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in order.progress_logs.all %}
+                <tr>
+                    <td>
+                        {% if log.order_item and log.order_item.design %}
+                            {{ log.order_item.design.display_name }}
                         {% else %}
                             -
                         {% endif %}
-                        {% if log.order_item.color %} / {{ log.order_item.color }}{% endif %}
-                        {% if log.order_item.size %} / {{ log.order_item.size }}{% endif %}
-                    {% else %}
-                        -
-                    {% endif %}
-                </td>
-                <td>{{ log.qty_done }}</td>
-                <td>{{ log.remark }}</td>
-                <td>{{ log.created_at|date:"Y-m-d H:i" }}</td>
-            </tr>
-            {% empty %}
-            <tr>
-                <td colspan="4">No progress history yet.</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+                    </td>
+                    <td>
+                        {% if log.order_item %}
+                            {% if log.order_item.item_mode == "FILM" %}
+                                {{ log.order_item.film_item|default:"-" }}
+                            {% else %}
+                                {{ log.order_item.shirt_item|default:"-" }}
+                            {% endif %}
+                            {% if log.order_item.color %} / {{ log.order_item.color }}{% endif %}
+                            {% if log.order_item.size %} / {{ log.order_item.size }}{% endif %}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td>{{ log.qty_done }}</td>
+                    <td>{{ log.remark }}</td>
+                    <td>{{ log.created_at|date:"Y-m-d H:i" }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5">No progress history yet.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
 
 <div id="imageModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.78);z-index:9999;align-items:center;justify-content:center;padding:24px;">
@@ -358,9 +408,158 @@
     background:#b91c1c;
 }
 
+.production-design-stack{
+    display:grid;
+    gap:18px;
+}
+
+.production-design-card{
+    border:1px solid var(--line);
+    border-radius:22px;
+    background:linear-gradient(180deg, rgba(255,255,255,.98), rgba(249,247,240,.90));
+    padding:18px;
+}
+
+.production-design-head{
+    display:flex;
+    justify-content:space-between;
+    gap:12px;
+    flex-wrap:wrap;
+    margin-bottom:14px;
+}
+
+.production-design-badge{
+    display:inline-flex;
+    align-items:center;
+    padding:8px 12px;
+    border-radius:999px;
+    background:#f8f6ef;
+    border:1px solid var(--line);
+    font-size:12px;
+    font-weight:800;
+    color:#111827;
+}
+
+.production-design-remark{
+    margin-top:6px;
+    font-size:13px;
+    color:#6b7280;
+}
+
+.production-design-summary{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+}
+
+.summary-chip{
+    padding:8px 12px;
+    border-radius:14px;
+    border:1px solid var(--line);
+    background:#fff;
+    font-size:12px;
+    font-weight:800;
+    color:#1f2937;
+}
+
+.production-design-grid{
+    display:grid;
+    grid-template-columns:320px minmax(0,1fr);
+    gap:18px;
+}
+
+.production-image-box,
+.production-item-box{
+    border:1px solid var(--line);
+    border-radius:18px;
+    background:#fff;
+    padding:14px;
+}
+
+.production-box-title{
+    font-size:13px;
+    font-weight:800;
+    color:#6b7280;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    margin-bottom:12px;
+}
+
+.production-image-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(130px,1fr));
+    gap:12px;
+}
+
+.production-image-card{
+    border:1px solid var(--line);
+    border-radius:14px;
+    overflow:hidden;
+    background:#fff;
+}
+
+.production-image-card img{
+    width:100%;
+    height:130px;
+    object-fit:cover;
+    display:block;
+    cursor:pointer;
+}
+
+.table-wrap{
+    overflow-x:auto;
+}
+
+.production-table{
+    width:100%;
+    border-collapse:collapse;
+    min-width:860px;
+}
+
+.production-table th,
+.production-table td{
+    padding:12px 10px;
+    border-bottom:1px solid var(--line);
+    text-align:left;
+    vertical-align:top;
+    font-size:14px;
+}
+
+.production-table th{
+    font-size:12px;
+    font-weight:800;
+    color:#6b7280;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+}
+
+.update-inline-form{
+    display:flex;
+    gap:8px;
+    align-items:center;
+    flex-wrap:wrap;
+}
+
+.update-inline-form input[type="number"]{
+    width:90px;
+}
+
+.update-inline-form input[type="text"]{
+    width:160px;
+}
+
+.empty-note{
+    color:#6b7280;
+    font-size:13px;
+}
+
 @media (max-width: 1100px){
     .detail-grid{
         grid-template-columns:repeat(2, minmax(0,1fr));
+    }
+
+    .production-design-grid{
+        grid-template-columns:1fr;
     }
 }
 
@@ -388,10 +587,23 @@ document.addEventListener("DOMContentLoaded", function () {
     document.querySelectorAll(".design-preview-img").forEach(img => {
         img.addEventListener("click", function () {
             modal.style.display = "flex";
-            modalImage.src = this.dataset.src;
+            modalImage.src = this.dataset.src || this.src;
             currentScale = 1;
             modalImage.style.transform = "scale(1)";
         });
+    });
+
+    function closeModal() {
+        modal.style.display = "none";
+        modalImage.src = "";
+    }
+
+    closeBtn.addEventListener("click", closeModal);
+
+    modal.addEventListener("click", function (e) {
+        if (e.target === modal) {
+            closeModal();
+        }
     });
 
     zoomInBtn.addEventListener("click", function () {
@@ -400,20 +612,8 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     zoomOutBtn.addEventListener("click", function () {
-        currentScale = Math.max(0.2, currentScale - 0.2);
+        currentScale = Math.max(0.4, currentScale - 0.2);
         modalImage.style.transform = `scale(${currentScale})`;
-    });
-
-    closeBtn.addEventListener("click", function () {
-        modal.style.display = "none";
-        modalImage.src = "";
-    });
-
-    modal.addEventListener("click", function (e) {
-        if (e.target === modal) {
-            modal.style.display = "none";
-            modalImage.src = "";
-        }
     });
 });
 </script>

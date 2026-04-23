@@ -68,6 +68,53 @@ class Order(models.Model):
         super().save(*args, **kwargs)
 
 
+class OrderDesign(models.Model):
+    order = models.ForeignKey(
+        Order,
+        on_delete=models.CASCADE,
+        related_name="designs",
+    )
+    name = models.CharField(max_length=120, blank=True, default="")
+    sort_order = models.PositiveIntegerField(default=1)
+    remark = models.CharField(max_length=255, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["sort_order", "id"]
+
+    def __str__(self):
+        return f"{self.order.order_no} - {self.display_name}"
+
+    @property
+    def display_name(self):
+        return self.name.strip() if self.name else f"Design {self.sort_order}"
+
+    @property
+    def total_pcs(self):
+        total = Decimal("0")
+        for item in self.items.all():
+            total += item.quantity or Decimal("0")
+        return total
+
+    @property
+    def done_pcs(self):
+        total = Decimal("0")
+        for item in self.items.all():
+            total += item.done_qty or Decimal("0")
+        return total
+
+    @property
+    def remaining_pcs(self):
+        return self.total_pcs - self.done_pcs
+
+    @property
+    def total_amount(self):
+        total = Decimal("0")
+        for item in self.items.all():
+            total += item.line_total or Decimal("0")
+        return total
+
+
 class OrderItem(models.Model):
     MODE_CLOTH = "CLOTH"
     MODE_FILM = "FILM"
@@ -77,7 +124,20 @@ class OrderItem(models.Model):
         (MODE_FILM, "Film"),
     ]
 
-    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="items")
+    # keep order for easier querying/report/progress compatibility
+    order = models.ForeignKey(
+        Order,
+        on_delete=models.CASCADE,
+        related_name="items",
+    )
+    # keep nullable for migration safety first
+    design = models.ForeignKey(
+        OrderDesign,
+        on_delete=models.CASCADE,
+        related_name="items",
+        null=True,
+        blank=True,
+    )
 
     item_mode = models.CharField(
         max_length=20,
@@ -133,7 +193,17 @@ class OrderItem(models.Model):
     class Meta:
         ordering = ["id"]
 
+    def __str__(self):
+        base_name = self.description or (
+            str(self.film_item) if self.item_mode == self.MODE_FILM and self.film_item
+            else str(self.shirt_item) if self.shirt_item
+            else f"Item {self.pk}"
+        )
+        return f"{self.order.order_no} - {base_name}"
+
     def save(self, *args, **kwargs):
+        if self.design_id:
+            self.order = self.design.order
         self.line_total = (self.quantity or Decimal("0")) * (self.unit_price or Decimal("0"))
         super().save(*args, **kwargs)
 
@@ -170,10 +240,19 @@ class StockConsumption(models.Model):
 
 
 class OrderDesignFile(models.Model):
+    # keep order for easier compatibility
     order = models.ForeignKey(
         Order,
         on_delete=models.CASCADE,
         related_name="design_files",
+    )
+    # keep nullable for migration safety first
+    design = models.ForeignKey(
+        OrderDesign,
+        on_delete=models.CASCADE,
+        related_name="files",
+        null=True,
+        blank=True,
     )
     image = models.ImageField(upload_to="order_designs/")
     uploaded_at = models.DateTimeField(auto_now_add=True)
@@ -182,7 +261,14 @@ class OrderDesignFile(models.Model):
         ordering = ["id"]
 
     def __str__(self):
+        if self.design_id:
+            return f"{self.order.order_no} - {self.design.display_name}"
         return f"{self.order.order_no} - Design {self.pk}"
+
+    def save(self, *args, **kwargs):
+        if self.design_id:
+            self.order = self.design.order
+        super().save(*args, **kwargs)
 
 
 class OrderProgress(models.Model):

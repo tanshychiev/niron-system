@@ -2,7 +2,7 @@ from django import forms
 from django.forms import inlineformset_factory
 
 from inventory.models import Color, InventoryItem, Size
-from .models import Order, OrderItem
+from .models import Order, OrderDesign, OrderItem
 
 
 class MultipleFileInput(forms.ClearableFileInput):
@@ -32,16 +32,6 @@ class OrderForm(forms.ModelForm):
                 "class": "form-control",
             }
         )
-    )
-
-    design_files = MultipleFileField(
-        required=False,
-        widget=MultipleFileInput(
-            attrs={
-                "accept": "image/*",
-                "class": "form-control",
-            }
-        ),
     )
 
     shipping_fee = forms.DecimalField(
@@ -112,10 +102,39 @@ class OrderForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
         self.fields["customer_location"].required = False
         self.fields["remark"].required = False
         self.fields["phone"].required = False
+
+
+class OrderDesignForm(forms.ModelForm):
+    design_files = MultipleFileField(
+        required=False,
+        widget=MultipleFileInput(
+            attrs={
+                "accept": "image/*",
+                "class": "form-control",
+            }
+        ),
+    )
+
+    class Meta:
+        model = OrderDesign
+        fields = ["name", "remark"]
+        widgets = {
+            "name": forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "Design name",
+                }
+            ),
+            "remark": forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "Design remark",
+                }
+            ),
+        }
 
 
 class OrderItemForm(forms.ModelForm):
@@ -144,31 +163,11 @@ class OrderItemForm(forms.ModelForm):
             "manual_film_meter",
         ]
         widgets = {
-            "item_mode": forms.Select(
-                attrs={
-                    "class": "form-select",
-                }
-            ),
-            "shirt_item": forms.Select(
-                attrs={
-                    "class": "form-select",
-                }
-            ),
-            "color": forms.Select(
-                attrs={
-                    "class": "form-select",
-                }
-            ),
-            "size": forms.Select(
-                attrs={
-                    "class": "form-select",
-                }
-            ),
-            "film_item": forms.Select(
-                attrs={
-                    "class": "form-select",
-                }
-            ),
+            "item_mode": forms.Select(attrs={"class": "form-select"}),
+            "shirt_item": forms.Select(attrs={"class": "form-select"}),
+            "color": forms.Select(attrs={"class": "form-select"}),
+            "size": forms.Select(attrs={"class": "form-select"}),
+            "film_item": forms.Select(attrs={"class": "form-select"}),
             "quantity": forms.NumberInput(
                 attrs={
                     "class": "form-control",
@@ -235,12 +234,14 @@ class OrderItemForm(forms.ModelForm):
 
 
 OrderItemFormSet = inlineformset_factory(
-    Order,
+    OrderDesign,
     OrderItem,
     form=OrderItemForm,
     extra=1,
     can_delete=True,
 )
+
+
 class ProductionFilterForm(forms.Form):
     STATUS_ACTIVE = "ACTIVE"
     STATUS_ALL = "ALL"
