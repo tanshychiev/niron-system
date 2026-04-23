@@ -7,6 +7,7 @@ from django.db.models import Q, Sum
 from django.db.models.functions import TruncDate
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
+from django.utils import timezone
 
 from .forms import (
     BatchExpenseForm,
@@ -104,38 +105,6 @@ def _apply_filters(request, qs):
     return form, qs
 
 
-def _get_revenue_total():
-    try:
-        from orders.models import Order
-    except Exception:
-        return Decimal("0.00")
-
-    for field_name in ["total_selling_price", "total_price", "price", "grand_total"]:
-        try:
-            value = Order.objects.aggregate(total=Sum(field_name))["total"]
-            if value is not None:
-                return value
-        except Exception:
-            continue
-    return Decimal("0.00")
-
-
-def _get_total_cloth_sold():
-    try:
-        from orders.models import OrderItem
-        value = OrderItem.objects.aggregate(total=Sum("quantity"))["total"]
-        return value or 0
-    except Exception:
-        pass
-
-    try:
-        from orders.models import Order
-        value = Order.objects.aggregate(total=Sum("quantity"))["total"]
-        return value or 0
-    except Exception:
-        return 0
-
-
 def _get_total_inventory():
     try:
         from inventory.models import InventoryBatchItem, InventoryItem
@@ -154,8 +123,6 @@ def _get_total_inventory():
 
 
 def _get_expense_chart_data():
-    from django.utils import timezone
-
     end_date = timezone.localdate()
     start_date = end_date - timedelta(days=29)
 
@@ -175,50 +142,6 @@ def _get_expense_chart_data():
     while current <= end_date:
         labels.append(current.strftime("%d %b"))
         values.append(expense_map.get(current, 0))
-        current += timedelta(days=1)
-
-    return labels, values
-
-
-def _get_revenue_chart_data():
-    from django.utils import timezone
-
-    end_date = timezone.localdate()
-    start_date = end_date - timedelta(days=29)
-
-    labels = []
-    values = []
-
-    try:
-        from orders.models import Order
-
-        money_field = None
-        for field_name in ["total_selling_price", "total_price", "price", "grand_total"]:
-            try:
-                Order.objects.values(field_name)[:1]
-                money_field = field_name
-                break
-            except Exception:
-                continue
-
-        if money_field:
-            qs = (
-                Order.objects.filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
-                .annotate(day=TruncDate("created_at"))
-                .values("day")
-                .annotate(total=Sum(money_field))
-                .order_by("day")
-            )
-            revenue_map = {row["day"]: float(row["total"] or 0) for row in qs}
-        else:
-            revenue_map = {}
-    except Exception:
-        revenue_map = {}
-
-    current = start_date
-    while current <= end_date:
-        labels.append(current.strftime("%d %b"))
-        values.append(revenue_map.get(current, 0))
         current += timedelta(days=1)
 
     return labels, values
@@ -417,45 +340,153 @@ def create_operating_expense(request):
         },
     )
 
-
 @login_required
 @permission_required("finance.view_expense", raise_exception=True)
 def profit_dashboard(request):
-    revenue_total = _get_revenue_total()
-    expense_total = Expense.objects.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
-    profit_total = revenue_total - expense_total
+    from orders.models import Order, OrderItem
 
-    cloth_sold = _get_total_cloth_sold()
+    def get_summary(order_type=None):
+        order_qs = Order.objects.all()
+        item_qs = OrderItem.objects.all()
+
+        if order_type:
+            order_qs = order_qs.filter(order_type=order_type)
+            item_qs = item_qs.filter(order__order_type=order_type)
+
+        # Exclude cancelled / void if your system uses these statuses
+        order_qs = order_qs.exclude(status__in=["CANCELLED", "CANCELED", "VOID"])
+
+        total_amount = order_qs.aggregate(total=Sum("total_amount"))["total"] or Decimal("0")
+        deposit = order_qs.aggregate(total=Sum("deposit_amount"))["total"] or Decimal("0")
+        paid = order_qs.aggregate(total=Sum("paid_amount"))["total"] or Decimal("0")
+        receivable = total_amount - deposit - paid
+
+        cloth_sold = item_qs.filter(
+            order__in=order_qs,
+            item_mode="CLOTH",
+        ).aggregate(total=Sum("quantity"))["total"] or Decimal("0")
+
+        cloth_revenue = item_qs.filter(
+            order__in=order_qs,
+            item_mode="CLOTH",
+        ).aggregate(total=Sum("line_total"))["total"] or Decimal("0")
+
+        film_sold = item_qs.filter(
+            order__in=order_qs,
+            item_mode="FILM",
+        ).aggregate(total=Sum("manual_film_meter"))["total"] or Decimal("0")
+
+        film_revenue = item_qs.filter(
+            order__in=order_qs,
+            item_mode="FILM",
+        ).aggregate(total=Sum("line_total"))["total"] or Decimal("0")
+
+        return {
+            "total_amount": total_amount,
+            "deposit": deposit,
+            "paid": paid,
+            "receivable": receivable,
+            "cloth_sold": cloth_sold,
+            "cloth_revenue": cloth_revenue,
+            "film_sold": film_sold,
+            "film_revenue": film_revenue,
+        }
+
+    niron = get_summary("NIRON")
+    kampu = get_summary("KAMPU")
+    total = get_summary()
+
+    expense_total = Expense.objects.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+    profit_total = total["total_amount"] - expense_total
     total_inventory = _get_total_inventory()
 
     expense_by_type = {
-        "other": Expense.objects.filter(expense_type=Expense.TYPE_OTHER).aggregate(total=Sum("amount"))["total"] or Decimal("0.00"),
-        "batch": Expense.objects.filter(expense_type=Expense.TYPE_BATCH).aggregate(total=Sum("amount"))["total"] or Decimal("0.00"),
-        "operating": Expense.objects.filter(expense_type=Expense.TYPE_OPERATING).aggregate(total=Sum("amount"))["total"] or Decimal("0.00"),
+        "other": Expense.objects.filter(
+            expense_type=Expense.TYPE_OTHER
+        ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00"),
+        "batch": Expense.objects.filter(
+            expense_type=Expense.TYPE_BATCH
+        ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00"),
+        "operating": Expense.objects.filter(
+            expense_type=Expense.TYPE_OPERATING
+        ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00"),
     }
 
     recent_expenses = Expense.objects.select_related("created_by", "batch").all()[:8]
-    revenue_labels, revenue_values = _get_revenue_chart_data()
+
+    end_date = timezone.localdate()
+    start_date = end_date - timedelta(days=29)
+
+    excluded_statuses = ["CANCELLED", "CANCELED", "VOID"]
+
+    base_order_qs = Order.objects.filter(
+        created_at__date__gte=start_date,
+        created_at__date__lte=end_date,
+    ).exclude(status__in=excluded_statuses)
+
+    niron_qs = (
+        base_order_qs.filter(order_type="NIRON")
+        .annotate(day=TruncDate("created_at"))
+        .values("day")
+        .annotate(total=Sum("total_amount"))
+        .order_by("day")
+    )
+
+    kampu_qs = (
+        base_order_qs.filter(order_type="KAMPU")
+        .annotate(day=TruncDate("created_at"))
+        .values("day")
+        .annotate(total=Sum("total_amount"))
+        .order_by("day")
+    )
+
+    total_qs = (
+        base_order_qs
+        .annotate(day=TruncDate("created_at"))
+        .values("day")
+        .annotate(total=Sum("total_amount"))
+        .order_by("day")
+    )
+
+    niron_map = {row["day"]: float(row["total"] or 0) for row in niron_qs}
+    kampu_map = {row["day"]: float(row["total"] or 0) for row in kampu_qs}
+    total_map = {row["day"]: float(row["total"] or 0) for row in total_qs}
+
+    chart_labels = []
+    niron_values = []
+    kampu_values = []
+    total_values = []
+
+    current = start_date
+    while current <= end_date:
+        chart_labels.append(current.strftime("%d %b"))
+        niron_values.append(niron_map.get(current, 0))
+        kampu_values.append(kampu_map.get(current, 0))
+        total_values.append(total_map.get(current, 0))
+        current += timedelta(days=1)
+
     expense_labels, expense_values = _get_expense_chart_data()
 
     return render(
         request,
         "finance/profit_dashboard.html",
         {
-            "revenue_total": revenue_total,
+            "niron": niron,
+            "kampu": kampu,
+            "total": total,
             "expense_total": expense_total,
             "profit_total": profit_total,
-            "cloth_sold": cloth_sold,
             "total_inventory": total_inventory,
             "expense_by_type": expense_by_type,
             "recent_expenses": recent_expenses,
-            "revenue_labels": revenue_labels,
-            "revenue_values": revenue_values,
+            "chart_labels": chart_labels,
+            "niron_values": niron_values,
+            "kampu_values": kampu_values,
+            "total_values": total_values,
             "expense_labels": expense_labels,
             "expense_values": expense_values,
         },
     )
-
 
 @login_required
 @permission_required("finance.add_batch_expense", raise_exception=True)

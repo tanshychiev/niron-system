@@ -2,96 +2,147 @@
 
 {% block title %}Profit Dashboard{% endblock %}
 {% block page_title %}Profit Dashboard{% endblock %}
-{% block page_subtitle %}Revenue, expense, profit, cloth sold, and inventory overview{% endblock %}
+{% block page_subtitle %}Niron, Kampu, totals, revenue, deposit, receivable, cloth and film overview{% endblock %}
 {% block topbar_title %}Finance{% endblock %}
 {% block topbar_subtitle %}Business profit overview{% endblock %}
 
 {% block content %}
 <style>
-    .kpi-grid {
+    .summary-grid {
         display: grid;
-        grid-template-columns: repeat(5, 1fr);
+        grid-template-columns: repeat(4, 1fr);
         gap: 18px;
-        margin-bottom: 22px;
+        margin-bottom: 20px;
     }
 
-    .kpi-card,
-    .dash-card {
-        background: rgba(255,255,255,.88);
+    .summary-card,
+    .dash-card,
+    .section-card,
+    .mini-card {
+        background: rgba(255,255,255,.90);
         border: 1px solid var(--line);
         border-radius: 24px;
         box-shadow: var(--shadow);
     }
 
-    .kpi-card {
-        padding: 24px;
+    .summary-card,
+    .section-card,
+    .dash-card,
+    .mini-card {
+        padding: 22px;
     }
 
-    .kpi-label {
-        color: var(--muted);
+    .summary-label,
+    .mini-label {
         font-size: 12px;
         font-weight: 800;
         letter-spacing: .8px;
         text-transform: uppercase;
-        margin-bottom: 10px;
+        color: var(--muted);
+        margin-bottom: 8px;
     }
 
-    .kpi-value {
-        font-size: 30px;
+    .summary-value {
+        font-size: 32px;
         font-weight: 900;
         letter-spacing: -.8px;
     }
 
-    .kpi-primary { color: #1D4ED8; }
-    .kpi-danger { color: #B42318; }
-    .kpi-success { color: #067647; }
-    .kpi-dark { color: #111827; }
+    .mini-value {
+        font-size: 28px;
+        font-weight: 900;
+    }
+
+    .blue { color: #1D4ED8; }
+    .green { color: #067647; }
+    .red { color: #B42318; }
+    .dark { color: #111827; }
+
+    .section-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 18px;
+        margin-bottom: 20px;
+    }
+
+    .section-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+
+    .section-title,
+    .dash-title {
+        margin: 0 0 16px;
+        font-size: 20px;
+        font-weight: 900;
+    }
+
+    .section-head .section-title {
+        margin: 0;
+    }
+
+    .section-badge {
+        padding: 7px 12px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: #f8f6ef;
+        font-size: 12px;
+        font-weight: 800;
+    }
+
+    .metric-list {
+        display: grid;
+        gap: 12px;
+    }
+
+    .metric-row,
+    .breakdown-row,
+    .recent-item {
+        display: flex;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--line);
+    }
+
+    .metric-row:last-child,
+    .breakdown-row:last-child,
+    .recent-item:last-child {
+        border-bottom: none;
+    }
+
+    .metric-name {
+        font-size: 13px;
+        color: var(--muted);
+        font-weight: 700;
+    }
+
+    .metric-value {
+        font-size: 15px;
+        font-weight: 900;
+        color: var(--text);
+        text-align: right;
+    }
 
     .dash-grid {
         display: grid;
-        grid-template-columns: 1.4fr 1fr;
+        grid-template-columns: 1.5fr 1fr;
         gap: 18px;
         margin-bottom: 18px;
     }
 
-    .dash-card {
-        padding: 24px;
-    }
-
-    .dash-title {
-        margin: 0 0 16px;
-        font-size: 20px;
-        font-weight: 800;
-    }
-
-    .breakdown-row {
-        display: flex;
-        justify-content: space-between;
-        gap: 12px;
-        padding: 12px 0;
-        border-bottom: 1px solid var(--line);
-    }
-
-    .breakdown-row:last-child {
-        border-bottom: none;
+    .chart-box {
+        position: relative;
+        min-height: 320px;
     }
 
     .recent-list {
         display: flex;
         flex-direction: column;
-        gap: 12px;
-    }
-
-    .recent-item {
-        padding: 14px 0;
-        border-bottom: 1px solid var(--line);
-        display: flex;
-        justify-content: space-between;
-        gap: 16px;
-    }
-
-    .recent-item:last-child {
-        border-bottom: none;
+        gap: 0;
     }
 
     .recent-title {
@@ -106,12 +157,21 @@
 
     .recent-amount {
         color: #B42318;
-        font-weight: 800;
+        font-weight: 900;
         white-space: nowrap;
     }
 
+    .mini-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 18px;
+        margin-bottom: 20px;
+    }
+
     @media (max-width: 1200px) {
-        .kpi-grid {
+        .summary-grid,
+        .section-grid,
+        .mini-grid {
             grid-template-columns: repeat(2, 1fr);
         }
 
@@ -121,45 +181,120 @@
     }
 
     @media (max-width: 700px) {
-        .kpi-grid {
+        .summary-grid,
+        .section-grid,
+        .mini-grid {
             grid-template-columns: 1fr;
+        }
+
+        .chart-box {
+            min-height: 260px;
         }
     }
 </style>
 
-<div class="kpi-grid">
-    <div class="kpi-card">
-        <div class="kpi-label">Revenue</div>
-        <div class="kpi-value kpi-primary">${{ revenue_total|floatformat:2 }}</div>
+<div class="summary-grid">
+    <div class="summary-card">
+        <div class="summary-label">Total Revenue</div>
+        <div class="summary-value blue">${{ total.total_amount|floatformat:2 }}</div>
     </div>
 
-    <div class="kpi-card">
-        <div class="kpi-label">Total Expense</div>
-        <div class="kpi-value kpi-danger">${{ expense_total|floatformat:2 }}</div>
+    <div class="summary-card">
+        <div class="summary-label">Total Expense</div>
+        <div class="summary-value red">${{ expense_total|floatformat:2 }}</div>
     </div>
 
-    <div class="kpi-card">
-        <div class="kpi-label">Profit</div>
-        <div class="kpi-value {% if profit_total < 0 %}kpi-danger{% else %}kpi-success{% endif %}">
+    <div class="summary-card">
+        <div class="summary-label">Total Profit</div>
+        <div class="summary-value {% if profit_total < 0 %}red{% else %}green{% endif %}">
             ${{ profit_total|floatformat:2 }}
         </div>
     </div>
 
-    <div class="kpi-card">
-        <div class="kpi-label">Cloth Sold</div>
-        <div class="kpi-value kpi-dark">{{ cloth_sold }}</div>
+    <div class="summary-card">
+        <div class="summary-label">All Inventory</div>
+        <div class="summary-value dark">{{ total_inventory|floatformat:0 }}</div>
+    </div>
+</div>
+
+<div class="section-grid">
+    <div class="section-card">
+        <div class="section-head">
+            <h3 class="section-title">Niron</h3>
+            <div class="section-badge">Niron</div>
+        </div>
+        <div class="metric-list">
+            <div class="metric-row"><div class="metric-name">Total Amount</div><div class="metric-value">${{ niron.total_amount|floatformat:2 }}</div></div>
+            <div class="metric-row"><div class="metric-name">Deposit</div><div class="metric-value">${{ niron.deposit|floatformat:2 }}</div></div>
+            <div class="metric-row"><div class="metric-name">Paid</div><div class="metric-value">${{ niron.paid|floatformat:2 }}</div></div>
+            <div class="metric-row"><div class="metric-name">Receivable</div><div class="metric-value">${{ niron.receivable|floatformat:2 }}</div></div>
+            <div class="metric-row"><div class="metric-name">Cloth Sold</div><div class="metric-value">{{ niron.cloth_sold|floatformat:0 }}</div></div>
+            <div class="metric-row"><div class="metric-name">Cloth Revenue</div><div class="metric-value">${{ niron.cloth_revenue|floatformat:2 }}</div></div>
+            <div class="metric-row"><div class="metric-name">Film Sold</div><div class="metric-value">{{ niron.film_sold|floatformat:2 }}</div></div>
+            <div class="metric-row"><div class="metric-name">Film Revenue</div><div class="metric-value">${{ niron.film_revenue|floatformat:2 }}</div></div>
+        </div>
     </div>
 
-    <div class="kpi-card">
-        <div class="kpi-label">All Inventory</div>
-        <div class="kpi-value kpi-dark">{{ total_inventory }}</div>
+    <div class="section-card">
+        <div class="section-head">
+            <h3 class="section-title">Kampu</h3>
+            <div class="section-badge">Kampu</div>
+        </div>
+        <div class="metric-list">
+            <div class="metric-row"><div class="metric-name">Total Amount</div><div class="metric-value">${{ kampu.total_amount|floatformat:2 }}</div></div>
+            <div class="metric-row"><div class="metric-name">Deposit</div><div class="metric-value">${{ kampu.deposit|floatformat:2 }}</div></div>
+            <div class="metric-row"><div class="metric-name">Paid</div><div class="metric-value">${{ kampu.paid|floatformat:2 }}</div></div>
+            <div class="metric-row"><div class="metric-name">Receivable</div><div class="metric-value">${{ kampu.receivable|floatformat:2 }}</div></div>
+            <div class="metric-row"><div class="metric-name">Cloth Sold</div><div class="metric-value">{{ kampu.cloth_sold|floatformat:0 }}</div></div>
+            <div class="metric-row"><div class="metric-name">Cloth Revenue</div><div class="metric-value">${{ kampu.cloth_revenue|floatformat:2 }}</div></div>
+            <div class="metric-row"><div class="metric-name">Film Sold</div><div class="metric-value">{{ kampu.film_sold|floatformat:2 }}</div></div>
+            <div class="metric-row"><div class="metric-name">Film Revenue</div><div class="metric-value">${{ kampu.film_revenue|floatformat:2 }}</div></div>
+        </div>
+    </div>
+
+    <div class="section-card">
+        <div class="section-head">
+            <h3 class="section-title">Total</h3>
+            <div class="section-badge">All</div>
+        </div>
+        <div class="metric-list">
+            <div class="metric-row"><div class="metric-name">Total Amount</div><div class="metric-value">${{ total.total_amount|floatformat:2 }}</div></div>
+            <div class="metric-row"><div class="metric-name">Deposit</div><div class="metric-value">${{ total.deposit|floatformat:2 }}</div></div>
+            <div class="metric-row"><div class="metric-name">Paid</div><div class="metric-value">${{ total.paid|floatformat:2 }}</div></div>
+            <div class="metric-row"><div class="metric-name">Receivable</div><div class="metric-value">${{ total.receivable|floatformat:2 }}</div></div>
+            <div class="metric-row"><div class="metric-name">Cloth Sold</div><div class="metric-value">{{ total.cloth_sold|floatformat:0 }}</div></div>
+            <div class="metric-row"><div class="metric-name">Cloth Revenue</div><div class="metric-value">${{ total.cloth_revenue|floatformat:2 }}</div></div>
+            <div class="metric-row"><div class="metric-name">Film Sold</div><div class="metric-value">{{ total.film_sold|floatformat:2 }}</div></div>
+            <div class="metric-row"><div class="metric-name">Film Revenue</div><div class="metric-value">${{ total.film_revenue|floatformat:2 }}</div></div>
+        </div>
+    </div>
+</div>
+
+<div class="mini-grid">
+    <div class="mini-card">
+        <div class="mini-label">Total Cloth Sold</div>
+        <div class="mini-value dark">{{ total.cloth_sold|floatformat:0 }}</div>
+    </div>
+    <div class="mini-card">
+        <div class="mini-label">Total Film Sold</div>
+        <div class="mini-value dark">{{ total.film_sold|floatformat:2 }}</div>
+    </div>
+    <div class="mini-card">
+        <div class="mini-label">Total Paid</div>
+        <div class="mini-value green">${{ total.paid|floatformat:2 }}</div>
+    </div>
+    <div class="mini-card">
+        <div class="mini-label">Total Receivable</div>
+        <div class="mini-value red">${{ total.receivable|floatformat:2 }}</div>
     </div>
 </div>
 
 <div class="dash-grid">
     <div class="dash-card">
         <h3 class="dash-title">30 Days Revenue Trend</h3>
-        <canvas id="revenueChart" height="110"></canvas>
+        <div class="chart-box">
+            <canvas id="revenueChart"></canvas>
+        </div>
     </div>
 
     <div class="dash-card">
@@ -182,7 +317,9 @@
 <div class="dash-grid">
     <div class="dash-card">
         <h3 class="dash-title">30 Days Expense Trend</h3>
-        <canvas id="expenseChart" height="110"></canvas>
+        <div class="chart-box">
+            <canvas id="expenseChart"></canvas>
+        </div>
     </div>
 
     <div class="dash-card">
@@ -216,41 +353,91 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    const revenueLabels = {{ revenue_labels|safe }};
-    const revenueValues = {{ revenue_values|safe }};
+    const chartLabels = {{ chart_labels|safe }};
+    const nironValues = {{ niron_values|safe }};
+    const kampuValues = {{ kampu_values|safe }};
+    const totalValues = {{ total_values|safe }};
     const expenseLabels = {{ expense_labels|safe }};
     const expenseValues = {{ expense_values|safe }};
 
-    new Chart(document.getElementById("revenueChart"), {
-        type: "line",
-        data: {
-            labels: revenueLabels,
-            datasets: [{
-                label: "Revenue",
-                data: revenueValues,
-                tension: 0.35,
-                fill: true
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false
-        }
-    });
+    const revenueCanvas = document.getElementById("revenueChart");
+    if (revenueCanvas) {
+        new Chart(revenueCanvas, {
+            type: "line",
+            data: {
+                labels: chartLabels,
+                datasets: [
+                    {
+                        label: "Niron",
+                        data: nironValues,
+                        tension: 0.35,
+                        fill: false,
+                        borderWidth: 3
+                    },
+                    {
+                        label: "Kampu",
+                        data: kampuValues,
+                        tension: 0.35,
+                        fill: false,
+                        borderWidth: 3
+                    },
+                    {
+                        label: "Total",
+                        data: totalValues,
+                        tension: 0.35,
+                        fill: true,
+                        borderWidth: 3
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: "index",
+                    intersect: false
+                },
+                plugins: {
+                    legend: {
+                        position: "top"
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
 
-    new Chart(document.getElementById("expenseChart"), {
-        type: "bar",
-        data: {
-            labels: expenseLabels,
-            datasets: [{
-                label: "Expense",
-                data: expenseValues
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false
-        }
-    });
+    const expenseCanvas = document.getElementById("expenseChart");
+    if (expenseCanvas) {
+        new Chart(expenseCanvas, {
+            type: "bar",
+            data: {
+                labels: expenseLabels,
+                datasets: [{
+                    label: "Expense",
+                    data: expenseValues,
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: "top"
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
 </script>
 {% endblock %}
