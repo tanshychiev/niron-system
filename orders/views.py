@@ -5,18 +5,24 @@ from django.contrib.auth.decorators import login_required, permission_required
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import Prefetch, Q
+from django.db.models import Prefetch, Q, Sum
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from inventory.models import Color, InventoryItem, Size
+from openpyxl import Workbook
 
 from .forms import OrderForm, ProductionFilterForm
-from .models import Order, OrderDesign, OrderDesignFile, OrderHistory, OrderItem, OrderProgress
-from .services import deduct_stock_for_order, get_order_shortages, build_shortage_message
-from django.db.models import Prefetch, Q, Sum
-from django.http import HttpResponse
-from openpyxl import Workbook
+from .models import (
+    Order,
+    OrderDesign,
+    OrderDesignFile,
+    OrderHistory,
+    OrderItem,
+    OrderProgress,
+)
+from .services import deduct_stock_for_order
 
 
 def _stringify(value):
@@ -47,6 +53,7 @@ def _log_order_history(order, action, field_name="", old_value="", new_value="",
 def _snapshot_order(order):
     return {
         "order_type": order.order_type,
+        "service_type": order.service_type,
         "customer_name": order.customer_name,
         "phone": order.phone,
         "customer_location": order.customer_location,
@@ -64,7 +71,6 @@ def _snapshot_order(order):
 def _snapshot_item(item):
     return {
         "design": item.design.display_name if getattr(item, "design", None) else "",
-        "item_mode": item.item_mode,
         "description": item.description,
         "shirt_item": str(item.shirt_item) if item.shirt_item else "",
         "film_item": str(item.film_item) if item.film_item else "",
@@ -73,8 +79,7 @@ def _snapshot_item(item):
         "quantity": str(item.quantity or 0),
         "done_qty": str(item.done_qty or 0),
         "unit_price": str(item.unit_price or 0),
-        "film_meter_per_piece": str(item.film_meter_per_piece or 0),
-        "manual_film_meter": str(item.manual_film_meter or 0),
+        "film_meter": str(item.film_meter or 0),
         "line_total": str(item.line_total or 0),
     }
 
@@ -183,12 +188,10 @@ def _build_design_payloads_from_post(request):
         items = []
         for item_index in range(item_total):
             item_prefix = f"{prefix}-item-{item_index}"
-
             delete_item = request.POST.get(f"{item_prefix}-DELETE") == "1"
 
             payload = {
                 "id": request.POST.get(f"{item_prefix}-id") or "",
-                "item_mode": (request.POST.get(f"{item_prefix}-item_mode") or OrderItem.MODE_CLOTH).strip(),
                 "description": (request.POST.get(f"{item_prefix}-description") or "").strip(),
                 "shirt_item_id": request.POST.get(f"{item_prefix}-shirt_item") or None,
                 "film_item_id": request.POST.get(f"{item_prefix}-film_item") or None,
@@ -196,8 +199,7 @@ def _build_design_payloads_from_post(request):
                 "size_id": request.POST.get(f"{item_prefix}-size") or None,
                 "quantity": _decimal_or_zero(request.POST.get(f"{item_prefix}-quantity")),
                 "unit_price": _decimal_or_zero(request.POST.get(f"{item_prefix}-unit_price")),
-                "film_meter_per_piece": _decimal_or_zero(request.POST.get(f"{item_prefix}-film_meter_per_piece")),
-                "manual_film_meter": _decimal_or_zero(request.POST.get(f"{item_prefix}-manual_film_meter")),
+                "film_meter": _decimal_or_zero(request.POST.get(f"{item_prefix}-film_meter")),
                 "delete": delete_item,
             }
             items.append(payload)
@@ -319,23 +321,28 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
                     item.delete()
                 continue
 
-            if not item_data["description"] and not item_data["shirt_item_id"] and not item_data["film_item_id"]:
+            if (
+                not item_data["description"]
+                and not item_data["shirt_item_id"]
+                and not item_data["film_item_id"]
+                and item_data["quantity"] <= 0
+                and item_data["unit_price"] <= 0
+                and item_data["film_meter"] <= 0
+            ):
                 continue
 
             if item is None:
                 item = OrderItem.objects.create(
                     order=order,
                     design=design,
-                    item_mode=item_data["item_mode"],
                     description=item_data["description"],
                     shirt_item_id=item_data["shirt_item_id"],
                     film_item_id=item_data["film_item_id"],
                     color_id=item_data["color_id"],
                     size_id=item_data["size_id"],
-                    quantity=item_data["quantity"],
+                    quantity=item_data["quantity"] or Decimal("1"),
                     unit_price=item_data["unit_price"],
-                    film_meter_per_piece=item_data["film_meter_per_piece"],
-                    manual_film_meter=item_data["manual_film_meter"],
+                    film_meter=item_data["film_meter"],
                 )
                 _log_order_history(
                     order=order,
@@ -349,16 +356,14 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
             else:
                 item.order = order
                 item.design = design
-                item.item_mode = item_data["item_mode"]
                 item.description = item_data["description"]
                 item.shirt_item_id = item_data["shirt_item_id"]
                 item.film_item_id = item_data["film_item_id"]
                 item.color_id = item_data["color_id"]
                 item.size_id = item_data["size_id"]
-                item.quantity = item_data["quantity"]
+                item.quantity = item_data["quantity"] or Decimal("1")
                 item.unit_price = item_data["unit_price"]
-                item.film_meter_per_piece = item_data["film_meter_per_piece"]
-                item.manual_film_meter = item_data["manual_film_meter"]
+                item.film_meter = item_data["film_meter"]
                 item.save()
 
                 new_item_data = _snapshot_item(item)
@@ -411,7 +416,7 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
             kept_design_ids.discard(str(design.pk))
 
     if is_edit:
-        for item in order.items.all():
+        for item in list(order.items.all()):
             if str(item.pk) not in kept_item_ids:
                 _log_order_history(
                     order=order,
@@ -424,7 +429,7 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
                 )
                 item.delete()
 
-        for design in order.designs.all():
+        for design in list(order.designs.all()):
             if str(design.pk) not in kept_design_ids:
                 _log_order_history(
                     order=order,
@@ -440,6 +445,19 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
     return total_amount, total_pcs
 
 
+def _get_order_totals_by_service(order):
+    if order.service_type == Order.SERVICE_FULL:
+        cloth_qty = order.items.aggregate(total=Sum("quantity"))["total"] or Decimal("0")
+        film_meter = Decimal("0")
+    elif order.service_type == Order.SERVICE_FILM_ONLY:
+        cloth_qty = Decimal("0")
+        film_meter = order.items.aggregate(total=Sum("film_meter"))["total"] or Decimal("0")
+    else:
+        cloth_qty = Decimal("0")
+        film_meter = Decimal("0")
+    return cloth_qty, film_meter
+
+
 @login_required
 @permission_required("orders.view_order", raise_exception=True)
 def order_list(request):
@@ -449,11 +467,7 @@ def order_list(request):
     created_date_from = (request.GET.get("created_date_from") or "").strip()
     created_date_to = (request.GET.get("created_date_to") or "").strip()
 
-    qs = (
-        Order.objects.all()
-        .prefetch_related("items")
-        .order_by("-created_at", "-id")
-    )
+    qs = Order.objects.all().prefetch_related("items").order_by("-created_at", "-id")
 
     if keyword:
         qs = qs.filter(
@@ -485,14 +499,7 @@ def order_list(request):
     now = timezone.now()
 
     for order in qs:
-        cloth_qty = (
-            order.items.filter(item_mode="CLOTH").aggregate(total=Sum("quantity"))["total"]
-            or Decimal("0")
-        )
-        film_meter = (
-            order.items.filter(item_mode="FILM").aggregate(total=Sum("manual_film_meter"))["total"]
-            or Decimal("0")
-        )
+        cloth_qty, film_meter = _get_order_totals_by_service(order)
 
         total_amount = Decimal(order.total_amount or 0)
         paid_amount = Decimal(order.paid_amount or 0)
@@ -528,7 +535,7 @@ def order_list(request):
         "done_count": done_count,
         "revenue_total": revenue_total,
         "status_choices": getattr(Order, "STATUS_CHOICES", []),
-        "order_type_choices": getattr(Order, "ORDER_TYPE_CHOICES", []),
+        "order_type_choices": getattr(Order, "TYPE_CHOICES", []),
     }
     return render(request, "orders/order_list.html", context)
 
@@ -542,11 +549,7 @@ def order_list_export_excel(request):
     created_date_from = (request.GET.get("created_date_from") or "").strip()
     created_date_to = (request.GET.get("created_date_to") or "").strip()
 
-    qs = (
-        Order.objects.all()
-        .prefetch_related("items")
-        .order_by("-created_at", "-id")
-    )
+    qs = Order.objects.all().prefetch_related("items").order_by("-created_at", "-id")
 
     if keyword:
         qs = qs.filter(
@@ -580,6 +583,7 @@ def order_list_export_excel(request):
         "Phone",
         "Location",
         "Order Type",
+        "Service Type",
         "Status",
         "Cloth Qty",
         "Film Meter",
@@ -593,14 +597,7 @@ def order_list_export_excel(request):
     ws.append(headers)
 
     for order in qs:
-        cloth_qty = (
-            order.items.filter(item_mode="CLOTH").aggregate(total=Sum("quantity"))["total"]
-            or Decimal("0")
-        )
-        film_meter = (
-            order.items.filter(item_mode="FILM").aggregate(total=Sum("manual_film_meter"))["total"]
-            or Decimal("0")
-        )
+        cloth_qty, film_meter = _get_order_totals_by_service(order)
 
         total_amount = Decimal(order.total_amount or 0)
         deposit_amount = Decimal(order.deposit_amount or 0)
@@ -614,6 +611,7 @@ def order_list_export_excel(request):
             order.phone or "",
             order.customer_location or "",
             getattr(order, "get_order_type_display", lambda: order.order_type)(),
+            getattr(order, "get_service_type_display", lambda: order.service_type)(),
             getattr(order, "get_status_display", lambda: order.status)(),
             float(cloth_qty),
             float(film_meter),
@@ -631,6 +629,8 @@ def order_list_export_excel(request):
     response["Content-Disposition"] = 'attachment; filename="orders_filtered.xlsx"'
     wb.save(response)
     return response
+
+
 @login_required
 @permission_required("orders.add_order", raise_exception=True)
 @transaction.atomic
@@ -686,10 +686,7 @@ def order_create(request):
 
                 unresolved = deduct_stock_for_order(order, allow_shortage=True)
 
-                messages.success(
-                    request,
-                    f"Order {order.order_no} created successfully."
-                )
+                messages.success(request, f"Order {order.order_no} created successfully.")
 
                 if unresolved:
                     shortage_text = ", ".join(
@@ -717,6 +714,7 @@ def order_create(request):
         **_order_form_context_base(),
     }
     return render(request, "orders/order_form.html", context)
+
 
 @login_required
 @permission_required("orders.view_order", raise_exception=True)
@@ -746,10 +744,7 @@ def production_list(request):
 
         if status == ProductionFilterForm.STATUS_ACTIVE:
             qs = qs.filter(
-                status__in=[
-                    Order.STATUS_PENDING,
-                    Order.STATUS_PROCESSING,
-                ]
+                status__in=[Order.STATUS_PENDING, Order.STATUS_PROCESSING]
             )
         elif status == ProductionFilterForm.STATUS_DONE:
             qs = qs.filter(status=Order.STATUS_DONE)
@@ -928,14 +923,10 @@ def order_invoice_pdf(request, pk):
 @permission_required("orders.change_order", raise_exception=True)
 @transaction.atomic
 def order_edit(request, pk):
-    order = get_object_or_404(
-        _get_prefetched_order_queryset(),
-        pk=pk,
-    )
+    order = get_object_or_404(_get_prefetched_order_queryset(), pk=pk)
 
     if request.method == "POST":
         before_order = _snapshot_order(order)
-
         form = OrderForm(request.POST, request.FILES, instance=order)
 
         if form.is_valid():
@@ -974,6 +965,7 @@ def order_edit(request, pk):
                 order.save(
                     update_fields=[
                         "order_type",
+                        "service_type",
                         "customer_name",
                         "phone",
                         "customer_location",
