@@ -60,7 +60,8 @@
 }
 
 .btn-primary,
-.btn-secondary{
+.btn-secondary,
+.btn-danger{
   display:inline-flex;
   align-items:center;
   justify-content:center;
@@ -81,6 +82,15 @@
   background:#fff;
   color:#111827;
   border:1px solid #e5d8c3;
+}
+
+.btn-danger{
+  background:#dc2626;
+  color:#fff;
+}
+
+.btn-danger:hover{
+  background:#b91c1c;
 }
 
 .drop-zone{
@@ -204,10 +214,40 @@
   font-weight:700;
 }
 
-.status-select{
+.status-switch{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  padding:6px;
+  border-radius:18px;
+  background:#f3f4f6;
+  border:1px solid #e5e7eb;
+}
+
+.status-switch input{
+  display:none;
+}
+
+.status-option{
+  cursor:pointer;
+  border-radius:14px;
+  padding:12px 14px;
+  text-align:center;
   font-weight:900;
-  border-radius:14px !important;
-  height:46px;
+  color:#6b7280;
+  transition:.2s ease;
+}
+
+#statusActive:checked + .status-option{
+  background:#dcfce7;
+  color:#166534;
+  box-shadow:0 8px 18px rgba(22,101,52,.12);
+}
+
+#statusInactive:checked + .status-option{
+  background:#fee2e2;
+  color:#991b1b;
+  box-shadow:0 8px 18px rgba(153,27,27,.12);
 }
 
 .status-help{
@@ -222,6 +262,10 @@
   display:flex;
   gap:10px;
   flex-wrap:wrap;
+}
+
+.delete-form{
+  margin:0;
 }
 </style>
 
@@ -305,10 +349,15 @@
 
       <div class="field">
         <label>Status</label>
-        <select name="is_active" class="form-select status-select">
-          <option value="on" {% if form.instance.is_active %}selected{% endif %}>🟢 Active</option>
-          <option value="" {% if not form.instance.is_active %}selected{% endif %}>🔴 Inactive</option>
-        </select>
+
+        <div class="status-switch">
+          <input type="radio" name="is_active" id="statusActive" value="on" {% if form.instance.is_active %}checked{% endif %}>
+          <label for="statusActive" class="status-option">🟢 Active</label>
+
+          <input type="radio" name="is_active" id="statusInactive" value="" {% if not form.instance.is_active %}checked{% endif %}>
+          <label for="statusInactive" class="status-option">🔴 Inactive</label>
+        </div>
+
         <div class="status-help">Inactive item will not show in Stock In.</div>
       </div>
 
@@ -316,9 +365,19 @@
         <button type="submit" class="btn-primary">
           {{ submit_label|default:"Save Item" }}
         </button>
+
         <a href="{% url 'inventory_item_list' %}" class="btn-secondary">Cancel</a>
       </div>
     </form>
+
+    {% if object %}
+      <form method="post" action="{% url 'inventory_item_delete' object.id %}" class="delete-form" style="margin-top:12px;">
+        {% csrf_token %}
+        <button type="submit" class="btn-danger" onclick="return confirm('Delete this item? If it already has stock or orders, system will block delete.')">
+          Delete Item
+        </button>
+      </form>
+    {% endif %}
   </div>
 </div>
 {% endblock %}
