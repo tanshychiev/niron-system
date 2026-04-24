@@ -78,6 +78,11 @@ def inventory_list(request):
     items = InventoryItem.objects.all().order_by("code", "name")
     batches = InventoryBatch.objects.filter(is_deleted=False).order_by("-received_date", "-id")
 
+    active_statuses = [
+        Order.STATUS_PENDING,
+        Order.STATUS_PROCESSING,
+    ]
+
     grouped = defaultdict(
         lambda: {
             "item_id": None,
@@ -96,11 +101,6 @@ def inventory_list(request):
             "sizes": {},
         }
     )
-
-    active_statuses = [
-        Order.STATUS_PENDING,
-        Order.STATUS_PROCESSING,
-    ]
 
     stock_rows = (
         InventoryBatchItem.objects.select_related("item", "color", "size", "batch")
@@ -301,6 +301,36 @@ def inventory_list(request):
 
     style_groups = sorted(style_groups, key=lambda x: x["sort_order"])
 
+    material_types = [
+        InventoryItem.TYPE_FILM,
+        InventoryItem.TYPE_INK,
+        InventoryItem.TYPE_POWDER,
+        InventoryItem.TYPE_MAINTENANCE,
+        InventoryItem.TYPE_OTHER,
+    ]
+
+    material_items = InventoryItem.objects.filter(
+        is_active=True,
+        item_type__in=material_types,
+    ).order_by("item_type", "code", "name")
+
+    material_rows = []
+
+    for material in material_items:
+        stock_qty = (
+            InventoryBatchItem.objects.filter(
+                item=material,
+                is_active=True,
+                batch__is_deleted=False,
+            )
+            .aggregate(total=Sum("qty_remaining"))
+            .get("total")
+            or Decimal("0")
+        )
+
+        material.stock_qty = stock_qty
+        material_rows.append(material)
+
     batch_rows = []
 
     for batch in batches:
@@ -327,6 +357,7 @@ def inventory_list(request):
         {
             "items": items,
             "style_groups": style_groups,
+            "materials": material_rows,
             "batches": batch_rows,
         },
     )
@@ -343,7 +374,7 @@ def inventory_item_list(request):
 @permission_required("inventory.add_inventoryitem", raise_exception=True)
 def inventory_item_create(request):
     if request.method == "POST":
-        form = InventoryItemForm(request.POST)
+        form = InventoryItemForm(request.POST, request.FILES)
         if form.is_valid():
             form.save()
             messages.success(request, "Inventory item created.")
@@ -368,7 +399,7 @@ def inventory_item_edit(request, pk):
     item = get_object_or_404(InventoryItem, pk=pk)
 
     if request.method == "POST":
-        form = InventoryItemForm(request.POST, instance=item)
+        form = InventoryItemForm(request.POST, request.FILES, instance=item)
         if form.is_valid():
             form.save()
             messages.success(request, "Item updated successfully.")
@@ -381,6 +412,7 @@ def inventory_item_edit(request, pk):
         "inventory/inventory_item_form.html",
         {
             "form": form,
+            "object": item,
             "page_title": "Edit Item",
             "submit_label": "Update Item",
         },
@@ -767,9 +799,7 @@ def inventory_adjust_stock_select(request):
         selected_color = select_form.cleaned_data.get("color")
         selected_size = select_form.cleaned_data.get("size")
 
-        qs = InventoryBatchItem.objects.select_related(
-            "batch", "item", "color", "size"
-        ).filter(
+        qs = InventoryBatchItem.objects.select_related("batch", "item", "color", "size").filter(
             is_active=True,
             batch__is_deleted=False,
             item=selected_item,
@@ -925,7 +955,6 @@ def inventory_adjust_stock_select(request):
 
         else:
             adjust_form = InventoryAdjustVariantForm()
-
     else:
         adjust_form = InventoryAdjustVariantForm() if request.method == "POST" else None
 
@@ -941,5 +970,182 @@ def inventory_adjust_stock_select(request):
             "selected_item": selected_item,
             "selected_color": selected_color,
             "selected_size": selected_size,
+        },
+    )
+
+
+@login_required
+@permission_required("inventory.add_inventoryadjustment", raise_exception=True)
+@transaction.atomic
+def material_usage(request):
+    material_types = [
+        InventoryItem.TYPE_FILM,
+        InventoryItem.TYPE_INK,
+        InventoryItem.TYPE_POWDER,
+        InventoryItem.TYPE_MAINTENANCE,
+        InventoryItem.TYPE_OTHER,
+    ]
+
+    materials = InventoryItem.objects.filter(
+        is_active=True,
+        item_type__in=material_types,
+    ).order_by("item_type", "code", "name")
+
+    material_rows = []
+
+    for item in materials:
+        stock = (
+            InventoryBatchItem.objects.filter(
+                item=item,
+                is_active=True,
+                batch__is_deleted=False,
+            )
+            .aggregate(total=Sum("qty_remaining"))
+            .get("total")
+            or Decimal("0")
+        )
+
+        if item.item_type == InventoryItem.TYPE_FILM:
+            quick_qty = Decimal("1")
+            quick_label = "Use 1 Roll"
+        elif item.item_type == InventoryItem.TYPE_INK:
+            quick_qty = Decimal("1")
+            quick_label = "Use 1 Bottle"
+        elif item.item_type == InventoryItem.TYPE_POWDER:
+            quick_qty = Decimal("1")
+            quick_label = "Use 1 Pack"
+        elif item.item_type == InventoryItem.TYPE_MAINTENANCE:
+            quick_qty = Decimal("1")
+            quick_label = "Use 1 PCS"
+        else:
+            quick_qty = Decimal("1")
+            quick_label = "Use 1"
+
+        material_rows.append(
+            {
+                "item": item,
+                "stock": stock,
+                "quick_qty": quick_qty,
+                "quick_label": quick_label,
+            }
+        )
+
+    if request.method == "POST":
+        item_id = request.POST.get("item_id")
+        qty = Decimal(str(request.POST.get("qty") or "0"))
+        reason = (request.POST.get("reason") or "").strip()
+
+        item = get_object_or_404(
+            InventoryItem,
+            pk=item_id,
+            item_type__in=material_types,
+            is_active=True,
+        )
+
+        if qty <= 0:
+            messages.error(request, "Qty must be greater than 0.")
+            return redirect("material_usage")
+
+        stock_rows = list(
+            InventoryBatchItem.objects.select_related("batch", "item")
+            .filter(
+                item=item,
+                is_active=True,
+                batch__is_deleted=False,
+                qty_remaining__gt=0,
+            )
+            .order_by("-batch__received_date", "-id")
+        )
+
+        total_stock = sum((row.qty_remaining or Decimal("0")) for row in stock_rows)
+
+        if qty > total_stock:
+            messages.error(request, f"Not enough stock. Current stock: {total_stock}")
+            return redirect("material_usage")
+
+        remaining_to_reduce = qty
+
+        for row in stock_rows:
+            if remaining_to_reduce <= 0:
+                break
+
+            use_qty = min(row.qty_remaining, remaining_to_reduce)
+            old_qty = row.qty_remaining
+            row.qty_remaining = old_qty - use_qty
+            row.save(update_fields=["qty_remaining"])
+
+            InventoryAdjustment.objects.create(
+                batch_item=row,
+                adjustment_type=InventoryAdjustment.TYPE_REMOVE,
+                qty=use_qty,
+                reason=reason or "Material usage",
+                created_by=request.user if request.user.is_authenticated else None,
+                qty_before=old_qty,
+                qty_after=row.qty_remaining,
+            )
+
+            remaining_to_reduce -= use_qty
+
+        messages.success(request, f"{item.name} deducted successfully.")
+        return redirect("material_usage")
+
+    date_from = (request.GET.get("date_from") or "").strip()
+    date_to = (request.GET.get("date_to") or "").strip()
+    item_id = (request.GET.get("item") or "").strip()
+    user_id = (request.GET.get("user") or "").strip()
+
+    usage_qs = (
+        InventoryAdjustment.objects.select_related(
+            "batch_item",
+            "batch_item__item",
+            "created_by",
+        )
+        .filter(
+            adjustment_type=InventoryAdjustment.TYPE_REMOVE,
+            batch_item__item__item_type__in=material_types,
+            batch_item__batch__is_deleted=False,
+        )
+        .order_by("-created_at", "-id")
+    )
+
+    if date_from:
+        usage_qs = usage_qs.filter(created_at__date__gte=date_from)
+
+    if date_to:
+        usage_qs = usage_qs.filter(created_at__date__lte=date_to)
+
+    if item_id:
+        usage_qs = usage_qs.filter(batch_item__item_id=item_id)
+
+    if user_id:
+        usage_qs = usage_qs.filter(created_by_id=user_id)
+
+    users = (
+        InventoryAdjustment.objects.filter(
+            adjustment_type=InventoryAdjustment.TYPE_REMOVE,
+            batch_item__item__item_type__in=material_types,
+            created_by__isnull=False,
+        )
+        .select_related("created_by")
+        .order_by("created_by__username")
+        .values("created_by_id", "created_by__username")
+        .distinct()
+    )
+
+    total_used = usage_qs.aggregate(total=Sum("qty")).get("total") or Decimal("0")
+
+    return render(
+        request,
+        "inventory/material_usage.html",
+        {
+            "material_rows": material_rows,
+            "usage_rows": usage_qs[:300],
+            "materials": materials,
+            "users": users,
+            "date_from": date_from,
+            "date_to": date_to,
+            "selected_item_id": item_id,
+            "selected_user_id": user_id,
+            "total_used": total_used,
         },
     )

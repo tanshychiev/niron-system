@@ -57,9 +57,7 @@
             flex-direction: column;
         }
 
-        .logo-wrap {
-            margin-bottom: 18px;
-        }
+        .logo-wrap { margin-bottom: 18px; }
 
         .logo {
             font-size: 28px;
@@ -93,13 +91,8 @@
             padding-left: 52px;
         }
 
-        .sidebar-scroll {
-            flex: 1;
-        }
-
-        .nav-group {
-            margin-bottom: 10px;
-        }
+        .sidebar-scroll { flex: 1; }
+        .nav-group { margin-bottom: 10px; }
 
         .nav-toggle {
             width: 100%;
@@ -117,11 +110,7 @@
             transition: 0.2s ease;
         }
 
-        .nav-toggle:hover {
-            background: var(--accent-soft);
-            color: var(--accent-dark);
-        }
-
+        .nav-toggle:hover,
         .nav-toggle.active {
             background: var(--accent-soft);
             color: var(--accent-dark);
@@ -145,7 +134,7 @@
         }
 
         .nav-submenu.show {
-            max-height: 520px;
+            max-height: 620px;
             opacity: 1;
             padding: 8px 0 4px 10px;
         }
@@ -266,9 +255,7 @@
             flex-shrink: 0;
         }
 
-        .content-wrap {
-            padding: 32px 34px 40px;
-        }
+        .content-wrap { padding: 32px 34px 40px; }
 
         .hero {
             background: linear-gradient(180deg, #F8F3E6 0%, #F7F3E8 100%);
@@ -339,9 +326,7 @@
             box-shadow: 0 8px 20px rgba(232,155,20,.28);
         }
 
-        .btn-primary:hover {
-            background: var(--accent-dark);
-        }
+        .btn-primary:hover { background: var(--accent-dark); }
 
         .btn-danger {
             background: #DC2626;
@@ -370,9 +355,7 @@
             outline: none;
         }
 
-        input, select, .form-control, .form-select {
-            height: 44px;
-        }
+        input, select, .form-control, .form-select { height: 44px; }
 
         textarea, textarea.form-control {
             height: auto;
@@ -533,14 +516,15 @@
                         <span class="nav-arrow">▼</span>
                     </button>
                     <div class="nav-submenu" id="menu-inventory">
-                        <a class="nav-link" href="/inventory/">Finished Tshirt Inventory</a>
+                        <a class="nav-link" href="/inventory/">Cloth Inventory</a>
 
                         {% if perms.inventory.add_inventorybatch %}
                         <a class="nav-link" href="/inventory/batches/new/">Stock In</a>
                         {% endif %}
 
                         {% if perms.inventory.add_inventoryadjustment %}
-                        <a class="nav-link" href="/inventory/adjust-stock/">Adjust Stock</a>
+                        <a class="nav-link" href="/inventory/adjust-stock/">Adjust Cloth Stock</a>
+                        <a class="nav-link" href="/inventory/material-usage/">Material Usage</a>
                         {% endif %}
 
                         {% if perms.inventory.view_inventoryadjustment %}

@@ -44,22 +44,45 @@ class Color(models.Model):
 
 
 class InventoryItem(models.Model):
+    # ===== TYPE =====
     TYPE_SHIRT = "SHIRT"
     TYPE_FILM = "FILM"
+    TYPE_INK = "INK"
+    TYPE_POWDER = "POWDER"
+    TYPE_MAINTENANCE = "MAINTENANCE"
+    TYPE_OTHER = "OTHER"
 
     TYPE_CHOICES = [
         (TYPE_SHIRT, "Shirt"),
         (TYPE_FILM, "Film"),
+        (TYPE_INK, "Ink"),
+        (TYPE_POWDER, "Powder"),
+        (TYPE_MAINTENANCE, "Maintenance"),
+        (TYPE_OTHER, "Other"),
     ]
 
+    # ===== UNIT =====
     UNIT_PCS = "PCS"
     UNIT_METER = "METER"
+    UNIT_ROLL = "ROLL"
+    UNIT_BOTTLE = "BOTTLE"
+    UNIT_PACK = "PACK"
+    UNIT_KG = "KG"
+    UNIT_ML = "ML"
+    UNIT_LITER = "LITER"
 
     UNIT_CHOICES = [
         (UNIT_PCS, "PCS"),
         (UNIT_METER, "Meter"),
+        (UNIT_ROLL, "Roll"),
+        (UNIT_BOTTLE, "Bottle"),
+        (UNIT_PACK, "Pack"),
+        (UNIT_KG, "KG"),
+        (UNIT_ML, "ML"),
+        (UNIT_LITER, "Liter"),
     ]
 
+    # ===== STYLE (ONLY FOR SHIRT) =====
     STYLE_OVERSIZE = "OVERSIZE"
     STYLE_POLO = "POLO"
     STYLE_BOXY = "BOXY"
@@ -70,17 +93,41 @@ class InventoryItem(models.Model):
         (STYLE_BOXY, "Boxy"),
     ]
 
+    # ===== BASIC =====
     code = models.CharField(max_length=50, unique=True, blank=True)
-    name = models.CharField(max_length=120)
-    item_type = models.CharField(max_length=20, choices=TYPE_CHOICES)
-    unit = models.CharField(max_length=20, choices=UNIT_CHOICES)
+    name = models.CharField(max_length=150)
+
+    item_type = models.CharField(
+        max_length=20,
+        choices=TYPE_CHOICES,
+        default=TYPE_SHIRT,
+    )
+
+    unit = models.CharField(
+        max_length=20,
+        choices=UNIT_CHOICES,
+        default=UNIT_PCS,
+    )
+
     sample_style = models.CharField(
         max_length=20,
         choices=STYLE_CHOICES,
         default=STYLE_OVERSIZE,
         blank=True,
     )
+
+    # 🔥 IMAGE (ONLY USED FOR NON-SHIRT)
+    image = models.ImageField(
+        upload_to="inventory/items/",
+        blank=True,
+        null=True,
+    )
+
     is_active = models.BooleanField(default=True)
+    note = models.TextField(blank=True, default="")
+
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ["code", "id"]
@@ -88,6 +135,7 @@ class InventoryItem(models.Model):
     def __str__(self):
         return f"{self.code} - {self.name}"
 
+    # ===== AUTO CODE =====
     def save(self, *args, **kwargs):
         if not self.code:
             name_lower = (self.name or "").strip().lower()
@@ -100,8 +148,18 @@ class InventoryItem(models.Model):
                 base = "PO"
             elif "film" in name_lower:
                 base = "FL"
+            elif "ink" in name_lower:
+                base = "INK"
+            elif "powder" in name_lower:
+                base = "PWD"
+            elif "tube" in name_lower:
+                base = "TUBE"
+            elif "damper" in name_lower:
+                base = "DMP"
+            elif "motor" in name_lower:
+                base = "MTR"
             else:
-                base = "".join([w[:1].upper() for w in self.name.split()[:3]]) or "IT"
+                base = "IT"
 
             code = base
             i = 1
@@ -111,19 +169,20 @@ class InventoryItem(models.Model):
 
             self.code = code
 
+        # 👕 ONLY SHIRT uses style
         if self.item_type != self.TYPE_SHIRT:
-            self.sample_style = self.STYLE_OVERSIZE
+            self.sample_style = ""
 
         super().save(*args, **kwargs)
 
+    # ===== TOTAL STOCK =====
     @property
     def total_stock(self):
-        result = self.batch_items.filter(is_active=True, batch__is_deleted=False).aggregate(
-            total=Sum("qty_remaining")
-        )
+        result = self.batch_items.filter(
+            is_active=True,
+            batch__is_deleted=False,
+        ).aggregate(total=Sum("qty_remaining"))
         return result["total"] or Decimal("0")
-
-
 class InventoryBatch(models.Model):
     STATUS_DRAFT = "DRAFT"
     STATUS_FINAL = "FINAL"

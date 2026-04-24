@@ -12,8 +12,10 @@
   <table class="app-table">
     <thead>
       <tr>
+        <th>Image</th>
         <th>Code</th>
         <th>Name</th>
+        <th>Type</th>
         <th>Style</th>
         <th>Active</th>
         <th>Edit</th>
@@ -22,17 +24,53 @@
     <tbody>
       {% for item in items %}
         <tr>
+          <!-- IMAGE -->
+          <td>
+            {% if item.image %}
+              <img src="{{ item.image.url }}"
+                   style="width:50px;height:50px;object-fit:cover;border-radius:10px;">
+            {% else %}
+              <div style="
+                width:50px;height:50px;
+                background:#f3f4f6;
+                border-radius:10px;
+                display:flex;
+                align-items:center;
+                justify-content:center;
+                font-size:10px;
+                color:#999;">
+                NO IMG
+              </div>
+            {% endif %}
+          </td>
+
           <td>{{ item.code }}</td>
           <td>{{ item.name }}</td>
-          <td>{{ item.get_sample_style_display }}</td>
-          <td>{% if item.is_active %}Yes{% else %}No{% endif %}</td>
+          <td>{{ item.get_item_type_display }}</td>
+
+          <td>
+            {% if item.item_type == "SHIRT" %}
+              {{ item.get_sample_style_display }}
+            {% else %}
+              -
+            {% endif %}
+          </td>
+
+          <td>
+            {% if item.is_active %}
+              <span style="color:green;font-weight:700;">Yes</span>
+            {% else %}
+              <span style="color:red;font-weight:700;">No</span>
+            {% endif %}
+          </td>
+
           <td>
             <a href="{% url 'inventory_item_edit' item.id %}" class="btn-light">Edit</a>
           </td>
         </tr>
       {% empty %}
         <tr>
-          <td colspan="5">No items found.</td>
+          <td colspan="7">No items found.</td>
         </tr>
       {% endfor %}
     </tbody>

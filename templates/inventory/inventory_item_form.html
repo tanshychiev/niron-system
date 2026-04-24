@@ -1,14 +1,219 @@
 {% extends "base.html" %}
 
 {% block page_title %}{{ page_title|default:"Create Item" }}{% endblock %}
-{% block page_subtitle %}Create inventory item and choose shirt style template{% endblock %}
+{% block page_subtitle %}Create inventory item{% endblock %}
 
 {% block content %}
+<style>
+.page-wrap{
+  max-width:1100px;
+  margin:24px auto;
+  padding:0 18px 40px;
+}
+
+.page-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:16px;
+  margin-bottom:18px;
+}
+
+.page-head h1{
+  margin:0;
+  font-size:30px;
+  font-weight:900;
+  color:#111827;
+}
+
+.sub{
+  margin:6px 0 0;
+  color:#6b7280;
+}
+
+.form-card{
+  background:#fff;
+  border:1px solid #eadfca;
+  border-radius:18px;
+  padding:22px;
+}
+
+.field{
+  margin-bottom:16px;
+}
+
+.field label{
+  display:block;
+  margin-bottom:6px;
+  font-weight:700;
+  color:#111827;
+}
+
+.field input,
+.field select,
+.field textarea{
+  width:100%;
+  border:1px solid #e5d8c3;
+  border-radius:12px;
+  padding:10px 12px;
+  outline:none;
+}
+
+.btn-primary,
+.btn-secondary{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:11px 16px;
+  border-radius:12px;
+  font-weight:800;
+  text-decoration:none;
+  border:none;
+  cursor:pointer;
+}
+
+.btn-primary{
+  background:#111827;
+  color:#fff;
+}
+
+.btn-secondary{
+  background:#fff;
+  color:#111827;
+  border:1px solid #e5d8c3;
+}
+
+.drop-zone{
+  border:2px dashed #d1d5db;
+  border-radius:16px;
+  padding:26px;
+  text-align:center;
+  cursor:pointer;
+  transition:.2s ease;
+  background:#fafafa;
+  min-height:120px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-direction:column;
+}
+
+.drop-zone:hover{
+  border-color:#111827;
+  background:#f3f4f6;
+}
+
+.drop-zone.dragover{
+  border-color:#2563eb;
+  background:#eff6ff;
+}
+
+.drop-content{
+  color:#6b7280;
+}
+
+.drop-content p{
+  margin:0;
+}
+
+.drop-content .hint{
+  font-size:12px;
+  margin-top:6px;
+}
+
+#previewImage{
+  margin-top:12px;
+  width:120px;
+  height:120px;
+  object-fit:cover;
+  border-radius:14px;
+  border:1px solid #e5e7eb;
+}
+
+.current-image{
+  margin-top:10px;
+}
+
+.current-image img{
+  width:90px;
+  height:90px;
+  object-fit:cover;
+  border-radius:12px;
+  border:1px solid #e5e7eb;
+}
+
+.preview-panel{
+  margin-top:18px;
+  max-width:360px;
+}
+
+.preview-title{
+  font-weight:800;
+  margin-bottom:10px;
+  color:#111827;
+}
+
+.shirt-preview-card{
+  width:160px;
+  height:160px;
+  border:1px solid #e5e7eb;
+  border-radius:18px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:#f9fafb;
+  margin-bottom:14px;
+}
+
+.shirt-preview{
+  width:120px;
+  height:120px;
+}
+
+.shirt-preview svg{
+  width:100%;
+  height:100%;
+}
+
+.shape,
+.collar{
+  display:none;
+}
+
+.style-OVERSIZE .shape-oversize{
+  display:block;
+}
+
+.style-POLO .shape-polo,
+.style-POLO .collar-polo{
+  display:block;
+}
+
+.style-BOXY .shape-boxy{
+  display:block;
+}
+
+.help-box{
+  margin:10px 0 16px;
+  padding:12px 14px;
+  border-radius:14px;
+  background:#fff7ed;
+  border:1px solid #fed7aa;
+  color:#9a3412;
+  font-size:13px;
+  font-weight:700;
+}
+
+.actions{
+  margin-top:20px;
+}
+</style>
+
 <div class="page-wrap">
   <div class="page-head">
     <div>
       <h1>{{ page_title|default:"Create Item" }}</h1>
-      <p class="sub">Create inventory item and choose shirt style template.</p>
+      <p class="sub">Create cloth or material item</p>
     </div>
 
     <div class="page-head-actions">
@@ -17,318 +222,192 @@
   </div>
 
   <div class="form-card">
-    <form method="post" novalidate>
+    <form method="post" enctype="multipart/form-data" novalidate>
       {% csrf_token %}
 
-      {% if form.non_field_errors %}
-        <div class="alert alert-danger">
-          {{ form.non_field_errors }}
-        </div>
+      {% if form.errors %}
+        <div class="alert alert-danger">{{ form.errors }}</div>
       {% endif %}
 
       <div class="field">
-        <label for="{{ form.name.id_for_label }}">Item Name</label>
+        <label>Item Name</label>
         {{ form.name }}
-        {% for e in form.name.errors %}<div class="error">{{ e }}</div>{% endfor %}
       </div>
 
       <div class="field">
-        <label for="{{ form.sample_style.id_for_label }}">Shirt Style</label>
-        {{ form.sample_style }}
-        {% for e in form.sample_style.errors %}<div class="error">{{ e }}</div>{% endfor %}
+        <label>Item Type</label>
+        {{ form.item_type }}
       </div>
 
-      <div class="preview-panel">
-        <div class="preview-title">Style Preview</div>
+      <div class="help-box" id="typeHelp"></div>
+
+      <div class="field">
+        <label>Unit</label>
+        {{ form.unit }}
+      </div>
+
+      <div class="field" id="imageField">
+        <label>Image for Material Item</label>
+
+        <div id="dropZone" class="drop-zone">
+          <input type="file" name="image" id="fileInput" accept="image/*" hidden>
+
+          <div class="drop-content">
+            <p><strong>Click, Drag, or Paste Image</strong></p>
+            <p class="hint">Ctrl+V / Drag file here</p>
+          </div>
+
+          <img id="previewImage" style="display:none;">
+        </div>
+
+        {% if object.image %}
+          <div class="current-image">
+            <img src="{{ object.image.url }}" alt="Current image">
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="preview-panel" id="previewPanel">
+        <div class="preview-title">Shirt Style Preview</div>
 
         <div class="shirt-preview-card">
           <div id="stylePreview" class="shirt-preview style-OVERSIZE">
-            <svg viewBox="0 0 220 220" class="shirt-svg" aria-hidden="true">
-              <path class="shape shape-oversize" d="M55 48 L82 30 L138 30 L165 48 L190 83 L170 96 L160 78 L160 190 L60 190 L60 78 L50 96 L30 83 Z"></path>
-              <path class="shape shape-polo" d="M65 46 L88 28 L132 28 L155 46 L178 80 L160 92 L150 74 L150 190 L70 190 L70 74 L60 92 L42 80 Z"></path>
-              <path class="collar collar-polo" d="M92 30 L110 48 L128 30 L118 62 L102 62 Z"></path>
-              <path class="shape shape-boxy" d="M48 58 L75 34 L145 34 L172 58 L188 86 L168 97 L158 80 L158 175 L62 175 L62 80 L52 97 L32 86 Z"></path>
+            <svg viewBox="0 0 220 220">
+              <path class="shape shape-oversize" fill="#111111" d="M55 48 L82 30 L138 30 L165 48 L190 83 L170 96 L160 78 L160 190 L60 190 L60 78 L50 96 L30 83 Z"></path>
+              <path class="shape shape-polo" fill="#111111" d="M65 46 L88 28 L132 28 L155 46 L178 80 L160 92 L150 74 L150 190 L70 190 L70 74 L60 92 L42 80 Z"></path>
+              <path class="collar collar-polo" fill="#e5e7eb" d="M92 30 L110 48 L128 30 L118 62 L102 62 Z"></path>
+              <path class="shape shape-boxy" fill="#111111" d="M48 58 L75 34 L145 34 L172 58 L188 86 L168 97 L158 80 L158 175 L62 175 L62 80 L52 97 L32 86 Z"></path>
             </svg>
           </div>
+        </div>
 
-          <div class="preview-labels">
-            <span class="badge-soft">Oversize</span>
-            <span class="badge-soft">Polo</span>
-            <span class="badge-soft">Boxy</span>
-          </div>
+        <div class="field">
+          <label>Shirt Style</label>
+          {{ form.sample_style }}
         </div>
       </div>
 
       <div class="field">
         <label>Status</label>
-
-        <div class="status-choice-wrap">
-          {{ form.is_active }}
-
-          <button type="button" id="activeBtn" class="status-btn active-state">
-            Active
-          </button>
-
-          <button type="button" id="inactiveBtn" class="status-btn inactive-state">
-            Inactive
-          </button>
-        </div>
+        {{ form.is_active }}
       </div>
 
       <div class="actions">
-        <button type="submit" class="btn-primary">{{ submit_label|default:"Save Item" }}</button>
+        <button type="submit" class="btn-primary">
+          {{ submit_label|default:"Save Item" }}
+        </button>
       </div>
     </form>
   </div>
 </div>
 {% endblock %}
 
-{% block extra_css %}
-<style>
-  .page-wrap{
-    max-width:980px;
-    margin:24px auto;
-    padding:0 16px;
-  }
-
-  .page-head{
-    display:flex;
-    justify-content:space-between;
-    align-items:flex-start;
-    gap:16px;
-    flex-wrap:wrap;
-  }
-
-  .page-head h1{
-    margin:0;
-    font-size:32px;
-    font-weight:800;
-  }
-
-  .sub{
-    margin-top:6px;
-    color:#6b7280;
-  }
-
-  .page-head-actions{
-    display:flex;
-    align-items:center;
-    gap:10px;
-  }
-
-  .form-card{
-    margin-top:20px;
-    background:#fff;
-    border:1px solid #e5e7eb;
-    border-radius:24px;
-    padding:24px;
-    box-shadow:0 10px 30px rgba(0,0,0,.05);
-  }
-
-  .field{
-    margin-bottom:16px;
-  }
-
-  .field label{
-    display:block;
-    margin-bottom:8px;
-    font-weight:700;
-    color:#111827;
-  }
-
-  .form-control,
-  .form-select{
-    width:100%;
-    height:46px;
-    border:1px solid #d1d5db;
-    border-radius:14px;
-    padding:0 14px;
-    background:#fff;
-  }
-
-  .form-control:focus,
-  .form-select:focus{
-    outline:none;
-    border-color:#111827;
-  }
-
-  .preview-panel{
-    margin:22px 0;
-    padding:20px;
-    border-radius:20px;
-    background:#f8fafc;
-    border:1px solid #e5e7eb;
-  }
-
-  .preview-title{
-    font-size:14px;
-    font-weight:800;
-    color:#374151;
-    margin-bottom:12px;
-    text-transform:uppercase;
-    letter-spacing:.06em;
-  }
-
-  .shirt-preview-card{
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    justify-content:center;
-    padding:18px;
-    border-radius:20px;
-    background:#fff;
-    border:1px solid #e5e7eb;
-  }
-
-  .shirt-preview{
-    width:220px;
-    height:220px;
-  }
-
-  .shirt-svg{
-    width:100%;
-    height:100%;
-  }
-
-  .shape,
-  .collar{
-    display:none;
-    fill:#111827;
-  }
-
-  .style-OVERSIZE .shape-oversize{
-    display:block;
-  }
-
-  .style-POLO .shape-polo,
-  .style-POLO .collar-polo{
-    display:block;
-  }
-
-  .style-BOXY .shape-boxy{
-    display:block;
-  }
-
-  .style-POLO .collar-polo{
-    fill:#e5e7eb;
-  }
-
-  .preview-labels{
-    display:flex;
-    gap:8px;
-    flex-wrap:wrap;
-    margin-top:10px;
-  }
-
-  .badge-soft{
-    padding:6px 10px;
-    border-radius:999px;
-    background:#f3f4f6;
-    color:#374151;
-    font-size:12px;
-    font-weight:700;
-  }
-
-  .status-choice-wrap{
-    display:flex;
-    gap:10px;
-    align-items:center;
-    flex-wrap:wrap;
-  }
-
-  .status-choice-wrap input[type="checkbox"]{
-    display:none;
-  }
-
-  .status-btn{
-    min-width:120px;
-    height:46px;
-    border-radius:14px;
-    border:1px solid #d1d5db;
-    background:#fff;
-    color:#374151;
-    font-weight:800;
-    cursor:pointer;
-    transition:.2s ease;
-    padding:0 18px;
-  }
-
-  .status-btn:hover{
-    transform:translateY(-1px);
-  }
-
-  .status-btn.is-selected.active-state{
-    background:#166534;
-    border-color:#166534;
-    color:#fff;
-    box-shadow:0 8px 20px rgba(22,101,52,.18);
-  }
-
-  .status-btn.is-selected.inactive-state{
-    background:#475569;
-    border-color:#475569;
-    color:#fff;
-    box-shadow:0 8px 20px rgba(71,85,105,.16);
-  }
-
-  .actions{
-    margin-top:10px;
-    display:flex;
-    gap:10px;
-    flex-wrap:wrap;
-    justify-content:flex-end;
-  }
-
-  .error{
-    margin-top:6px;
-    color:#dc2626;
-    font-size:13px;
-  }
-</style>
-{% endblock %}
-
 {% block extra_js %}
 <script>
-  (function(){
-    const select = document.getElementById("{{ form.sample_style.id_for_label }}");
-    const preview = document.getElementById("stylePreview");
+(function(){
+  const typeField = document.getElementById("{{ form.item_type.id_for_label }}");
+  const previewPanel = document.getElementById("previewPanel");
+  const imageField = document.getElementById("imageField");
+  const typeHelp = document.getElementById("typeHelp");
 
-    if (select && preview) {
-      function updatePreview() {
-        preview.className = "shirt-preview style-" + select.value;
+  function toggleUI(){
+    if (!typeField) return;
+
+    if (typeField.value === "SHIRT") {
+      previewPanel.style.display = "block";
+      imageField.style.display = "none";
+      if (typeHelp) {
+        typeHelp.textContent = "Cloth item: choose shirt style. Stock In will require color and size.";
       }
-
-      select.addEventListener("change", updatePreview);
-      updatePreview();
-    }
-
-    const hiddenCheckbox = document.getElementById("{{ form.is_active.id_for_label }}");
-    const activeBtn = document.getElementById("activeBtn");
-    const inactiveBtn = document.getElementById("inactiveBtn");
-
-    if (hiddenCheckbox && activeBtn && inactiveBtn) {
-      function syncStatus() {
-        if (hiddenCheckbox.checked) {
-          activeBtn.classList.add("is-selected");
-          inactiveBtn.classList.remove("is-selected");
-        } else {
-          inactiveBtn.classList.add("is-selected");
-          activeBtn.classList.remove("is-selected");
-        }
+    } else {
+      previewPanel.style.display = "none";
+      imageField.style.display = "block";
+      if (typeHelp) {
+        typeHelp.textContent = "Material item: upload image. Stock In will use quantity only, no color or size.";
       }
-
-      activeBtn.addEventListener("click", function(){
-        hiddenCheckbox.checked = true;
-        syncStatus();
-      });
-
-      inactiveBtn.addEventListener("click", function(){
-        hiddenCheckbox.checked = false;
-        syncStatus();
-      });
-
-      syncStatus();
     }
-  })();
+  }
+
+  if (typeField) {
+    typeField.addEventListener("change", toggleUI);
+    toggleUI();
+  }
+
+  const styleSelect = document.getElementById("{{ form.sample_style.id_for_label }}");
+  const preview = document.getElementById("stylePreview");
+
+  function updatePreview(){
+    if (!styleSelect || !preview) return;
+    preview.className = "shirt-preview style-" + styleSelect.value;
+  }
+
+  if (styleSelect && preview) {
+    styleSelect.addEventListener("change", updatePreview);
+    updatePreview();
+  }
+
+  const dropZone = document.getElementById("dropZone");
+  const fileInput = document.getElementById("fileInput");
+  const previewImage = document.getElementById("previewImage");
+
+  if (!dropZone || !fileInput || !previewImage) return;
+
+  dropZone.addEventListener("click", function(){
+    fileInput.click();
+  });
+
+  fileInput.addEventListener("change", function(){
+    handleFile(this.files[0]);
+  });
+
+  dropZone.addEventListener("dragover", function(e){
+    e.preventDefault();
+    dropZone.classList.add("dragover");
+  });
+
+  dropZone.addEventListener("dragleave", function(){
+    dropZone.classList.remove("dragover");
+  });
+
+  dropZone.addEventListener("drop", function(e){
+    e.preventDefault();
+    dropZone.classList.remove("dragover");
+
+    const file = e.dataTransfer.files[0];
+    handleFile(file);
+  });
+
+  document.addEventListener("paste", function(e){
+    if (!e.clipboardData || !e.clipboardData.items) return;
+
+    const items = e.clipboardData.items;
+
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf("image") !== -1) {
+        const file = items[i].getAsFile();
+        handleFile(file);
+        break;
+      }
+    }
+  });
+
+  function handleFile(file){
+    if (!file) return;
+    if (!file.type.startsWith("image/")) return;
+
+    const reader = new FileReader();
+
+    reader.onload = function(e){
+      previewImage.src = e.target.result;
+      previewImage.style.display = "block";
+    };
+
+    reader.readAsDataURL(file);
+
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    fileInput.files = dt.files;
+  }
+})();
 </script>
 {% endblock %}

@@ -5,7 +5,7 @@
   <div class="inventory-head">
     <div>
       <h1>Inventory</h1>
-      <p class="sub">Total Cloth - In Proc = Available.</p>
+      <p class="sub">Cloth shows Available / In Process / Total. Material shows stock only.</p>
     </div>
 
     <div class="head-actions">
@@ -16,6 +16,9 @@
     </div>
   </div>
 
+  <!-- =========================
+       CLOTH INVENTORY
+  ========================== -->
   {% for style_group in style_groups %}
     <section class="style-section">
       <div class="section-head">
@@ -135,9 +138,69 @@
       </div>
     </section>
   {% empty %}
-    <div class="empty-main">No inventory data found.</div>
+    <div class="empty-main">No cloth inventory data found.</div>
   {% endfor %}
 
+  <!-- =========================
+       MATERIAL INVENTORY
+       Film / Ink / Powder / Other
+       No In Process / No Total
+  ========================== -->
+  <section class="material-section">
+    <div class="section-head">
+      <div class="section-title-row">
+        <h2>Material Inventory</h2>
+        <span class="count-pill">{{ materials|length }} item{{ materials|length|pluralize }}</span>
+      </div>
+    </div>
+
+    <div class="material-grid">
+      {% for material in materials %}
+        <div class="material-card {% if material.stock_qty <= 0 %}empty-material{% endif %}">
+          <div class="material-image-box">
+            {% if material.image %}
+              <img src="{{ material.image.url }}" alt="{{ material.name }}" class="material-image">
+            {% else %}
+              <div class="material-no-image">
+                <span>No Image</span>
+              </div>
+            {% endif %}
+          </div>
+
+          <div class="material-info">
+            <div class="top-meta-row">
+              <span class="item-code">{{ material.code }}</span>
+              <span class="material-type">{{ material.get_item_type_display }}</span>
+            </div>
+
+            <h3>{{ material.name }}</h3>
+
+            <div class="material-stock-box">
+              <div>
+                <div class="metric-label">Stock</div>
+                <div class="material-stock-number">
+                  {{ material.stock_qty|floatformat:0 }}
+                  {% if material.unit %}
+                    <span>{{ material.unit }}</span>
+                  {% endif %}
+                </div>
+              </div>
+
+              {% if material.stock_qty <= 0 %}
+                <span class="out-pill">OUT</span>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      {% empty %}
+        <div class="empty-block">No material inventory found.</div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <!-- =========================
+       BATCH LIST
+  ========================== -->
   <section class="batch-section">
     <div class="section-head">
       <div class="section-title-row">
@@ -261,6 +324,7 @@
   }
 
   .style-section,
+  .material-section,
   .batch-section{
     margin-top:34px;
   }
@@ -606,6 +670,135 @@
     letter-spacing:-0.03em;
   }
 
+  /* MATERIAL */
+  .material-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
+    gap:20px;
+  }
+
+  .material-card{
+    background:linear-gradient(180deg,#ffffff,#f8fafc);
+    border:1px solid #e2e8f0;
+    border-radius:28px;
+    padding:16px;
+    box-shadow:0 14px 35px rgba(15,23,42,.06);
+    transition:.25s ease;
+    overflow:hidden;
+  }
+
+  .material-card:hover{
+    transform:translateY(-4px);
+    box-shadow:0 20px 42px rgba(15,23,42,.09);
+  }
+
+  .empty-material{
+    border-color:#fecaca;
+    background:linear-gradient(180deg,#ffffff,#fff7f7);
+  }
+
+  .material-image-box{
+    width:100%;
+    aspect-ratio:1 / .72;
+    border-radius:22px;
+    background:#f1f5f9;
+    border:1px solid #e2e8f0;
+    overflow:hidden;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    margin-bottom:14px;
+  }
+
+  .material-image{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    display:block;
+  }
+
+  .material-no-image{
+    width:100%;
+    height:100%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:#94a3b8;
+    font-weight:900;
+    font-size:13px;
+    background:
+      linear-gradient(135deg,rgba(226,232,240,.65) 25%,transparent 25%),
+      linear-gradient(225deg,rgba(226,232,240,.65) 25%,transparent 25%),
+      linear-gradient(45deg,rgba(226,232,240,.65) 25%,transparent 25%),
+      linear-gradient(315deg,rgba(226,232,240,.65) 25%,#f8fafc 25%);
+    background-size:22px 22px;
+  }
+
+  .material-info h3{
+    margin:0 0 14px;
+    font-size:18px;
+    line-height:1.25;
+    font-weight:900;
+    color:#0f172a;
+    letter-spacing:-0.02em;
+  }
+
+  .material-type{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    padding:5px 10px;
+    border-radius:999px;
+    background:#ecfeff;
+    border:1px solid #cffafe;
+    color:#0e7490;
+    font-size:11px;
+    font-weight:900;
+    letter-spacing:.05em;
+  }
+
+  .material-stock-box{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    border-radius:20px;
+    padding:14px;
+    background:#fff;
+    border:1px solid #e2e8f0;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.9);
+  }
+
+  .material-stock-number{
+    margin-top:5px;
+    font-size:24px;
+    line-height:1;
+    font-weight:900;
+    color:#0f172a;
+    letter-spacing:-0.04em;
+  }
+
+  .material-stock-number span{
+    font-size:12px;
+    color:#64748b;
+    letter-spacing:0;
+    margin-left:4px;
+  }
+
+  .out-pill{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    padding:7px 11px;
+    border-radius:999px;
+    background:#fef2f2;
+    border:1px solid #fecaca;
+    color:#dc2626;
+    font-size:11px;
+    font-weight:900;
+  }
+
+  /* TABLE */
   .table-card{
     background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(248,250,252,.96));
     border:1px solid rgba(226,232,240,.95);
@@ -680,6 +873,16 @@
       font-size:32px;
     }
 
+    .head-actions{
+      width:100%;
+    }
+
+    .btn-dark,
+    .btn-light{
+      flex:1;
+      min-width:130px;
+    }
+
     .shirt-card{
       border-radius:24px;
       padding:16px;
@@ -700,7 +903,8 @@
       height:76px;
     }
 
-    .card-grid{
+    .card-grid,
+    .material-grid{
       grid-template-columns:1fr;
       gap:16px;
     }

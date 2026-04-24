@@ -1,0 +1,287 @@
+{% extends "base.html" %}
+
+{% block page_title %}Material Usage{% endblock %}
+{% block page_subtitle %}Deduct material stock and view usage history{% endblock %}
+
+{% block content %}
+<style>
+  .material-wrap { max-width: 1200px; margin: 0 auto; }
+  .notice-box {
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    color: #9a3412;
+    padding: 14px 16px;
+    border-radius: 16px;
+    margin-bottom: 18px;
+    font-weight: 800;
+  }
+  .section-title {
+    font-size: 22px;
+    font-weight: 900;
+    margin: 0 0 14px;
+  }
+  .material-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 16px;
+  }
+  .material-card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 20px;
+    padding: 18px;
+    box-shadow: 0 8px 24px rgba(15,23,42,.06);
+  }
+  .material-type {
+    font-size: 12px;
+    font-weight: 900;
+    color: #6b7280;
+    text-transform: uppercase;
+  }
+  .material-name {
+    font-size: 20px;
+    font-weight: 900;
+    margin: 8px 0 12px;
+  }
+  .stock-box {
+    background: #f9fafb;
+    border-radius: 14px;
+    padding: 12px;
+    margin-bottom: 14px;
+  }
+  .stock-label {
+    font-size: 12px;
+    color: #6b7280;
+    font-weight: 800;
+  }
+  .stock-value {
+    font-size: 26px;
+    font-weight: 900;
+    color: #111827;
+  }
+  .use-btn {
+    width: 100%;
+    border: 0;
+    border-radius: 14px;
+    padding: 12px;
+    font-weight: 900;
+    background: #dc2626;
+    color: white;
+    cursor: pointer;
+  }
+  .manual-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .manual-row input,
+  .reason-input {
+    width: 100%;
+    border: 1px solid #d1d5db;
+    border-radius: 12px;
+    padding: 10px;
+  }
+  .manual-btn {
+    border: 0;
+    border-radius: 12px;
+    padding: 10px 12px;
+    background: #111827;
+    color: #fff;
+    font-weight: 800;
+    cursor: pointer;
+  }
+  .reason-input { margin-top: 8px; }
+  .filter-card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 20px;
+    padding: 18px;
+    margin-top: 24px;
+    margin-bottom: 14px;
+  }
+  .filter-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(140px, 1fr));
+    gap: 12px;
+    align-items: end;
+  }
+  .filter-label {
+    font-size: 12px;
+    color: #6b7280;
+    font-weight: 900;
+    margin-bottom: 6px;
+  }
+  .summary-pill {
+    display: inline-block;
+    background: #f3f4f6;
+    border-radius: 999px;
+    padding: 9px 14px;
+    font-weight: 900;
+    margin-bottom: 12px;
+  }
+  .usage-table-wrap {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 20px;
+    overflow-x: auto;
+  }
+  .usage-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .usage-table th,
+  .usage-table td {
+    padding: 12px;
+    border-bottom: 1px solid #e5e7eb;
+    text-align: left;
+    font-size: 14px;
+  }
+  .usage-table th {
+    font-size: 12px;
+    color: #6b7280;
+    text-transform: uppercase;
+  }
+  @media (max-width: 900px) {
+    .filter-grid { grid-template-columns: 1fr; }
+  }
+</style>
+
+<div class="material-wrap">
+  <div class="notice-box">
+    This page is for MATERIAL USE only. Use it when staff opens film roll, ink bottle, powder pack, tube, damper, or motor.
+    Do not use this page to fix cloth stock.
+  </div>
+
+  <div class="card">
+    <h2 class="section-title">Create Material Usage</h2>
+
+    <div class="material-grid">
+      {% for row in material_rows %}
+        <div class="material-card">
+          <div class="material-type">{{ row.item.get_item_type_display }}</div>
+          <div class="material-name">{{ row.item.name }}</div>
+
+          <div class="stock-box">
+            <div class="stock-label">Current Stock</div>
+            <div class="stock-value">{{ row.stock|floatformat:2 }} {{ row.item.get_unit_display }}</div>
+          </div>
+
+          <form method="post" onsubmit="return confirm('Deduct {{ row.quick_qty }} from {{ row.item.name }}?');">
+            {% csrf_token %}
+            <input type="hidden" name="item_id" value="{{ row.item.id }}">
+            <input type="hidden" name="qty" value="{{ row.quick_qty }}">
+            <input type="hidden" name="reason" value="Quick material usage">
+            <button class="use-btn" type="submit">{{ row.quick_label }}</button>
+          </form>
+
+          <form method="post" onsubmit="return confirm('Deduct manual qty from {{ row.item.name }}?');">
+            {% csrf_token %}
+            <input type="hidden" name="item_id" value="{{ row.item.id }}">
+
+            <div class="manual-row">
+              <input type="number" name="qty" step="0.01" min="0.01" placeholder="Manual qty">
+              <button class="manual-btn" type="submit">Use</button>
+            </div>
+
+            <input class="reason-input" type="text" name="reason" placeholder="Note optional">
+          </form>
+        </div>
+      {% empty %}
+        <div class="notice-box">
+          No material item yet. Create Film / Ink / Powder / Maintenance item first.
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="filter-card">
+    <h2 class="section-title">Material Usage Records</h2>
+
+    <form method="get">
+      <div class="filter-grid">
+        <div>
+          <div class="filter-label">From Date</div>
+          <input type="date" name="date_from" value="{{ date_from }}">
+        </div>
+
+        <div>
+          <div class="filter-label">To Date</div>
+          <input type="date" name="date_to" value="{{ date_to }}">
+        </div>
+
+        <div>
+          <div class="filter-label">Material</div>
+          <select name="item">
+            <option value="">All Materials</option>
+            {% for item in materials %}
+              <option value="{{ item.id }}" {% if selected_item_id == item.id|stringformat:"s" %}selected{% endif %}>
+                {{ item.code }} - {{ item.name }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <div class="filter-label">Record By</div>
+          <select name="user">
+            <option value="">All Users</option>
+            {% for u in users %}
+              <option value="{{ u.created_by_id }}" {% if selected_user_id == u.created_by_id|stringformat:"s" %}selected{% endif %}>
+                {{ u.created_by__username }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <button class="btn-primary" type="submit">Search</button>
+          <a class="btn-light" href="{% url 'material_usage' %}">Clear</a>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <div class="summary-pill">
+    Total Used: {{ total_used|floatformat:2 }}
+  </div>
+
+  <div class="usage-table-wrap">
+    <table class="usage-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Material</th>
+          <th>Type</th>
+          <th>Qty Used</th>
+          <th>Unit</th>
+          <th>Record By</th>
+          <th>Note</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in usage_rows %}
+          <tr>
+            <td>{{ row.created_at|date:"Y-m-d H:i" }}</td>
+            <td>{{ row.batch_item.item.name }}</td>
+            <td>{{ row.batch_item.item.get_item_type_display }}</td>
+            <td>{{ row.qty|floatformat:2 }}</td>
+            <td>{{ row.batch_item.item.get_unit_display }}</td>
+            <td>
+              {% if row.created_by %}
+                {{ row.created_by.username }}
+              {% else %}
+                -
+              {% endif %}
+            </td>
+            <td>{{ row.reason|default:"-" }}</td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="7">No usage records found.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

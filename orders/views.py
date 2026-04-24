@@ -22,7 +22,7 @@ from .models import (
     OrderItem,
     OrderProgress,
 )
-from .services import deduct_stock_for_order, restore_stock_for_order
+from .services import restore_stock_for_order
 
 
 def _stringify(value):
@@ -425,7 +425,7 @@ def _get_order_totals_by_service(order):
         film_meter = order.items.aggregate(total=Sum("film_meter"))["total"] or Decimal("0")
     else:
         cloth_qty = Decimal("0")
-        film_meter = Decimal("0")
+        film_meter = order.items.aggregate(total=Sum("film_meter"))["total"] or Decimal("0")
 
     return cloth_qty, film_meter
 
@@ -664,6 +664,10 @@ def order_create(request):
             try:
                 order = form.save(commit=False)
                 order.status = Order.STATUS_PENDING
+
+                if request.user.is_authenticated and not order.created_by_id:
+                    order.created_by = request.user
+
                 order.save()
 
                 design_payloads = _build_design_payloads_from_post(request)
@@ -686,9 +690,12 @@ def order_create(request):
                 order.total_pcs = total_pcs
                 order.done_pcs = Decimal("0")
                 order.status = Order.STATUS_PENDING
+                order.stock_deducted = False
+
                 order.save(update_fields=[
                     "total_amount", "deposit_amount", "paid_amount",
-                    "total_pcs", "done_pcs", "status",
+                    "total_pcs", "done_pcs", "status", "stock_deducted",
+                    "created_by",
                 ])
 
                 _log_order_history(
@@ -698,17 +705,13 @@ def order_create(request):
                     old_value="",
                     new_value=order.order_no,
                     user=request.user,
-                    remark="Order created",
+                    remark="Order created. Stock is manual; no auto deduction.",
                 )
 
-                unresolved = deduct_stock_for_order(order, allow_shortage=True)
-
-                messages.success(request, f"Order {order.order_no} created successfully.")
-
-                if unresolved:
-                    shortage_text = ", ".join(f"{row['label']} short {row['shortage']}" for row in unresolved)
-                    messages.warning(request, f"Order created, but stock is lacking: {shortage_text}")
-
+                messages.success(
+                    request,
+                    f"Order {order.order_no} created successfully. Stock was not deducted automatically."
+                )
                 return redirect("order_detail", pk=order.pk)
 
             except ValidationError as e:
@@ -777,7 +780,7 @@ def production_update(request, pk):
             order.status = cancel_status
             order.save(update_fields=["status"])
 
-            messages.success(request, "Order cancelled and stock returned.")
+            messages.success(request, "Order cancelled.")
             return redirect("production_detail", pk=order.pk)
 
         if request.POST.get("complete_all"):
@@ -961,12 +964,12 @@ def order_restore(request, pk):
         order.deleted_at = None
         order.save(update_fields=["is_deleted", "deleted_at"])
 
-        deduct_stock_for_order(order, allow_shortage=True)
-
-        messages.success(request, f"Order {order.order_no} restored.")
+        messages.success(request, f"Order {order.order_no} restored. Stock was not deducted automatically.")
         return redirect("order_detail", pk=order.pk)
 
     return redirect("order_trash_list")
+
+
 @login_required
 @permission_required("orders.view_order", raise_exception=True)
 def order_trash_list(request):
@@ -996,5 +999,128 @@ def order_trash_list(request):
         {
             "rows": rows,
             "total_orders": qs.count(),
+        },
+    )
+
+@login_required
+@permission_required("inventory.add_inventoryadjustment", raise_exception=True)
+@transaction.atomic
+def material_usage(request):
+    material_types = [
+        InventoryItem.TYPE_FILM,
+        InventoryItem.TYPE_INK,
+        InventoryItem.TYPE_POWDER,
+        InventoryItem.TYPE_MAINTENANCE,
+        InventoryItem.TYPE_OTHER,
+    ]
+
+    materials = InventoryItem.objects.filter(
+        is_active=True,
+        item_type__in=material_types,
+    ).order_by("item_type", "code", "name")
+
+    rows = []
+
+    for item in materials:
+        stock = (
+            InventoryBatchItem.objects.filter(
+                item=item,
+                is_active=True,
+                batch__is_deleted=False,
+            )
+            .aggregate(total=Sum("qty_remaining"))
+            .get("total")
+            or Decimal("0")
+        )
+
+        if item.item_type == InventoryItem.TYPE_FILM:
+            quick_qty = Decimal("1")
+            quick_label = "Use 1 Roll"
+        elif item.item_type == InventoryItem.TYPE_INK:
+            quick_qty = Decimal("1")
+            quick_label = "Use 1 Bottle"
+        elif item.item_type == InventoryItem.TYPE_POWDER:
+            quick_qty = Decimal("1")
+            quick_label = "Use 1 Pack"
+        elif item.item_type == InventoryItem.TYPE_MAINTENANCE:
+            quick_qty = Decimal("1")
+            quick_label = "Use 1 PCS"
+        else:
+            quick_qty = Decimal("1")
+            quick_label = "Use 1"
+
+        rows.append(
+            {
+                "item": item,
+                "stock": stock,
+                "quick_qty": quick_qty,
+                "quick_label": quick_label,
+            }
+        )
+
+    if request.method == "POST":
+        item_id = request.POST.get("item_id")
+        qty = Decimal(str(request.POST.get("qty") or "0"))
+        reason = (request.POST.get("reason") or "").strip()
+
+        item = get_object_or_404(
+            InventoryItem,
+            pk=item_id,
+            item_type__in=material_types,
+            is_active=True,
+        )
+
+        if qty <= 0:
+            messages.error(request, "Qty must be greater than 0.")
+            return redirect("material_usage")
+
+        stock_rows = list(
+            InventoryBatchItem.objects.select_related("batch", "item")
+            .filter(
+                item=item,
+                is_active=True,
+                batch__is_deleted=False,
+                qty_remaining__gt=0,
+            )
+            .order_by("-batch__received_date", "-id")
+        )
+
+        total_stock = sum((row.qty_remaining or Decimal("0")) for row in stock_rows)
+
+        if qty > total_stock:
+            messages.error(request, f"Not enough stock. Current stock: {total_stock}")
+            return redirect("material_usage")
+
+        remaining_to_reduce = qty
+
+        for row in stock_rows:
+            if remaining_to_reduce <= 0:
+                break
+
+            use_qty = min(row.qty_remaining, remaining_to_reduce)
+            old_qty = row.qty_remaining
+            row.qty_remaining = old_qty - use_qty
+            row.save(update_fields=["qty_remaining"])
+
+            InventoryAdjustment.objects.create(
+                batch_item=row,
+                adjustment_type=InventoryAdjustment.TYPE_REMOVE,
+                qty=use_qty,
+                reason=reason or "Material usage",
+                created_by=request.user if request.user.is_authenticated else None,
+                qty_before=old_qty,
+                qty_after=row.qty_remaining,
+            )
+
+            remaining_to_reduce -= use_qty
+
+        messages.success(request, f"{item.name} deducted successfully.")
+        return redirect("material_usage")
+
+    return render(
+        request,
+        "inventory/material_usage.html",
+        {
+            "rows": rows,
         },
     )

@@ -16,20 +16,33 @@ from .models import (
 class InventoryItemForm(forms.ModelForm):
     class Meta:
         model = InventoryItem
-        fields = ["name", "sample_style", "is_active"]
+        fields = [
+            "name",
+            "item_type",
+            "unit",
+            "image",
+            "sample_style",
+            "is_active",
+        ]
         widgets = {
             "name": forms.TextInput(attrs={"class": "form-control", "placeholder": "Item name"}),
+            "item_type": forms.Select(attrs={"class": "form-select"}),
+            "unit": forms.Select(attrs={"class": "form-select"}),
+            "image": forms.ClearableFileInput(attrs={"class": "form-control", "accept": "image/*"}),
             "sample_style": forms.Select(attrs={"class": "form-select"}),
             "is_active": forms.CheckboxInput(attrs={"class": "form-check-input"}),
         }
 
-    def save(self, commit=True):
-        instance = super().save(commit=False)
-        instance.item_type = InventoryItem.TYPE_SHIRT
-        instance.unit = InventoryItem.UNIT_PCS
-        if commit:
-            instance.save()
-        return instance
+    def clean(self):
+        cleaned_data = super().clean()
+        item_type = cleaned_data.get("item_type")
+
+        if item_type == InventoryItem.TYPE_SHIRT:
+            cleaned_data["image"] = None
+        else:
+            cleaned_data["sample_style"] = ""
+
+        return cleaned_data
 
 
 class ColorForm(forms.ModelForm):
@@ -111,29 +124,32 @@ class InventoryBatchForm(forms.ModelForm):
             base = f"STK-{date_part}"
             batch_no = base
             i = 1
+
             while InventoryBatch.objects.filter(batch_no=batch_no).exclude(pk=instance.pk).exists():
                 batch_no = f"{base}-{i}"
                 i += 1
+
             instance.batch_no = batch_no
 
         if commit:
             instance.save()
         return instance
 
+
 class InventoryBatchItemForm(forms.ModelForm):
     quantity = forms.DecimalField(
         max_digits=12,
         decimal_places=2,
-        widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
+        widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0"}),
     )
 
     class Meta:
         model = InventoryBatchItem
         fields = ["item", "color", "size", "quantity"]
         widgets = {
-            "item": forms.Select(attrs={"class": "form-select"}),
-            "color": forms.Select(attrs={"class": "form-select"}),
-            "size": forms.Select(attrs={"class": "form-select"}),
+            "item": forms.Select(attrs={"class": "form-select item-select"}),
+            "color": forms.Select(attrs={"class": "form-select color-select"}),
+            "size": forms.Select(attrs={"class": "form-select size-select"}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -141,13 +157,42 @@ class InventoryBatchItemForm(forms.ModelForm):
 
         self.fields["item"].queryset = InventoryItem.objects.filter(
             is_active=True,
-            item_type=InventoryItem.TYPE_SHIRT,
-        ).order_by("code")
+        ).order_by("item_type", "code", "name")
+
         self.fields["color"].queryset = Color.objects.filter(is_active=True).order_by("name")
         self.fields["size"].queryset = Size.objects.filter(is_active=True).order_by("sort_order", "id")
 
+        self.fields["color"].required = False
+        self.fields["size"].required = False
+
+        item_widget = self.fields["item"].widget
+        item_choices = [("", "---------")]
+
+        for item in self.fields["item"].queryset:
+            label = f"{item.code} - {item.name}"
+            item_choices.append((item.pk, label))
+
+        item_widget.choices = item_choices
+
         if self.instance and self.instance.pk:
             self.fields["quantity"].initial = self.instance.qty_received
+
+    def clean(self):
+        cleaned_data = super().clean()
+        item = cleaned_data.get("item")
+        color = cleaned_data.get("color")
+        size = cleaned_data.get("size")
+
+        if item and item.item_type == InventoryItem.TYPE_SHIRT:
+            if not color:
+                self.add_error("color", "Color is required for shirt stock.")
+            if not size:
+                self.add_error("size", "Size is required for shirt stock.")
+        else:
+            cleaned_data["color"] = None
+            cleaned_data["size"] = None
+
+        return cleaned_data
 
     def save(self, commit=True):
         instance = super().save(commit=False)
@@ -159,6 +204,10 @@ class InventoryBatchItemForm(forms.ModelForm):
                     "This row already has stock used. Please use stock adjustment instead of editing qty."
                 )
 
+        if instance.item and instance.item.item_type != InventoryItem.TYPE_SHIRT:
+            instance.color = None
+            instance.size = None
+
         if not instance.pk:
             instance.qty_received = qty
             instance.qty_remaining = qty
@@ -167,12 +216,22 @@ class InventoryBatchItemForm(forms.ModelForm):
             diff = qty - old_received
             instance.qty_received = qty
             instance.qty_remaining = (instance.qty_remaining or Decimal("0")) + diff
+
             if instance.qty_remaining < 0:
                 raise forms.ValidationError("Remaining qty cannot go below 0.")
 
         if commit:
             instance.save()
         return instance
+
+
+InventoryBatchItemFormSet = inlineformset_factory(
+    InventoryBatch,
+    InventoryBatchItem,
+    form=InventoryBatchItemForm,
+    extra=1,
+    can_delete=True,
+)
 
 
 class InventoryAdjustmentForm(forms.ModelForm):
@@ -226,34 +285,6 @@ class InventoryAdjustmentForm(forms.ModelForm):
 
         return cleaned_data
 
-
-class InventoryAdjustStockSelectForm(forms.Form):
-    item = forms.ModelChoiceField(
-        queryset=InventoryItem.objects.filter(
-            is_active=True,
-            item_type=InventoryItem.TYPE_SHIRT,
-        ).order_by("code"),
-        widget=forms.Select(attrs={"class": "form-select"}),
-    )
-    color = forms.ModelChoiceField(
-        queryset=Color.objects.filter(is_active=True).order_by("name"),
-        required=False,
-        widget=forms.Select(attrs={"class": "form-select"}),
-    )
-    size = forms.ModelChoiceField(
-        queryset=Size.objects.filter(is_active=True).order_by("sort_order", "id"),
-        required=False,
-        widget=forms.Select(attrs={"class": "form-select"}),
-    )
-
-
-InventoryBatchItemFormSet = inlineformset_factory(
-    InventoryBatch,
-    InventoryBatchItem,
-    form=InventoryBatchItemForm,
-    extra=1,
-    can_delete=True,
-)
 
 class InventoryAdjustStockSelectForm(forms.Form):
     item = forms.ModelChoiceField(
