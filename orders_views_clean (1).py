@@ -126,29 +126,6 @@ def _status_badge(status):
     return "yellow"
 
 
-def _format_countdown(deadline):
-    if not deadline:
-        return "-"
-
-    now = timezone.now()
-
-    if now > deadline:
-        return "Overdue"
-
-    diff = deadline - now
-    total_hours = int(diff.total_seconds() // 3600)
-    days = total_hours // 24
-    hours = total_hours % 24
-
-    if days > 0 and hours > 0:
-        return f"{days}day {hours}h" if days == 1 else f"{days}days {hours}h"
-
-    if days > 0:
-        return f"{days}day" if days == 1 else f"{days}days"
-
-    return f"{hours}h"
-
-
 def _get_prefetched_order_queryset():
     return Order.objects.prefetch_related(
         Prefetch(
@@ -186,8 +163,12 @@ def _order_form_context_base():
             item_type=InventoryItem.TYPE_FILM,
             is_active=True,
         ).order_by("code", "name"),
-        "colors": Color.objects.filter(is_active=True).order_by("name"),
-        "sizes": Size.objects.filter(is_active=True).order_by("sort_order", "id"),
+        "colors": Color.objects.filter(
+            is_active=True
+        ).order_by("name"),
+        "sizes": Size.objects.filter(
+            is_active=True
+        ).order_by("sort_order", "id"),
     }
 
 
@@ -205,25 +186,23 @@ def _build_design_payloads_from_post(request):
         item_total = int(request.POST.get(f"{prefix}-item_total", 0) or 0)
 
         items = []
-
         for item_index in range(item_total):
             item_prefix = f"{prefix}-item-{item_index}"
             delete_item = request.POST.get(f"{item_prefix}-DELETE") == "1"
 
-            items.append(
-                {
-                    "id": request.POST.get(f"{item_prefix}-id") or "",
-                    "description": (request.POST.get(f"{item_prefix}-description") or "").strip(),
-                    "shirt_item_id": request.POST.get(f"{item_prefix}-shirt_item") or None,
-                    "film_item_id": request.POST.get(f"{item_prefix}-film_item") or None,
-                    "color_id": request.POST.get(f"{item_prefix}-color") or None,
-                    "size_id": request.POST.get(f"{item_prefix}-size") or None,
-                    "quantity": _decimal_or_zero(request.POST.get(f"{item_prefix}-quantity")),
-                    "unit_price": _decimal_or_zero(request.POST.get(f"{item_prefix}-unit_price")),
-                    "film_meter": _decimal_or_zero(request.POST.get(f"{item_prefix}-film_meter")),
-                    "delete": delete_item,
-                }
-            )
+            payload = {
+                "id": request.POST.get(f"{item_prefix}-id") or "",
+                "description": (request.POST.get(f"{item_prefix}-description") or "").strip(),
+                "shirt_item_id": request.POST.get(f"{item_prefix}-shirt_item") or None,
+                "film_item_id": request.POST.get(f"{item_prefix}-film_item") or None,
+                "color_id": request.POST.get(f"{item_prefix}-color") or None,
+                "size_id": request.POST.get(f"{item_prefix}-size") or None,
+                "quantity": _decimal_or_zero(request.POST.get(f"{item_prefix}-quantity")),
+                "unit_price": _decimal_or_zero(request.POST.get(f"{item_prefix}-unit_price")),
+                "film_meter": _decimal_or_zero(request.POST.get(f"{item_prefix}-film_meter")),
+                "delete": delete_item,
+            }
+            items.append(payload)
 
         payloads.append(
             {
@@ -248,6 +227,7 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
 
     kept_design_ids = set()
     kept_item_ids = set()
+
     next_sort_order = 1
 
     for design_data in design_payloads:
@@ -282,7 +262,6 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
                 remark=design_data["remark"],
                 sort_order=next_sort_order,
             )
-
             _log_order_history(
                 order=order,
                 action=OrderHistory.ACTION_DESIGN_ADD,
@@ -299,7 +278,6 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
             design.save(update_fields=["name", "remark", "sort_order"])
 
             after_design = _snapshot_design(design)
-
             for key, old_val in before_design.items():
                 new_val = after_design.get(key)
                 if _stringify(old_val) != _stringify(new_val):
@@ -315,6 +293,7 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
 
         kept_design_ids.add(str(design.pk))
         next_sort_order += 1
+
         has_item_or_file = False
 
         for item_data in design_data["items"]:
@@ -342,16 +321,14 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
                     item.delete()
                 continue
 
-            is_blank_item = (
+            if (
                 not item_data["description"]
                 and not item_data["shirt_item_id"]
                 and not item_data["film_item_id"]
                 and item_data["quantity"] <= 0
                 and item_data["unit_price"] <= 0
                 and item_data["film_meter"] <= 0
-            )
-
-            if is_blank_item:
+            ):
                 continue
 
             if item is None:
@@ -367,7 +344,6 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
                     unit_price=item_data["unit_price"],
                     film_meter=item_data["film_meter"],
                 )
-
                 _log_order_history(
                     order=order,
                     action=OrderHistory.ACTION_ITEM_ADD,
@@ -391,7 +367,6 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
                 item.save()
 
                 new_item_data = _snapshot_item(item)
-
                 for key, old_val in old_item_data.items():
                     new_val = new_item_data.get(key)
                     if _stringify(old_val) != _stringify(new_val):
@@ -416,7 +391,6 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
                 design=design,
                 image=f,
             )
-
             _log_order_history(
                 order=order,
                 action=OrderHistory.ACTION_DESIGN_ADD,
@@ -426,7 +400,6 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
                 user=user,
                 remark=f"Design file uploaded in {design.display_name}",
             )
-
             has_item_or_file = True
 
         if not has_item_or_file:
@@ -482,7 +455,6 @@ def _get_order_totals_by_service(order):
     else:
         cloth_qty = Decimal("0")
         film_meter = Decimal("0")
-
     return cloth_qty, film_meter
 
 
@@ -522,6 +494,7 @@ def order_list(request):
     total_orders = qs.count()
     pending_count = qs.filter(status=Order.STATUS_PENDING).count() if hasattr(Order, "STATUS_PENDING") else 0
     done_count = qs.filter(status=Order.STATUS_DONE).count() if hasattr(Order, "STATUS_DONE") else 0
+    revenue_total = qs.aggregate(total=Sum("total_amount"))["total"] or Decimal("0.00")
 
     now = timezone.now()
 
@@ -534,7 +507,6 @@ def order_list(request):
         balance_amount = total_amount - deposit_amount - paid_amount
 
         is_late = False
-
         if order.deadline:
             if hasattr(Order, "STATUS_DONE") and order.status != Order.STATUS_DONE:
                 is_late = order.deadline < now
@@ -561,119 +533,12 @@ def order_list(request):
         "total_orders": total_orders,
         "pending_count": pending_count,
         "done_count": done_count,
+        "revenue_total": revenue_total,
         "status_choices": getattr(Order, "STATUS_CHOICES", []),
         "order_type_choices": getattr(Order, "TYPE_CHOICES", []),
     }
-
     return render(request, "orders/order_list.html", context)
 
-
-@login_required
-@permission_required("orders.view_order", raise_exception=True)
-def production_list(request):
-    data = request.GET.copy()
-
-    if "status" not in data:
-        data["status"] = ProductionFilterForm.STATUS_ACTIVE
-
-    if "sort" not in data:
-        data["sort"] = ProductionFilterForm.SORT_DEADLINE_ASC
-
-    form = ProductionFilterForm(data)
-    qs = Order.objects.all().prefetch_related("items")
-
-    if form.is_valid():
-        keyword = (form.cleaned_data.get("q") or "").strip()
-        status = form.cleaned_data.get("status") or ProductionFilterForm.STATUS_ACTIVE
-        deadline = form.cleaned_data.get("deadline")
-        sort = form.cleaned_data.get("sort") or ProductionFilterForm.SORT_DEADLINE_ASC
-
-        if keyword:
-            qs = qs.filter(
-                Q(customer_name__icontains=keyword)
-                | Q(order_no__icontains=keyword)
-            )
-
-        cancel_status = _get_cancel_status()
-
-        if status == ProductionFilterForm.STATUS_ACTIVE:
-            qs = qs.filter(
-                status__in=[Order.STATUS_PENDING, Order.STATUS_PROCESSING]
-            )
-        elif status == ProductionFilterForm.STATUS_DONE:
-            qs = qs.filter(status=Order.STATUS_DONE)
-        elif status == ProductionFilterForm.STATUS_CANCEL:
-            qs = qs.filter(status=cancel_status)
-
-        if deadline:
-            qs = qs.filter(deadline__date=deadline)
-
-        if sort == ProductionFilterForm.SORT_CREATED_DESC:
-            qs = qs.order_by("-created_at", "-id")
-        elif sort == ProductionFilterForm.SORT_CREATED_ASC:
-            qs = qs.order_by("created_at", "id")
-        elif sort == ProductionFilterForm.SORT_DEADLINE_DESC:
-            qs = qs.order_by("-deadline", "-id")
-        else:
-            qs = qs.order_by("deadline", "id")
-    else:
-        qs = qs.filter(
-            status__in=[Order.STATUS_PENDING, Order.STATUS_PROCESSING]
-        ).order_by("deadline", "id")
-
-    summary_totals = qs.aggregate(
-        total_pcs_sum=Sum("total_pcs"),
-        done_pcs_sum=Sum("done_pcs"),
-    )
-
-    total_project_pending = qs.count()
-
-    total_pcs_sum = Decimal(summary_totals["total_pcs_sum"] or 0)
-    done_pcs_sum = Decimal(summary_totals["done_pcs_sum"] or 0)
-
-    total_cloth_done = done_pcs_sum
-    total_cloth_pending = total_pcs_sum - done_pcs_sum
-
-    if total_cloth_pending < 0:
-        total_cloth_pending = Decimal("0")
-
-    paginator = Paginator(qs, 50)
-    page_number = request.GET.get("page")
-    page_obj = paginator.get_page(page_number)
-
-    start_no = (page_obj.number - 1) * paginator.per_page
-
-    rows = []
-
-    for idx, order in enumerate(page_obj.object_list, start=1):
-        total_qty = Decimal(order.total_pcs or 0)
-        done_qty = Decimal(order.done_pcs or 0)
-
-        rows.append(
-            {
-                "no": start_no + idx,
-                "order": order,
-                "countdown_text": _format_countdown(order.deadline),
-                "status_color": _status_badge(order.status),
-                "total_qty": total_qty,
-                "done_qty": done_qty,
-            }
-        )
-
-    return render(
-        request,
-        "orders/production_list.html",
-        {
-            "form": form,
-            "page_obj": page_obj,
-            "rows": rows,
-            "total_found": paginator.count,
-            "total_project_pending": total_project_pending,
-            "total_cloth_pending": total_cloth_pending,
-            "total_cloth_done": total_cloth_done,
-            "now": timezone.now(),
-        },
-    )
 
 @login_required
 @permission_required("orders.view_order", raise_exception=True)
@@ -739,33 +604,30 @@ def order_list_export_excel(request):
         paid_amount = Decimal(order.paid_amount or 0)
         balance_amount = total_amount - deposit_amount - paid_amount
 
-        ws.append(
-            [
-                order.order_no,
-                order.created_at.strftime("%Y-%m-%d %H:%M") if order.created_at else "",
-                order.customer_name or "",
-                order.phone or "",
-                order.customer_location or "",
-                getattr(order, "get_order_type_display", lambda: order.order_type)(),
-                getattr(order, "get_service_type_display", lambda: order.service_type)(),
-                getattr(order, "get_status_display", lambda: order.status)(),
-                float(cloth_qty),
-                float(film_meter),
-                float(total_amount),
-                float(deposit_amount),
-                float(paid_amount),
-                float(balance_amount),
-                order.deadline.strftime("%Y-%m-%d %H:%M") if order.deadline else "",
-                order.remark or "",
-            ]
-        )
+        ws.append([
+            order.order_no,
+            order.created_at.strftime("%Y-%m-%d %H:%M") if order.created_at else "",
+            order.customer_name or "",
+            order.phone or "",
+            order.customer_location or "",
+            getattr(order, "get_order_type_display", lambda: order.order_type)(),
+            getattr(order, "get_service_type_display", lambda: order.service_type)(),
+            getattr(order, "get_status_display", lambda: order.status)(),
+            float(cloth_qty),
+            float(film_meter),
+            float(total_amount),
+            float(deposit_amount),
+            float(paid_amount),
+            float(balance_amount),
+            order.deadline.strftime("%Y-%m-%d %H:%M") if order.deadline else "",
+            order.remark or "",
+        ])
 
     response = HttpResponse(
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
     response["Content-Disposition"] = 'attachment; filename="orders_filtered.xlsx"'
     wb.save(response)
-
     return response
 
 
@@ -783,7 +645,6 @@ def order_create(request):
                 order.save()
 
                 design_payloads = _build_design_payloads_from_post(request)
-
                 total_amount, total_pcs = _save_design_payloads(
                     order=order,
                     design_payloads=design_payloads,
@@ -832,10 +693,9 @@ def order_create(request):
                         f"{row['label']} short {row['shortage']}"
                         for row in unresolved
                     )
-
                     messages.warning(
                         request,
-                        f"Order created, but stock is lacking: {shortage_text}",
+                        f"Order created, but stock is lacking: {shortage_text}"
                     )
 
                 return redirect("order_detail", pk=order.pk)
@@ -853,7 +713,6 @@ def order_create(request):
         "submit_label": "Save Order",
         **_order_form_context_base(),
     }
-
     return render(request, "orders/order_form.html", context)
 
 
@@ -866,11 +725,145 @@ def order_detail(request, pk):
 
 @login_required
 @permission_required("orders.view_order", raise_exception=True)
+def production_list(request):
+    data = request.GET.copy()
+
+    status_active = getattr(ProductionFilterForm, "STATUS_ACTIVE", "ACTIVE")
+    status_done = getattr(ProductionFilterForm, "STATUS_DONE", "DONE")
+    status_cancel = getattr(ProductionFilterForm, "STATUS_CANCEL", "CANCEL")
+
+    sort_deadline_asc = getattr(ProductionFilterForm, "SORT_DEADLINE_ASC", "deadline_asc")
+    sort_deadline_desc = getattr(ProductionFilterForm, "SORT_DEADLINE_DESC", "deadline_desc")
+    sort_created_desc = getattr(ProductionFilterForm, "SORT_CREATED_DESC", "created_desc")
+    sort_created_asc = getattr(ProductionFilterForm, "SORT_CREATED_ASC", "created_asc")
+
+    if "status" not in data:
+        data["status"] = status_active
+
+    if "sort" not in data:
+        data["sort"] = sort_deadline_asc
+
+    form = ProductionFilterForm(data)
+    qs = Order.objects.all().prefetch_related("items")
+
+    if form.is_valid():
+        keyword = (form.cleaned_data.get("q") or "").strip()
+        status = form.cleaned_data.get("status") or status_active
+        deadline = form.cleaned_data.get("deadline")
+        sort = form.cleaned_data.get("sort") or sort_deadline_asc
+
+        if keyword:
+            qs = qs.filter(
+                Q(customer_name__icontains=keyword)
+                | Q(order_no__icontains=keyword)
+                | Q(phone__icontains=keyword)
+            )
+
+        cancel_status = _get_cancel_status()
+
+        if status == status_active:
+            qs = qs.filter(status__in=[Order.STATUS_PENDING, Order.STATUS_PROCESSING])
+        elif status == status_done:
+            qs = qs.filter(status=Order.STATUS_DONE)
+        elif status == status_cancel:
+            qs = qs.filter(status=cancel_status)
+
+        if deadline:
+            qs = qs.filter(deadline__date=deadline)
+
+        if sort == sort_created_desc:
+            qs = qs.order_by("-created_at", "-id")
+        elif sort == sort_created_asc:
+            qs = qs.order_by("created_at", "id")
+        elif sort == sort_deadline_desc:
+            qs = qs.order_by("-deadline", "-id")
+        else:
+            qs = qs.order_by("deadline", "id")
+    else:
+        qs = qs.filter(
+            status__in=[Order.STATUS_PENDING, Order.STATUS_PROCESSING]
+        ).order_by("deadline", "id")
+
+    summary_qs = Order.objects.filter(
+        status__in=[Order.STATUS_PENDING, Order.STATUS_PROCESSING]
+    )
+
+    total_project_pending = summary_qs.count()
+    summary_totals = summary_qs.aggregate(
+        total_pcs_sum=Sum("total_pcs"),
+        done_pcs_sum=Sum("done_pcs"),
+    )
+
+    total_pcs_sum = Decimal(summary_totals.get("total_pcs_sum") or 0)
+    done_pcs_sum = Decimal(summary_totals.get("done_pcs_sum") or 0)
+    total_cloth_pending = total_pcs_sum - done_pcs_sum
+    total_cloth_done = done_pcs_sum
+
+    paginator = Paginator(qs, 50)
+    page_obj = paginator.get_page(request.GET.get("page"))
+
+    start_no = (page_obj.number - 1) * paginator.per_page
+    now = timezone.now()
+
+    rows = []
+    for idx, order in enumerate(page_obj.object_list, start=1):
+        deadline = getattr(order, "deadline", None)
+
+        if deadline:
+            if now > deadline:
+                countdown_text = "Overdue"
+            else:
+                diff = deadline - now
+                total_hours = int(diff.total_seconds() // 3600)
+                days = total_hours // 24
+                hours = total_hours % 24
+
+                if days > 0 and hours > 0:
+                    day_label = "day" if days == 1 else "days"
+                    countdown_text = f"{days}{day_label} {hours}h"
+                elif days > 0:
+                    day_label = "day" if days == 1 else "days"
+                    countdown_text = f"{days}{day_label}"
+                else:
+                    countdown_text = f"{hours}h"
+        else:
+            countdown_text = "-"
+
+        total_qty = Decimal(order.total_pcs or 0)
+        done_qty = Decimal(order.done_pcs or 0)
+
+        rows.append(
+            {
+                "no": start_no + idx,
+                "order": order,
+                "countdown_text": countdown_text,
+                "status_color": _status_badge(order.status),
+                "total_qty": total_qty,
+                "done_qty": done_qty,
+            }
+        )
+
+    return render(
+        request,
+        "orders/production_list.html",
+        {
+            "form": form,
+            "page_obj": page_obj,
+            "rows": rows,
+            "total_found": paginator.count,
+            "total_project_pending": total_project_pending,
+            "total_cloth_pending": total_cloth_pending,
+            "total_cloth_done": total_cloth_done,
+            "now": now,
+        },
+    )
+
+@login_required
+@permission_required("orders.view_order", raise_exception=True)
 def production_detail(request, pk):
     order = get_object_or_404(_get_prefetched_order_queryset(), pk=pk)
 
     remaining_pcs = Decimal(order.total_pcs or 0) - Decimal(order.done_pcs or 0)
-
     if remaining_pcs < 0:
         remaining_pcs = Decimal("0")
 
@@ -898,14 +891,12 @@ def production_update(request, pk):
             cancel_status = _get_cancel_status()
             order.status = cancel_status
             order.save(update_fields=["status"])
-
             messages.success(request, "Order marked as CANCEL.")
             return redirect("production_detail", pk=order.pk)
 
         if request.POST.get("complete_all"):
             for item in order.items.all():
                 remaining = Decimal(item.quantity or 0) - Decimal(item.done_qty or 0)
-
                 if remaining > 0:
                     OrderProgress.objects.create(
                         order=order,
@@ -913,7 +904,6 @@ def production_update(request, pk):
                         qty_done=remaining,
                         remark="Auto complete",
                     )
-
                     item.done_qty = item.quantity
                     item.save(update_fields=["done_qty"])
 
@@ -960,7 +950,6 @@ def production_update(request, pk):
             order.status = Order.STATUS_PENDING
 
         order.save(update_fields=["done_pcs", "status"])
-
         messages.success(request, "Production progress updated.")
 
     return redirect("production_detail", pk=order.pk)
@@ -977,7 +966,6 @@ def order_invoice(request, pk):
 @permission_required("orders.view_order", raise_exception=True)
 def order_invoice_pdf(request, pk):
     order = get_object_or_404(_get_prefetched_order_queryset(), pk=pk)
-
     return render(
         request,
         "orders/order_invoice_pdf.html",
@@ -1004,7 +992,6 @@ def order_edit(request, pk):
                 order.save()
 
                 design_payloads = _build_design_payloads_from_post(request)
-
                 total_amount, total_pcs = _save_design_payloads(
                     order=order,
                     design_payloads=design_payloads,
@@ -1072,5 +1059,4 @@ def order_edit(request, pk):
         "order": order,
         **_order_form_context_base(),
     }
-
     return render(request, "orders/order_form.html", context)

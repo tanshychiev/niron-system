@@ -251,6 +251,11 @@ class ProductionFilterForm(forms.Form):
     STATUS_DONE = "DONE"
     STATUS_CANCEL = "CANCEL"
 
+    SORT_DEADLINE_ASC = "deadline_asc"
+    SORT_DEADLINE_DESC = "deadline_desc"
+    SORT_CREATED_DESC = "created_desc"
+    SORT_CREATED_ASC = "created_asc"
+
     STATUS_CHOICES = [
         (STATUS_ACTIVE, "Pending & Processing"),
         (STATUS_ALL, "All"),
@@ -258,15 +263,20 @@ class ProductionFilterForm(forms.Form):
         (STATUS_CANCEL, "Cancel"),
     ]
 
+    SORT_CHOICES = [
+        (SORT_DEADLINE_ASC, "Deadline nearest first"),
+        (SORT_DEADLINE_DESC, "Deadline latest first"),
+        (SORT_CREATED_DESC, "Created newest first"),
+        (SORT_CREATED_ASC, "Created oldest first"),
+    ]
+
     q = forms.CharField(
         required=False,
         label="Search",
-        widget=forms.TextInput(
-            attrs={
-                "class": "form-control",
-                "placeholder": "Customer name or order no",
-            }
-        ),
+        widget=forms.TextInput(attrs={
+            "class": "form-control",
+            "placeholder": "Customer name or order no",
+        }),
     )
 
     status = forms.ChoiceField(
@@ -280,10 +290,16 @@ class ProductionFilterForm(forms.Form):
     deadline = forms.DateField(
         required=False,
         label="Deadline",
-        widget=forms.DateInput(
-            attrs={
-                "type": "date",
-                "class": "form-control",
-            }
-        ),
+        widget=forms.DateInput(attrs={
+            "type": "date",
+            "class": "form-control",
+        }),
+    )
+
+    sort = forms.ChoiceField(
+        required=False,
+        label="Sort",
+        initial=SORT_DEADLINE_ASC,
+        choices=SORT_CHOICES,
+        widget=forms.Select(attrs={"class": "form-select"}),
     )

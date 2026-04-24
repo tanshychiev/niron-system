@@ -12,7 +12,7 @@
 <style>
     .kpi-grid {
         display: grid;
-        grid-template-columns: repeat(4, 1fr);
+        grid-template-columns: repeat(3, 1fr);
         gap: 18px;
         margin-bottom: 22px;
     }
@@ -98,7 +98,7 @@
     .order-table {
         width: 100%;
         border-collapse: collapse;
-        min-width: 1460px;
+        min-width: 1380px;
     }
 
     .order-table th,
@@ -215,17 +215,15 @@
         <div class="kpi-label">Total Orders</div>
         <div class="kpi-value">{{ total_orders }}</div>
     </div>
+
     <div class="kpi-card">
         <div class="kpi-label">Pending</div>
         <div class="kpi-value">{{ pending_count }}</div>
     </div>
+
     <div class="kpi-card">
         <div class="kpi-label">Done</div>
         <div class="kpi-value">{{ done_count }}</div>
-    </div>
-    <div class="kpi-card">
-        <div class="kpi-label">Revenue</div>
-        <div class="kpi-value">${{ revenue_total|floatformat:2 }}</div>
     </div>
 </div>
 
@@ -300,26 +298,32 @@
                     <th>Deadline</th>
                 </tr>
             </thead>
+
             <tbody>
                 {% for row in rows %}
                 <tr class="{% if row.is_late %}late-row{% endif %}">
                     <td>
                         <a href="{% url 'order_detail' row.obj.pk %}" class="order-link">{{ row.obj.order_no }}</a>
                     </td>
+
                     <td>{{ row.obj.created_at|date:"d M Y H:i" }}</td>
+
                     <td>
                         <div>{{ row.obj.customer_name|default:"-" }}</div>
                         <div class="muted-text">{{ row.obj.phone|default:"-" }}</div>
                     </td>
+
                     <td>
                         <span class="type-badge">{{ row.obj.get_order_type_display }}</span>
                     </td>
-                    <td>{{ row.cloth_qty|floatformat:0 }}</td>
-                    <td>{{ row.film_meter|floatformat:2 }}</td>
-                    <td>${{ row.obj.total_amount|floatformat:2 }}</td>
-                    <td>${{ row.obj.deposit_amount|floatformat:2 }}</td>
-                    <td>${{ row.obj.paid_amount|floatformat:2 }}</td>
-                    <td>${{ row.balance_amount|floatformat:2 }}</td>
+
+                    <td>{{ row.cloth_qty|default:0|floatformat:0 }}</td>
+                    <td>{{ row.film_meter|default:0|floatformat:2 }}</td>
+                    <td>${{ row.obj.total_amount|default:0|floatformat:2 }}</td>
+                    <td>${{ row.obj.deposit_amount|default:0|floatformat:2 }}</td>
+                    <td>${{ row.obj.paid_amount|default:0|floatformat:2 }}</td>
+                    <td>${{ row.balance_amount|default:0|floatformat:2 }}</td>
+
                     <td>
                         {% with s=row.obj.status|lower %}
                         <span class="status-badge
@@ -333,6 +337,7 @@
                         </span>
                         {% endwith %}
                     </td>
+
                     <td>
                         {% if row.obj.deadline %}
                             <div class="{% if row.is_late %}late-text{% endif %}">

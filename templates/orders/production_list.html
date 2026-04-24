@@ -5,10 +5,107 @@
 {% block page_subtitle %}Working list and progress tracking{% endblock %}
 
 {% block content %}
+<style>
+.production-summary {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 18px;
+}
+
+.summary-box {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 18px;
+    padding: 18px;
+    box-shadow: 0 8px 20px rgba(0,0,0,.04);
+}
+
+.summary-label {
+    font-size: 12px;
+    font-weight: 800;
+    color: #6b7280;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+}
+
+.summary-value {
+    font-size: 28px;
+    font-weight: 900;
+    color: #111827;
+}
+
+.filter-grid {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr 1fr 1fr auto auto;
+    gap: 14px;
+    align-items: end;
+}
+
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 90px;
+    padding: 7px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.status-red {
+    background: #fef2f2;
+    color: #dc2626;
+}
+
+.status-yellow {
+    background: #fff7ed;
+    color: #d97706;
+}
+
+.status-blue {
+    background: #eff6ff;
+    color: #2563eb;
+}
+
+.status-green {
+    background: #ecfdf5;
+    color: #16a34a;
+}
+
+.progress-text {
+    font-weight: 900;
+    color: #111827;
+}
+
+.countdown-overdue {
+    color: #dc2626;
+    font-weight: 900;
+}
+
+.countdown-text {
+    font-weight: 800;
+    color: #111827;
+}
+
+@media (max-width: 1000px) {
+    .filter-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+@media (max-width: 800px) {
+    .production-summary,
+    .filter-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
 <div class="form-card">
     <h2 style="margin-top:0;">Search & Filter</h2>
 
-    <form method="get">
+    <form method="get" class="filter-grid">
         <div class="field">
             <label>{{ form.q.label }}</label>
             {{ form.q }}
@@ -24,11 +121,31 @@
             {{ form.deadline }}
         </div>
 
-        <div class="actions" style="justify-content:flex-start;">
-            <button type="submit" class="btn-primary">Apply</button>
-            <a href="{% url 'production_list' %}" class="btn-secondary">Reset</a>
+        <div class="field">
+            <label>{{ form.sort.label }}</label>
+            {{ form.sort }}
         </div>
+
+        <button type="submit" class="btn-primary">Search</button>
+        <a href="{% url 'production_list' %}" class="btn-secondary">Reset</a>
     </form>
+</div>
+
+<div class="production-summary">
+    <div class="summary-box">
+        <div class="summary-label">Project Pending</div>
+        <div class="summary-value">{{ total_project_pending|default:0 }}</div>
+    </div>
+
+    <div class="summary-box">
+        <div class="summary-label">Cloth Pending</div>
+        <div class="summary-value">{{ total_cloth_pending|default:0|floatformat:0 }}</div>
+    </div>
+
+    <div class="summary-box">
+        <div class="summary-label">Cloth Done</div>
+        <div class="summary-value">{{ total_cloth_done|default:0|floatformat:0 }}</div>
+    </div>
 </div>
 
 <div class="table-card">
@@ -48,20 +165,24 @@
                 <th>Created Date</th>
                 <th>Deadline</th>
                 <th>Countdown</th>
-                <th>Progress</th>
+                <th>Total Cloths Progress</th>
                 <th>Status</th>
             </tr>
         </thead>
+
         <tbody>
             {% for row in rows %}
             <tr>
                 <td>{{ row.no }}</td>
+
                 <td>
                     <a href="{% url 'production_detail' row.order.pk %}">
-    {{ row.order.order_no }}
-</a>
+                        {{ row.order.order_no }}
+                    </a>
                 </td>
-                <td>{{ row.order.customer_name }}</td>
+
+                <td>{{ row.order.customer_name|default:"-" }}</td>
+
                 <td>
                     {% if row.order.created_at %}
                         {{ row.order.created_at|date:"Y-m-d H:i" }}
@@ -69,6 +190,7 @@
                         -
                     {% endif %}
                 </td>
+
                 <td>
                     {% if row.order.deadline %}
                         {{ row.order.deadline|date:"Y-m-d H:i" }}
@@ -76,14 +198,22 @@
                         -
                     {% endif %}
                 </td>
+
                 <td>
                     {% if row.countdown_text == "Overdue" %}
-                        <span style="color:#dc2626;font-weight:800;">Overdue</span>
+                        <span class="countdown-overdue">Overdue</span>
                     {% else %}
-                        {{ row.countdown_text }}
+                        <span class="countdown-text">{{ row.countdown_text }}</span>
                     {% endif %}
                 </td>
-                <td>{{ row.done_qty }} / {{ row.total_qty }} pcs</td>
+
+                <td>
+                    <span class="progress-text">
+                        {{ row.done_qty|default:0|floatformat:0 }}/{{ row.total_qty|default:0|floatformat:0 }}
+                    </span>
+                    <span style="color:#6B7280;font-size:12px;">pcs</span>
+                </td>
+
                 <td>
                     {% if row.status_color == "red" %}
                         <span class="status-badge status-red">Cancel</span>
@@ -93,6 +223,8 @@
                         <span class="status-badge status-blue">Processing</span>
                     {% elif row.status_color == "green" %}
                         <span class="status-badge status-green">Done</span>
+                    {% else %}
+                        <span class="status-badge status-yellow">Pending</span>
                     {% endif %}
                 </td>
             </tr>
@@ -112,43 +244,18 @@
 
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
             {% if page_obj.has_previous %}
-                <a class="btn-secondary" href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if request.GET.status %}status={{ request.GET.status }}&{% endif %}{% if request.GET.deadline %}deadline={{ request.GET.deadline }}&{% endif %}page={{ page_obj.previous_page_number }}">Previous</a>
+                <a class="btn-secondary" href="?q={{ request.GET.q|urlencode }}&status={{ request.GET.status|urlencode }}&deadline={{ request.GET.deadline|urlencode }}&sort={{ request.GET.sort|urlencode }}&page={{ page_obj.previous_page_number }}">
+                    Previous
+                </a>
             {% endif %}
 
             {% if page_obj.has_next %}
-                <a class="btn-secondary" href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if request.GET.status %}status={{ request.GET.status }}&{% endif %}{% if request.GET.deadline %}deadline={{ request.GET.deadline }}&{% endif %}page={{ page_obj.next_page_number }}">Next</a>
+                <a class="btn-secondary" href="?q={{ request.GET.q|urlencode }}&status={{ request.GET.status|urlencode }}&deadline={{ request.GET.deadline|urlencode }}&sort={{ request.GET.sort|urlencode }}&page={{ page_obj.next_page_number }}">
+                    Next
+                </a>
             {% endif %}
         </div>
     </div>
     {% endif %}
 </div>
-
-<style>
-.status-badge{
-    display:inline-flex;
-    align-items:center;
-    justify-content:center;
-    min-width:90px;
-    padding:7px 12px;
-    border-radius:999px;
-    font-size:12px;
-    font-weight:800;
-}
-.status-red{
-    background:#fef2f2;
-    color:#dc2626;
-}
-.status-yellow{
-    background:#fff7ed;
-    color:#d97706;
-}
-.status-blue{
-    background:#eff6ff;
-    color:#2563eb;
-}
-.status-green{
-    background:#ecfdf5;
-    color:#16a34a;
-}
-</style>
 {% endblock %}
