@@ -10,91 +10,145 @@
 
 {% block content %}
 <div class="table-card">
-    <div style="padding:16px; font-weight:800;">
-        Total Trash: {{ total_orders }}
+  <div class="trash-head">
+    <div>
+      <h3>Total Trash: {{ total_orders }}</h3>
+      <p>Deleted orders can be restored from here.</p>
     </div>
+  </div>
 
-    <div class="table-wrap">
-        <table class="orders-table">
-            <thead>
-                <tr>
-                    <th>Order No</th>
-                    <th>Customer</th>
-                    <th>Phone</th>
-                    <th>Cloth</th>
-                    <th>Film</th>
-                    <th>Reason</th>
-                    <th>Deleted By</th>
-                    <th>Deleted At</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
+  <div class="table-wrap">
+    <table class="orders-table">
+      <thead>
+        <tr>
+          <th>Order No</th>
+          <th>Customer</th>
+          <th>Phone</th>
+          <th>Cloth</th>
+          <th>Film</th>
+          <th>Reason</th>
+          <th>Deleted By</th>
+          <th>Deleted At</th>
+          <th>Action</th>
+        </tr>
+      </thead>
 
-            <tbody>
-                {% for row in rows %}
-                <tr>
-                    <td>{{ row.obj.order_no }}</td>
-                    <td>{{ row.obj.customer_name|default:"-" }}</td>
-                    <td>{{ row.obj.phone|default:"-" }}</td>
-                    <td>{{ row.cloth_qty }}</td>
-                    <td>{{ row.film_meter }}</td>
-                    <td>{{ row.obj.deleted_reason|default:"-" }}</td>
-                    <td>{{ row.obj.deleted_by|default:"-" }}</td>
-                    <td>{{ row.obj.deleted_at|date:"Y-m-d H:i"|default:"-" }}</td>
-                    <td>
-                        <form method="post"
-                              action="{% url 'order_restore' row.obj.pk %}"
-                              onsubmit="return confirm('Restore this order? Stock will deduct again.');">
-                            {% csrf_token %}
-                            <button type="submit" class="btn btn-primary">Restore</button>
-                        </form>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="9" style="text-align:center; padding:30px;">
-                        Trash is empty.
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td><strong>{{ row.obj.order_no }}</strong></td>
+          <td>{{ row.obj.customer_name|default:"-" }}</td>
+          <td>{{ row.obj.phone|default:"-" }}</td>
+          <td>{{ row.cloth_qty }}</td>
+          <td>{{ row.film_meter }}</td>
+          <td>
+            <span class="reason-pill">{{ row.reason|default:"-" }}</span>
+          </td>
+          <td>{{ row.deleted_by|default:"-" }}</td>
+          <td>{{ row.deleted_at|date:"Y-m-d H:i"|default:"-" }}</td>
+          <td>
+            <form method="post"
+                  action="{% url 'order_restore' row.obj.pk %}"
+                  onsubmit="return confirm('Restore this order?');">
+              {% csrf_token %}
+              <button type="submit" class="restore-btn">Restore</button>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="9" class="empty-td">Trash is empty.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 
 <style>
-.table-card {
-    background: rgba(255,255,255,.94);
-    border: 1px solid var(--line);
-    border-radius: 22px;
-    box-shadow: var(--shadow);
-    overflow: hidden;
+.table-card{
+  background:rgba(255,255,255,.94);
+  border:1px solid var(--line);
+  border-radius:22px;
+  box-shadow:var(--shadow);
+  overflow:hidden;
 }
 
-.table-wrap {
-    overflow-x: auto;
+.trash-head{
+  padding:18px 20px;
+  border-bottom:1px solid var(--line);
 }
 
-.orders-table {
-    width: 100%;
-    border-collapse: collapse;
-    min-width: 1000px;
+.trash-head h3{
+  margin:0;
+  font-size:18px;
+  font-weight:900;
+}
+
+.trash-head p{
+  margin:4px 0 0;
+  color:var(--muted);
+}
+
+.table-wrap{
+  overflow-x:auto;
+}
+
+.orders-table{
+  width:100%;
+  border-collapse:collapse;
+  min-width:1000px;
 }
 
 .orders-table th,
-.orders-table td {
-    padding: 13px 12px;
-    border-bottom: 1px solid var(--line);
-    text-align: left;
-    font-size: 14px;
+.orders-table td{
+  padding:14px 12px;
+  border-bottom:1px solid var(--line);
+  text-align:left;
+  font-size:14px;
+  vertical-align:middle;
 }
 
-.orders-table th {
-    background: #faf8f2;
-    color: var(--muted);
-    font-size: 11px;
-    font-weight: 900;
-    text-transform: uppercase;
+.orders-table th{
+  background:#faf8f2;
+  color:var(--muted);
+  font-size:11px;
+  font-weight:900;
+  text-transform:uppercase;
+  letter-spacing:.06em;
+}
+
+.reason-pill{
+  display:inline-flex;
+  max-width:260px;
+  padding:6px 10px;
+  border-radius:999px;
+  background:#fff7ed;
+  border:1px solid #fed7aa;
+  color:#9a3412;
+  font-weight:800;
+  font-size:12px;
+  white-space:normal;
+}
+
+.restore-btn{
+  background:#f59e0b;
+  color:#fff;
+  border:none;
+  border-radius:12px;
+  padding:10px 16px;
+  font-weight:900;
+  cursor:pointer;
+}
+
+.restore-btn:hover{
+  background:#d97706;
+}
+
+.empty-td{
+  text-align:center !important;
+  padding:30px !important;
+  color:var(--muted);
 }
 </style>
 {% endblock %}

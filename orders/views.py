@@ -940,24 +940,19 @@ def order_trash(request, pk):
     order = get_object_or_404(Order, pk=pk, is_deleted=False)
 
     if request.method == "POST":
-        # restore stock if needed
         if order.stock_deducted:
             restore_stock_for_order(order)
 
-        # get reason
-        delete_reason = (request.POST.get("delete_reason") or "").strip()
-
-        # save trash info
         order.is_deleted = True
         order.deleted_at = timezone.now()
         order.deleted_by = request.user if request.user.is_authenticated else None
-        order.delete_reason = delete_reason
+        order.deleted_reason = (request.POST.get("delete_reason") or "").strip()
 
         order.save(update_fields=[
             "is_deleted",
             "deleted_at",
             "deleted_by",
-            "delete_reason",
+            "deleted_reason",
         ])
 
         messages.success(request, f"Order {order.order_no} moved to trash.")
@@ -976,13 +971,13 @@ def order_restore(request, pk):
         order.is_deleted = False
         order.deleted_at = None
         order.deleted_by = None
-        order.delete_reason = ""
+        order.deleted_reason = ""
 
         order.save(update_fields=[
             "is_deleted",
             "deleted_at",
             "deleted_by",
-            "delete_reason",
+            "deleted_reason",
         ])
 
         messages.success(request, f"Order {order.order_no} restored.")
@@ -990,10 +985,89 @@ def order_restore(request, pk):
 
     return redirect("order_trash_list")
 
-
 @login_required
 @permission_required("orders.view_order", raise_exception=True)
 def order_trash_list(request):
+    qs = (
+        Order.objects.filter(is_deleted=True)
+        .select_related("deleted_by")
+        .prefetch_related("items")
+        .order_by("-deleted_at", "-id")
+    )
+
+    rows = []
+
+    for order in qs:
+        cloth_qty, film_meter = _get_order_totals_by_service(order)
+
+        rows.append({
+            "obj": order,
+            "cloth_qty": cloth_qty,
+            "film_meter": film_meter,
+            "reason": order.deleted_reason or "-",
+            "deleted_by": order.deleted_by.username if order.deleted_by else "-",
+            "deleted_at": order.deleted_at,
+        })
+
+    return render(
+        request,
+        "orders/order_trash_list.html",
+        {
+            "rows": rows,
+            "total_orders": qs.count(),
+        },
+    )
+    qs = (
+        Order.objects.filter(is_deleted=True)
+        .select_related("deleted_by")
+        .prefetch_related("items")
+        .order_by("-deleted_at", "-id")
+    )
+
+    rows = []
+
+    for order in qs:
+        cloth_qty, film_meter = _get_order_totals_by_service(order)
+
+        rows.append({
+            "obj": order,
+            "cloth_qty": cloth_qty,
+            "film_meter": film_meter,
+            "reason": order.deleted_reason or "-",   # ✅ correct
+            "deleted_by": order.deleted_by.username if order.deleted_by else "-",
+            "deleted_at": order.deleted_at,
+        })
+
+    return render(
+        request,
+        "orders/order_trash_list.html",
+        {
+            "rows": rows,
+            "total_orders": qs.count(),
+        },
+    )
+    qs = (
+        Order.objects.filter(is_deleted=True)
+        .select_related("deleted_by")
+        .prefetch_related("items")
+        .order_by("-deleted_at", "-id")
+    )
+
+    rows = []
+
+    for order in qs:
+        cloth_qty, film_meter = _get_order_totals_by_service(order)
+
+        rows.append({
+            "obj": order,
+            "cloth_qty": cloth_qty,
+            "film_meter": film_meter,
+            "reason": order.deleted_reason or "-",
+            "deleted_by": order.deleted_by.username if order.deleted_by else "-",
+            "deleted_at": order.deleted_at,
+        })
+
+    
     qs = (
         Order.objects.filter(is_deleted=True)
         .select_related("deleted_by")

@@ -95,7 +95,7 @@
     .orders-table {
         width: 100%;
         border-collapse: collapse;
-        min-width: 1450px;
+        min-width: 1220px;
     }
 
     .orders-table th,
@@ -105,6 +105,7 @@
         text-align: left;
         vertical-align: middle;
         font-size: 14px;
+        white-space: nowrap;
     }
 
     .orders-table th {
@@ -114,7 +115,6 @@
         text-transform: uppercase;
         letter-spacing: .8px;
         background: #faf8f2;
-        white-space: nowrap;
     }
 
     .orders-table tr:hover td {
@@ -169,13 +169,14 @@
 
     .action-row {
         display: flex;
-        gap: 8px;
-        flex-wrap: wrap;
         align-items: center;
+        gap: 8px;
+        flex-wrap: nowrap;
+        white-space: nowrap;
     }
 
     .inline-form {
-        display: inline;
+        display: inline-flex;
         margin: 0;
     }
 
@@ -191,6 +192,7 @@
         align-items: center;
         justify-content: center;
         white-space: nowrap;
+        min-height: 34px;
     }
 
     .btn-mini-light {
@@ -294,13 +296,11 @@
                         <th>Created</th>
                         <th>Created By</th>
                         <th>Customer</th>
-                        <th>Phone</th>
-                        <th>Location</th>
                         <th>Type</th>
                         <th>Service</th>
                         <th>Status</th>
-                        <th>Cloth</th>
-                        <th>Film</th>
+                        <th>Cloth (PCS)</th>
+                        <th>Film (Meter)</th>
                         <th>Total</th>
                         <th>Balance</th>
                         <th>Deadline</th>
@@ -325,10 +325,15 @@
                             {% endif %}
                         </td>
 
-                        <td>{{ row.obj.created_by|default:"-" }}</td>
+                        <td>
+                            {% if row.obj.created_by %}
+                                {{ row.obj.created_by.username|default:row.obj.created_by }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+
                         <td>{{ row.obj.customer_name|default:"-" }}</td>
-                        <td>{{ row.obj.phone|default:"-" }}</td>
-                        <td>{{ row.obj.customer_location|default:"-" }}</td>
                         <td>{{ row.obj.get_order_type_display }}</td>
                         <td>{{ row.obj.get_service_type_display }}</td>
 
@@ -372,7 +377,7 @@
                                       action="{% url 'order_trash' row.obj.pk %}"
                                       class="inline-form trash-form">
                                     {% csrf_token %}
-                                    <input type="hidden" name="deleted_reason" class="deleted-reason-input">
+                                    <input type="hidden" name="delete_reason" class="delete-reason-input">
                                     <button type="submit" class="btn-mini btn-mini-danger">🗑</button>
                                 </form>
                             </div>
@@ -380,7 +385,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="15">
+                        <td colspan="13">
                             <div class="empty-state">No orders found.</div>
                         </td>
                     </tr>
@@ -410,7 +415,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 return false;
             }
 
-            form.querySelector(".deleted-reason-input").value = reason.trim();
+            form.querySelector(".delete-reason-input").value = reason.trim();
         });
     });
 });
