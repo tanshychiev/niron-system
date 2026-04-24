@@ -7,6 +7,7 @@ from django.db import transaction
 from django.db.models import Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.db.models import Q
 
 from orders.models import Order, OrderItem, StockConsumption
 
@@ -1149,3 +1150,23 @@ def material_usage(request):
             "total_used": total_used,
         },
     )
+
+@login_required
+@permission_required("inventory.delete_inventoryitem", raise_exception=True)
+def inventory_item_delete(request, pk):
+    item = get_object_or_404(InventoryItem, pk=pk)
+
+    # prevent delete if already used
+    used_in_batch = InventoryBatchItem.objects.filter(item=item).exists()
+    used_in_order = OrderItem.objects.filter(shirt_item=item).exists()
+
+    if used_in_batch or used_in_order:
+        messages.error(request, "Cannot delete. Item already used in stock or orders.")
+        return redirect("inventory_item_list")
+
+    if request.method == "POST":
+        item.delete()
+        messages.success(request, "Item deleted successfully.")
+        return redirect("inventory_item_list")
+
+    return render(request, "inventory/inventory_item_delete.html", {"item": item})

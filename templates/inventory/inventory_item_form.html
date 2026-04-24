@@ -45,7 +45,7 @@
 .field label{
   display:block;
   margin-bottom:6px;
-  font-weight:700;
+  font-weight:800;
   color:#111827;
 }
 
@@ -204,8 +204,24 @@
   font-weight:700;
 }
 
+.status-select{
+  font-weight:900;
+  border-radius:14px !important;
+  height:46px;
+}
+
+.status-help{
+  margin-top:7px;
+  font-size:12px;
+  color:#6b7280;
+  font-weight:700;
+}
+
 .actions{
   margin-top:20px;
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
 }
 </style>
 
@@ -289,13 +305,18 @@
 
       <div class="field">
         <label>Status</label>
-        {{ form.is_active }}
+        <select name="is_active" class="form-select status-select">
+          <option value="on" {% if form.instance.is_active %}selected{% endif %}>🟢 Active</option>
+          <option value="" {% if not form.instance.is_active %}selected{% endif %}>🔴 Inactive</option>
+        </select>
+        <div class="status-help">Inactive item will not show in Stock In.</div>
       </div>
 
       <div class="actions">
         <button type="submit" class="btn-primary">
           {{ submit_label|default:"Save Item" }}
         </button>
+        <a href="{% url 'inventory_item_list' %}" class="btn-secondary">Cancel</a>
       </div>
     </form>
   </div>
