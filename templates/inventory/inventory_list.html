@@ -1,11 +1,13 @@
 {% extends "base.html" %}
+
 {% block content %}
 <div class="inventory-page">
   <div class="inventory-head">
     <div>
       <h1>Inventory</h1>
-      <p class="sub">Visual stock overview by shirt style, color and size.</p>
+      <p class="sub">Total Cloth - In Proc = Available.</p>
     </div>
+
     <div class="head-actions">
       <a href="{% url 'inventory_item_create' %}" class="btn-dark">+ Create Item</a>
       <a href="{% url 'color_create' %}" class="btn-light">+ Create Color</a>
@@ -25,7 +27,7 @@
 
       <div class="card-grid">
         {% for card in style_group.cards %}
-          <div class="shirt-card">
+          <div class="shirt-card {% if card.available_qty < 0 %}shortage-card{% endif %}">
             <div class="shirt-card-top">
               <div class="shirt-preview-wrap">
                 <div class="shirt-preview style-{{ card.item_style }}">
@@ -60,6 +62,10 @@
               <div class="card-title-block">
                 <div class="top-meta-row">
                   <span class="item-code">{{ card.item_code }}</span>
+
+                  {% if card.available_qty < 0 %}
+                    <span class="shortage-pill">SHORTAGE</span>
+                  {% endif %}
                 </div>
 
                 <h3>{{ card.item_name }}</h3>
@@ -77,24 +83,27 @@
 
             <div class="size-wrap">
               {% for size_row in card.sizes %}
-                <div class="size-chip">
+                <div class="size-chip {% if size_row.available_qty < 0 %}shortage-size{% endif %}">
                   <div class="size-name">{{ size_row.size_name }}</div>
+
                   <div class="size-values">
-  <div class="size-line available">
-    <span class="size-label">Avail.</span>
-    <span class="size-number">{{ size_row.available_qty|floatformat:0 }}</span>
-  </div>
+                    <div class="size-line available">
+                      <span class="size-label">Avail.</span>
+                      <span class="size-number {% if size_row.available_qty < 0 %}negative-stock{% endif %}">
+                        {{ size_row.available_qty|floatformat:0 }}
+                      </span>
+                    </div>
 
-  <div class="size-line pending">
-    <span class="size-label">In Proc.</span>
-    <span class="size-number small">{{ size_row.in_progress_qty|floatformat:0 }}</span>
-  </div>
+                    <div class="size-line pending">
+                      <span class="size-label">In Proc.</span>
+                      <span class="size-number small">{{ size_row.in_progress_qty|floatformat:0 }}</span>
+                    </div>
 
-  <div class="size-line total">
-    <span class="size-label">Total</span>
-    <span class="size-number small">{{ size_row.total_qty|floatformat:0 }}</span>
-  </div>
-</div>
+                    <div class="size-line total">
+                      <span class="size-label">Total</span>
+                      <span class="size-number small">{{ size_row.total_qty|floatformat:0 }}</span>
+                    </div>
+                  </div>
                 </div>
               {% empty %}
                 <div class="empty-size">No sizes</div>
@@ -104,14 +113,18 @@
             <div class="totals-row">
               <div class="metric metric-available">
                 <div class="metric-label">Available</div>
-                <div class="metric-value">{{ card.available_qty|floatformat:0 }}</div>
+                <div class="metric-value {% if card.available_qty < 0 %}negative-stock{% endif %}">
+                  {{ card.available_qty|floatformat:0 }}
+                </div>
               </div>
+
               <div class="metric metric-progress">
-                <div class="metric-label">PROCESSING</div>
+                <div class="metric-label">In Proc.</div>
                 <div class="metric-value">{{ card.in_progress_qty|floatformat:0 }}</div>
               </div>
+
               <div class="metric metric-total">
-                <div class="metric-label">Total</div>
+                <div class="metric-label">Total Cloth</div>
                 <div class="metric-value">{{ card.total_qty|floatformat:0 }}</div>
               </div>
             </div>
@@ -144,6 +157,7 @@
               <th class="text-end">Total Cloth</th>
             </tr>
           </thead>
+
           <tbody>
             {% for batch in batches %}
               <tr>
@@ -322,6 +336,11 @@
       0 8px 20px rgba(15,23,42,.06);
   }
 
+  .shortage-card{
+    border-color:#fecaca;
+    background:linear-gradient(180deg,#ffffff,#fff5f5);
+  }
+
   .shirt-card-top{
     display:flex;
     gap:16px;
@@ -374,9 +393,11 @@
 
   .top-meta-row{
     display:flex;
-    justify-content:space-between;
+    justify-content:flex-start;
     align-items:center;
+    gap:8px;
     margin-bottom:8px;
+    flex-wrap:wrap;
   }
 
   .item-code{
@@ -392,6 +413,20 @@
     font-weight:900;
     letter-spacing:.05em;
     box-shadow:0 4px 12px rgba(15,23,42,.04);
+  }
+
+  .shortage-pill{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    padding:5px 10px;
+    border-radius:999px;
+    background:#fef2f2;
+    border:1px solid #fecaca;
+    color:#dc2626;
+    font-size:11px;
+    font-weight:900;
+    letter-spacing:.05em;
   }
 
   .card-title-block h3{
@@ -449,6 +484,11 @@
       0 6px 14px rgba(15,23,42,.04);
   }
 
+  .shortage-size{
+    border-color:#fecaca;
+    background:linear-gradient(180deg,#ffffff,#fef2f2);
+  }
+
   .size-name{
     font-size:20px;
     font-weight:900;
@@ -459,58 +499,62 @@
   }
 
   .size-values{
-  display:flex;
-  flex-direction:column;
-  gap:6px;
-}
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
 
-/* shared */
-.size-line{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-}
+  .size-line{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:10px;
+  }
 
-/* labels */
-.size-label{
-  font-size:11px;
-  font-weight:800;
-  letter-spacing:.08em;
-}
+  .size-label{
+    font-size:11px;
+    font-weight:800;
+    letter-spacing:.08em;
+  }
 
-/* main number */
-.size-number{
-  font-weight:900;
-  font-size:16px;
-}
+  .size-number{
+    font-weight:900;
+    font-size:16px;
+  }
 
-/* smaller numbers */
-.size-number.small{
-  font-size:13px;
-  font-weight:700;
-}
+  .size-number.small{
+    font-size:13px;
+    font-weight:700;
+  }
 
-/* colors */
-.size-line.available .size-label{
-  color:#16a34a; /* green */
-}
-.size-line.available .size-number{
-  color:#166534;
-}
+  .size-line.available .size-label{
+    color:#16a34a;
+  }
 
-.size-line.pending .size-label{
-  color:#f59e0b; /* orange */
-}
-.size-line.pending .size-number{
-  color:#92400e;
-}
+  .size-line.available .size-number{
+    color:#166534;
+  }
 
-.size-line.total .size-label{
-  color:#64748b; /* gray */
-}
-.size-line.total .size-number{
-  color:#334155;
-}
+  .size-line.pending .size-label{
+    color:#f59e0b;
+  }
+
+  .size-line.pending .size-number{
+    color:#92400e;
+  }
+
+  .size-line.total .size-label{
+    color:#64748b;
+  }
+
+  .size-line.total .size-number{
+    color:#334155;
+  }
+
+  .negative-stock{
+    color:#dc2626 !important;
+    font-weight:900;
+  }
 
   .empty-size{
     color:#94a3b8;
