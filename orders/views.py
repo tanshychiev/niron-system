@@ -22,7 +22,7 @@ from .models import (
     OrderItem,
     OrderProgress,
 )
-from .services import deduct_stock_for_order
+from .services import deduct_stock_for_order, restore_stock_for_order
 
 
 def _stringify(value):
@@ -901,14 +901,8 @@ def production_update(request, pk):
                 messages.warning(request, "Order already cancelled.")
                 return redirect("production_detail", pk=order.pk)
 
-            for item in order.items.select_related("shirt_item", "film_item").all():
-                if item.shirt_item and item.quantity:
-                    item.shirt_item.quantity = Decimal(item.shirt_item.quantity or 0) + Decimal(item.quantity or 0)
-                    item.shirt_item.save(update_fields=["quantity"])
-
-                if item.film_item and item.film_meter:
-                    item.film_item.quantity = Decimal(item.film_item.quantity or 0) + Decimal(item.film_meter or 0)
-                    item.film_item.save(update_fields=["quantity"])
+            if order.stock_deducted:
+                restore_stock_for_order(order)
 
             order.status = cancel_status
             order.save(update_fields=["status"])
@@ -920,10 +914,10 @@ def production_update(request, pk):
                 old_value="",
                 new_value=cancel_status,
                 user=request.user,
-                remark="Order cancelled and inventory returned",
+                remark="Order cancelled and stock returned",
             )
 
-            messages.success(request, "Order cancelled and inventory returned.")
+            messages.success(request, "Order cancelled and stock returned.")
             return redirect("production_detail", pk=order.pk)
 
         if request.POST.get("complete_all"):
@@ -988,7 +982,6 @@ def production_update(request, pk):
         messages.success(request, "Production progress updated.")
 
     return redirect("production_detail", pk=order.pk)
-
 @login_required
 @permission_required("orders.view_order", raise_exception=True)
 def order_invoice(request, pk):
