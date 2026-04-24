@@ -510,6 +510,33 @@
         background: white;
         box-shadow: 0 20px 60px rgba(0,0,0,.28);
     }
+    .design-drop-zone {
+        border: 2px dashed #E0C78A;
+        background: #FFF9E8;
+        border-radius: 18px;
+        padding: 18px;
+        text-align: center;
+        cursor: pointer;
+        transition: .2s ease;
+    }
+
+    .design-drop-zone:hover,
+    .design-drop-zone.drag-over {
+        background: #FFF2C7;
+        border-color: #F59E0B;
+    }
+
+    .design-drop-title {
+        font-size: 14px;
+        font-weight: 800;
+        color: var(--text);
+    }
+
+    .design-drop-sub {
+        margin-top: 6px;
+        font-size: 12px;
+        color: var(--muted);
+    }
 
     @media (max-width: 1280px) {
         .customer-row-grid {
@@ -866,8 +893,11 @@
                         <div class="design-row-grid">
                             <div class="field design-upload-field">
                                 <label>Upload Design Images</label>
-                                <input type="file" name="design-0-design_files" class="form-control design-file-input" accept="image/*" multiple>
-                                <small>You can upload images for this design only.</small>
+                                <div class="design-drop-zone">
+    <div class="design-drop-title">Drag image here or Ctrl + V screenshot</div>
+    <div class="design-drop-sub">Click to choose file also works</div>
+    <input type="file" name="design-0-design_files" class="form-control design-file-input" accept="image/*" multiple hidden>
+</div>
                             </div>
 
                             <div class="field">
@@ -1267,6 +1297,32 @@ document.addEventListener("DOMContentLoaded", function () {
         fileInput.files = dt.files;
     }
 
+    function addFilesToDesign(designBlock, files) {
+        if (!designBlock || !files) return;
+
+        const key = ensureDesignStore(designBlock);
+        const arr = designFileStore.get(key) || [];
+
+        Array.from(files || []).forEach(file => {
+            if (!file.type || !file.type.startsWith("image/")) return;
+
+            const duplicate = arr.some(
+                oldFile =>
+                    oldFile.name === file.name &&
+                    oldFile.size === file.size &&
+                    oldFile.lastModified === file.lastModified
+            );
+
+            if (!duplicate) {
+                arr.push(file);
+            }
+        });
+
+        designFileStore.set(key, arr);
+        rebuildDesignInputFiles(designBlock);
+        renderDesignPreview(designBlock);
+    }
+
     function renderDesignPreview(designBlock) {
         const previewGrid = designBlock.querySelector(".design-preview-grid");
         if (!previewGrid) return;
@@ -1280,6 +1336,7 @@ document.addEventListener("DOMContentLoaded", function () {
             if (!file.type.startsWith("image/")) return;
 
             const reader = new FileReader();
+
             reader.onload = function (e) {
                 const box = document.createElement("div");
                 box.className = "preview-card new-upload-card";
@@ -1292,6 +1349,7 @@ document.addEventListener("DOMContentLoaded", function () {
                         <button type="button" class="preview-remove" data-index="${index}">Remove</button>
                     </div>
                 `;
+
                 previewGrid.appendChild(box);
 
                 const openBtn = box.querySelector(".preview-open-btn");
@@ -1312,6 +1370,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     });
                 }
             };
+
             reader.readAsDataURL(file);
         });
     }
@@ -1360,6 +1419,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
             row.querySelectorAll("input, select, textarea").forEach(el => {
                 if (!el.name) return;
+
                 el.name = el.name.replace(
                     /design-\d+-item-\d+-/g,
                     `design-${designIndex}-item-${itemIndex}-`
@@ -1429,6 +1489,7 @@ document.addEventListener("DOMContentLoaded", function () {
         });
 
         const removeBtn = row.querySelector(".remove-row-btn");
+
         if (removeBtn) {
             removeBtn.addEventListener("click", function () {
                 const designBlock = row.closest(".design-block");
@@ -1482,31 +1543,35 @@ document.addEventListener("DOMContentLoaded", function () {
 
     function bindDesignFileInput(designBlock) {
         const fileInput = designBlock.querySelector(".design-file-input");
+        const dropZone = designBlock.querySelector(".design-drop-zone");
+
         if (!fileInput) return;
 
-        const key = ensureDesignStore(designBlock);
+        ensureDesignStore(designBlock);
 
         fileInput.addEventListener("change", function () {
-            const arr = designFileStore.get(key) || [];
+            addFilesToDesign(designBlock, fileInput.files);
+        });
 
-            Array.from(fileInput.files || []).forEach(file => {
-                if (!file.type.startsWith("image/")) return;
+        if (!dropZone) return;
 
-                const duplicate = arr.some(
-                    oldFile =>
-                        oldFile.name === file.name &&
-                        oldFile.size === file.size &&
-                        oldFile.lastModified === file.lastModified
-                );
+        dropZone.addEventListener("click", function () {
+            fileInput.click();
+        });
 
-                if (!duplicate) {
-                    arr.push(file);
-                }
-            });
+        dropZone.addEventListener("dragover", function (e) {
+            e.preventDefault();
+            dropZone.classList.add("drag-over");
+        });
 
-            designFileStore.set(key, arr);
-            rebuildDesignInputFiles(designBlock);
-            renderDesignPreview(designBlock);
+        dropZone.addEventListener("dragleave", function () {
+            dropZone.classList.remove("drag-over");
+        });
+
+        dropZone.addEventListener("drop", function (e) {
+            e.preventDefault();
+            dropZone.classList.remove("drag-over");
+            addFilesToDesign(designBlock, e.dataTransfer.files);
         });
     }
 
@@ -1599,6 +1664,37 @@ document.addEventListener("DOMContentLoaded", function () {
             updateTotals();
         });
     }
+
+    document.addEventListener("paste", function (e) {
+        const items = e.clipboardData?.items || [];
+        const files = [];
+
+        Array.from(items).forEach((item, index) => {
+            if (item.type && item.type.startsWith("image/")) {
+                const blob = item.getAsFile();
+
+                if (blob) {
+                    const file = new File(
+                        [blob],
+                        `pasted-screenshot-${Date.now()}-${index}.png`,
+                        { type: blob.type || "image/png" }
+                    );
+
+                    files.push(file);
+                }
+            }
+        });
+
+        if (!files.length) return;
+
+        const focusedDesign = document.activeElement?.closest?.(".design-block");
+        const visibleDesigns = getVisibleDesigns();
+        const targetDesign = focusedDesign || visibleDesigns[visibleDesigns.length - 1];
+
+        if (!targetDesign) return;
+
+        addFilesToDesign(targetDesign, files);
+    });
 
     document.querySelectorAll(".design-block").forEach(bindDesignEvents);
 

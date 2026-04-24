@@ -896,10 +896,34 @@ def production_update(request, pk):
     if request.method == "POST":
         if request.POST.get("cancel_order"):
             cancel_status = _get_cancel_status()
+
+            if order.status == cancel_status:
+                messages.warning(request, "Order already cancelled.")
+                return redirect("production_detail", pk=order.pk)
+
+            for item in order.items.select_related("shirt_item", "film_item").all():
+                if item.shirt_item and item.quantity:
+                    item.shirt_item.quantity = Decimal(item.shirt_item.quantity or 0) + Decimal(item.quantity or 0)
+                    item.shirt_item.save(update_fields=["quantity"])
+
+                if item.film_item and item.film_meter:
+                    item.film_item.quantity = Decimal(item.film_item.quantity or 0) + Decimal(item.film_meter or 0)
+                    item.film_item.save(update_fields=["quantity"])
+
             order.status = cancel_status
             order.save(update_fields=["status"])
 
-            messages.success(request, "Order marked as CANCEL.")
+            _log_order_history(
+                order=order,
+                action=OrderHistory.ACTION_EDIT,
+                field_name="status",
+                old_value="",
+                new_value=cancel_status,
+                user=request.user,
+                remark="Order cancelled and inventory returned",
+            )
+
+            messages.success(request, "Order cancelled and inventory returned.")
             return redirect("production_detail", pk=order.pk)
 
         if request.POST.get("complete_all"):
@@ -964,7 +988,6 @@ def production_update(request, pk):
         messages.success(request, "Production progress updated.")
 
     return redirect("production_detail", pk=order.pk)
-
 
 @login_required
 @permission_required("orders.view_order", raise_exception=True)
