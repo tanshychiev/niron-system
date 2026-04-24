@@ -282,7 +282,6 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
                 remark=design_data["remark"],
                 sort_order=next_sort_order,
             )
-
             _log_order_history(
                 order=order,
                 action=OrderHistory.ACTION_DESIGN_ADD,
@@ -297,21 +296,6 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
             design.remark = design_data["remark"]
             design.sort_order = next_sort_order
             design.save(update_fields=["name", "remark", "sort_order"])
-
-            after_design = _snapshot_design(design)
-
-            for key, old_val in before_design.items():
-                new_val = after_design.get(key)
-                if _stringify(old_val) != _stringify(new_val):
-                    _log_order_history(
-                        order=order,
-                        action=OrderHistory.ACTION_EDIT,
-                        field_name=f"design#{design.pk}.{key}",
-                        old_value=old_val,
-                        new_value=new_val,
-                        user=user,
-                        remark=f"Design updated: {design.display_name}",
-                    )
 
         kept_design_ids.add(str(design.pk))
         next_sort_order += 1
@@ -367,7 +351,6 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
                     unit_price=item_data["unit_price"],
                     film_meter=item_data["film_meter"],
                 )
-
                 _log_order_history(
                     order=order,
                     action=OrderHistory.ACTION_ITEM_ADD,
@@ -391,7 +374,6 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
                 item.save()
 
                 new_item_data = _snapshot_item(item)
-
                 for key, old_val in old_item_data.items():
                     new_val = new_item_data.get(key)
                     if _stringify(old_val) != _stringify(new_val):
@@ -416,57 +398,19 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
                 design=design,
                 image=f,
             )
-
-            _log_order_history(
-                order=order,
-                action=OrderHistory.ACTION_DESIGN_ADD,
-                field_name="design_file",
-                old_value="",
-                new_value=f.name,
-                user=user,
-                remark=f"Design file uploaded in {design.display_name}",
-            )
-
             has_item_or_file = True
 
         if not has_item_or_file:
-            _log_order_history(
-                order=order,
-                action=OrderHistory.ACTION_ITEM_DELETE,
-                field_name=f"design#{design.pk}",
-                old_value=_snapshot_design(design),
-                new_value="",
-                user=user,
-                remark=f"Empty design removed: {design.display_name}",
-            )
             design.delete()
             kept_design_ids.discard(str(design.pk))
 
     if is_edit:
         for item in list(order.items.all()):
             if str(item.pk) not in kept_item_ids:
-                _log_order_history(
-                    order=order,
-                    action=OrderHistory.ACTION_ITEM_DELETE,
-                    field_name=f"item#{item.pk}",
-                    old_value=_snapshot_item(item),
-                    new_value="",
-                    user=user,
-                    remark="Item removed during edit sync",
-                )
                 item.delete()
 
         for design in list(order.designs.all()):
             if str(design.pk) not in kept_design_ids:
-                _log_order_history(
-                    order=order,
-                    action=OrderHistory.ACTION_ITEM_DELETE,
-                    field_name=f"design#{design.pk}",
-                    old_value=_snapshot_design(design),
-                    new_value="",
-                    user=user,
-                    remark="Design removed during edit sync",
-                )
                 design.delete()
 
     return total_amount, total_pcs
@@ -494,8 +438,16 @@ def order_list(request):
     order_type = (request.GET.get("order_type") or "").strip()
     created_date_from = (request.GET.get("created_date_from") or "").strip()
     created_date_to = (request.GET.get("created_date_to") or "").strip()
+    show_trash = request.GET.get("trash") == "1"
 
-    qs = Order.objects.all().prefetch_related("items").order_by("-created_at", "-id")
+    qs = Order.objects.all().prefetch_related("items")
+
+    if show_trash:
+        qs = qs.filter(is_deleted=True)
+    else:
+        qs = qs.filter(is_deleted=False)
+
+    qs = qs.order_by("-created_at", "-id")
 
     if keyword:
         qs = qs.filter(
@@ -520,26 +472,19 @@ def order_list(request):
 
     rows = []
     total_orders = qs.count()
-    pending_count = qs.filter(status=Order.STATUS_PENDING).count() if hasattr(Order, "STATUS_PENDING") else 0
-    done_count = qs.filter(status=Order.STATUS_DONE).count() if hasattr(Order, "STATUS_DONE") else 0
+    pending_count = qs.filter(status=Order.STATUS_PENDING).count()
+    done_count = qs.filter(status=Order.STATUS_DONE).count()
 
     now = timezone.now()
 
     for order in qs:
         cloth_qty, film_meter = _get_order_totals_by_service(order)
-
         total_amount = Decimal(order.total_amount or 0)
         paid_amount = Decimal(order.paid_amount or 0)
         deposit_amount = Decimal(order.deposit_amount or 0)
         balance_amount = total_amount - deposit_amount - paid_amount
 
-        is_late = False
-
-        if order.deadline:
-            if hasattr(Order, "STATUS_DONE") and order.status != Order.STATUS_DONE:
-                is_late = order.deadline < now
-            elif not hasattr(Order, "STATUS_DONE"):
-                is_late = order.deadline < now
+        is_late = bool(order.deadline and order.status != Order.STATUS_DONE and order.deadline < now)
 
         rows.append(
             {
@@ -558,6 +503,7 @@ def order_list(request):
         "order_type": order_type,
         "created_date_from": created_date_from,
         "created_date_to": created_date_to,
+        "show_trash": show_trash,
         "total_orders": total_orders,
         "pending_count": pending_count,
         "done_count": done_count,
@@ -580,7 +526,7 @@ def production_list(request):
         data["sort"] = ProductionFilterForm.SORT_DEADLINE_ASC
 
     form = ProductionFilterForm(data)
-    qs = Order.objects.all().prefetch_related("items")
+    qs = Order.objects.filter(is_deleted=False).prefetch_related("items")
 
     if form.is_valid():
         keyword = (form.cleaned_data.get("q") or "").strip()
@@ -589,17 +535,12 @@ def production_list(request):
         sort = form.cleaned_data.get("sort") or ProductionFilterForm.SORT_DEADLINE_ASC
 
         if keyword:
-            qs = qs.filter(
-                Q(customer_name__icontains=keyword)
-                | Q(order_no__icontains=keyword)
-            )
+            qs = qs.filter(Q(customer_name__icontains=keyword) | Q(order_no__icontains=keyword))
 
         cancel_status = _get_cancel_status()
 
         if status == ProductionFilterForm.STATUS_ACTIVE:
-            qs = qs.filter(
-                status__in=[Order.STATUS_PENDING, Order.STATUS_PROCESSING]
-            )
+            qs = qs.filter(status__in=[Order.STATUS_PENDING, Order.STATUS_PROCESSING])
         elif status == ProductionFilterForm.STATUS_DONE:
             qs = qs.filter(status=Order.STATUS_DONE)
         elif status == ProductionFilterForm.STATUS_CANCEL:
@@ -617,17 +558,11 @@ def production_list(request):
         else:
             qs = qs.order_by("deadline", "id")
     else:
-        qs = qs.filter(
-            status__in=[Order.STATUS_PENDING, Order.STATUS_PROCESSING]
-        ).order_by("deadline", "id")
+        qs = qs.filter(status__in=[Order.STATUS_PENDING, Order.STATUS_PROCESSING]).order_by("deadline", "id")
 
-    summary_totals = qs.aggregate(
-        total_pcs_sum=Sum("total_pcs"),
-        done_pcs_sum=Sum("done_pcs"),
-    )
+    summary_totals = qs.aggregate(total_pcs_sum=Sum("total_pcs"), done_pcs_sum=Sum("done_pcs"))
 
     total_project_pending = qs.count()
-
     total_pcs_sum = Decimal(summary_totals["total_pcs_sum"] or 0)
     done_pcs_sum = Decimal(summary_totals["done_pcs_sum"] or 0)
 
@@ -638,25 +573,20 @@ def production_list(request):
         total_cloth_pending = Decimal("0")
 
     paginator = Paginator(qs, 50)
-    page_number = request.GET.get("page")
-    page_obj = paginator.get_page(page_number)
-
+    page_obj = paginator.get_page(request.GET.get("page"))
     start_no = (page_obj.number - 1) * paginator.per_page
 
     rows = []
 
     for idx, order in enumerate(page_obj.object_list, start=1):
-        total_qty = Decimal(order.total_pcs or 0)
-        done_qty = Decimal(order.done_pcs or 0)
-
         rows.append(
             {
                 "no": start_no + idx,
                 "order": order,
                 "countdown_text": _format_countdown(order.deadline),
                 "status_color": _status_badge(order.status),
-                "total_qty": total_qty,
-                "done_qty": done_qty,
+                "total_qty": Decimal(order.total_pcs or 0),
+                "done_qty": Decimal(order.done_pcs or 0),
             }
         )
 
@@ -675,97 +605,51 @@ def production_list(request):
         },
     )
 
+
 @login_required
 @permission_required("orders.view_order", raise_exception=True)
 def order_list_export_excel(request):
-    keyword = (request.GET.get("keyword") or "").strip()
-    status = (request.GET.get("status") or "").strip()
-    order_type = (request.GET.get("order_type") or "").strip()
-    created_date_from = (request.GET.get("created_date_from") or "").strip()
-    created_date_to = (request.GET.get("created_date_to") or "").strip()
-
-    qs = Order.objects.all().prefetch_related("items").order_by("-created_at", "-id")
-
-    if keyword:
-        qs = qs.filter(
-            Q(order_no__icontains=keyword)
-            | Q(customer_name__icontains=keyword)
-            | Q(phone__icontains=keyword)
-            | Q(customer_location__icontains=keyword)
-            | Q(remark__icontains=keyword)
-        )
-
-    if status:
-        qs = qs.filter(status=status)
-
-    if order_type:
-        qs = qs.filter(order_type=order_type)
-
-    if created_date_from:
-        qs = qs.filter(created_at__date__gte=created_date_from)
-
-    if created_date_to:
-        qs = qs.filter(created_at__date__lte=created_date_to)
+    qs = Order.objects.filter(is_deleted=False).prefetch_related("items").order_by("-created_at", "-id")
 
     wb = Workbook()
     ws = wb.active
     ws.title = "Orders"
 
-    headers = [
-        "Order No",
-        "Created At",
-        "Customer",
-        "Phone",
-        "Location",
-        "Order Type",
-        "Service Type",
-        "Status",
-        "Cloth Qty",
-        "Film Meter",
-        "Total Amount",
-        "Deposit Amount",
-        "Paid Amount",
-        "Balance",
-        "Deadline",
-        "Remark",
-    ]
-    ws.append(headers)
+    ws.append([
+        "Order No", "Created At", "Customer", "Phone", "Location",
+        "Order Type", "Service Type", "Status", "Cloth Qty", "Film Meter",
+        "Total Amount", "Deposit Amount", "Paid Amount", "Balance", "Deadline", "Remark",
+    ])
 
     for order in qs:
         cloth_qty, film_meter = _get_order_totals_by_service(order)
-
         total_amount = Decimal(order.total_amount or 0)
         deposit_amount = Decimal(order.deposit_amount or 0)
         paid_amount = Decimal(order.paid_amount or 0)
         balance_amount = total_amount - deposit_amount - paid_amount
 
-        ws.append(
-            [
-                order.order_no,
-                order.created_at.strftime("%Y-%m-%d %H:%M") if order.created_at else "",
-                order.customer_name or "",
-                order.phone or "",
-                order.customer_location or "",
-                getattr(order, "get_order_type_display", lambda: order.order_type)(),
-                getattr(order, "get_service_type_display", lambda: order.service_type)(),
-                getattr(order, "get_status_display", lambda: order.status)(),
-                float(cloth_qty),
-                float(film_meter),
-                float(total_amount),
-                float(deposit_amount),
-                float(paid_amount),
-                float(balance_amount),
-                order.deadline.strftime("%Y-%m-%d %H:%M") if order.deadline else "",
-                order.remark or "",
-            ]
-        )
+        ws.append([
+            order.order_no,
+            order.created_at.strftime("%Y-%m-%d %H:%M") if order.created_at else "",
+            order.customer_name or "",
+            order.phone or "",
+            order.customer_location or "",
+            order.get_order_type_display(),
+            order.get_service_type_display(),
+            order.get_status_display(),
+            float(cloth_qty),
+            float(film_meter),
+            float(total_amount),
+            float(deposit_amount),
+            float(paid_amount),
+            float(balance_amount),
+            order.deadline.strftime("%Y-%m-%d %H:%M") if order.deadline else "",
+            order.remark or "",
+        ])
 
-    response = HttpResponse(
-        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
+    response = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     response["Content-Disposition"] = 'attachment; filename="orders_filtered.xlsx"'
     wb.save(response)
-
     return response
 
 
@@ -802,16 +686,10 @@ def order_create(request):
                 order.total_pcs = total_pcs
                 order.done_pcs = Decimal("0")
                 order.status = Order.STATUS_PENDING
-                order.save(
-                    update_fields=[
-                        "total_amount",
-                        "deposit_amount",
-                        "paid_amount",
-                        "total_pcs",
-                        "done_pcs",
-                        "status",
-                    ]
-                )
+                order.save(update_fields=[
+                    "total_amount", "deposit_amount", "paid_amount",
+                    "total_pcs", "done_pcs", "status",
+                ])
 
                 _log_order_history(
                     order=order,
@@ -828,15 +706,8 @@ def order_create(request):
                 messages.success(request, f"Order {order.order_no} created successfully.")
 
                 if unresolved:
-                    shortage_text = ", ".join(
-                        f"{row['label']} short {row['shortage']}"
-                        for row in unresolved
-                    )
-
-                    messages.warning(
-                        request,
-                        f"Order created, but stock is lacking: {shortage_text}",
-                    )
+                    shortage_text = ", ".join(f"{row['label']} short {row['shortage']}" for row in unresolved)
+                    messages.warning(request, f"Order created, but stock is lacking: {shortage_text}")
 
                 return redirect("order_detail", pk=order.pk)
 
@@ -847,14 +718,16 @@ def order_create(request):
     else:
         form = OrderForm()
 
-    context = {
-        "form": form,
-        "is_edit": False,
-        "submit_label": "Save Order",
-        **_order_form_context_base(),
-    }
-
-    return render(request, "orders/order_form.html", context)
+    return render(
+        request,
+        "orders/order_form.html",
+        {
+            "form": form,
+            "is_edit": False,
+            "submit_label": "Save Order",
+            **_order_form_context_base(),
+        },
+    )
 
 
 @login_required
@@ -867,7 +740,7 @@ def order_detail(request, pk):
 @login_required
 @permission_required("orders.view_order", raise_exception=True)
 def production_detail(request, pk):
-    order = get_object_or_404(_get_prefetched_order_queryset(), pk=pk)
+    order = get_object_or_404(_get_prefetched_order_queryset(), pk=pk, is_deleted=False)
 
     remaining_pcs = Decimal(order.total_pcs or 0) - Decimal(order.done_pcs or 0)
 
@@ -888,10 +761,7 @@ def production_detail(request, pk):
 @permission_required("orders.change_order", raise_exception=True)
 @transaction.atomic
 def production_update(request, pk):
-    order = get_object_or_404(
-        Order.objects.prefetch_related("items", "designs__items"),
-        pk=pk,
-    )
+    order = get_object_or_404(Order.objects.prefetch_related("items", "designs__items"), pk=pk, is_deleted=False)
 
     if request.method == "POST":
         if request.POST.get("cancel_order"):
@@ -906,16 +776,6 @@ def production_update(request, pk):
 
             order.status = cancel_status
             order.save(update_fields=["status"])
-
-            _log_order_history(
-                order=order,
-                action=OrderHistory.ACTION_EDIT,
-                field_name="status",
-                old_value="",
-                new_value=cancel_status,
-                user=request.user,
-                remark="Order cancelled and stock returned",
-            )
 
             messages.success(request, "Order cancelled and stock returned.")
             return redirect("production_detail", pk=order.pk)
@@ -956,12 +816,7 @@ def production_update(request, pk):
             messages.error(request, "Done qty cannot be greater than ordered qty.")
             return redirect("production_detail", pk=order.pk)
 
-        OrderProgress.objects.create(
-            order=order,
-            order_item=order_item,
-            qty_done=qty_done,
-            remark=remark,
-        )
+        OrderProgress.objects.create(order=order, order_item=order_item, qty_done=qty_done, remark=remark)
 
         order_item.done_qty = Decimal(order_item.done_qty or 0) + qty_done
         order_item.save(update_fields=["done_qty"])
@@ -978,10 +833,11 @@ def production_update(request, pk):
             order.status = Order.STATUS_PENDING
 
         order.save(update_fields=["done_pcs", "status"])
-
         messages.success(request, "Production progress updated.")
 
     return redirect("production_detail", pk=order.pk)
+
+
 @login_required
 @permission_required("orders.view_order", raise_exception=True)
 def order_invoice(request, pk):
@@ -993,22 +849,14 @@ def order_invoice(request, pk):
 @permission_required("orders.view_order", raise_exception=True)
 def order_invoice_pdf(request, pk):
     order = get_object_or_404(_get_prefetched_order_queryset(), pk=pk)
-
-    return render(
-        request,
-        "orders/order_invoice_pdf.html",
-        {
-            "order": order,
-            "print_mode": True,
-        },
-    )
+    return render(request, "orders/order_invoice_pdf.html", {"order": order, "print_mode": True})
 
 
 @login_required
 @permission_required("orders.change_order", raise_exception=True)
 @transaction.atomic
 def order_edit(request, pk):
-    order = get_object_or_404(_get_prefetched_order_queryset(), pk=pk)
+    order = get_object_or_404(_get_prefetched_order_queryset(), pk=pk, is_deleted=False)
 
     if request.method == "POST":
         before_order = _snapshot_order(order)
@@ -1048,23 +896,11 @@ def order_edit(request, pk):
                 else:
                     order.status = Order.STATUS_PENDING
 
-                order.save(
-                    update_fields=[
-                        "order_type",
-                        "service_type",
-                        "customer_name",
-                        "phone",
-                        "customer_location",
-                        "deadline",
-                        "remark",
-                        "total_amount",
-                        "deposit_amount",
-                        "paid_amount",
-                        "total_pcs",
-                        "done_pcs",
-                        "status",
-                    ]
-                )
+                order.save(update_fields=[
+                    "order_type", "service_type", "customer_name", "phone",
+                    "customer_location", "deadline", "remark", "total_amount",
+                    "deposit_amount", "paid_amount", "total_pcs", "done_pcs", "status",
+                ])
 
                 after_order = _snapshot_order(order)
                 _log_order_changes(order, before_order, after_order, request.user)
@@ -1081,12 +917,84 @@ def order_edit(request, pk):
         form.fields["discount_amount"].initial = Decimal("0")
         form.fields["shipping_fee"].initial = Decimal("0")
 
-    context = {
-        "form": form,
-        "is_edit": True,
-        "submit_label": "Update Order",
-        "order": order,
-        **_order_form_context_base(),
-    }
+    return render(
+        request,
+        "orders/order_form.html",
+        {
+            "form": form,
+            "is_edit": True,
+            "submit_label": "Update Order",
+            "order": order,
+            **_order_form_context_base(),
+        },
+    )
 
-    return render(request, "orders/order_form.html", context)
+
+@login_required
+@permission_required("orders.delete_order", raise_exception=True)
+@transaction.atomic
+def order_trash(request, pk):
+    order = get_object_or_404(Order, pk=pk, is_deleted=False)
+
+    if request.method == "POST":
+        if order.stock_deducted:
+            restore_stock_for_order(order)
+
+        order.is_deleted = True
+        order.deleted_at = timezone.now()
+        order.save(update_fields=["is_deleted", "deleted_at"])
+
+        messages.success(request, f"Order {order.order_no} moved to trash.")
+        return redirect("order_trash_list")
+
+    return redirect("order_detail", pk=order.pk)
+
+
+@login_required
+@permission_required("orders.change_order", raise_exception=True)
+@transaction.atomic
+def order_restore(request, pk):
+    order = get_object_or_404(Order, pk=pk, is_deleted=True)
+
+    if request.method == "POST":
+        order.is_deleted = False
+        order.deleted_at = None
+        order.save(update_fields=["is_deleted", "deleted_at"])
+
+        deduct_stock_for_order(order, allow_shortage=True)
+
+        messages.success(request, f"Order {order.order_no} restored.")
+        return redirect("order_detail", pk=order.pk)
+
+    return redirect("order_trash_list")
+@login_required
+@permission_required("orders.view_order", raise_exception=True)
+def order_trash_list(request):
+    qs = (
+        Order.objects.filter(is_deleted=True)
+        .select_related("deleted_by")
+        .prefetch_related("items")
+        .order_by("-deleted_at", "-id")
+    )
+
+    rows = []
+
+    for order in qs:
+        cloth_qty, film_meter = _get_order_totals_by_service(order)
+
+        rows.append(
+            {
+                "obj": order,
+                "cloth_qty": cloth_qty,
+                "film_meter": film_meter,
+            }
+        )
+
+    return render(
+        request,
+        "orders/order_trash_list.html",
+        {
+            "rows": rows,
+            "total_orders": qs.count(),
+        },
+    )

@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block title %}Trash Orders{% endblock %}
+{% block page_title %}Trash Orders{% endblock %}
+{% block page_subtitle %}Deleted orders with reason and restore function{% endblock %}
+
+{% block top_actions %}
+<a href="{% url 'order_list' %}" class="btn btn-light">← Back to Orders</a>
+{% endblock %}
+
+{% block content %}
+<div class="table-card">
+    <div style="padding:16px; font-weight:800;">
+        Total Trash: {{ total_orders }}
+    </div>
+
+    <div class="table-wrap">
+        <table class="orders-table">
+            <thead>
+                <tr>
+                    <th>Order No</th>
+                    <th>Customer</th>
+                    <th>Phone</th>
+                    <th>Cloth</th>
+                    <th>Film</th>
+                    <th>Reason</th>
+                    <th>Deleted By</th>
+                    <th>Deleted At</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for row in rows %}
+                <tr>
+                    <td>{{ row.obj.order_no }}</td>
+                    <td>{{ row.obj.customer_name|default:"-" }}</td>
+                    <td>{{ row.obj.phone|default:"-" }}</td>
+                    <td>{{ row.cloth_qty }}</td>
+                    <td>{{ row.film_meter }}</td>
+                    <td>{{ row.obj.deleted_reason|default:"-" }}</td>
+                    <td>{{ row.obj.deleted_by|default:"-" }}</td>
+                    <td>{{ row.obj.deleted_at|date:"Y-m-d H:i"|default:"-" }}</td>
+                    <td>
+                        <form method="post"
+                              action="{% url 'order_restore' row.obj.pk %}"
+                              onsubmit="return confirm('Restore this order? Stock will deduct again.');">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-primary">Restore</button>
+                        </form>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="9" style="text-align:center; padding:30px;">
+                        Trash is empty.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<style>
+.table-card {
+    background: rgba(255,255,255,.94);
+    border: 1px solid var(--line);
+    border-radius: 22px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+}
+
+.table-wrap {
+    overflow-x: auto;
+}
+
+.orders-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 1000px;
+}
+
+.orders-table th,
+.orders-table td {
+    padding: 13px 12px;
+    border-bottom: 1px solid var(--line);
+    text-align: left;
+    font-size: 14px;
+}
+
+.orders-table th {
+    background: #faf8f2;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+</style>
+{% endblock %}

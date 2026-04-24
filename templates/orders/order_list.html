@@ -2,362 +2,417 @@
 
 {% block title %}Orders{% endblock %}
 {% block page_title %}Orders{% endblock %}
-{% block page_subtitle %}Manage orders, payments and production deadlines{% endblock %}
+{% block page_subtitle %}Manage customer orders{% endblock %}
 
 {% block top_actions %}
 <a href="{% url 'order_create' %}" class="btn btn-primary">Create Order</a>
+<a href="{% url 'order_trash_list' %}" class="btn btn-light">🗑 Trash</a>
+<a href="{% url 'order_list_export_excel' %}" class="btn btn-light">Export Excel</a>
 {% endblock %}
 
 {% block content %}
 <style>
-    .kpi-grid {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 18px;
-        margin-bottom: 22px;
+    .orders-shell {
+        max-width: 1550px;
+        margin: 0 auto;
     }
 
-    .kpi-card,
-    .list-card,
-    .filter-card {
-        background: rgba(255,255,255,.90);
+    .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+        margin-bottom: 18px;
+    }
+
+    .summary-card {
+        background: rgba(255,255,255,.94);
         border: 1px solid var(--line);
-        border-radius: 24px;
+        border-radius: 20px;
+        padding: 18px;
         box-shadow: var(--shadow);
     }
 
-    .kpi-card {
-        padding: 20px 22px;
-    }
-
-    .kpi-label {
+    .summary-label {
         font-size: 12px;
         font-weight: 800;
         color: var(--muted);
         text-transform: uppercase;
         letter-spacing: .8px;
-        margin-bottom: 8px;
     }
 
-    .kpi-value {
-        font-size: 30px;
+    .summary-value {
+        margin-top: 8px;
+        font-size: 28px;
         font-weight: 900;
-        letter-spacing: -.8px;
         color: var(--text);
     }
 
-    .filter-card,
-    .list-card {
-        padding: 22px;
-        margin-bottom: 22px;
+    .filter-card {
+        background: rgba(255,255,255,.94);
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        padding: 18px;
+        box-shadow: var(--shadow);
+        margin-bottom: 18px;
     }
 
     .filter-grid {
         display: grid;
-        grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr auto auto;
-        gap: 14px;
+        grid-template-columns: 1.3fr .8fr .8fr .8fr .8fr auto;
+        gap: 12px;
         align-items: end;
     }
 
     .field label {
         display: block;
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 800;
         color: var(--muted);
         text-transform: uppercase;
         letter-spacing: .8px;
-        margin-bottom: 8px;
+        margin-bottom: 7px;
     }
 
-    .list-head {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: 12px;
-        margin-bottom: 16px;
-        flex-wrap: wrap;
+    .field input,
+    .field select {
+        width: 100%;
+        height: 42px;
+        border-radius: 12px;
     }
 
-    .list-title {
-        margin: 0;
-        font-size: 20px;
-        font-weight: 900;
-        color: var(--text);
-    }
-
-    .list-subtitle {
-        margin-top: 6px;
-        color: var(--muted);
-        font-size: 13px;
+    .table-card {
+        background: rgba(255,255,255,.94);
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        box-shadow: var(--shadow);
+        overflow: hidden;
     }
 
     .table-wrap {
         overflow-x: auto;
     }
 
-    .order-table {
+    .orders-table {
         width: 100%;
         border-collapse: collapse;
-        min-width: 1380px;
+        min-width: 1450px;
     }
 
-    .order-table th,
-    .order-table td {
-        padding: 14px 10px;
+    .orders-table th,
+    .orders-table td {
+        padding: 13px 12px;
         border-bottom: 1px solid var(--line);
         text-align: left;
         vertical-align: middle;
         font-size: 14px;
     }
 
-    .order-table th {
-        font-size: 12px;
-        font-weight: 800;
+    .orders-table th {
+        font-size: 11px;
+        font-weight: 900;
+        color: var(--muted);
         text-transform: uppercase;
         letter-spacing: .8px;
-        color: var(--muted);
-    }
-
-    .order-link {
-        font-weight: 800;
-        text-decoration: none;
-    }
-
-    .status-badge {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        padding: 6px 10px;
-        border-radius: 999px;
-        font-size: 12px;
-        font-weight: 800;
-        border: 1px solid transparent;
+        background: #faf8f2;
         white-space: nowrap;
     }
 
+    .orders-table tr:hover td {
+        background: #fffaf0;
+    }
+
+    .order-link {
+        font-weight: 900;
+        color: var(--text);
+        text-decoration: none;
+    }
+
+    .order-link:hover {
+        text-decoration: underline;
+    }
+
+    .status-pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 88px;
+        padding: 7px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 900;
+    }
+
     .status-pending {
-        background: #FFF7E8;
-        color: #B54708;
-        border-color: #F7D08A;
+        background: #fff7ed;
+        color: #d97706;
     }
 
     .status-processing {
-        background: #EEF4FF;
-        color: #1D4ED8;
-        border-color: #BFD3FF;
+        background: #eff6ff;
+        color: #2563eb;
     }
 
     .status-done {
-        background: #ECFDF3;
-        color: #067647;
-        border-color: #ABEFC6;
+        background: #ecfdf5;
+        color: #16a34a;
     }
 
-    .status-cancelled,
-    .status-void {
-        background: #FDECEC;
-        color: #B42318;
-        border-color: #F5C2C7;
-    }
-
-    .type-badge {
-        display: inline-flex;
-        align-items: center;
-        padding: 6px 10px;
-        border-radius: 999px;
-        background: #f8f6ef;
-        border: 1px solid var(--line);
-        font-size: 12px;
-        font-weight: 800;
+    .status-cancel {
+        background: #fef2f2;
+        color: #dc2626;
     }
 
     .late-text {
-        color: #B42318;
-        font-weight: 800;
+        color: #dc2626;
+        font-weight: 900;
     }
 
-    .late-row {
-        background: rgba(180, 35, 24, 0.03);
+    .action-row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-items: center;
     }
 
-    .muted-text {
-        color: var(--muted);
+    .inline-form {
+        display: inline;
+        margin: 0;
+    }
+
+    .btn-mini {
+        border: none;
+        border-radius: 10px;
+        padding: 8px 11px;
         font-size: 12px;
+        font-weight: 900;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        white-space: nowrap;
+    }
+
+    .btn-mini-light {
+        background: #f8f6ef;
+        color: #1f2937;
+        border: 1px solid var(--line);
+    }
+
+    .btn-mini-danger {
+        background: #fef2f2;
+        color: #dc2626;
+        border: 1px solid #fecaca;
     }
 
     .empty-state {
+        padding: 30px;
         text-align: center;
-        padding: 26px 0 10px;
         color: var(--muted);
         font-weight: 700;
     }
 
-    @media (max-width: 1200px) {
-        .kpi-grid {
-            grid-template-columns: repeat(2, 1fr);
-        }
-
-        .filter-grid {
-            grid-template-columns: 1fr 1fr;
-        }
-    }
-
-    @media (max-width: 700px) {
-        .kpi-grid,
+    @media (max-width: 1100px) {
+        .summary-grid,
         .filter-grid {
             grid-template-columns: 1fr;
         }
     }
 </style>
 
-<div class="kpi-grid">
-    <div class="kpi-card">
-        <div class="kpi-label">Total Orders</div>
-        <div class="kpi-value">{{ total_orders }}</div>
-    </div>
+<div class="orders-shell">
 
-    <div class="kpi-card">
-        <div class="kpi-label">Pending</div>
-        <div class="kpi-value">{{ pending_count }}</div>
-    </div>
-
-    <div class="kpi-card">
-        <div class="kpi-label">Done</div>
-        <div class="kpi-value">{{ done_count }}</div>
-    </div>
-</div>
-
-<div class="filter-card">
-    <form method="get" class="filter-grid">
-        <div class="field">
-            <label>Search</label>
-            <input type="text" name="keyword" value="{{ keyword }}" placeholder="Order no, customer, phone, location, remark">
+    <div class="summary-grid">
+        <div class="summary-card">
+            <div class="summary-label">Total Orders</div>
+            <div class="summary-value">{{ total_orders }}</div>
         </div>
 
-        <div class="field">
-            <label>Status</label>
-            <select name="status">
-                <option value="">All Status</option>
-                {% for value, label in status_choices %}
-                <option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-            </select>
+        <div class="summary-card">
+            <div class="summary-label">Pending</div>
+            <div class="summary-value">{{ pending_count }}</div>
         </div>
 
-        <div class="field">
-            <label>Order Type</label>
-            <select name="order_type">
-                <option value="">All Type</option>
-                {% for value, label in order_type_choices %}
-                <option value="{{ value }}" {% if order_type == value %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-            </select>
-        </div>
-
-        <div class="field">
-            <label>Created From</label>
-            <input type="date" name="created_date_from" value="{{ created_date_from }}">
-        </div>
-
-        <div class="field">
-            <label>Created To</label>
-            <input type="date" name="created_date_to" value="{{ created_date_to }}">
-        </div>
-
-        <button type="submit" class="btn btn-primary">Search</button>
-
-        <a href="{% url 'order_list_export_excel' %}?keyword={{ keyword|urlencode }}&status={{ status|urlencode }}&order_type={{ order_type|urlencode }}&created_date_from={{ created_date_from|urlencode }}&created_date_to={{ created_date_to|urlencode }}" class="btn btn-light">
-            Download Excel
-        </a>
-    </form>
-</div>
-
-<div class="list-card">
-    <div class="list-head">
-        <div>
-            <h3 class="list-title">Order List</h3>
-            <div class="list-subtitle">Latest created orders appear first. Search, filter, highlight late deadlines, and export the current result.</div>
+        <div class="summary-card">
+            <div class="summary-label">Done</div>
+            <div class="summary-value">{{ done_count }}</div>
         </div>
     </div>
 
-    <div class="table-wrap">
-        <table class="order-table">
-            <thead>
-                <tr>
-                    <th>Order No</th>
-                    <th>Created</th>
-                    <th>Customer</th>
-                    <th>Type</th>
-                    <th>Cloth Qty</th>
-                    <th>Film Meter</th>
-                    <th>Total</th>
-                    <th>Deposit</th>
-                    <th>Paid</th>
-                    <th>Balance</th>
-                    <th>Status</th>
-                    <th>Deadline</th>
-                </tr>
-            </thead>
+    <div class="filter-card">
+        <form method="get">
+            <div class="filter-grid">
+                <div class="field">
+                    <label>Search</label>
+                    <input type="text" name="keyword" value="{{ keyword }}" placeholder="Order no, customer, phone, location">
+                </div>
 
-            <tbody>
-                {% for row in rows %}
-                <tr class="{% if row.is_late %}late-row{% endif %}">
-                    <td>
-                        <a href="{% url 'order_detail' row.obj.pk %}" class="order-link">{{ row.obj.order_no }}</a>
-                    </td>
+                <div class="field">
+                    <label>Status</label>
+                    <select name="status">
+                        <option value="">All Status</option>
+                        {% for value, label in status_choices %}
+                            <option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
 
-                    <td>{{ row.obj.created_at|date:"d M Y H:i" }}</td>
+                <div class="field">
+                    <label>Order Type</label>
+                    <select name="order_type">
+                        <option value="">All Type</option>
+                        {% for value, label in order_type_choices %}
+                            <option value="{{ value }}" {% if order_type == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
 
-                    <td>
-                        <div>{{ row.obj.customer_name|default:"-" }}</div>
-                        <div class="muted-text">{{ row.obj.phone|default:"-" }}</div>
-                    </td>
+                <div class="field">
+                    <label>Created From</label>
+                    <input type="date" name="created_date_from" value="{{ created_date_from }}">
+                </div>
 
-                    <td>
-                        <span class="type-badge">{{ row.obj.get_order_type_display }}</span>
-                    </td>
+                <div class="field">
+                    <label>Created To</label>
+                    <input type="date" name="created_date_to" value="{{ created_date_to }}">
+                </div>
 
-                    <td>{{ row.cloth_qty|default:0|floatformat:0 }}</td>
-                    <td>{{ row.film_meter|default:0|floatformat:2 }}</td>
-                    <td>${{ row.obj.total_amount|default:0|floatformat:2 }}</td>
-                    <td>${{ row.obj.deposit_amount|default:0|floatformat:2 }}</td>
-                    <td>${{ row.obj.paid_amount|default:0|floatformat:2 }}</td>
-                    <td>${{ row.balance_amount|default:0|floatformat:2 }}</td>
+                <div class="field">
+                    <label>&nbsp;</label>
+                    <button type="submit" class="btn btn-primary">Search</button>
+                </div>
+            </div>
+        </form>
+    </div>
 
-                    <td>
-                        {% with s=row.obj.status|lower %}
-                        <span class="status-badge
-                            {% if s == 'pending' %}status-pending
-                            {% elif s == 'processing' %}status-processing
-                            {% elif s == 'done' %}status-done
-                            {% elif s == 'cancelled' or s == 'void' %}status-cancelled
-                            {% else %}status-void{% endif %}
-                        ">
-                            {{ row.obj.get_status_display }}
-                        </span>
-                        {% endwith %}
-                    </td>
+    <div class="table-card">
+        <div class="table-wrap">
+            <table class="orders-table">
+                <thead>
+                    <tr>
+                        <th>Order No</th>
+                        <th>Created</th>
+                        <th>Created By</th>
+                        <th>Customer</th>
+                        <th>Phone</th>
+                        <th>Location</th>
+                        <th>Type</th>
+                        <th>Service</th>
+                        <th>Status</th>
+                        <th>Cloth</th>
+                        <th>Film</th>
+                        <th>Total</th>
+                        <th>Balance</th>
+                        <th>Deadline</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
 
-                    <td>
-                        {% if row.obj.deadline %}
-                            <div class="{% if row.is_late %}late-text{% endif %}">
-                                {{ row.obj.deadline|date:"d M Y H:i" }}
-                            </div>
-                            {% if row.is_late %}
-                            <div class="muted-text">Late</div>
+                <tbody>
+                    {% for row in rows %}
+                    <tr>
+                        <td>
+                            <a href="{% url 'order_detail' row.obj.pk %}" class="order-link">
+                                {{ row.obj.order_no }}
+                            </a>
+                        </td>
+
+                        <td>
+                            {% if row.obj.created_at %}
+                                {{ row.obj.created_at|date:"Y-m-d H:i" }}
+                            {% else %}
+                                -
                             {% endif %}
-                        {% else %}
-                            -
-                        {% endif %}
-                    </td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="12" class="empty-state">No orders found.</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                        </td>
+
+                        <td>{{ row.obj.created_by|default:"-" }}</td>
+                        <td>{{ row.obj.customer_name|default:"-" }}</td>
+                        <td>{{ row.obj.phone|default:"-" }}</td>
+                        <td>{{ row.obj.customer_location|default:"-" }}</td>
+                        <td>{{ row.obj.get_order_type_display }}</td>
+                        <td>{{ row.obj.get_service_type_display }}</td>
+
+                        <td>
+                            {% if row.obj.status == "PENDING" %}
+                                <span class="status-pill status-pending">Pending</span>
+                            {% elif row.obj.status == "PROCESSING" %}
+                                <span class="status-pill status-processing">Processing</span>
+                            {% elif row.obj.status == "DONE" %}
+                                <span class="status-pill status-done">Done</span>
+                            {% elif row.obj.status == "CANCEL" or row.obj.status == "CANCELLED" %}
+                                <span class="status-pill status-cancel">Cancel</span>
+                            {% else %}
+                                <span class="status-pill">{{ row.obj.status }}</span>
+                            {% endif %}
+                        </td>
+
+                        <td>{{ row.cloth_qty }}</td>
+                        <td>{{ row.film_meter }}</td>
+                        <td>${{ row.obj.total_amount }}</td>
+                        <td>${{ row.balance_amount }}</td>
+
+                        <td>
+                            {% if row.obj.deadline %}
+                                {% if row.is_late %}
+                                    <span class="late-text">{{ row.obj.deadline|date:"Y-m-d H:i" }}</span>
+                                {% else %}
+                                    {{ row.obj.deadline|date:"Y-m-d H:i" }}
+                                {% endif %}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            <div class="action-row">
+                                <a href="{% url 'order_detail' row.obj.pk %}" class="btn-mini btn-mini-light">View</a>
+                                <a href="{% url 'order_edit' row.obj.pk %}" class="btn-mini btn-mini-light">Edit</a>
+
+                                <form method="post"
+                                      action="{% url 'order_trash' row.obj.pk %}"
+                                      class="inline-form trash-form">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="deleted_reason" class="deleted-reason-input">
+                                    <button type="submit" class="btn-mini btn-mini-danger">🗑</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="15">
+                            <div class="empty-state">No orders found.</div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
+
 </div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll(".trash-form").forEach(function (form) {
+        form.addEventListener("submit", function (e) {
+            const reason = prompt("Why do you delete this order?");
+
+            if (!reason || !reason.trim()) {
+                e.preventDefault();
+                alert("Delete reason is required.");
+                return false;
+            }
+
+            const ok = confirm("Move this order to trash? Stock will return.");
+            if (!ok) {
+                e.preventDefault();
+                return false;
+            }
+
+            form.querySelector(".deleted-reason-input").value = reason.trim();
+        });
+    });
+});
+</script>
 {% endblock %}

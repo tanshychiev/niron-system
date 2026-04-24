@@ -12,11 +12,13 @@ class Order(models.Model):
     STATUS_PENDING = "PENDING"
     STATUS_PROCESSING = "PROCESSING"
     STATUS_DONE = "DONE"
+    STATUS_CANCEL = "CANCEL"
 
     STATUS_CHOICES = [
         (STATUS_PENDING, "Pending"),
         (STATUS_PROCESSING, "Processing"),
         (STATUS_DONE, "Done"),
+        (STATUS_CANCEL, "Cancel"),
     ]
 
     TYPE_NIRON = "NIRON"
@@ -37,32 +39,54 @@ class Order(models.Model):
         (SERVICE_PRINT_HEATPRESS, "Print & Heat Press"),
     ]
 
+    # ===== BASIC =====
     order_no = models.CharField(max_length=50, unique=True, blank=True)
     order_type = models.CharField(max_length=20, choices=TYPE_CHOICES, default=TYPE_NIRON)
-    service_type = models.CharField(
-        max_length=30,
-        choices=SERVICE_CHOICES,
-        default=SERVICE_FULL,
-        db_index=True,
-    )
+    service_type = models.CharField(max_length=30, choices=SERVICE_CHOICES, default=SERVICE_FULL)
 
     customer_name = models.CharField(max_length=120)
     phone = models.CharField(max_length=30, blank=True, default="")
     customer_location = models.CharField(max_length=255, blank=True, default="")
     deadline = models.DateTimeField()
 
+    # ✅ NEW (created by)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_orders",
+    )
+
+    # ===== MONEY =====
     total_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     deposit_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     paid_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
+    # ===== STATUS =====
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
     remark = models.TextField(blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
 
+    # ===== STOCK =====
     stock_deducted = models.BooleanField(default=False)
 
+    # ===== PRODUCTION =====
     total_pcs = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     done_pcs = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    # ===== TRASH SYSTEM =====
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+
+    deleted_reason = models.TextField(blank=True, default="")
+    deleted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="deleted_orders",
+    )
 
     class Meta:
         ordering = ["-id"]
@@ -85,8 +109,6 @@ class Order(models.Model):
             ) + 1
             self.order_no = f"NR-{last_id:06d}"
         super().save(*args, **kwargs)
-
-
 class OrderDesign(models.Model):
     order = models.ForeignKey(
         Order,

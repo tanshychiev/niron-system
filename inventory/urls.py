@@ -41,6 +41,7 @@ urlpatterns = [
     path("batches/<int:pk>/edit/", inventory_batch_edit, name="inventory_batch_edit"),
     path("batches/<int:pk>/delete/", inventory_batch_delete, name="inventory_batch_delete"),
     path("batches/<int:pk>/history/", inventory_batch_history, name="inventory_batch_history"),
+    
 
     path("adjust-stock/", inventory_adjust_stock_select, name="inventory_adjust_stock_select"),
     path("adjustments/", inventory_adjustment_list, name="inventory_adjustment_list"),
