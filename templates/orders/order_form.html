@@ -189,7 +189,7 @@
 
     .design-row-grid {
         display: grid;
-        grid-template-columns: 1.15fr 1fr 1fr;
+        grid-template-columns: 1.7fr .75fr .75fr;
         gap: 14px;
         align-items: start;
         margin-bottom: 8px;
@@ -273,21 +273,61 @@
 
     .item-header-row,
     .item-input-row {
-        min-width: 1180px;
+        min-width: 1280px;
         display: grid;
+        grid-template-columns:
+            240px
+            190px
+            130px
+            110px
+            95px
+            210px
+            140px
+            130px
+            120px
+            70px;
+        gap: 10px;
+        align-items: center;
+    }
+
+    body.service-film-only-mode .col-qty {
+        display: none !important;
+    }
+    body.service-full-mode .item-header-row,
+    body.service-full-mode .item-input-row {
+        min-width: 900px;
         grid-template-columns:
             220px
             170px
             120px
             100px
             90px
-            170px
+            130px
             120px
-            110px
-            90px
             70px;
-        gap: 10px;
-        align-items: center;
+    }
+
+    body.service-film-only-mode .item-header-row,
+    body.service-film-only-mode .item-input-row {
+        min-width: 980px;
+        grid-template-columns:
+            260px
+            260px
+            170px
+            150px
+            130px
+            70px;
+    }
+
+    body.service-print-mode .item-header-row,
+    body.service-print-mode .item-input-row {
+        min-width: 720px;
+        grid-template-columns:
+            280px
+            120px
+            150px
+            130px
+            70px;
     }
 
     .item-header-row {
@@ -510,6 +550,7 @@
         background: white;
         box-shadow: 0 20px 60px rgba(0,0,0,.28);
     }
+
     .design-drop-zone {
         border: 2px dashed #E0C78A;
         background: #FFF9E8;
@@ -518,6 +559,10 @@
         text-align: center;
         cursor: pointer;
         transition: .2s ease;
+        min-height: 86px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
     }
 
     .design-drop-zone:hover,
@@ -544,7 +589,7 @@
         }
 
         .design-row-grid {
-            grid-template-columns: 1.1fr 1fr 1fr;
+            grid-template-columns: 1.6fr .8fr .8fr;
         }
     }
 
@@ -681,8 +726,11 @@
                         <div class="design-row-grid">
                             <div class="field design-upload-field">
                                 <label>Upload Design Images</label>
-                                <input type="file" name="design-{{ forloop.counter0 }}-design_files" class="form-control design-file-input" accept="image/*" multiple>
-                                <small>You can upload images for this design only.</small>
+                                <div class="design-drop-zone">
+                                    <div class="design-drop-title">Drag image here or Ctrl + V screenshot</div>
+                                    <div class="design-drop-sub">Click to choose file also works</div>
+                                    <input type="file" name="design-{{ forloop.counter0 }}-design_files" class="form-control design-file-input" accept="image/*" multiple hidden>
+                                </div>
                             </div>
 
                             <div class="field">
@@ -894,10 +942,10 @@
                             <div class="field design-upload-field">
                                 <label>Upload Design Images</label>
                                 <div class="design-drop-zone">
-    <div class="design-drop-title">Drag image here or Ctrl + V screenshot</div>
-    <div class="design-drop-sub">Click to choose file also works</div>
-    <input type="file" name="design-0-design_files" class="form-control design-file-input" accept="image/*" multiple hidden>
-</div>
+                                    <div class="design-drop-title">Drag image here or Ctrl + V screenshot</div>
+                                    <div class="design-drop-sub">Click to choose file also works</div>
+                                    <input type="file" name="design-0-design_files" class="form-control design-file-input" accept="image/*" multiple hidden>
+                                </div>
                             </div>
 
                             <div class="field">
@@ -1096,8 +1144,11 @@
         <div class="design-row-grid">
             <div class="field design-upload-field">
                 <label>Upload Design Images</label>
-                <input type="file" name="design-__DESIGN_INDEX__-design_files" class="form-control design-file-input" accept="image/*" multiple>
-                <small>You can upload images for this design only.</small>
+                <div class="design-drop-zone">
+                    <div class="design-drop-title">Drag image here or Ctrl + V screenshot</div>
+                    <div class="design-drop-sub">Click to choose file also works</div>
+                    <input type="file" name="design-__DESIGN_INDEX__-design_files" class="form-control design-file-input" accept="image/*" multiple hidden>
+                </div>
             </div>
 
             <div class="field">
@@ -1377,15 +1428,23 @@ document.addEventListener("DOMContentLoaded", function () {
 
     function updateTotals() {
         let itemsTotal = 0;
+        const serviceType = getServiceType();
 
         document.querySelectorAll(".item-row").forEach(row => {
             if (row.style.display === "none") return;
 
             const qtyInput = row.querySelector(".qty-input");
+            const filmMeterInput = row.querySelector(".film-meter-input");
             const unitPriceInput = row.querySelector(".unit-price-input");
             const lineTotalView = row.querySelector(".line-total-view");
 
-            const lineTotal = num(qtyInput?.value) * num(unitPriceInput?.value);
+            let lineTotal = 0;
+
+            if (serviceType === "FILM_ONLY") {
+                lineTotal = num(filmMeterInput?.value) * num(unitPriceInput?.value);
+            } else {
+                lineTotal = num(qtyInput?.value) * num(unitPriceInput?.value);
+            }
 
             if (lineTotalView) {
                 lineTotalView.value = lineTotal.toFixed(2);
@@ -1436,13 +1495,17 @@ document.addEventListener("DOMContentLoaded", function () {
     function applyServiceTypeLayout() {
         const serviceType = getServiceType();
 
+        document.body.classList.toggle("service-full-mode", serviceType === "FULL");
+        document.body.classList.toggle("service-film-only-mode", serviceType === "FILM_ONLY");
+        document.body.classList.toggle("service-print-mode", serviceType === "PRINT_HEATPRESS");
+
         if (serviceHelpText) {
             if (serviceType === "FULL") {
-                serviceHelpText.textContent = "Full Order: show shirt columns only.";
+                serviceHelpText.textContent = "Full Order: show shirt columns only. Total = Qty × Unit Price.";
             } else if (serviceType === "FILM_ONLY") {
-                serviceHelpText.textContent = "Film Only: show film columns only.";
+                serviceHelpText.textContent = "Film Only: show film columns only. Total = Film Meter × Unit Price.";
             } else if (serviceType === "PRINT_HEATPRESS") {
-                serviceHelpText.textContent = "Print & Heat Press: service only, no inventory deduction.";
+                serviceHelpText.textContent = "Print & Heat Press: service only, no inventory deduction. Total = Qty × Unit Price.";
             } else {
                 serviceHelpText.textContent = "";
             }
@@ -1481,10 +1544,12 @@ document.addEventListener("DOMContentLoaded", function () {
                 if (filmMeterInput) filmMeterInput.value = "";
             }
         });
+
+        updateTotals();
     }
 
     function bindRowEvents(row) {
-        row.querySelectorAll(".qty-input, .unit-price-input").forEach(el => {
+        row.querySelectorAll(".qty-input, .film-meter-input, .unit-price-input").forEach(el => {
             el.addEventListener("input", updateTotals);
         });
 
