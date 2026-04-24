@@ -8,7 +8,7 @@ from django.db.models import Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
-from orders.models import Order, OrderItem
+from orders.models import Order, OrderItem, StockConsumption
 
 from .forms import (
     ColorForm,
@@ -66,6 +66,25 @@ def _log_batch_history(batch, action, user=None, note=""):
     )
 
 
+def _ensure_size_row(grouped, key, size_obj):
+    size_name = size_obj.name if size_obj else "-"
+    size_sort = size_obj.sort_order if size_obj else 9999
+
+    if size_name not in grouped[key]["sizes"]:
+        grouped[key]["sizes"][size_name] = {
+            "size_name": size_name,
+            "size_sort": size_sort,
+            "stock_qty": 0,
+            "reserved_qty": 0,
+            "available_qty": 0,
+            "in_progress_qty": 0,
+            "total_qty": 0,
+            "shortage_qty": 0,
+        }
+
+    return grouped[key]["sizes"][size_name]
+
+
 @login_required
 @permission_required("inventory.view_inventorybatch", raise_exception=True)
 def inventory_list(request):
@@ -82,13 +101,28 @@ def inventory_list(request):
             "color_id": None,
             "color_name": "-",
             "color_hex": "#D1D5DB",
+
+            # stock_qty = physical stock before active orders reserve it
+            # reserved_qty = qty already deducted by active orders
+            # in_progress_qty = active order remaining qty
+            # available_qty = stock_qty - in_progress_qty
+            # total_qty = stock_qty
+            "stock_qty": 0,
+            "reserved_qty": 0,
             "available_qty": 0,
             "in_progress_qty": 0,
             "total_qty": 0,
+            "shortage_qty": 0,
             "sizes": {},
         }
     )
 
+    active_statuses = [
+        Order.STATUS_PENDING,
+        Order.STATUS_PROCESSING,
+    ]
+
+    # 1) Current remaining stock in batch rows.
     stock_rows = (
         InventoryBatchItem.objects.select_related("item", "color", "size", "batch")
         .filter(
@@ -118,32 +152,62 @@ def inventory_list(request):
         grouped[key]["color_id"] = row.color_id
         grouped[key]["color_name"] = row.color.name if row.color else "-"
         grouped[key]["color_hex"] = getattr(row.color, "hex_code", "#D1D5DB") if row.color else "#D1D5DB"
-        grouped[key]["available_qty"] += float(row.qty_remaining or 0)
 
-        size_name = row.size.name if row.size else "-"
-        size_sort = row.size.sort_order if row.size else 9999
+        qty = float(row.qty_remaining or 0)
+        grouped[key]["stock_qty"] += qty
 
-        if size_name not in grouped[key]["sizes"]:
-            grouped[key]["sizes"][size_name] = {
-                "size_name": size_name,
-                "size_sort": size_sort,
-                "available_qty": 0,
-                "in_progress_qty": 0,
-                "total_qty": 0,
-            }
+        size_row = _ensure_size_row(grouped, key, row.size)
+        size_row["stock_qty"] += qty
 
-        grouped[key]["sizes"][size_name]["available_qty"] += float(row.qty_remaining or 0)
+    # 2) Stock already deducted by active orders.
+    # This adds reserved stock back into "total physical stock".
+    reserved_rows = (
+        StockConsumption.objects.select_related(
+            "order",
+            "batch_item",
+            "batch_item__item",
+            "batch_item__color",
+            "batch_item__size",
+            "batch_item__batch",
+        )
+        .filter(
+            order__status__in=active_statuses,
+            order__is_deleted=False,
+            batch_item__item__item_type=InventoryItem.TYPE_SHIRT,
+            batch_item__batch__is_deleted=False,
+        )
+    )
 
-    active_statuses = [
-        Order.STATUS_PENDING,
-        Order.STATUS_PROCESSING,
-    ]
+    for c in reserved_rows:
+        batch_item = c.batch_item
+        item = batch_item.item
+        color = batch_item.color
+        size = batch_item.size
 
+        key = (item.id, color.id if color else 0)
+
+        grouped[key]["item_id"] = item.id
+        grouped[key]["item_code"] = item.code
+        grouped[key]["item_name"] = item.name
+        grouped[key]["item_style"] = getattr(item, "sample_style", InventoryItem.STYLE_OVERSIZE)
+        grouped[key]["item_style_label"] = item.get_sample_style_display()
+        grouped[key]["color_id"] = color.id if color else None
+        grouped[key]["color_name"] = color.name if color else "-"
+        grouped[key]["color_hex"] = getattr(color, "hex_code", "#D1D5DB") if color else "#D1D5DB"
+
+        qty = float(c.consumed_qty or 0)
+        grouped[key]["reserved_qty"] += qty
+
+        size_row = _ensure_size_row(grouped, key, size)
+        size_row["reserved_qty"] += qty
+
+    # 3) Active order demand.
     progress_rows = (
         OrderItem.objects.select_related("shirt_item", "color", "size", "order")
         .filter(
             shirt_item__isnull=False,
             order__status__in=active_statuses,
+            order__is_deleted=False,
         )
     )
 
@@ -158,32 +222,39 @@ def inventory_list(request):
         grouped[key]["color_id"] = row.color_id
         grouped[key]["color_name"] = row.color.name if row.color else "-"
         grouped[key]["color_hex"] = getattr(row.color, "hex_code", "#D1D5DB") if row.color else "#D1D5DB"
-        grouped[key]["in_progress_qty"] += float(row.quantity or 0)
 
-        size_name = row.size.name if row.size else "-"
-        size_sort = row.size.sort_order if row.size else 9999
+        remaining_qty = Decimal(row.quantity or 0) - Decimal(row.done_qty or 0)
+        if remaining_qty < 0:
+            remaining_qty = Decimal("0")
 
-        if size_name not in grouped[key]["sizes"]:
-            grouped[key]["sizes"][size_name] = {
-                "size_name": size_name,
-                "size_sort": size_sort,
-                "available_qty": 0,
-                "in_progress_qty": 0,
-                "total_qty": 0,
-            }
+        qty = float(remaining_qty)
+        grouped[key]["in_progress_qty"] += qty
 
-        grouped[key]["sizes"][size_name]["in_progress_qty"] += float(row.quantity or 0)
+        size_row = _ensure_size_row(grouped, key, row.size)
+        size_row["in_progress_qty"] += qty
 
     variant_cards = []
+
     for _, data in grouped.items():
-        data["total_qty"] = data["available_qty"] - data["in_progress_qty"]
+        stock_qty = float(data.get("stock_qty", 0)) + float(data.get("reserved_qty", 0))
+        in_progress_qty = float(data.get("in_progress_qty", 0))
+
+        data["total_qty"] = stock_qty
+        data["available_qty"] = stock_qty - in_progress_qty
+        data["shortage_qty"] = max(in_progress_qty - stock_qty, 0)
 
         size_list = []
         for _, s in sorted(
             data["sizes"].items(),
             key=lambda x: (x[1]["size_sort"], x[1]["size_name"]),
         ):
-            s["total_qty"] = s["available_qty"] - s["in_progress_qty"]
+            size_stock_qty = float(s.get("stock_qty", 0)) + float(s.get("reserved_qty", 0))
+            size_in_progress_qty = float(s.get("in_progress_qty", 0))
+
+            s["total_qty"] = size_stock_qty
+            s["available_qty"] = size_stock_qty - size_in_progress_qty
+            s["shortage_qty"] = max(size_in_progress_qty - size_stock_qty, 0)
+
             size_list.append(s)
 
         data["sizes"] = size_list
@@ -239,6 +310,7 @@ def inventory_list(request):
             "batches": batch_rows,
         },
     )
+
 
 @login_required
 @permission_required("inventory.view_inventoryitem", raise_exception=True)
