@@ -1,9 +1,50 @@
 {% extends "base.html" %}
 
 {% block page_title %}Adjust Stock{% endblock %}
-{% block page_subtitle %}Show total available inventory and adjust final balance{% endblock %}
+{% block page_subtitle %}Total Cloth - In Proc = Available{% endblock %}
 
 {% block content %}
+<style>
+  .stock-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    margin-top: 14px;
+  }
+
+  .stock-stat {
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    padding: 16px;
+    background: #fff;
+  }
+
+  .stock-stat-label {
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+  }
+
+  .stock-stat-value {
+    margin-top: 8px;
+    font-size: 28px;
+    font-weight: 900;
+    color: var(--text);
+  }
+
+  .text-danger {
+    color: #dc2626 !important;
+  }
+
+  @media (max-width: 768px) {
+    .stock-summary-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
 <div class="form-card">
   <div class="section-head">
     <h2>Find Inventory</h2>
@@ -37,7 +78,8 @@
 
 {% if selected_item %}
   <div class="info-card">
-    <h2 class="card-title">Current Available Inventory</h2>
+    <h2 class="card-title">Current Stock Summary</h2>
+
     <p>
       <strong>Item:</strong> {{ selected_item.name }}
       &nbsp; | &nbsp;
@@ -45,14 +87,29 @@
       &nbsp; | &nbsp;
       <strong>Size:</strong> {{ selected_size.name|default:"-" }}
     </p>
-    <div class="stat" style="max-width:280px;margin-top:14px;">
-      <div class="stat-label">Total Available</div>
-      <div class="stat-value">{{ total_available }}</div>
+
+    <div class="stock-summary-grid">
+      <div class="stock-stat">
+        <div class="stock-stat-label">Total Cloth</div>
+        <div class="stock-stat-value">{{ total_stock|floatformat:0 }}</div>
+      </div>
+
+      <div class="stock-stat">
+        <div class="stock-stat-label">In Proc.</div>
+        <div class="stock-stat-value">{{ in_progress_qty|floatformat:0 }}</div>
+      </div>
+
+      <div class="stock-stat">
+        <div class="stock-stat-label">Available</div>
+        <div class="stock-stat-value {% if available_after_production < 0 %}text-danger{% endif %}">
+          {{ available_after_production|floatformat:0 }}
+        </div>
+      </div>
     </div>
   </div>
 
   <div class="form-card">
-    <h2 class="card-title">Adjust Total Stock</h2>
+    <h2 class="card-title">Adjust Total Cloth</h2>
 
     {% if adjust_form.errors %}
       <div class="alert alert-danger">{{ adjust_form.errors }}</div>
@@ -61,8 +118,12 @@
     <form method="post">
       {% csrf_token %}
       <input type="hidden" name="item" value="{{ selected_item.id }}">
-      {% if selected_color %}<input type="hidden" name="color" value="{{ selected_color.id }}">{% endif %}
-      {% if selected_size %}<input type="hidden" name="size" value="{{ selected_size.id }}">{% endif %}
+      {% if selected_color %}
+        <input type="hidden" name="color" value="{{ selected_color.id }}">
+      {% endif %}
+      {% if selected_size %}
+        <input type="hidden" name="size" value="{{ selected_size.id }}">
+      {% endif %}
 
       <div class="grid-3">
         <div class="field">
@@ -76,7 +137,7 @@
         </div>
 
         <div class="field">
-          <label>Final Total Qty</label>
+          <label>Final Total Cloth</label>
           {{ adjust_form.final_qty }}
         </div>
       </div>

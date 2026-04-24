@@ -759,6 +759,204 @@ def inventory_adjustment_list(request):
 def inventory_adjust_stock_select(request):
     select_form = InventoryAdjustStockSelectForm(request.GET or None)
     adjust_form = None
+
+    selected_rows = []
+    total_stock = Decimal("0")
+    in_progress_qty = Decimal("0")
+    available_after_production = Decimal("0")
+
+    selected_item = None
+    selected_color = None
+    selected_size = None
+
+    active_statuses = [
+        Order.STATUS_PENDING,
+        Order.STATUS_PROCESSING,
+    ]
+
+    if select_form.is_valid():
+        selected_item = select_form.cleaned_data.get("item")
+        selected_color = select_form.cleaned_data.get("color")
+        selected_size = select_form.cleaned_data.get("size")
+
+        qs = InventoryBatchItem.objects.select_related(
+            "batch", "item", "color", "size"
+        ).filter(
+            is_active=True,
+            batch__is_deleted=False,
+            item=selected_item,
+        )
+
+        if selected_color:
+            qs = qs.filter(color=selected_color)
+
+        if selected_size:
+            qs = qs.filter(size=selected_size)
+
+        selected_rows = list(qs.order_by("-batch__received_date", "-id"))
+        total_stock = qs.aggregate(total=Sum("qty_remaining")).get("total") or Decimal("0")
+
+        order_qs = OrderItem.objects.filter(
+            shirt_item=selected_item,
+            order__status__in=active_statuses,
+            order__is_deleted=False,
+        )
+
+        if selected_color:
+            order_qs = order_qs.filter(color=selected_color)
+
+        if selected_size:
+            order_qs = order_qs.filter(size=selected_size)
+
+        for item in order_qs:
+            remaining = Decimal(item.quantity or 0) - Decimal(item.done_qty or 0)
+            if remaining > 0:
+                in_progress_qty += remaining
+
+        available_after_production = total_stock - in_progress_qty
+
+        if request.method == "POST":
+            adjust_form = InventoryAdjustVariantForm(request.POST)
+
+            if adjust_form.is_valid():
+                adjustment_type = adjust_form.cleaned_data["adjustment_type"]
+                qty = adjust_form.cleaned_data.get("qty") or Decimal("0")
+                final_qty = adjust_form.cleaned_data.get("final_qty")
+                reason = adjust_form.cleaned_data.get("reason") or ""
+
+                if adjustment_type == "STOCKTAKE":
+                    diff = final_qty - total_stock
+
+                    if diff == 0:
+                        messages.success(request, "No stock change needed.")
+                        return redirect(request.path + "?" + request.META.get("QUERY_STRING", ""))
+
+                    if diff > 0:
+                        target = selected_rows[0] if selected_rows else None
+
+                        if not target:
+                            messages.error(request, "No stock row found to add into. Please create stock batch first.")
+                            return redirect(request.path + "?" + request.META.get("QUERY_STRING", ""))
+
+                        old_qty = target.qty_remaining
+                        target.qty_remaining = old_qty + diff
+                        target.save(update_fields=["qty_remaining"])
+
+                        InventoryAdjustment.objects.create(
+                            batch_item=target,
+                            adjustment_type=InventoryAdjustment.TYPE_FOUND,
+                            qty=diff,
+                            reason=reason or f"Stock take adjusted total stock from {total_stock} to {final_qty}",
+                            created_by=request.user if request.user.is_authenticated else None,
+                            qty_before=old_qty,
+                            qty_after=target.qty_remaining,
+                        )
+
+                    else:
+                        remaining_to_reduce = abs(diff)
+
+                        for row in selected_rows:
+                            if remaining_to_reduce <= 0:
+                                break
+
+                            use_qty = min(row.qty_remaining, remaining_to_reduce)
+                            old_qty = row.qty_remaining
+                            row.qty_remaining = old_qty - use_qty
+                            row.save(update_fields=["qty_remaining"])
+
+                            InventoryAdjustment.objects.create(
+                                batch_item=row,
+                                adjustment_type=InventoryAdjustment.TYPE_STOCKTAKE,
+                                qty=use_qty,
+                                reason=reason or f"Stock take adjusted total stock from {total_stock} to {final_qty}",
+                                created_by=request.user if request.user.is_authenticated else None,
+                                qty_before=old_qty,
+                                qty_after=row.qty_remaining,
+                            )
+
+                            remaining_to_reduce -= use_qty
+
+                else:
+                    if adjustment_type in ["ADD", "FOUND"]:
+                        target = selected_rows[0] if selected_rows else None
+
+                        if not target:
+                            messages.error(request, "No stock row found to add into. Please create stock batch first.")
+                            return redirect(request.path + "?" + request.META.get("QUERY_STRING", ""))
+
+                        old_qty = target.qty_remaining
+                        target.qty_remaining = old_qty + qty
+                        target.save(update_fields=["qty_remaining"])
+
+                        InventoryAdjustment.objects.create(
+                            batch_item=target,
+                            adjustment_type=InventoryAdjustment.TYPE_FOUND if adjustment_type == "FOUND" else InventoryAdjustment.TYPE_ADD,
+                            qty=qty,
+                            reason=reason,
+                            created_by=request.user if request.user.is_authenticated else None,
+                            qty_before=old_qty,
+                            qty_after=target.qty_remaining,
+                        )
+
+                    else:
+                        remaining_to_reduce = qty
+
+                        if remaining_to_reduce > total_stock:
+                            messages.error(request, "Cannot reduce more than total stock.")
+                            return redirect(request.path + "?" + request.META.get("QUERY_STRING", ""))
+
+                        type_map = {
+                            "REMOVE": InventoryAdjustment.TYPE_REMOVE,
+                            "LOST": InventoryAdjustment.TYPE_LOST,
+                            "DAMAGE": InventoryAdjustment.TYPE_DAMAGE,
+                        }
+
+                        for row in selected_rows:
+                            if remaining_to_reduce <= 0:
+                                break
+
+                            use_qty = min(row.qty_remaining, remaining_to_reduce)
+                            old_qty = row.qty_remaining
+                            row.qty_remaining = old_qty - use_qty
+                            row.save(update_fields=["qty_remaining"])
+
+                            InventoryAdjustment.objects.create(
+                                batch_item=row,
+                                adjustment_type=type_map[adjustment_type],
+                                qty=use_qty,
+                                reason=reason,
+                                created_by=request.user if request.user.is_authenticated else None,
+                                qty_before=old_qty,
+                                qty_after=row.qty_remaining,
+                            )
+
+                            remaining_to_reduce -= use_qty
+
+                messages.success(request, "Stock adjusted successfully.")
+                return redirect(request.path + "?" + request.META.get("QUERY_STRING", ""))
+
+        else:
+            adjust_form = InventoryAdjustVariantForm()
+
+    else:
+        adjust_form = InventoryAdjustVariantForm() if request.method == "POST" else None
+
+    return render(
+        request,
+        "inventory/inventory_adjust_stock_select.html",
+        {
+            "form": select_form,
+            "adjust_form": adjust_form,
+            "total_stock": total_stock,
+            "in_progress_qty": in_progress_qty,
+            "available_after_production": available_after_production,
+            "selected_item": selected_item,
+            "selected_color": selected_color,
+            "selected_size": selected_size,
+        },
+    )
+    select_form = InventoryAdjustStockSelectForm(request.GET or None)
+    adjust_form = None
     selected_rows = []
     total_available = Decimal("0")
     selected_item = None
