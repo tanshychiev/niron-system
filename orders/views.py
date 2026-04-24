@@ -940,12 +940,25 @@ def order_trash(request, pk):
     order = get_object_or_404(Order, pk=pk, is_deleted=False)
 
     if request.method == "POST":
+        # restore stock if needed
         if order.stock_deducted:
             restore_stock_for_order(order)
 
+        # get reason
+        delete_reason = (request.POST.get("delete_reason") or "").strip()
+
+        # save trash info
         order.is_deleted = True
         order.deleted_at = timezone.now()
-        order.save(update_fields=["is_deleted", "deleted_at"])
+        order.deleted_by = request.user if request.user.is_authenticated else None
+        order.delete_reason = delete_reason
+
+        order.save(update_fields=[
+            "is_deleted",
+            "deleted_at",
+            "deleted_by",
+            "delete_reason",
+        ])
 
         messages.success(request, f"Order {order.order_no} moved to trash.")
         return redirect("order_trash_list")
@@ -962,9 +975,17 @@ def order_restore(request, pk):
     if request.method == "POST":
         order.is_deleted = False
         order.deleted_at = None
-        order.save(update_fields=["is_deleted", "deleted_at"])
+        order.deleted_by = None
+        order.delete_reason = ""
 
-        messages.success(request, f"Order {order.order_no} restored. Stock was not deducted automatically.")
+        order.save(update_fields=[
+            "is_deleted",
+            "deleted_at",
+            "deleted_by",
+            "delete_reason",
+        ])
+
+        messages.success(request, f"Order {order.order_no} restored.")
         return redirect("order_detail", pk=order.pk)
 
     return redirect("order_trash_list")
@@ -990,6 +1011,9 @@ def order_trash_list(request):
                 "obj": order,
                 "cloth_qty": cloth_qty,
                 "film_meter": film_meter,
+                "reason": order.delete_reason or "-",
+                "deleted_by": order.deleted_by.username if order.deleted_by else "-",
+                "deleted_at": order.deleted_at,
             }
         )
 
@@ -999,128 +1023,5 @@ def order_trash_list(request):
         {
             "rows": rows,
             "total_orders": qs.count(),
-        },
-    )
-
-@login_required
-@permission_required("inventory.add_inventoryadjustment", raise_exception=True)
-@transaction.atomic
-def material_usage(request):
-    material_types = [
-        InventoryItem.TYPE_FILM,
-        InventoryItem.TYPE_INK,
-        InventoryItem.TYPE_POWDER,
-        InventoryItem.TYPE_MAINTENANCE,
-        InventoryItem.TYPE_OTHER,
-    ]
-
-    materials = InventoryItem.objects.filter(
-        is_active=True,
-        item_type__in=material_types,
-    ).order_by("item_type", "code", "name")
-
-    rows = []
-
-    for item in materials:
-        stock = (
-            InventoryBatchItem.objects.filter(
-                item=item,
-                is_active=True,
-                batch__is_deleted=False,
-            )
-            .aggregate(total=Sum("qty_remaining"))
-            .get("total")
-            or Decimal("0")
-        )
-
-        if item.item_type == InventoryItem.TYPE_FILM:
-            quick_qty = Decimal("1")
-            quick_label = "Use 1 Roll"
-        elif item.item_type == InventoryItem.TYPE_INK:
-            quick_qty = Decimal("1")
-            quick_label = "Use 1 Bottle"
-        elif item.item_type == InventoryItem.TYPE_POWDER:
-            quick_qty = Decimal("1")
-            quick_label = "Use 1 Pack"
-        elif item.item_type == InventoryItem.TYPE_MAINTENANCE:
-            quick_qty = Decimal("1")
-            quick_label = "Use 1 PCS"
-        else:
-            quick_qty = Decimal("1")
-            quick_label = "Use 1"
-
-        rows.append(
-            {
-                "item": item,
-                "stock": stock,
-                "quick_qty": quick_qty,
-                "quick_label": quick_label,
-            }
-        )
-
-    if request.method == "POST":
-        item_id = request.POST.get("item_id")
-        qty = Decimal(str(request.POST.get("qty") or "0"))
-        reason = (request.POST.get("reason") or "").strip()
-
-        item = get_object_or_404(
-            InventoryItem,
-            pk=item_id,
-            item_type__in=material_types,
-            is_active=True,
-        )
-
-        if qty <= 0:
-            messages.error(request, "Qty must be greater than 0.")
-            return redirect("material_usage")
-
-        stock_rows = list(
-            InventoryBatchItem.objects.select_related("batch", "item")
-            .filter(
-                item=item,
-                is_active=True,
-                batch__is_deleted=False,
-                qty_remaining__gt=0,
-            )
-            .order_by("-batch__received_date", "-id")
-        )
-
-        total_stock = sum((row.qty_remaining or Decimal("0")) for row in stock_rows)
-
-        if qty > total_stock:
-            messages.error(request, f"Not enough stock. Current stock: {total_stock}")
-            return redirect("material_usage")
-
-        remaining_to_reduce = qty
-
-        for row in stock_rows:
-            if remaining_to_reduce <= 0:
-                break
-
-            use_qty = min(row.qty_remaining, remaining_to_reduce)
-            old_qty = row.qty_remaining
-            row.qty_remaining = old_qty - use_qty
-            row.save(update_fields=["qty_remaining"])
-
-            InventoryAdjustment.objects.create(
-                batch_item=row,
-                adjustment_type=InventoryAdjustment.TYPE_REMOVE,
-                qty=use_qty,
-                reason=reason or "Material usage",
-                created_by=request.user if request.user.is_authenticated else None,
-                qty_before=old_qty,
-                qty_after=row.qty_remaining,
-            )
-
-            remaining_to_reduce -= use_qty
-
-        messages.success(request, f"{item.name} deducted successfully.")
-        return redirect("material_usage")
-
-    return render(
-        request,
-        "inventory/material_usage.html",
-        {
-            "rows": rows,
         },
     )
