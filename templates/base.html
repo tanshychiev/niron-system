@@ -573,21 +573,38 @@
                 {% endif %}
 
                 <!-- FINANCE -->
-                {% if perms.finance.view_finance_nav %}
-                <div class="nav-group">
-                    <button class="nav-toggle" type="button" data-target="menu-finance">
-                        <span>Finance</span>
-                        <span class="nav-arrow">▼</span>
-                    </button>
-                    <div class="nav-submenu" id="menu-finance">
-                        <a class="nav-link" href="/expenses/">Expense Summary</a>
-                        <a class="nav-link" href="/expenses/other/">Other Expense</a>
-                        <a class="nav-link" href="/expenses/batch/">Batch Expense</a>
-                        <a class="nav-link" href="/expenses/operating/">Operating Expense</a>
-                        <a class="nav-link" href="/profit-dashboard/">Profit Dashboard</a>
-                    </div>
-                </div>
-                {% endif %}
+                {% if perms.finance.view_expense_summary_nav or perms.finance.view_other_expense_nav or perms.finance.view_batch_expense_nav or perms.finance.view_operating_expense_nav or perms.finance.view_profit_dashboard_nav %}
+<div class="nav-group">
+    <button class="nav-toggle" type="button" data-target="menu-finance">
+        <span>Finance</span>
+        <span class="nav-arrow">▼</span>
+    </button>
+
+    <div class="nav-submenu" id="menu-finance">
+
+        {% if perms.finance.view_expense_summary_nav %}
+        <a class="nav-link" href="/expenses/">Expense Summary</a>
+        {% endif %}
+
+        {% if perms.finance.view_other_expense_nav %}
+        <a class="nav-link" href="/expenses/other/">Other Expense</a>
+        {% endif %}
+
+        {% if perms.finance.view_batch_expense_nav %}
+        <a class="nav-link" href="/expenses/batch/">Batch Expense</a>
+        {% endif %}
+
+        {% if perms.finance.view_operating_expense_nav %}
+        <a class="nav-link" href="/expenses/operating/">Operating Expense</a>
+        {% endif %}
+
+        {% if perms.finance.view_profit_dashboard_nav %}
+        <a class="nav-link" href="/profit-dashboard/">Profit Dashboard</a>
+        {% endif %}
+
+    </div>
+</div>
+{% endif %}
 
                 <!-- SETUP -->
                 {% if perms.inventory.view_inventoryitem or perms.inventory.view_color or perms.inventory.view_size %}
