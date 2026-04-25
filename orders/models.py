@@ -212,24 +212,36 @@ class OrderItem(models.Model):
         blank=True,
         null=True,
     )
-    film_meter = models.DecimalField(max_digits=12, decimal_places=4, default=0)
+    film_meter = models.DecimalField(
+        max_digits=12,
+        decimal_places=4,
+        default=0,
+        validators=[MinValueValidator(Decimal("0"))],
+    )
 
-    # Cloth qty = PCS only, no decimal
+    # Cloth qty = PCS only.
+    # Must allow 0 because Film Only uses quantity = 0.
     quantity = models.DecimalField(
         max_digits=12,
         decimal_places=0,
-        validators=[MinValueValidator(Decimal("1"))],
-        default=1,
-    )
-
-    # Done qty = PCS only, no decimal
-    done_qty = models.DecimalField(
-        max_digits=12,
-        decimal_places=0,
+        validators=[MinValueValidator(Decimal("0"))],
         default=0,
     )
 
-    unit_price = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    # Done qty = PCS only.
+    done_qty = models.DecimalField(
+        max_digits=12,
+        decimal_places=0,
+        validators=[MinValueValidator(Decimal("0"))],
+        default=0,
+    )
+
+    unit_price = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        validators=[MinValueValidator(Decimal("0"))],
+    )
     line_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
     class Meta:
@@ -261,8 +273,10 @@ class OrderItem(models.Model):
                 raise ValidationError({"color": "Full Order requires color."})
             if not self.size:
                 raise ValidationError({"size": "Full Order requires size."})
-            if not self.quantity or self.quantity < 1:
+            if not self.quantity or Decimal(self.quantity) < 1:
                 raise ValidationError({"quantity": "Full Order requires cloth quantity."})
+            if not self.unit_price or Decimal(self.unit_price) <= 0:
+                raise ValidationError({"unit_price": "Full Order requires unit price."})
 
             self.quantity = Decimal(self.quantity).quantize(Decimal("1"))
             self.film_item = None
@@ -271,39 +285,52 @@ class OrderItem(models.Model):
         elif service_type == Order.SERVICE_FILM_ONLY:
             if not self.film_item:
                 raise ValidationError({"film_item": "Film Only requires film item."})
-            if not self.film_meter or self.film_meter <= 0:
+            if not self.film_meter or Decimal(self.film_meter) <= 0:
                 raise ValidationError({"film_meter": "Film Only requires film meter."})
+            if not self.unit_price or Decimal(self.unit_price) <= 0:
+                raise ValidationError({"unit_price": "Film Only requires unit price."})
 
             self.quantity = Decimal("0")
+            self.done_qty = Decimal("0")
             self.shirt_item = None
             self.color = None
             self.size = None
 
         elif service_type == Order.SERVICE_PRINT_HEATPRESS:
-            self.quantity = Decimal(self.quantity or 1).quantize(Decimal("1"))
+            if not self.quantity or Decimal(self.quantity) < 1:
+                raise ValidationError({"quantity": "Print & Heat Press requires quantity."})
+            if not self.unit_price or Decimal(self.unit_price) <= 0:
+                raise ValidationError({"unit_price": "Print & Heat Press requires unit price."})
+
+            self.quantity = Decimal(self.quantity).quantize(Decimal("1"))
             self.shirt_item = None
             self.color = None
             self.size = None
             self.film_item = None
             self.film_meter = Decimal("0")
 
+        if Decimal(self.done_qty or 0) > Decimal(self.quantity or 0):
+            raise ValidationError({"done_qty": "Done qty cannot be greater than quantity."})
+
     def save(self, *args, **kwargs):
         if self.design_id:
             self.order = self.design.order
 
         if self.order and self.order.service_type == Order.SERVICE_FILM_ONLY:
-            self.line_total = (self.film_meter or Decimal("0")) * (self.unit_price or Decimal("0"))
+            self.quantity = Decimal("0")
+            self.done_qty = Decimal("0")
+            self.line_total = (Decimal(self.film_meter or 0) * Decimal(self.unit_price or 0))
         else:
             self.quantity = Decimal(self.quantity or 0).quantize(Decimal("1"))
-            self.line_total = (self.quantity or Decimal("0")) * (self.unit_price or Decimal("0"))
+            self.line_total = (Decimal(self.quantity or 0) * Decimal(self.unit_price or 0))
 
         self.full_clean()
         super().save(*args, **kwargs)
 
     @property
     def remaining_qty(self):
-        return (self.quantity or Decimal("0")) - (self.done_qty or Decimal("0"))
-
+        remaining = Decimal(self.quantity or 0) - Decimal(self.done_qty or 0)
+        return remaining if remaining > 0 else Decimal("0")
 class StockConsumption(models.Model):
     order = models.ForeignKey(
         Order,

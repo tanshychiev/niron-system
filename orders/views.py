@@ -840,8 +840,11 @@ def order_detail(request, pk):
 def production_detail(request, pk):
     order = get_object_or_404(_get_prefetched_order_queryset(), pk=pk, is_deleted=False)
 
-    remaining_pcs = Decimal(order.total_pcs or 0) - Decimal(order.done_pcs or 0)
+    # ✅ ALWAYS calculate from items
+    total_pcs = order.items.aggregate(total=Sum("quantity"))["total"] or Decimal("0")
+    done_pcs = order.items.aggregate(total=Sum("done_qty"))["total"] or Decimal("0")
 
+    remaining_pcs = total_pcs - done_pcs
     if remaining_pcs < 0:
         remaining_pcs = Decimal("0")
 
@@ -850,6 +853,8 @@ def production_detail(request, pk):
         "orders/production_detail.html",
         {
             "order": order,
+            "total_pcs": total_pcs,
+            "done_pcs": done_pcs,
             "remaining_pcs": remaining_pcs,
         },
     )

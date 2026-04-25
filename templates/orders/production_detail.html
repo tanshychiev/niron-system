@@ -63,14 +63,14 @@
         </div>
 
         <div class="info-mini-card">
-            <div class="mini-label">Progress</div>
-            <div class="mini-value">{{ order.done_pcs }} / {{ order.total_pcs }} pcs</div>
-        </div>
+    <div class="mini-label">Progress</div>
+    <div class="mini-value">{{ done_pcs|floatformat:2 }} / {{ total_pcs|floatformat:2 }} pcs</div>
+</div>
 
-        <div class="info-mini-card">
-            <div class="mini-label">Remaining</div>
-            <div class="mini-value">{{ remaining_pcs }} pcs</div>
-        </div>
+<div class="info-mini-card">
+    <div class="mini-label">Remaining</div>
+    <div class="mini-value">{{ remaining_pcs|floatformat:2 }} pcs</div>
+</div>
     </div>
 
     {% if order.status != "DONE" and order.status != "CANCEL" and order.status != "CANCELLED" %}
