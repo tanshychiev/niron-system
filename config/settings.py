@@ -26,6 +26,7 @@ INSTALLED_APPS = [
     "inventory.apps.InventoryConfig",
     "orders.apps.OrdersConfig",
     "finance",
+    "customers",
 ]
 
 MIDDLEWARE = [
@@ -96,3 +97,16 @@ LOGIN_REDIRECT_URL = "/inventory/"
 LOGOUT_REDIRECT_URL = "/login/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# =========================
+# SESSION SETTINGS
+# =========================
+
+# Session lasts 12 hours
+SESSION_COOKIE_AGE = 60 * 60 * 12  # 43200 seconds
+
+# Refresh session on every request (active user stays logged in)
+SESSION_SAVE_EVERY_REQUEST = True
+
+# Do NOT logout when browser closes
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False

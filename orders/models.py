@@ -4,6 +4,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models
+from customers.models import Customer
 
 from inventory.models import Color, InventoryBatchItem, InventoryItem, Size
 
@@ -44,12 +45,19 @@ class Order(models.Model):
     order_type = models.CharField(max_length=20, choices=TYPE_CHOICES, default=TYPE_NIRON)
     service_type = models.CharField(max_length=30, choices=SERVICE_CHOICES, default=SERVICE_FULL)
 
+    customer = models.ForeignKey(
+        "customers.Customer",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="orders",
+    )
+
     customer_name = models.CharField(max_length=120)
     phone = models.CharField(max_length=30, blank=True, default="")
     customer_location = models.CharField(max_length=255, blank=True, default="")
     deadline = models.DateTimeField()
 
-    # ✅ NEW (created by)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -78,7 +86,6 @@ class Order(models.Model):
     # ===== TRASH SYSTEM =====
     is_deleted = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
-
     deleted_reason = models.TextField(blank=True, default="")
     deleted_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -96,7 +103,11 @@ class Order(models.Model):
 
     @property
     def balance_amount(self):
-        return (self.total_amount or Decimal("0")) - (self.paid_amount or Decimal("0"))
+        return (
+            (self.total_amount or Decimal("0"))
+            - (self.deposit_amount or Decimal("0"))
+            - (self.paid_amount or Decimal("0"))
+        )
 
     @property
     def remaining_pcs(self):
@@ -203,13 +214,21 @@ class OrderItem(models.Model):
     )
     film_meter = models.DecimalField(max_digits=12, decimal_places=4, default=0)
 
+    # Cloth qty = PCS only, no decimal
     quantity = models.DecimalField(
         max_digits=12,
-        decimal_places=2,
-        validators=[MinValueValidator(Decimal("0.01"))],
+        decimal_places=0,
+        validators=[MinValueValidator(Decimal("1"))],
         default=1,
     )
-    done_qty = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    # Done qty = PCS only, no decimal
+    done_qty = models.DecimalField(
+        max_digits=12,
+        decimal_places=0,
+        default=0,
+    )
+
     unit_price = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     line_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
@@ -242,7 +261,10 @@ class OrderItem(models.Model):
                 raise ValidationError({"color": "Full Order requires color."})
             if not self.size:
                 raise ValidationError({"size": "Full Order requires size."})
+            if not self.quantity or self.quantity < 1:
+                raise ValidationError({"quantity": "Full Order requires cloth quantity."})
 
+            self.quantity = Decimal(self.quantity).quantize(Decimal("1"))
             self.film_item = None
             self.film_meter = Decimal("0")
 
@@ -252,11 +274,13 @@ class OrderItem(models.Model):
             if not self.film_meter or self.film_meter <= 0:
                 raise ValidationError({"film_meter": "Film Only requires film meter."})
 
+            self.quantity = Decimal("0")
             self.shirt_item = None
             self.color = None
             self.size = None
 
         elif service_type == Order.SERVICE_PRINT_HEATPRESS:
+            self.quantity = Decimal(self.quantity or 1).quantize(Decimal("1"))
             self.shirt_item = None
             self.color = None
             self.size = None
@@ -267,14 +291,18 @@ class OrderItem(models.Model):
         if self.design_id:
             self.order = self.design.order
 
-        self.line_total = (self.quantity or Decimal("0")) * (self.unit_price or Decimal("0"))
+        if self.order and self.order.service_type == Order.SERVICE_FILM_ONLY:
+            self.line_total = (self.film_meter or Decimal("0")) * (self.unit_price or Decimal("0"))
+        else:
+            self.quantity = Decimal(self.quantity or 0).quantize(Decimal("1"))
+            self.line_total = (self.quantity or Decimal("0")) * (self.unit_price or Decimal("0"))
+
         self.full_clean()
         super().save(*args, **kwargs)
 
     @property
     def remaining_qty(self):
         return (self.quantity or Decimal("0")) - (self.done_qty or Decimal("0"))
-
 
 class StockConsumption(models.Model):
     order = models.ForeignKey(

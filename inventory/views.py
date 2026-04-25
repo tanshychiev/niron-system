@@ -95,7 +95,6 @@ def inventory_list(request):
             "color_name": "-",
             "color_hex": "#D1D5DB",
             "stock_qty": 0,
-            "reserved_qty": 0,
             "available_qty": 0,
             "in_progress_qty": 0,
             "total_qty": 0,
@@ -144,66 +143,12 @@ def inventory_list(request):
                 "size_name": size_name,
                 "size_sort": size_sort,
                 "stock_qty": 0,
-                "reserved_qty": 0,
                 "available_qty": 0,
                 "in_progress_qty": 0,
                 "total_qty": 0,
             }
 
         grouped[key]["sizes"][size_name]["stock_qty"] += stock_qty
-
-    reserved_rows = (
-        StockConsumption.objects.select_related(
-            "order",
-            "batch_item",
-            "batch_item__item",
-            "batch_item__color",
-            "batch_item__size",
-            "batch_item__batch",
-        )
-        .filter(
-            order__status__in=active_statuses,
-            order__is_deleted=False,
-            batch_item__item__item_type=InventoryItem.TYPE_SHIRT,
-            batch_item__batch__is_deleted=False,
-        )
-    )
-
-    for consume in reserved_rows:
-        batch_item = consume.batch_item
-        item = batch_item.item
-        color = batch_item.color
-        size = batch_item.size
-
-        key = (item.id, color.id if color else 0)
-
-        grouped[key]["item_id"] = item.id
-        grouped[key]["item_code"] = item.code
-        grouped[key]["item_name"] = item.name
-        grouped[key]["item_style"] = getattr(item, "sample_style", InventoryItem.STYLE_OVERSIZE)
-        grouped[key]["item_style_label"] = item.get_sample_style_display()
-        grouped[key]["color_id"] = color.id if color else None
-        grouped[key]["color_name"] = color.name if color else "-"
-        grouped[key]["color_hex"] = getattr(color, "hex_code", "#D1D5DB") if color else "#D1D5DB"
-
-        reserved_qty = float(consume.consumed_qty or 0)
-        grouped[key]["reserved_qty"] += reserved_qty
-
-        size_name = size.name if size else "-"
-        size_sort = size.sort_order if size else 9999
-
-        if size_name not in grouped[key]["sizes"]:
-            grouped[key]["sizes"][size_name] = {
-                "size_name": size_name,
-                "size_sort": size_sort,
-                "stock_qty": 0,
-                "reserved_qty": 0,
-                "available_qty": 0,
-                "in_progress_qty": 0,
-                "total_qty": 0,
-            }
-
-        grouped[key]["sizes"][size_name]["reserved_qty"] += reserved_qty
 
     progress_rows = (
         OrderItem.objects.select_related("shirt_item", "color", "size", "order")
@@ -241,7 +186,6 @@ def inventory_list(request):
                 "size_name": size_name,
                 "size_sort": size_sort,
                 "stock_qty": 0,
-                "reserved_qty": 0,
                 "available_qty": 0,
                 "in_progress_qty": 0,
                 "total_qty": 0,
@@ -362,7 +306,6 @@ def inventory_list(request):
             "batches": batch_rows,
         },
     )
-
 
 @login_required
 @permission_required("inventory.view_inventoryitem", raise_exception=True)
@@ -540,9 +483,11 @@ def inventory_batch_create(request):
 
         if form.is_valid() and formset.is_valid():
             batch = form.save(commit=False)
+
             if request.user.is_authenticated:
                 batch.created_by = request.user
                 batch.updated_by = request.user
+
             batch.save()
 
             formset.instance = batch
@@ -554,13 +499,25 @@ def inventory_batch_create(request):
             for item in items:
                 if not item.item:
                     continue
+
                 item.batch = batch
                 item.base_unit_cost = 0
                 item.final_unit_cost = 0
                 item.is_active = True
+
+                # make remaining stock same as received qty on create
+                if not item.qty_remaining:
+                    item.qty_remaining = item.qty_received
+
                 item.save()
 
-            _log_batch_history(batch, InventoryBatchHistory.ACTION_CREATE, request.user, "Batch created")
+            _log_batch_history(
+                batch,
+                InventoryBatchHistory.ACTION_CREATE,
+                request.user,
+                "Batch created",
+            )
+
             messages.success(request, f"Inventory batch {batch.batch_no} created.")
             return redirect("inventory_batch_detail", pk=batch.pk)
     else:
@@ -575,9 +532,9 @@ def inventory_batch_create(request):
             "formset": formset,
             "page_title": "Stock In",
             "submit_label": "Save Batch",
+            "items": InventoryItem.objects.filter(is_active=True).order_by("code", "name"),
         },
     )
-
 
 @login_required
 @permission_required("inventory.change_inventorybatch", raise_exception=True)

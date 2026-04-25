@@ -5,9 +5,10 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
 from django.db.models import Q, Sum
 from django.db.models.functions import TruncDate
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
+from openpyxl import Workbook
 
 from .forms import (
     BatchExpenseForm,
@@ -16,8 +17,6 @@ from .forms import (
     OtherExpenseForm,
 )
 from .models import Expense
-from django.http import HttpResponse
-from openpyxl import Workbook
 
 
 def _to_decimal(value):
@@ -109,11 +108,11 @@ def _apply_filters(request, qs):
                 | Q(batch__batch_no__icontains=keyword)
             )
 
-        # ✅ THIS IS WHAT YOU WERE MISSING
         if expense_type:
             qs = qs.filter(expense_type=expense_type)
 
     return form, qs
+
 
 def _get_total_inventory():
     try:
@@ -149,6 +148,7 @@ def _get_expense_chart_data():
     labels = []
     values = []
     current = start_date
+
     while current <= end_date:
         labels.append(current.strftime("%d %b"))
         values.append(expense_map.get(current, 0))
@@ -251,11 +251,13 @@ def operating_expense_list(request):
 def create_other_expense(request):
     if request.method == "POST":
         form = OtherExpenseForm(request.POST)
+
         if form.is_valid():
             obj = form.save(commit=False)
             obj.expense_type = Expense.TYPE_OTHER
             obj.created_by = request.user
             obj.save()
+
             messages.success(request, "Other expense created successfully.")
             return redirect("other_expense_list")
     else:
@@ -277,12 +279,14 @@ def create_other_expense(request):
 def create_batch_expense(request):
     if request.method == "POST":
         form = BatchExpenseForm(request.POST)
+
         if form.is_valid():
             obj = form.save(commit=False)
             obj.expense_type = Expense.TYPE_BATCH
             obj.created_by = request.user
 
             batch = obj.batch
+
             if batch:
                 detail = _get_batch_expense_data(batch)
 
@@ -330,11 +334,13 @@ def create_batch_expense(request):
 def create_operating_expense(request):
     if request.method == "POST":
         form = OperatingExpenseForm(request.POST)
+
         if form.is_valid():
             obj = form.save(commit=False)
             obj.expense_type = Expense.TYPE_OPERATING
             obj.created_by = request.user
             obj.save()
+
             messages.success(request, "Operating expense created successfully.")
             return redirect("operating_expense_list")
     else:
@@ -350,6 +356,7 @@ def create_operating_expense(request):
         },
     )
 
+
 @login_required
 @permission_required("finance.view_expense", raise_exception=True)
 def profit_dashboard(request):
@@ -363,33 +370,39 @@ def profit_dashboard(request):
             order_qs = order_qs.filter(order_type=order_type)
             item_qs = item_qs.filter(order__order_type=order_type)
 
-        # Exclude cancelled / void if your system uses these statuses
-        order_qs = order_qs.exclude(status__in=["CANCELLED", "CANCELED", "VOID"])
+        excluded_statuses = ["CANCEL", "CANCELLED", "CANCELED", "VOID"]
+        order_qs = order_qs.exclude(status__in=excluded_statuses)
 
         total_amount = order_qs.aggregate(total=Sum("total_amount"))["total"] or Decimal("0")
         deposit = order_qs.aggregate(total=Sum("deposit_amount"))["total"] or Decimal("0")
         paid = order_qs.aggregate(total=Sum("paid_amount"))["total"] or Decimal("0")
         receivable = total_amount - deposit - paid
 
-        cloth_sold = item_qs.filter(
+        cloth_qs = item_qs.filter(
             order__in=order_qs,
-            item_mode="CLOTH",
-        ).aggregate(total=Sum("quantity"))["total"] or Decimal("0")
+            shirt_item__isnull=False,
+        )
 
-        cloth_revenue = item_qs.filter(
-            order__in=order_qs,
-            item_mode="CLOTH",
-        ).aggregate(total=Sum("line_total"))["total"] or Decimal("0")
+        cloth_sold = cloth_qs.aggregate(
+            total=Sum("quantity")
+        )["total"] or Decimal("0")
 
-        film_sold = item_qs.filter(
-            order__in=order_qs,
-            item_mode="FILM",
-        ).aggregate(total=Sum("manual_film_meter"))["total"] or Decimal("0")
+        cloth_revenue = cloth_qs.aggregate(
+            total=Sum("line_total")
+        )["total"] or Decimal("0")
 
-        film_revenue = item_qs.filter(
+        film_qs = item_qs.filter(
             order__in=order_qs,
-            item_mode="FILM",
-        ).aggregate(total=Sum("line_total"))["total"] or Decimal("0")
+            film_item__isnull=False,
+        )
+
+        film_sold = film_qs.aggregate(
+            total=Sum("film_meter")
+        )["total"] or Decimal("0")
+
+        film_revenue = film_qs.aggregate(
+            total=Sum("line_total")
+        )["total"] or Decimal("0")
 
         return {
             "total_amount": total_amount,
@@ -411,15 +424,9 @@ def profit_dashboard(request):
     total_inventory = _get_total_inventory()
 
     expense_by_type = {
-        "other": Expense.objects.filter(
-            expense_type=Expense.TYPE_OTHER
-        ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00"),
-        "batch": Expense.objects.filter(
-            expense_type=Expense.TYPE_BATCH
-        ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00"),
-        "operating": Expense.objects.filter(
-            expense_type=Expense.TYPE_OPERATING
-        ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00"),
+        "other": Expense.objects.filter(expense_type=Expense.TYPE_OTHER).aggregate(total=Sum("amount"))["total"] or Decimal("0.00"),
+        "batch": Expense.objects.filter(expense_type=Expense.TYPE_BATCH).aggregate(total=Sum("amount"))["total"] or Decimal("0.00"),
+        "operating": Expense.objects.filter(expense_type=Expense.TYPE_OPERATING).aggregate(total=Sum("amount"))["total"] or Decimal("0.00"),
     }
 
     recent_expenses = Expense.objects.select_related("created_by", "batch").all()[:8]
@@ -427,7 +434,7 @@ def profit_dashboard(request):
     end_date = timezone.localdate()
     start_date = end_date - timedelta(days=29)
 
-    excluded_statuses = ["CANCELLED", "CANCELED", "VOID"]
+    excluded_statuses = ["CANCEL", "CANCELLED", "CANCELED", "VOID"]
 
     base_order_qs = Order.objects.filter(
         created_at__date__gte=start_date,
@@ -468,6 +475,7 @@ def profit_dashboard(request):
     total_values = []
 
     current = start_date
+
     while current <= end_date:
         chart_labels.append(current.strftime("%d %b"))
         niron_values.append(niron_map.get(current, 0))
@@ -498,10 +506,12 @@ def profit_dashboard(request):
         },
     )
 
+
 @login_required
 @permission_required("finance.add_batch_expense", raise_exception=True)
 def batch_expense_preview(request):
     batch_id = request.GET.get("batch_id")
+
     if not batch_id:
         return JsonResponse({"error": "Missing batch_id"}, status=400)
 
@@ -560,6 +570,8 @@ def batch_expense_preview(request):
             "color_count": len(color_summary),
         }
     )
+
+
 @login_required
 @permission_required("finance.view_expense", raise_exception=True)
 def expense_summary_export_excel(request):
@@ -589,6 +601,7 @@ def expense_summary_export_excel(request):
             title = "Other Expense"
 
         record_by = ""
+
         if row.created_by:
             record_by = row.created_by.get_full_name() or row.created_by.username
 

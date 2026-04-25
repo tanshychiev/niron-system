@@ -509,6 +509,8 @@
             </div>
 
             <div class="sidebar-scroll">
+
+                <!-- INVENTORY -->
                 {% if perms.inventory.view_inventorybatch %}
                 <div class="nav-group">
                     <button class="nav-toggle" type="button" data-target="menu-inventory">
@@ -534,6 +536,7 @@
                 </div>
                 {% endif %}
 
+                <!-- ORDERS -->
                 {% if perms.orders.view_order or perms.orders.add_order %}
                 <div class="nav-group">
                     <button class="nav-toggle" type="button" data-target="menu-orders">
@@ -556,6 +559,20 @@
                 </div>
                 {% endif %}
 
+                <!-- 🔥 NEW CUSTOMERS -->
+                {% if perms.customers.view_customer %}
+                <div class="nav-group">
+                    <button class="nav-toggle" type="button" data-target="menu-customers">
+                        <span>Customers</span>
+                        <span class="nav-arrow">▼</span>
+                    </button>
+                    <div class="nav-submenu" id="menu-customers">
+                        <a class="nav-link" href="/customers/">Customer List</a>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- FINANCE -->
                 {% if perms.finance.view_finance_nav %}
                 <div class="nav-group">
                     <button class="nav-toggle" type="button" data-target="menu-finance">
@@ -563,29 +580,16 @@
                         <span class="nav-arrow">▼</span>
                     </button>
                     <div class="nav-submenu" id="menu-finance">
-                        {% if perms.finance.view_expense_summary_nav %}
                         <a class="nav-link" href="/expenses/">Expense Summary</a>
-                        {% endif %}
-
-                        {% if perms.finance.view_other_expense_nav %}
                         <a class="nav-link" href="/expenses/other/">Other Expense</a>
-                        {% endif %}
-
-                        {% if perms.finance.view_batch_expense_nav %}
                         <a class="nav-link" href="/expenses/batch/">Batch Expense</a>
-                        {% endif %}
-
-                        {% if perms.finance.view_operating_expense_nav %}
                         <a class="nav-link" href="/expenses/operating/">Operating Expense</a>
-                        {% endif %}
-
-                        {% if perms.finance.view_profit_dashboard_nav %}
                         <a class="nav-link" href="/profit-dashboard/">Profit Dashboard</a>
-                        {% endif %}
                     </div>
                 </div>
                 {% endif %}
 
+                <!-- SETUP -->
                 {% if perms.inventory.view_inventoryitem or perms.inventory.view_color or perms.inventory.view_size %}
                 <div class="nav-group">
                     <button class="nav-toggle" type="button" data-target="menu-setup">
@@ -593,54 +597,28 @@
                         <span class="nav-arrow">▼</span>
                     </button>
                     <div class="nav-submenu" id="menu-setup">
-                        {% if perms.inventory.view_inventoryitem %}
                         <a class="nav-link" href="/inventory/items/">Item List</a>
-                        {% endif %}
-
-                        {% if perms.inventory.view_color %}
                         <a class="nav-link" href="/inventory/colors/">Color List</a>
-                        {% endif %}
-
-                        {% if perms.inventory.view_size %}
                         <a class="nav-link" href="/inventory/sizes/">Size List</a>
-                        {% endif %}
                     </div>
                 </div>
                 {% endif %}
 
-                {% if perms.auth.view_user or perms.auth.add_user or perms.auth.view_group or perms.auth.view_permission %}
+                <!-- USERS -->
+                {% if perms.auth.view_user or perms.auth.view_group %}
                 <div class="nav-group">
                     <button class="nav-toggle" type="button" data-target="menu-users">
                         <span>Users & Permissions</span>
                         <span class="nav-arrow">▼</span>
                     </button>
                     <div class="nav-submenu" id="menu-users">
-                        {% if perms.auth.view_user %}
                         <a class="nav-link" href="/users/">User List</a>
-                        {% endif %}
-
-                        {% if perms.auth.add_user %}
-                        <a class="nav-link" style="font-size:12px; padding-left:28px; opacity:.85;" href="/users/new/">
-                            + Create User
-                        </a>
-                        {% endif %}
-
-                        {% if perms.auth.view_group %}
                         <a class="nav-link" href="/users/roles/">Roles</a>
-                        {% endif %}
-
-                        {% if perms.auth.add_group %}
-                        <a class="nav-link" style="font-size:12px; padding-left:28px; opacity:.85;" href="/users/roles/create/">
-                            + Create Role
-                        </a>
-                        {% endif %}
-
-                        {% if perms.auth.view_permission %}
                         <a class="nav-link" href="/users/permissions/">Permissions</a>
-                        {% endif %}
                     </div>
                 </div>
                 {% endif %}
+
             </div>
 
             {% if user.is_authenticated %}
@@ -670,9 +648,7 @@
                     </div>
                     {% endif %}
 
-                    <div>
-                        {% block top_actions %}{% endblock %}
-                    </div>
+                    {% block top_actions %}{% endblock %}
                 </div>
             </div>
 
@@ -685,18 +661,8 @@
                 {% if messages %}
                 <div class="flash-stack">
                     {% for message in messages %}
-                    <div class="flash-message {% if message.tags == 'success' %}flash-success{% elif message.tags == 'warning' %}flash-warning{% elif message.tags == 'error' %}flash-error{% else %}flash-info{% endif %}">
-                        <div class="flash-icon">
-                            {% if message.tags == 'success' %}
-                                ✓
-                            {% elif message.tags == 'warning' %}
-                                !
-                            {% elif message.tags == 'error' %}
-                                ✕
-                            {% else %}
-                                i
-                            {% endif %}
-                        </div>
+                    <div class="flash-message flash-{{ message.tags }}">
+                        <div class="flash-icon">✓</div>
                         <div class="flash-text">{{ message }}</div>
                     </div>
                     {% endfor %}
@@ -707,60 +673,53 @@
             </div>
         </div>
     </div>
-
-    <script>
-        (function () {
-            const toggles = document.querySelectorAll(".nav-toggle");
-            const currentPath = window.location.pathname;
-
-            function closeAll() {
-                toggles.forEach((btn) => {
-                    const id = btn.getAttribute("data-target");
-                    const menu = document.getElementById(id);
-                    btn.classList.remove("active");
-                    if (menu) menu.classList.remove("show");
-                });
-            }
-
-            toggles.forEach((toggle) => {
-                toggle.addEventListener("click", function () {
-                    const targetId = this.getAttribute("data-target");
-                    const currentMenu = document.getElementById(targetId);
-                    if (!currentMenu) return;
-
-                    const isOpen = currentMenu.classList.contains("show");
-                    closeAll();
-
-                    if (!isOpen) {
-                        currentMenu.classList.add("show");
-                        this.classList.add("active");
-                    }
-                });
-            });
-
-            toggles.forEach((toggle) => {
-                const targetId = toggle.getAttribute("data-target");
-                const menu = document.getElementById(targetId);
-                if (!menu) return;
-
-                const links = menu.querySelectorAll(".nav-link");
-                links.forEach((link) => {
-                    const href = link.getAttribute("href");
-                    if (!href) return;
-
-                    if (
-                        href === currentPath ||
-                        (href !== "/" && currentPath.startsWith(href))
-                    ) {
-                        menu.classList.add("show");
-                        toggle.classList.add("active");
-                        link.classList.add("current");
-                    }
-                });
-            });
-        })();
-    </script>
-
-    {% block extra_js %}{% endblock %}
 </body>
+<script>
+(function () {
+    const toggles = document.querySelectorAll(".nav-toggle");
+    const currentPath = window.location.pathname;
+
+    function closeAll() {
+        toggles.forEach((btn) => {
+            const id = btn.getAttribute("data-target");
+            const menu = document.getElementById(id);
+            btn.classList.remove("active");
+            if (menu) menu.classList.remove("show");
+        });
+    }
+
+    toggles.forEach((toggle) => {
+        toggle.addEventListener("click", function () {
+            const targetId = this.getAttribute("data-target");
+            const currentMenu = document.getElementById(targetId);
+            if (!currentMenu) return;
+
+            const isOpen = currentMenu.classList.contains("show");
+            closeAll();
+
+            if (!isOpen) {
+                currentMenu.classList.add("show");
+                this.classList.add("active");
+            }
+        });
+    });
+
+    toggles.forEach((toggle) => {
+        const targetId = toggle.getAttribute("data-target");
+        const menu = document.getElementById(targetId);
+        if (!menu) return;
+
+        menu.querySelectorAll(".nav-link").forEach((link) => {
+            const href = link.getAttribute("href");
+            if (!href) return;
+
+            if (href === currentPath || (href !== "/" && currentPath.startsWith(href))) {
+                menu.classList.add("show");
+                toggle.classList.add("active");
+                link.classList.add("current");
+            }
+        });
+    });
+})();
+</script>
 </html>

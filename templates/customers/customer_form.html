@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block page_title %}Edit Customer{% endblock %}
+{% block page_subtitle %}Update customer information{% endblock %}
+
+{% block content %}
+<div class="form-card" style="max-width:600px; margin:auto;">
+
+  <h2 style="margin-bottom:20px;">Edit Customer</h2>
+
+  <form method="post">
+    {% csrf_token %}
+
+    <div class="field">
+      <label>Name</label>
+      <input type="text" name="name" value="{{ customer.name }}" required>
+    </div>
+
+    <div class="field">
+      <label>Phone</label>
+      <input type="text" name="phone" value="{{ customer.phone }}">
+    </div>
+
+    <div class="field">
+      <label>Location</label>
+      <input type="text" name="location" value="{{ customer.location }}">
+    </div>
+
+    <div style="margin-top:20px;">
+      <button type="submit" class="btn-primary">Update</button>
+      <a href="{% url 'customer_list' %}" class="btn-light">Cancel</a>
+    </div>
+  </form>
+
+</div>
+{% endblock %}

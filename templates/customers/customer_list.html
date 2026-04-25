@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block title %}Customers{% endblock %}
+{% block page_title %}Customers{% endblock %}
+{% block page_subtitle %}Customer list, order count, and total paid{% endblock %}
+
+{% block content %}
+<div class="table-card">
+  <div class="customer-head">
+    <form method="get" class="search-form">
+      <input type="text" name="q" value="{{ q }}" placeholder="Search customer, phone, location">
+      <button class="btn btn-primary" type="submit">Search</button>
+    </form>
+  </div>
+
+  <div class="table-wrap">
+    <table class="app-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Phone</th>
+          <th>Location</th>
+          <th>Total Orders</th>
+          <th>Total Paid</th>
+          <th>Last Order</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {% for c in customers %}
+        <tr>
+          <td><strong>{{ c.name }}</strong></td>
+          <td>{{ c.phone|default:"-" }}</td>
+          <td>{{ c.location|default:"-" }}</td>
+          <td>{{ c.total_orders|default:0 }}</td>
+          <td>${{ c.total_paid|default:0 }}</td>
+          <td>{{ c.last_order_at|date:"Y-m-d H:i"|default:"-" }}</td>
+          <td>
+            <div class="action-buttons">
+              <a href="{% url 'customer_detail' c.id %}" class="btn btn-light">View</a>
+              <a href="{% url 'customer_edit' c.id %}" class="btn btn-primary">Edit</a>
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7" class="empty-row">No customers found.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<style>
+.customer-head{
+  padding:16px;
+  border-bottom:1px solid var(--line);
+}
+
+.search-form{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+}
+
+.search-form input{
+  max-width:420px;
+}
+
+.table-card{
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:22px;
+  box-shadow:var(--shadow);
+  overflow:hidden;
+}
+
+.table-wrap{
+  overflow-x:auto;
+}
+
+.app-table{
+  width:100%;
+  border-collapse:collapse;
+  min-width:960px;
+}
+
+.app-table th,
+.app-table td{
+  padding:13px 12px;
+  border-bottom:1px solid var(--line);
+  text-align:left;
+  vertical-align:middle;
+}
+
+.app-table th{
+  background:#faf8f2;
+  color:var(--muted);
+  font-size:11px;
+  font-weight:900;
+  text-transform:uppercase;
+}
+
+.action-buttons{
+  display:flex;
+  gap:8px;
+  align-items:center;
+  flex-wrap:wrap;
+}
+
+.empty-row{
+  text-align:center;
+  padding:30px !important;
+  color:var(--muted);
+}
+</style>
+{% endblock %}

@@ -1,5 +1,3 @@
-from decimal import Decimal
-
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
 from django.core.exceptions import ValidationError
@@ -9,7 +7,8 @@ from django.db.models import Prefetch, Q, Sum
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
-
+from customers.models import Customer
+from decimal import Decimal, ROUND_HALF_UP
 from inventory.models import Color, InventoryItem, Size
 from openpyxl import Workbook
 
@@ -22,7 +21,7 @@ from .models import (
     OrderItem,
     OrderProgress,
 )
-from .services import restore_stock_for_order
+from .services import restore_stock_for_order, deduct_stock_for_order
 
 
 def _stringify(value):
@@ -210,6 +209,10 @@ def _build_design_payloads_from_post(request):
             item_prefix = f"{prefix}-item-{item_index}"
             delete_item = request.POST.get(f"{item_prefix}-DELETE") == "1"
 
+            qty = _decimal_or_zero(
+                request.POST.get(f"{item_prefix}-quantity")
+            ).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+
             items.append(
                 {
                     "id": request.POST.get(f"{item_prefix}-id") or "",
@@ -218,7 +221,7 @@ def _build_design_payloads_from_post(request):
                     "film_item_id": request.POST.get(f"{item_prefix}-film_item") or None,
                     "color_id": request.POST.get(f"{item_prefix}-color") or None,
                     "size_id": request.POST.get(f"{item_prefix}-size") or None,
-                    "quantity": _decimal_or_zero(request.POST.get(f"{item_prefix}-quantity")),
+                    "quantity": qty,
                     "unit_price": _decimal_or_zero(request.POST.get(f"{item_prefix}-unit_price")),
                     "film_meter": _decimal_or_zero(request.POST.get(f"{item_prefix}-film_meter")),
                     "delete": delete_item,
@@ -338,6 +341,50 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
             if is_blank_item:
                 continue
 
+            if order.service_type == Order.SERVICE_FULL:
+                if (
+                    not item_data["shirt_item_id"]
+                    or not item_data["color_id"]
+                    or not item_data["size_id"]
+                    or item_data["quantity"] <= 0
+                    or item_data["unit_price"] <= 0
+                ):
+                    raise ValidationError(
+                        "Full Order requires Shirt Item, Color, Size, Qty, and Unit Price."
+                    )
+
+                item_data["quantity"] = item_data["quantity"].quantize(Decimal("1"))
+                item_data["film_item_id"] = None
+                item_data["film_meter"] = Decimal("0")
+
+            elif order.service_type == Order.SERVICE_FILM_ONLY:
+                if (
+                    not item_data["film_item_id"]
+                    or item_data["film_meter"] <= 0
+                    or item_data["unit_price"] <= 0
+                ):
+                    raise ValidationError(
+                        "Film Only requires Film Item, Film Meter, and Unit Price."
+                    )
+
+                item_data["shirt_item_id"] = None
+                item_data["color_id"] = None
+                item_data["size_id"] = None
+                item_data["quantity"] = Decimal("0")
+
+            elif order.service_type == Order.SERVICE_PRINT_HEATPRESS:
+                if item_data["quantity"] <= 0 or item_data["unit_price"] <= 0:
+                    raise ValidationError(
+                        "Print & Heat Press requires Qty and Unit Price."
+                    )
+
+                item_data["quantity"] = item_data["quantity"].quantize(Decimal("1"))
+                item_data["shirt_item_id"] = None
+                item_data["film_item_id"] = None
+                item_data["color_id"] = None
+                item_data["size_id"] = None
+                item_data["film_meter"] = Decimal("0")
+
             if item is None:
                 item = OrderItem.objects.create(
                     order=order,
@@ -347,10 +394,11 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
                     film_item_id=item_data["film_item_id"],
                     color_id=item_data["color_id"],
                     size_id=item_data["size_id"],
-                    quantity=item_data["quantity"] or Decimal("1"),
+                    quantity=item_data["quantity"],
                     unit_price=item_data["unit_price"],
                     film_meter=item_data["film_meter"],
                 )
+
                 _log_order_history(
                     order=order,
                     action=OrderHistory.ACTION_ITEM_ADD,
@@ -368,29 +416,34 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
                 item.film_item_id = item_data["film_item_id"]
                 item.color_id = item_data["color_id"]
                 item.size_id = item_data["size_id"]
-                item.quantity = item_data["quantity"] or Decimal("1")
+                item.quantity = item_data["quantity"]
                 item.unit_price = item_data["unit_price"]
                 item.film_meter = item_data["film_meter"]
                 item.save()
 
                 new_item_data = _snapshot_item(item)
-                for key, old_val in old_item_data.items():
-                    new_val = new_item_data.get(key)
-                    if _stringify(old_val) != _stringify(new_val):
-                        _log_order_history(
-                            order=order,
-                            action=OrderHistory.ACTION_ITEM_EDIT,
-                            field_name=f"item#{item.pk}.{key}",
-                            old_value=old_val,
-                            new_value=new_val,
-                            user=user,
-                            remark=f"Item updated in {design.display_name}",
-                        )
+                if old_item_data:
+                    for key, old_val in old_item_data.items():
+                        new_val = new_item_data.get(key)
+                        if _stringify(old_val) != _stringify(new_val):
+                            _log_order_history(
+                                order=order,
+                                action=OrderHistory.ACTION_ITEM_EDIT,
+                                field_name=f"item#{item.pk}.{key}",
+                                old_value=old_val,
+                                new_value=new_val,
+                                user=user,
+                                remark=f"Item updated in {design.display_name}",
+                            )
 
             kept_item_ids.add(str(item.pk))
             has_item_or_file = True
             total_amount += Decimal(item.line_total or 0)
-            total_pcs += Decimal(item.quantity or 0)
+
+            if order.service_type == Order.SERVICE_FILM_ONLY:
+                total_pcs += Decimal("0")
+            else:
+                total_pcs += Decimal(item.quantity or 0)
 
         for f in design_data["files"]:
             OrderDesignFile.objects.create(
@@ -428,6 +481,39 @@ def _get_order_totals_by_service(order):
         film_meter = order.items.aggregate(total=Sum("film_meter"))["total"] or Decimal("0")
 
     return cloth_qty, film_meter
+
+
+def _get_or_create_customer_from_request(request):
+    customer_name = (request.POST.get("customer_name") or "").strip()
+    phone = (request.POST.get("phone") or "").strip()
+    location = (request.POST.get("customer_location") or "").strip()
+
+    if not customer_name:
+        return None
+
+    customer, created = Customer.objects.get_or_create(
+        name=customer_name,
+        defaults={
+            "phone": phone,
+            "location": location,
+        },
+    )
+
+    if not created:
+        changed = False
+
+        if phone and customer.phone != phone:
+            customer.phone = phone
+            changed = True
+
+        if location and customer.location != location:
+            customer.location = location
+            changed = True
+
+        if changed:
+            customer.save(update_fields=["phone", "location", "updated_at"])
+
+    return customer
 
 
 @login_required
@@ -655,67 +741,76 @@ def order_list_export_excel(request):
 
 @login_required
 @permission_required("orders.add_order", raise_exception=True)
-@transaction.atomic
 def order_create(request):
     if request.method == "POST":
         form = OrderForm(request.POST, request.FILES)
 
         if form.is_valid():
             try:
-                order = form.save(commit=False)
-                order.status = Order.STATUS_PENDING
+                with transaction.atomic():
+                    order = form.save(commit=False)
+                    order.status = Order.STATUS_PENDING
+                    order.customer = _get_or_create_customer_from_request(request)
 
-                if request.user.is_authenticated and not order.created_by_id:
-                    order.created_by = request.user
+                    if request.user.is_authenticated and not order.created_by_id:
+                        order.created_by = request.user
 
-                order.save()
+                    order.save()
 
-                design_payloads = _build_design_payloads_from_post(request)
+                    design_payloads = _build_design_payloads_from_post(request)
 
-                total_amount, total_pcs = _save_design_payloads(
-                    order=order,
-                    design_payloads=design_payloads,
-                    user=request.user,
-                    is_edit=False,
-                )
+                    total_amount, total_pcs = _save_design_payloads(
+                        order=order,
+                        design_payloads=design_payloads,
+                        user=request.user,
+                        is_edit=False,
+                    )
 
-                discount_amount = _decimal_or_zero(request.POST.get("discount_amount"))
-                shipping_fee = _decimal_or_zero(request.POST.get("shipping_fee"))
-                deposit_amount = _decimal_or_zero(request.POST.get("deposit_amount"))
-                paid_amount = _decimal_or_zero(request.POST.get("paid_amount"))
+                    discount_amount = _decimal_or_zero(request.POST.get("discount_amount"))
+                    shipping_fee = _decimal_or_zero(request.POST.get("shipping_fee"))
+                    deposit_amount = _decimal_or_zero(request.POST.get("deposit_amount"))
+                    paid_amount = _decimal_or_zero(request.POST.get("paid_amount"))
 
-                order.total_amount = total_amount - discount_amount + shipping_fee
-                order.deposit_amount = deposit_amount
-                order.paid_amount = paid_amount
-                order.total_pcs = total_pcs
-                order.done_pcs = Decimal("0")
-                order.status = Order.STATUS_PENDING
-                order.stock_deducted = False
+                    order.total_amount = total_amount - discount_amount + shipping_fee
+                    order.deposit_amount = deposit_amount
+                    order.paid_amount = paid_amount
+                    order.total_pcs = total_pcs
+                    order.done_pcs = Decimal("0")
+                    order.status = Order.STATUS_PENDING
+                    order.stock_deducted = False
 
-                order.save(update_fields=[
-                    "total_amount", "deposit_amount", "paid_amount",
-                    "total_pcs", "done_pcs", "status", "stock_deducted",
-                    "created_by",
-                ])
+                    order.save(update_fields=[
+                        "customer",
+                        "total_amount",
+                        "deposit_amount",
+                        "paid_amount",
+                        "total_pcs",
+                        "done_pcs",
+                        "status",
+                        "stock_deducted",
+                        "created_by",
+                    ])
 
-                _log_order_history(
-                    order=order,
-                    action=OrderHistory.ACTION_CREATE,
-                    field_name="order",
-                    old_value="",
-                    new_value=order.order_no,
-                    user=request.user,
-                    remark="Order created. Stock is manual; no auto deduction.",
-                )
+                    deduct_stock_for_order(order, allow_shortage=True)
+
+                    _log_order_history(
+                        order=order,
+                        action=OrderHistory.ACTION_CREATE,
+                        field_name="order",
+                        old_value="",
+                        new_value=order.order_no,
+                        user=request.user,
+                        remark="Order created. Cloth stock deducted automatically. Film was not deducted.",
+                    )
 
                 messages.success(
                     request,
-                    f"Order {order.order_no} created successfully. Stock was not deducted automatically."
+                    f"Order {order.order_no} created successfully. Cloth stock deducted automatically. Film was not deducted."
                 )
                 return redirect("order_detail", pk=order.pk)
 
             except ValidationError as e:
-                messages.error(request, str(e))
+                messages.error(request, e.messages[0] if hasattr(e, "messages") else str(e))
         else:
             messages.error(request, "Please fix the errors below and try again.")
     else:
@@ -764,7 +859,11 @@ def production_detail(request, pk):
 @permission_required("orders.change_order", raise_exception=True)
 @transaction.atomic
 def production_update(request, pk):
-    order = get_object_or_404(Order.objects.prefetch_related("items", "designs__items"), pk=pk, is_deleted=False)
+    order = get_object_or_404(
+        Order.objects.prefetch_related("items", "designs__items"),
+        pk=pk,
+        is_deleted=False,
+    )
 
     if request.method == "POST":
         if request.POST.get("cancel_order"):
@@ -774,13 +873,14 @@ def production_update(request, pk):
                 messages.warning(request, "Order already cancelled.")
                 return redirect("production_detail", pk=order.pk)
 
+            # Cancel = restore stock one time
             if order.stock_deducted:
                 restore_stock_for_order(order)
 
             order.status = cancel_status
             order.save(update_fields=["status"])
 
-            messages.success(request, "Order cancelled.")
+            messages.success(request, "Order cancelled and stock restored.")
             return redirect("production_detail", pk=order.pk)
 
         if request.POST.get("complete_all"):
@@ -819,7 +919,12 @@ def production_update(request, pk):
             messages.error(request, "Done qty cannot be greater than ordered qty.")
             return redirect("production_detail", pk=order.pk)
 
-        OrderProgress.objects.create(order=order, order_item=order_item, qty_done=qty_done, remark=remark)
+        OrderProgress.objects.create(
+            order=order,
+            order_item=order_item,
+            qty_done=qty_done,
+            remark=remark,
+        )
 
         order_item.done_qty = Decimal(order_item.done_qty or 0) + qty_done
         order_item.save(update_fields=["done_qty"])
@@ -840,7 +945,6 @@ def production_update(request, pk):
 
     return redirect("production_detail", pk=order.pk)
 
-
 @login_required
 @permission_required("orders.view_order", raise_exception=True)
 def order_invoice(request, pk):
@@ -857,7 +961,6 @@ def order_invoice_pdf(request, pk):
 
 @login_required
 @permission_required("orders.change_order", raise_exception=True)
-@transaction.atomic
 def order_edit(request, pk):
     order = get_object_or_404(_get_prefetched_order_queryset(), pk=pk, is_deleted=False)
 
@@ -867,52 +970,65 @@ def order_edit(request, pk):
 
         if form.is_valid():
             try:
-                order = form.save(commit=False)
-                order.save()
+                with transaction.atomic():
+                    order = form.save(commit=False)
+                    order.customer = _get_or_create_customer_from_request(request)
+                    order.save()
 
-                design_payloads = _build_design_payloads_from_post(request)
+                    design_payloads = _build_design_payloads_from_post(request)
 
-                total_amount, total_pcs = _save_design_payloads(
-                    order=order,
-                    design_payloads=design_payloads,
-                    user=request.user,
-                    is_edit=True,
-                )
+                    total_amount, total_pcs = _save_design_payloads(
+                        order=order,
+                        design_payloads=design_payloads,
+                        user=request.user,
+                        is_edit=True,
+                    )
 
-                discount_amount = _decimal_or_zero(request.POST.get("discount_amount"))
-                shipping_fee = _decimal_or_zero(request.POST.get("shipping_fee"))
-                deposit_amount = _decimal_or_zero(request.POST.get("deposit_amount"))
-                paid_amount = _decimal_or_zero(request.POST.get("paid_amount"))
+                    discount_amount = _decimal_or_zero(request.POST.get("discount_amount"))
+                    shipping_fee = _decimal_or_zero(request.POST.get("shipping_fee"))
+                    deposit_amount = _decimal_or_zero(request.POST.get("deposit_amount"))
+                    paid_amount = _decimal_or_zero(request.POST.get("paid_amount"))
 
-                order.total_amount = total_amount - discount_amount + shipping_fee
-                order.deposit_amount = deposit_amount
-                order.paid_amount = paid_amount
-                order.total_pcs = total_pcs
+                    order.total_amount = total_amount - discount_amount + shipping_fee
+                    order.deposit_amount = deposit_amount
+                    order.paid_amount = paid_amount
+                    order.total_pcs = total_pcs
 
-                if Decimal(order.done_pcs or 0) > total_pcs:
-                    order.done_pcs = total_pcs
+                    if Decimal(order.done_pcs or 0) > total_pcs:
+                        order.done_pcs = total_pcs
 
-                if order.done_pcs >= order.total_pcs and order.total_pcs > 0:
-                    order.status = Order.STATUS_DONE
-                elif order.done_pcs > 0:
-                    order.status = Order.STATUS_PROCESSING
-                else:
-                    order.status = Order.STATUS_PENDING
+                    if order.done_pcs >= order.total_pcs and order.total_pcs > 0:
+                        order.status = Order.STATUS_DONE
+                    elif order.done_pcs > 0:
+                        order.status = Order.STATUS_PROCESSING
+                    else:
+                        order.status = Order.STATUS_PENDING
 
-                order.save(update_fields=[
-                    "order_type", "service_type", "customer_name", "phone",
-                    "customer_location", "deadline", "remark", "total_amount",
-                    "deposit_amount", "paid_amount", "total_pcs", "done_pcs", "status",
-                ])
+                    order.save(update_fields=[
+                        "customer",
+                        "order_type",
+                        "service_type",
+                        "customer_name",
+                        "phone",
+                        "customer_location",
+                        "deadline",
+                        "remark",
+                        "total_amount",
+                        "deposit_amount",
+                        "paid_amount",
+                        "total_pcs",
+                        "done_pcs",
+                        "status",
+                    ])
 
-                after_order = _snapshot_order(order)
-                _log_order_changes(order, before_order, after_order, request.user)
+                    after_order = _snapshot_order(order)
+                    _log_order_changes(order, before_order, after_order, request.user)
 
                 messages.success(request, f"Order {order.order_no} updated successfully.")
                 return redirect("order_detail", pk=order.pk)
 
             except ValidationError as e:
-                messages.error(request, str(e))
+                messages.error(request, e.messages[0] if hasattr(e, "messages") else str(e))
         else:
             messages.error(request, "Please fix the errors below and try again.")
     else:
@@ -940,7 +1056,11 @@ def order_trash(request, pk):
     order = get_object_or_404(Order, pk=pk, is_deleted=False)
 
     if request.method == "POST":
-        if order.stock_deducted:
+        cancel_status = _get_cancel_status()
+
+        # Delete active order = restore stock
+        # Delete cancelled order = no restore, because cancel already restored
+        if order.status != cancel_status and order.stock_deducted:
             restore_stock_for_order(order)
 
         order.is_deleted = True
@@ -959,8 +1079,6 @@ def order_trash(request, pk):
         return redirect("order_trash_list")
 
     return redirect("order_detail", pk=order.pk)
-
-
 @login_required
 @permission_required("orders.change_order", raise_exception=True)
 @transaction.atomic
@@ -973,18 +1091,26 @@ def order_restore(request, pk):
         order.deleted_by = None
         order.deleted_reason = ""
 
+        # Restore = create that order again
+        order.status = Order.STATUS_PENDING
+        order.done_pcs = Decimal("0")
+
         order.save(update_fields=[
             "is_deleted",
             "deleted_at",
             "deleted_by",
             "deleted_reason",
+            "status",
+            "done_pcs",
         ])
 
-        messages.success(request, f"Order {order.order_no} restored.")
+        if not order.stock_deducted:
+            deduct_stock_for_order(order, allow_shortage=True)
+
+        messages.success(request, f"Order {order.order_no} restored and stock deducted again.")
         return redirect("order_detail", pk=order.pk)
 
     return redirect("order_trash_list")
-
 @login_required
 @permission_required("orders.view_order", raise_exception=True)
 def order_trash_list(request):
@@ -1008,88 +1134,6 @@ def order_trash_list(request):
             "deleted_by": order.deleted_by.username if order.deleted_by else "-",
             "deleted_at": order.deleted_at,
         })
-
-    return render(
-        request,
-        "orders/order_trash_list.html",
-        {
-            "rows": rows,
-            "total_orders": qs.count(),
-        },
-    )
-    qs = (
-        Order.objects.filter(is_deleted=True)
-        .select_related("deleted_by")
-        .prefetch_related("items")
-        .order_by("-deleted_at", "-id")
-    )
-
-    rows = []
-
-    for order in qs:
-        cloth_qty, film_meter = _get_order_totals_by_service(order)
-
-        rows.append({
-            "obj": order,
-            "cloth_qty": cloth_qty,
-            "film_meter": film_meter,
-            "reason": order.deleted_reason or "-",   # ✅ correct
-            "deleted_by": order.deleted_by.username if order.deleted_by else "-",
-            "deleted_at": order.deleted_at,
-        })
-
-    return render(
-        request,
-        "orders/order_trash_list.html",
-        {
-            "rows": rows,
-            "total_orders": qs.count(),
-        },
-    )
-    qs = (
-        Order.objects.filter(is_deleted=True)
-        .select_related("deleted_by")
-        .prefetch_related("items")
-        .order_by("-deleted_at", "-id")
-    )
-
-    rows = []
-
-    for order in qs:
-        cloth_qty, film_meter = _get_order_totals_by_service(order)
-
-        rows.append({
-            "obj": order,
-            "cloth_qty": cloth_qty,
-            "film_meter": film_meter,
-            "reason": order.deleted_reason or "-",
-            "deleted_by": order.deleted_by.username if order.deleted_by else "-",
-            "deleted_at": order.deleted_at,
-        })
-
-    
-    qs = (
-        Order.objects.filter(is_deleted=True)
-        .select_related("deleted_by")
-        .prefetch_related("items")
-        .order_by("-deleted_at", "-id")
-    )
-
-    rows = []
-
-    for order in qs:
-        cloth_qty, film_meter = _get_order_totals_by_service(order)
-
-        rows.append(
-            {
-                "obj": order,
-                "cloth_qty": cloth_qty,
-                "film_meter": film_meter,
-                "reason": order.delete_reason or "-",
-                "deleted_by": order.deleted_by.username if order.deleted_by else "-",
-                "deleted_at": order.deleted_at,
-            }
-        )
 
     return render(
         request,

@@ -80,7 +80,7 @@
                 <label>Quantity</label>
                 <div class="qty-with-unit">
                   {{ f.quantity }}
-                  <span class="unit-label">pcs</span>
+                  <span class="unit-label">PCS</span>
                 </div>
               </div>
 
@@ -98,47 +98,6 @@
         {% endfor %}
       </div>
 
-      <template id="emptyRowTemplate">
-        <div class="row-card batch-row">
-          __HIDDEN_FIELDS__
-
-          <div class="batch-row-grid">
-            <div class="field item-field">
-              <label>Item</label>
-              __ITEM__
-            </div>
-
-            <div class="field color-field">
-              <label>Color</label>
-              __COLOR__
-            </div>
-
-            <div class="field size-field">
-              <label>Size</label>
-              __SIZE__
-            </div>
-
-            <div class="field qty-field">
-              <label>Quantity</label>
-              <div class="qty-with-unit">
-                __QUANTITY__
-                <span class="unit-label">pcs</span>
-              </div>
-            </div>
-
-            <div class="field delete-field">
-              <label>Remove</label>
-              <div class="delete-icon-wrap">
-                __DELETE__
-                <button type="button" class="trash-btn" title="Delete row">
-                  <span class="trash-icon">🗑</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </template>
-
       <div class="stock-in-total-box">
         <div class="stock-in-total-label">Total Stock In</div>
         <div class="stock-in-total-value" id="totalStockIn">0</div>
@@ -151,38 +110,13 @@
     </div>
   </form>
 </div>
-{% endblock %}
 
-{% block extra_css %}
 <style>
-  .section-head {
-    margin-bottom: 18px;
-  }
-
-  .section-head h2 {
-    margin: 0 0 6px;
-    font-size: 28px;
-    font-weight: 800;
-    color: var(--text);
-    letter-spacing: -0.5px;
-  }
-
-  .rows-head-flex {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 16px;
-    flex-wrap: wrap;
-  }
-
-  .btn-add-row {
-    padding: 10px 14px;
-  }
-
-  .note-field textarea,
-  .note-field .form-control {
-    min-height: 82px;
-  }
+  .section-head { margin-bottom: 18px; }
+  .section-head h2 { margin: 0 0 6px; font-size: 28px; font-weight: 800; color: var(--text); letter-spacing: -0.5px; }
+  .rows-head-flex { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .btn-add-row { padding: 10px 14px; }
+  .note-field textarea, .note-field .form-control { min-height: 82px; }
 
   .batch-row-grid {
     display: grid;
@@ -191,18 +125,11 @@
     align-items: start;
   }
 
-  .batch-row.is-material .batch-row-grid {
-    grid-template-columns: 2.8fr 1.5fr 78px;
-  }
-
+  .batch-row.is-material .batch-row-grid { grid-template-columns: 2.8fr 1.5fr 78px; }
   .batch-row.is-material .color-field,
-  .batch-row.is-material .size-field {
-    display: none;
-  }
+  .batch-row.is-material .size-field { display: none; }
 
-  .batch-row .field {
-    margin-bottom: 0;
-  }
+  .batch-row .field { margin-bottom: 0; }
 
   .item-kind-pill {
     display: inline-flex;
@@ -223,15 +150,8 @@
     color: #15803d;
   }
 
-  .qty-with-unit {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .qty-with-unit input {
-    flex: 1;
-  }
+  .qty-with-unit { display: flex; align-items: center; gap: 8px; }
+  .qty-with-unit input { flex: 1; }
 
   .unit-label {
     min-width: 54px;
@@ -249,20 +169,8 @@
     text-transform: uppercase;
   }
 
-  .delete-field {
-    margin-bottom: 0;
-  }
-
-  .delete-icon-wrap {
-    position: relative;
-    height: 44px;
-  }
-
-  .delete-icon-wrap input[type="checkbox"] {
-    position: absolute;
-    opacity: 0;
-    pointer-events: none;
-  }
+  .delete-icon-wrap { position: relative; height: 44px; }
+  .delete-icon-wrap input[type="checkbox"] { position: absolute; opacity: 0; pointer-events: none; }
 
   .trash-btn {
     width: 100%;
@@ -278,26 +186,10 @@
     padding: 0;
   }
 
-  .trash-btn:hover {
-    background: #fee2e2;
-    border-color: #fca5a5;
-  }
-
-  .trash-btn.is-marked {
-    background: #dc2626;
-    border-color: #dc2626;
-  }
-
-  .trash-btn.is-marked .trash-icon {
-    color: #fff;
-    opacity: 1;
-  }
-
-  .trash-icon {
-    font-size: 18px;
-    line-height: 1;
-    opacity: .9;
-  }
+  .trash-btn:hover { background: #fee2e2; border-color: #fca5a5; }
+  .trash-btn.is-marked { background: #dc2626; border-color: #dc2626; }
+  .trash-btn.is-marked .trash-icon { color: #fff; opacity: 1; }
+  .trash-icon { font-size: 18px; line-height: 1; opacity: .9; }
 
   .stock-in-total-box {
     margin-top: 16px;
@@ -329,45 +221,57 @@
 
   @media (max-width: 1100px) {
     .batch-row-grid,
-    .batch-row.is-material .batch-row-grid {
-      grid-template-columns: 1fr 1fr;
-    }
+    .batch-row.is-material .batch-row-grid { grid-template-columns: 1fr 1fr; }
   }
 
   @media (max-width: 680px) {
     .batch-row-grid,
-    .batch-row.is-material .batch-row-grid {
-      grid-template-columns: 1fr;
-    }
+    .batch-row.is-material .batch-row-grid { grid-template-columns: 1fr; }
   }
 </style>
-{% endblock %}
 
-{% block extra_js %}
 <script>
-(function () {
-  const totalFormsInput =
-    document.getElementById("id_items-TOTAL_FORMS") ||
-    document.getElementById("id_inventorybatchitem_set-TOTAL_FORMS");
+document.addEventListener("DOMContentLoaded", function () {
+  const ITEM_UNIT_MAP = {
+    {% for item in items %}
+      "{{ item.id }}": "{{ item.get_unit_display|default:item.unit }}",
+    {% endfor %}
+  };
 
   const rowsContainer = document.getElementById("rowsContainer");
   const addRowBtn = document.getElementById("addRowBtn");
   const totalStockInEl = document.getElementById("totalStockIn");
-  const template = document.getElementById("emptyRowTemplate");
+  const totalFormsInput = document.querySelector('[name$="-TOTAL_FORMS"]');
 
-  if (!rowsContainer) return;
+  if (!rowsContainer || !totalFormsInput) return;
 
-  function getPrefix() {
-    if (document.getElementById("id_items-TOTAL_FORMS")) return "items";
-    if (document.getElementById("id_inventorybatchitem_set-TOTAL_FORMS")) return "inventorybatchitem_set";
-    return "items";
+  const prefix = totalFormsInput.name.replace("-TOTAL_FORMS", "");
+
+  function detectUnit(select) {
+    return ITEM_UNIT_MAP[select.value] || "PCS";
   }
 
-  const prefix = getPrefix();
+  function updateTotalStockIn() {
+    let total = 0;
+
+    rowsContainer.querySelectorAll(".batch-row").forEach(function (row) {
+      const deleteInput = row.querySelector('input[type="checkbox"][name$="-DELETE"]');
+      if (deleteInput && deleteInput.checked) return;
+
+      const qtyInput = row.querySelector('input[name$="-quantity"]');
+      const value = parseFloat(qtyInput ? qtyInput.value || "0" : "0");
+
+      if (!isNaN(value)) total += value;
+    });
+
+    totalStockInEl.textContent = Number.isInteger(total)
+      ? String(total)
+      : total.toFixed(2);
+  }
 
   function detectItemType(select) {
     const option = select.options[select.selectedIndex];
-    const text = (option ? option.textContent : "").toUpperCase();
+    const text = option ? option.textContent.toUpperCase() : "";
 
     if (
       text.includes("FILM") ||
@@ -376,8 +280,7 @@
       text.includes("MAINTENANCE") ||
       text.includes("OTHER") ||
       text.includes("TUBE") ||
-      text.includes("DAMPER") ||
-      text.includes("LINE")
+      text.includes("DAMPER")
     ) {
       return "MATERIAL";
     }
@@ -385,37 +288,11 @@
     return "SHIRT";
   }
 
-  function detectUnit(select) {
-    const option = select.options[select.selectedIndex];
-    const text = (option ? option.textContent : "").toUpperCase();
-
-    if (text.includes("FILM")) return "METER";
-    if (text.includes("INK")) return "ML";
-    if (text.includes("POWDER")) return "G";
-    if (text.includes("ROLL")) return "ROLL";
-    if (text.includes("BOTTLE")) return "BOTTLE";
-    if (text.includes("PACK")) return "PACK";
-    return "PCS";
-  }
-
-  function updateUnit(row) {
-    const itemSelect = row.querySelector('select[name$="-item"]');
-    const unitLabel = row.querySelector(".unit-label");
-
-    if (!itemSelect || !unitLabel) return;
-
-    if (!itemSelect.value) {
-      unitLabel.textContent = "PCS";
-      return;
-    }
-
-    unitLabel.textContent = detectUnit(itemSelect);
-  }
-
   function updateRowType(row) {
     const itemSelect = row.querySelector('select[name$="-item"]');
     const colorSelect = row.querySelector('select[name$="-color"]');
     const sizeSelect = row.querySelector('select[name$="-size"]');
+    const unitLabel = row.querySelector(".unit-label");
     const itemField = row.querySelector(".item-field");
 
     if (!itemSelect) return;
@@ -423,34 +300,26 @@
     let pill = row.querySelector(".item-kind-pill");
     if (!pill && itemField) {
       pill = document.createElement("div");
-      pill.className = "item-kind-pill";
       itemField.appendChild(pill);
     }
 
-    const value = itemSelect.value;
-
-    if (!value) {
-      row.classList.remove("is-material");
-      row.classList.remove("is-shirt");
-
+    if (!itemSelect.value) {
+      row.classList.remove("is-material", "is-shirt");
       if (pill) {
         pill.textContent = "Choose item";
         pill.className = "item-kind-pill";
       }
-
-      updateUnit(row);
+      if (unitLabel) unitLabel.textContent = "PCS";
       return;
     }
 
-    const type = detectItemType(itemSelect);
+    if (unitLabel) unitLabel.textContent = detectUnit(itemSelect);
 
-    if (type === "MATERIAL") {
+    if (detectItemType(itemSelect) === "MATERIAL") {
       row.classList.add("is-material");
       row.classList.remove("is-shirt");
-
       if (colorSelect) colorSelect.value = "";
       if (sizeSelect) sizeSelect.value = "";
-
       if (pill) {
         pill.textContent = "Material";
         pill.className = "item-kind-pill";
@@ -458,160 +327,127 @@
     } else {
       row.classList.remove("is-material");
       row.classList.add("is-shirt");
-
       if (pill) {
         pill.textContent = "Shirt";
         pill.className = "item-kind-pill shirt";
       }
     }
-
-    updateUnit(row);
   }
 
-  function bindItemSelects() {
-    rowsContainer.querySelectorAll('select[name$="-item"]').forEach((select) => {
-      const row = select.closest(".batch-row");
-      if (!row) return;
+  function bindRow(row) {
+    if (!row || row.dataset.bound === "1") return;
+    row.dataset.bound = "1";
 
-      updateRowType(row);
+    const itemSelect = row.querySelector('select[name$="-item"]');
+    const qtyInput = row.querySelector('input[name$="-quantity"]');
+    const trashBtn = row.querySelector(".trash-btn");
+    const deleteInput = row.querySelector('input[type="checkbox"][name$="-DELETE"]');
 
-      if (select.dataset.boundType === "1") return;
-      select.dataset.boundType = "1";
-
-      select.addEventListener("change", function () {
+    if (itemSelect) {
+      itemSelect.addEventListener("change", function () {
         updateRowType(row);
+        updateTotalStockIn();
       });
-    });
-  }
-
-  function formatQty(value) {
-    return Number.isInteger(value) ? String(value) : String(value);
-  }
-
-  function buildEmptyField(name, type) {
-    if (type === "select") {
-      const source = document.querySelector(`[name="${prefix}-0-${name}"]`);
-      if (!source) return "";
-
-      return source.outerHTML
-        .replaceAll(`${prefix}-0-${name}`, `${prefix}-__prefix__-${name}`)
-        .replaceAll(`id_${prefix}-0-${name}`, `id_${prefix}-__prefix__-${name}`);
     }
 
-    if (type === "number") {
-      return `<input type="number" name="${prefix}-__prefix__-${name}" id="id_${prefix}-__prefix__-${name}" step="0.01" min="0" class="form-control">`;
+    if (qtyInput) {
+      qtyInput.step = "0.01";
+      qtyInput.min = "0";
+      qtyInput.addEventListener("input", updateTotalStockIn);
+      qtyInput.addEventListener("change", updateTotalStockIn);
     }
 
-    if (type === "delete") {
-      return `<input type="checkbox" name="${prefix}-__prefix__-DELETE" id="id_${prefix}-__prefix__-DELETE">`;
-    }
+    if (trashBtn && deleteInput) {
+      trashBtn.addEventListener("click", function () {
+        const idInput = row.querySelector('input[name$="-id"]');
 
-    return "";
-  }
-
-  function buildHiddenFields() {
-    return `
-      <input type="hidden" name="${prefix}-__prefix__-id" id="id_${prefix}-__prefix__-id">
-      <input type="hidden" name="${prefix}-__prefix__-batch" id="id_${prefix}-__prefix__-batch">
-    `;
-  }
-
-  function addNewRow() {
-    if (!totalFormsInput || !template) return;
-
-    const formIndex = parseInt(totalFormsInput.value, 10);
-    let html = template.innerHTML;
-
-    html = html.replaceAll("__HIDDEN_FIELDS__", buildHiddenFields());
-    html = html.replaceAll("__ITEM__", buildEmptyField("item", "select"));
-    html = html.replaceAll("__COLOR__", buildEmptyField("color", "select"));
-    html = html.replaceAll("__SIZE__", buildEmptyField("size", "select"));
-    html = html.replaceAll("__QUANTITY__", buildEmptyField("quantity", "number"));
-    html = html.replaceAll("__DELETE__", buildEmptyField("DELETE", "delete"));
-    html = html.replaceAll("__prefix__", formIndex);
-
-    const wrapper = document.createElement("div");
-    wrapper.innerHTML = html.trim();
-
-    rowsContainer.appendChild(wrapper.firstElementChild);
-    totalFormsInput.value = formIndex + 1;
-
-    bindDeleteButtons();
-    bindQtyInputs();
-    bindItemSelects();
-    updateTotalStockIn();
-  }
-
-  function bindDeleteButtons() {
-    rowsContainer.querySelectorAll(".batch-row").forEach((row) => {
-      const btn = row.querySelector(".trash-btn");
-      const checkbox = row.querySelector('input[type="checkbox"][name$="-DELETE"]');
-
-      if (!btn || !checkbox || btn.dataset.bound === "1") return;
-      btn.dataset.bound = "1";
-
-      btn.addEventListener("click", function () {
-        const ok = window.confirm("Are you sure you want to delete this row?");
-        if (!ok) return;
-
-        checkbox.checked = true;
-        btn.classList.add("is-marked");
-
-        if (!row.querySelector('input[name$="-id"]')?.value) {
+        if (idInput && idInput.value) {
+          deleteInput.checked = !deleteInput.checked;
+          trashBtn.classList.toggle("is-marked", deleteInput.checked);
+          row.style.opacity = deleteInput.checked ? "0.45" : "1";
+        } else {
           row.remove();
-
-          if (totalFormsInput) {
-            totalFormsInput.value = rowsContainer.querySelectorAll(".batch-row").length;
-          }
+          reindexRows();
         }
 
         updateTotalStockIn();
       });
+    }
 
-      if (checkbox.checked) {
-        btn.classList.add("is-marked");
+    updateRowType(row);
+  }
+
+  function replaceIndex(value, index) {
+    if (!value) return value;
+    const re1 = new RegExp(prefix + "-\\d+-", "g");
+    const re2 = new RegExp("id_" + prefix + "-\\d+-", "g");
+    return value.replace(re1, prefix + "-" + index + "-").replace(re2, "id_" + prefix + "-" + index + "-");
+  }
+
+  function cleanRow(row, index) {
+    row.dataset.bound = "";
+    row.classList.remove("is-material", "is-shirt");
+    row.style.opacity = "1";
+
+    row.querySelectorAll("input, select, textarea, label").forEach(function (el) {
+      if (el.name) el.name = replaceIndex(el.name, index);
+      if (el.id) el.id = replaceIndex(el.id, index);
+      if (el.htmlFor) el.htmlFor = replaceIndex(el.htmlFor, index);
+
+      if (el.tagName === "SELECT") {
+        el.selectedIndex = 0;
+      } else if (el.type === "checkbox") {
+        el.checked = false;
+      } else {
+        el.value = "";
       }
     });
-  }
 
-  function bindQtyInputs() {
-    rowsContainer.querySelectorAll('input[name$="-quantity"]').forEach((input) => {
-      input.step = "0.01";
-      input.min = "0";
-
-      if (input.dataset.bound === "1") return;
-      input.dataset.bound = "1";
-
-      input.addEventListener("input", updateTotalStockIn);
-    });
-  }
-
-  function updateTotalStockIn() {
-    let total = 0;
-
-    rowsContainer.querySelectorAll(".batch-row").forEach((row) => {
-      const deleteInput = row.querySelector('input[type="checkbox"][name$="-DELETE"]');
-      if (deleteInput && deleteInput.checked) return;
-
-      const qtyInput = row.querySelector('input[name$="-quantity"]');
-      const val = parseFloat(qtyInput?.value || 0);
-
-      if (!isNaN(val)) total += val;
+    row.querySelectorAll(".alert, .item-kind-pill").forEach(function (el) {
+      el.remove();
     });
 
-    if (totalStockInEl) {
-      totalStockInEl.textContent = formatQty(total);
-    }
+    const trashBtn = row.querySelector(".trash-btn");
+    if (trashBtn) trashBtn.classList.remove("is-marked");
   }
+
+  function reindexRows() {
+    const rows = rowsContainer.querySelectorAll(".batch-row");
+
+    rows.forEach(function (row, index) {
+      row.querySelectorAll("input, select, textarea, label").forEach(function (el) {
+        if (el.name) el.name = replaceIndex(el.name, index);
+        if (el.id) el.id = replaceIndex(el.id, index);
+        if (el.htmlFor) el.htmlFor = replaceIndex(el.htmlFor, index);
+      });
+    });
+
+    totalFormsInput.value = String(rows.length);
+  }
+
+  function addNewRow() {
+    const firstRow = rowsContainer.querySelector(".batch-row");
+    if (!firstRow) return;
+
+    const index = parseInt(totalFormsInput.value || "0", 10);
+    const newRow = firstRow.cloneNode(true);
+
+    cleanRow(newRow, index);
+
+    rowsContainer.appendChild(newRow);
+    totalFormsInput.value = String(index + 1);
+
+    bindRow(newRow);
+    updateTotalStockIn();
+  }
+
+  rowsContainer.querySelectorAll(".batch-row").forEach(bindRow);
 
   if (addRowBtn) {
     addRowBtn.addEventListener("click", addNewRow);
   }
 
-  bindDeleteButtons();
-  bindQtyInputs();
-  bindItemSelects();
   updateTotalStockIn();
-})();
+});
 </script>
 {% endblock %}

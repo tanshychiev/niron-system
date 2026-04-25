@@ -5,268 +5,36 @@
 
 {% block content %}
 <style>
-.page-wrap{
-  max-width:1100px;
-  margin:24px auto;
-  padding:0 18px 40px;
-}
+.page-wrap{max-width:1100px;margin:24px auto;padding:0 18px 40px}
+.page-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:18px}
+.page-head h1{margin:0;font-size:30px;font-weight:900;color:#111827}
+.sub{margin:6px 0 0;color:#6b7280}
+.form-card{background:#fff;border:1px solid #eadfca;border-radius:18px;padding:22px}
+.field{margin-bottom:16px}
+.field label{display:block;margin-bottom:6px;font-weight:800;color:#111827}
+.field input,.field select,.field textarea{width:100%;border:1px solid #e5d8c3;border-radius:12px;padding:10px 12px;outline:none}
+.btn-primary,.btn-secondary,.btn-danger{display:inline-flex;align-items:center;justify-content:center;padding:11px 16px;border-radius:12px;font-weight:800;text-decoration:none;border:none;cursor:pointer}
+.btn-primary{background:#111827;color:#fff}.btn-secondary{background:#fff;color:#111827;border:1px solid #e5d8c3}.btn-danger{background:#dc2626;color:#fff}
 
-.page-head{
-  display:flex;
-  justify-content:space-between;
-  align-items:flex-start;
-  gap:16px;
-  margin-bottom:18px;
-}
+.drop-zone{border:2px dashed #d1d5db;border-radius:16px;padding:26px;text-align:center;cursor:pointer;transition:.2s;background:#fafafa;min-height:150px;display:flex;align-items:center;justify-content:center;flex-direction:column}
+.drop-zone:hover,.drop-zone.dragover{border-color:#111827;background:#f3f4f6}
+.drop-content{color:#6b7280}.drop-content p{margin:0}.hint{font-size:12px;margin-top:6px}
 
-.page-head h1{
-  margin:0;
-  font-size:30px;
-  font-weight:900;
-  color:#111827;
-}
+#previewWrapper{margin-top:12px;position:relative;display:none;width:130px;height:130px}
+#previewImage{width:130px;height:130px;object-fit:cover;border-radius:14px;border:1px solid #e5e7eb}
+#removeImageBtn{position:absolute;top:6px;right:6px;padding:5px 9px;font-size:12px;border-radius:8px;background:#dc2626;color:#fff;border:0;cursor:pointer}
 
-.sub{
-  margin:6px 0 0;
-  color:#6b7280;
-}
-
-.form-card{
-  background:#fff;
-  border:1px solid #eadfca;
-  border-radius:18px;
-  padding:22px;
-}
-
-.field{
-  margin-bottom:16px;
-}
-
-.field label{
-  display:block;
-  margin-bottom:6px;
-  font-weight:800;
-  color:#111827;
-}
-
-.field input,
-.field select,
-.field textarea{
-  width:100%;
-  border:1px solid #e5d8c3;
-  border-radius:12px;
-  padding:10px 12px;
-  outline:none;
-}
-
-.btn-primary,
-.btn-secondary,
-.btn-danger{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  padding:11px 16px;
-  border-radius:12px;
-  font-weight:800;
-  text-decoration:none;
-  border:none;
-  cursor:pointer;
-}
-
-.btn-primary{
-  background:#111827;
-  color:#fff;
-}
-
-.btn-secondary{
-  background:#fff;
-  color:#111827;
-  border:1px solid #e5d8c3;
-}
-
-.btn-danger{
-  background:#dc2626;
-  color:#fff;
-}
-
-.btn-danger:hover{
-  background:#b91c1c;
-}
-
-.drop-zone{
-  border:2px dashed #d1d5db;
-  border-radius:16px;
-  padding:26px;
-  text-align:center;
-  cursor:pointer;
-  transition:.2s ease;
-  background:#fafafa;
-  min-height:120px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  flex-direction:column;
-}
-
-.drop-zone:hover{
-  border-color:#111827;
-  background:#f3f4f6;
-}
-
-.drop-zone.dragover{
-  border-color:#2563eb;
-  background:#eff6ff;
-}
-
-.drop-content{
-  color:#6b7280;
-}
-
-.drop-content p{
-  margin:0;
-}
-
-.drop-content .hint{
-  font-size:12px;
-  margin-top:6px;
-}
-
-#previewImage{
-  margin-top:12px;
-  width:120px;
-  height:120px;
-  object-fit:cover;
-  border-radius:14px;
-  border:1px solid #e5e7eb;
-}
-
-.current-image{
-  margin-top:10px;
-}
-
-.current-image img{
-  width:90px;
-  height:90px;
-  object-fit:cover;
-  border-radius:12px;
-  border:1px solid #e5e7eb;
-}
-
-.preview-panel{
-  margin-top:18px;
-  max-width:360px;
-}
-
-.preview-title{
-  font-weight:800;
-  margin-bottom:10px;
-  color:#111827;
-}
-
-.shirt-preview-card{
-  width:160px;
-  height:160px;
-  border:1px solid #e5e7eb;
-  border-radius:18px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  background:#f9fafb;
-  margin-bottom:14px;
-}
-
-.shirt-preview{
-  width:120px;
-  height:120px;
-}
-
-.shirt-preview svg{
-  width:100%;
-  height:100%;
-}
-
-.shape,
-.collar{
-  display:none;
-}
-
-.style-OVERSIZE .shape-oversize{
-  display:block;
-}
-
-.style-POLO .shape-polo,
-.style-POLO .collar-polo{
-  display:block;
-}
-
-.style-BOXY .shape-boxy{
-  display:block;
-}
-
-.help-box{
-  margin:10px 0 16px;
-  padding:12px 14px;
-  border-radius:14px;
-  background:#fff7ed;
-  border:1px solid #fed7aa;
-  color:#9a3412;
-  font-size:13px;
-  font-weight:700;
-}
-
-.status-switch{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:8px;
-  padding:6px;
-  border-radius:18px;
-  background:#f3f4f6;
-  border:1px solid #e5e7eb;
-}
-
-.status-switch input{
-  display:none;
-}
-
-.status-option{
-  cursor:pointer;
-  border-radius:14px;
-  padding:12px 14px;
-  text-align:center;
-  font-weight:900;
-  color:#6b7280;
-  transition:.2s ease;
-}
-
-#statusActive:checked + .status-option{
-  background:#dcfce7;
-  color:#166534;
-  box-shadow:0 8px 18px rgba(22,101,52,.12);
-}
-
-#statusInactive:checked + .status-option{
-  background:#fee2e2;
-  color:#991b1b;
-  box-shadow:0 8px 18px rgba(153,27,27,.12);
-}
-
-.status-help{
-  margin-top:7px;
-  font-size:12px;
-  color:#6b7280;
-  font-weight:700;
-}
-
-.actions{
-  margin-top:20px;
-  display:flex;
-  gap:10px;
-  flex-wrap:wrap;
-}
-
-.delete-form{
-  margin:0;
-}
+.current-image{margin-top:10px}.current-image img{width:90px;height:90px;object-fit:cover;border-radius:12px;border:1px solid #e5e7eb}
+.preview-panel{margin-top:18px;max-width:360px}.preview-title{font-weight:800;margin-bottom:10px;color:#111827}
+.shirt-preview-card{width:160px;height:160px;border:1px solid #e5e7eb;border-radius:18px;display:flex;align-items:center;justify-content:center;background:#f9fafb;margin-bottom:14px}
+.shirt-preview{width:120px;height:120px}.shirt-preview svg{width:100%;height:100%}
+.shape,.collar{display:none}.style-OVERSIZE .shape-oversize{display:block}.style-POLO .shape-polo,.style-POLO .collar-polo{display:block}.style-BOXY .shape-boxy{display:block}
+.help-box{margin:10px 0 16px;padding:12px 14px;border-radius:14px;background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;font-size:13px;font-weight:700}
+.status-switch{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:6px;border-radius:18px;background:#f3f4f6;border:1px solid #e5e7eb}
+.status-switch input{display:none}.status-option{cursor:pointer;border-radius:14px;padding:12px 14px;text-align:center;font-weight:900;color:#6b7280}
+#statusActive:checked + .status-option{background:#dcfce7;color:#166534}#statusInactive:checked + .status-option{background:#fee2e2;color:#991b1b}
+.status-help{margin-top:7px;font-size:12px;color:#6b7280;font-weight:700}
+.actions{margin-top:20px;display:flex;gap:10px;flex-wrap:wrap}
 </style>
 
 <div class="page-wrap">
@@ -275,10 +43,7 @@
       <h1>{{ page_title|default:"Create Item" }}</h1>
       <p class="sub">Create cloth or material item</p>
     </div>
-
-    <div class="page-head-actions">
-      <a href="{% url 'inventory_item_list' %}" class="btn-secondary">Item List</a>
-    </div>
+    <a href="{% url 'inventory_item_list' %}" class="btn-secondary">Item List</a>
   </div>
 
   <div class="form-card">
@@ -310,18 +75,21 @@
         <label>Image for Material Item</label>
 
         <div id="dropZone" class="drop-zone">
-          <input type="file" name="image" id="fileInput" accept="image/*" hidden>
+          {{ form.image }}
 
-          <div class="drop-content">
+          <div class="drop-content" id="dropText">
             <p><strong>Click, Drag, or Paste Image</strong></p>
             <p class="hint">Ctrl+V / Drag file here</p>
           </div>
 
-          <img id="previewImage" style="display:none;">
+          <div id="previewWrapper">
+            <img id="previewImage">
+            <button type="button" id="removeImageBtn">✕</button>
+          </div>
         </div>
 
         {% if object.image %}
-          <div class="current-image">
+          <div class="current-image" id="currentImageBox">
             <img src="{{ object.image.url }}" alt="Current image">
           </div>
         {% endif %}
@@ -349,7 +117,6 @@
 
       <div class="field">
         <label>Status</label>
-
         <div class="status-switch">
           <input type="radio" name="is_active" id="statusActive" value="on" {% if form.instance.is_active %}checked{% endif %}>
           <label for="statusActive" class="status-option">🟢 Active</label>
@@ -357,21 +124,17 @@
           <input type="radio" name="is_active" id="statusInactive" value="" {% if not form.instance.is_active %}checked{% endif %}>
           <label for="statusInactive" class="status-option">🔴 Inactive</label>
         </div>
-
         <div class="status-help">Inactive item will not show in Stock In.</div>
       </div>
 
       <div class="actions">
-        <button type="submit" class="btn-primary">
-          {{ submit_label|default:"Save Item" }}
-        </button>
-
+        <button type="submit" class="btn-primary">{{ submit_label|default:"Save Item" }}</button>
         <a href="{% url 'inventory_item_list' %}" class="btn-secondary">Cancel</a>
       </div>
     </form>
 
     {% if object %}
-      <form method="post" action="{% url 'inventory_item_delete' object.id %}" class="delete-form" style="margin-top:12px;">
+      <form method="post" action="{% url 'inventory_item_delete' object.id %}" style="margin-top:12px;">
         {% csrf_token %}
         <button type="submit" class="btn-danger" onclick="return confirm('Delete this item? If it already has stock or orders, system will block delete.')">
           Delete Item
@@ -380,114 +143,149 @@
     {% endif %}
   </div>
 </div>
-{% endblock %}
 
-{% block extra_js %}
 <script>
-(function(){
-  const typeField = document.getElementById("{{ form.item_type.id_for_label }}");
-  const previewPanel = document.getElementById("previewPanel");
-  const imageField = document.getElementById("imageField");
-  const typeHelp = document.getElementById("typeHelp");
+(function () {
+  function ready(fn) {
+    if (document.readyState !== "loading") fn();
+    else document.addEventListener("DOMContentLoaded", fn);
+  }
 
-  function toggleUI(){
-    if (!typeField) return;
+  ready(function () {
+    const typeField = document.querySelector('[name="item_type"]');
+    const styleSelect = document.querySelector('[name="sample_style"]');
+    const imageField = document.getElementById("imageField");
+    const previewPanel = document.getElementById("previewPanel");
+    const typeHelp = document.getElementById("typeHelp");
+    const stylePreview = document.getElementById("stylePreview");
+    const dropZone = document.getElementById("dropZone");
+    const previewWrapper = document.getElementById("previewWrapper");
+    const previewImage = document.getElementById("previewImage");
+    const removeImageBtn = document.getElementById("removeImageBtn");
+    const currentImageBox = document.getElementById("currentImageBox");
 
-    if (typeField.value === "SHIRT") {
-      previewPanel.style.display = "block";
-      imageField.style.display = "none";
-      if (typeHelp) {
-        typeHelp.textContent = "Cloth item: choose shirt style. Stock In will require color and size.";
-      }
-    } else {
-      previewPanel.style.display = "none";
-      imageField.style.display = "block";
-      if (typeHelp) {
-        typeHelp.textContent = "Material item: upload image. Stock In will use quantity only, no color or size.";
+    let fileInput = document.querySelector('input[type="file"][name="image"]');
+
+    if (!fileInput && dropZone) {
+      fileInput = document.createElement("input");
+      fileInput.type = "file";
+      fileInput.name = "image";
+      fileInput.accept = "image/*";
+      dropZone.appendChild(fileInput);
+    }
+
+    if (fileInput) {
+      fileInput.style.display = "none";
+      fileInput.accept = "image/*";
+    }
+
+    function isShirt() {
+      return typeField && typeField.value === "SHIRT";
+    }
+
+    function clearImage() {
+      if (fileInput) fileInput.value = "";
+      if (previewImage) previewImage.src = "";
+      if (previewWrapper) previewWrapper.style.display = "none";
+    }
+
+    function updateTypeUI() {
+      if (!typeField) return;
+
+      if (isShirt()) {
+        if (previewPanel) previewPanel.style.display = "block";
+        if (imageField) imageField.style.display = "none";
+        if (typeHelp) typeHelp.textContent = "Shirt item: preview and shirt style only.";
+        clearImage();
+      } else {
+        if (previewPanel) previewPanel.style.display = "none";
+        if (imageField) imageField.style.display = "block";
+        if (typeHelp) typeHelp.textContent = "Material item: click, drag, or paste image.";
       }
     }
-  }
 
-  if (typeField) {
-    typeField.addEventListener("change", toggleUI);
-    toggleUI();
-  }
+    function updateStylePreview() {
+      if (!styleSelect || !stylePreview) return;
+      stylePreview.className = "shirt-preview style-" + styleSelect.value;
+    }
 
-  const styleSelect = document.getElementById("{{ form.sample_style.id_for_label }}");
-  const preview = document.getElementById("stylePreview");
+    function setFile(file) {
+      if (!file || !file.type.startsWith("image/")) return;
+      if (isShirt()) return;
 
-  function updatePreview(){
-    if (!styleSelect || !preview) return;
-    preview.className = "shirt-preview style-" + styleSelect.value;
-  }
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      fileInput.files = dt.files;
 
-  if (styleSelect && preview) {
-    styleSelect.addEventListener("change", updatePreview);
-    updatePreview();
-  }
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        previewImage.src = e.target.result;
+        previewWrapper.style.display = "block";
+        if (currentImageBox) currentImageBox.style.display = "none";
+      };
+      reader.readAsDataURL(file);
+    }
 
-  const dropZone = document.getElementById("dropZone");
-  const fileInput = document.getElementById("fileInput");
-  const previewImage = document.getElementById("previewImage");
+    if (typeField) {
+      typeField.addEventListener("change", updateTypeUI);
+      updateTypeUI();
+    }
 
-  if (!dropZone || !fileInput || !previewImage) return;
+    if (styleSelect) {
+      styleSelect.addEventListener("change", updateStylePreview);
+      updateStylePreview();
+    }
 
-  dropZone.addEventListener("click", function(){
-    fileInput.click();
-  });
+    if (dropZone && fileInput) {
+      dropZone.addEventListener("click", function (e) {
+        if (isShirt()) return;
+        if (e.target && e.target.id === "removeImageBtn") return;
+        fileInput.click();
+      });
 
-  fileInput.addEventListener("change", function(){
-    handleFile(this.files[0]);
-  });
+      fileInput.addEventListener("change", function () {
+        setFile(fileInput.files[0]);
+      });
 
-  dropZone.addEventListener("dragover", function(e){
-    e.preventDefault();
-    dropZone.classList.add("dragover");
-  });
+      dropZone.addEventListener("dragover", function (e) {
+        if (isShirt()) return;
+        e.preventDefault();
+        dropZone.classList.add("dragover");
+      });
 
-  dropZone.addEventListener("dragleave", function(){
-    dropZone.classList.remove("dragover");
-  });
+      dropZone.addEventListener("dragleave", function () {
+        dropZone.classList.remove("dragover");
+      });
 
-  dropZone.addEventListener("drop", function(e){
-    e.preventDefault();
-    dropZone.classList.remove("dragover");
+      dropZone.addEventListener("drop", function (e) {
+        if (isShirt()) return;
+        e.preventDefault();
+        dropZone.classList.remove("dragover");
+        setFile(e.dataTransfer.files[0]);
+      });
 
-    const file = e.dataTransfer.files[0];
-    handleFile(file);
-  });
+      document.addEventListener("paste", function (e) {
+        if (isShirt()) return;
+        if (!e.clipboardData) return;
 
-  document.addEventListener("paste", function(e){
-    if (!e.clipboardData || !e.clipboardData.items) return;
+        for (const item of e.clipboardData.items) {
+          if (item.type.startsWith("image/")) {
+            setFile(item.getAsFile());
+            break;
+          }
+        }
+      });
+    }
 
-    const items = e.clipboardData.items;
-
-    for (let i = 0; i < items.length; i++) {
-      if (items[i].type.indexOf("image") !== -1) {
-        const file = items[i].getAsFile();
-        handleFile(file);
-        break;
-      }
+    if (removeImageBtn) {
+      removeImageBtn.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        clearImage();
+        if (currentImageBox) currentImageBox.style.display = "block";
+      });
     }
   });
-
-  function handleFile(file){
-    if (!file) return;
-    if (!file.type.startsWith("image/")) return;
-
-    const reader = new FileReader();
-
-    reader.onload = function(e){
-      previewImage.src = e.target.result;
-      previewImage.style.display = "block";
-    };
-
-    reader.readAsDataURL(file);
-
-    const dt = new DataTransfer();
-    dt.items.add(file);
-    fileInput.files = dt.files;
-  }
 })();
 </script>
 {% endblock %}

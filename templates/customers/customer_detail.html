@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}Customer Detail{% endblock %}
+{% block page_title %}{{ customer.name }}{% endblock %}
+{% block page_subtitle %}Customer order history{% endblock %}
+
+{% block top_actions %}
+<a href="{% url 'customer_list' %}" class="btn btn-light">← Back</a>
+{% endblock %}
+
+{% block content %}
+<div class="summary-grid">
+  <div class="summary-card">
+    <div class="summary-label">Phone</div>
+    <div class="summary-value">{{ customer.phone|default:"-" }}</div>
+  </div>
+
+  <div class="summary-card">
+    <div class="summary-label">Total Orders</div>
+    <div class="summary-value">{{ total_orders }}</div>
+  </div>
+
+  <div class="summary-card">
+    <div class="summary-label">Total Paid</div>
+    <div class="summary-value">${{ total_paid }}</div>
+  </div>
+</div>
+
+<div class="table-card">
+  <div class="table-wrap">
+    <table class="app-table">
+      <thead>
+        <tr>
+          <th>Order No</th>
+          <th>Created</th>
+          <th>Status</th>
+          <th>Total</th>
+          <th>Paid</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for order in orders %}
+        <tr>
+          <td>{{ order.order_no }}</td>
+          <td>{{ order.created_at|date:"Y-m-d H:i" }}</td>
+          <td>{{ order.get_status_display }}</td>
+          <td>${{ order.total_amount }}</td>
+          <td>${{ order.paid_amount }}</td>
+          <td><a href="{% url 'order_detail' order.id %}" class="btn btn-light">View</a></td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="6" style="text-align:center;padding:30px;">No orders yet.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<style>
+.summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px}
+.summary-card{background:#fff;border:1px solid var(--line);border-radius:20px;padding:18px;box-shadow:var(--shadow)}
+.summary-label{font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase}
+.summary-value{margin-top:8px;font-size:24px;font-weight:900}
+.table-card{background:#fff;border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow);overflow:hidden}
+.table-wrap{overflow-x:auto}
+.app-table{width:100%;border-collapse:collapse;min-width:850px}
+.app-table th,.app-table td{padding:13px 12px;border-bottom:1px solid var(--line);text-align:left}
+.app-table th{background:#faf8f2;color:var(--muted);font-size:11px;font-weight:900;text-transform:uppercase}
+</style>
+{% endblock %}
