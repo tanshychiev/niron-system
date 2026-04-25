@@ -118,7 +118,7 @@ def _get_total_inventory():
     try:
         from inventory.models import InventoryBatchItem, InventoryItem
 
-        value = (
+        return (
             InventoryBatchItem.objects.filter(
                 is_active=True,
                 batch__is_deleted=False,
@@ -126,7 +126,6 @@ def _get_total_inventory():
             ).aggregate(total=Sum("qty_remaining"))["total"]
             or 0
         )
-        return value
     except Exception:
         return 0
 
@@ -136,7 +135,10 @@ def _get_expense_chart_data():
     start_date = end_date - timedelta(days=29)
 
     qs = (
-        Expense.objects.filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
+        Expense.objects.filter(
+            created_at__date__gte=start_date,
+            created_at__date__lte=end_date,
+        )
         .annotate(day=TruncDate("created_at"))
         .values("day")
         .annotate(total=Sum("amount"))
@@ -158,7 +160,7 @@ def _get_expense_chart_data():
 
 
 @login_required
-@permission_required("finance.view_expense", raise_exception=True)
+@permission_required("finance.view_expense_summary_nav", raise_exception=True)
 def expense_summary(request):
     qs = Expense.objects.select_related("created_by", "batch").all()
     form, qs = _apply_filters(request, qs)
@@ -178,9 +180,11 @@ def expense_summary(request):
 
 
 @login_required
-@permission_required("finance.view_expense", raise_exception=True)
+@permission_required("finance.view_other_expense_nav", raise_exception=True)
 def other_expense_list(request):
-    qs = Expense.objects.select_related("created_by", "batch").filter(expense_type=Expense.TYPE_OTHER)
+    qs = Expense.objects.select_related("created_by", "batch").filter(
+        expense_type=Expense.TYPE_OTHER
+    )
     form, qs = _apply_filters(request, qs)
     total_expense = qs.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
 
@@ -201,9 +205,11 @@ def other_expense_list(request):
 
 
 @login_required
-@permission_required("finance.view_expense", raise_exception=True)
+@permission_required("finance.view_batch_expense_nav", raise_exception=True)
 def batch_expense_list(request):
-    qs = Expense.objects.select_related("created_by", "batch").filter(expense_type=Expense.TYPE_BATCH)
+    qs = Expense.objects.select_related("created_by", "batch").filter(
+        expense_type=Expense.TYPE_BATCH
+    )
     form, qs = _apply_filters(request, qs)
     total_expense = qs.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
 
@@ -224,9 +230,11 @@ def batch_expense_list(request):
 
 
 @login_required
-@permission_required("finance.view_expense", raise_exception=True)
+@permission_required("finance.view_operating_expense_nav", raise_exception=True)
 def operating_expense_list(request):
-    qs = Expense.objects.select_related("created_by", "batch").filter(expense_type=Expense.TYPE_OPERATING)
+    qs = Expense.objects.select_related("created_by", "batch").filter(
+        expense_type=Expense.TYPE_OPERATING
+    )
     form, qs = _apply_filters(request, qs)
     total_expense = qs.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
 
@@ -294,9 +302,21 @@ def create_batch_expense(request):
                 manual_delivery_fee = request.POST.get("batch_delivery_fee_manual")
                 manual_other_fee = request.POST.get("batch_other_fee_manual")
 
-                cost = _to_decimal(manual_cost) if manual_cost not in (None, "") else detail["cost"]
-                delivery_fee = _to_decimal(manual_delivery_fee) if manual_delivery_fee not in (None, "") else detail["delivery_fee"]
-                other_fee = _to_decimal(manual_other_fee) if manual_other_fee not in (None, "") else detail["other_fee"]
+                cost = (
+                    _to_decimal(manual_cost)
+                    if manual_cost not in (None, "")
+                    else detail["cost"]
+                )
+                delivery_fee = (
+                    _to_decimal(manual_delivery_fee)
+                    if manual_delivery_fee not in (None, "")
+                    else detail["delivery_fee"]
+                )
+                other_fee = (
+                    _to_decimal(manual_other_fee)
+                    if manual_other_fee not in (None, "")
+                    else detail["other_fee"]
+                )
 
                 obj.batch_created_at = batch.created_at
                 obj.batch_total_cloth = detail["total_cloth"]
@@ -358,7 +378,7 @@ def create_operating_expense(request):
 
 
 @login_required
-@permission_required("finance.view_expense", raise_exception=True)
+@permission_required("finance.view_profit_dashboard_nav", raise_exception=True)
 def profit_dashboard(request):
     from orders.models import Order, OrderItem
 
@@ -383,26 +403,16 @@ def profit_dashboard(request):
             shirt_item__isnull=False,
         )
 
-        cloth_sold = cloth_qs.aggregate(
-            total=Sum("quantity")
-        )["total"] or Decimal("0")
-
-        cloth_revenue = cloth_qs.aggregate(
-            total=Sum("line_total")
-        )["total"] or Decimal("0")
+        cloth_sold = cloth_qs.aggregate(total=Sum("quantity"))["total"] or Decimal("0")
+        cloth_revenue = cloth_qs.aggregate(total=Sum("line_total"))["total"] or Decimal("0")
 
         film_qs = item_qs.filter(
             order__in=order_qs,
             film_item__isnull=False,
         )
 
-        film_sold = film_qs.aggregate(
-            total=Sum("film_meter")
-        )["total"] or Decimal("0")
-
-        film_revenue = film_qs.aggregate(
-            total=Sum("line_total")
-        )["total"] or Decimal("0")
+        film_sold = film_qs.aggregate(total=Sum("film_meter"))["total"] or Decimal("0")
+        film_revenue = film_qs.aggregate(total=Sum("line_total"))["total"] or Decimal("0")
 
         return {
             "total_amount": total_amount,
@@ -433,7 +443,6 @@ def profit_dashboard(request):
 
     end_date = timezone.localdate()
     start_date = end_date - timedelta(days=29)
-
     excluded_statuses = ["CANCEL", "CANCELLED", "CANCELED", "VOID"]
 
     base_order_qs = Order.objects.filter(
@@ -458,8 +467,7 @@ def profit_dashboard(request):
     )
 
     total_qs = (
-        base_order_qs
-        .annotate(day=TruncDate("created_at"))
+        base_order_qs.annotate(day=TruncDate("created_at"))
         .values("day")
         .annotate(total=Sum("total_amount"))
         .order_by("day")
@@ -475,7 +483,6 @@ def profit_dashboard(request):
     total_values = []
 
     current = start_date
-
     while current <= end_date:
         chart_labels.append(current.strftime("%d %b"))
         niron_values.append(niron_map.get(current, 0))
@@ -573,7 +580,7 @@ def batch_expense_preview(request):
 
 
 @login_required
-@permission_required("finance.view_expense", raise_exception=True)
+@permission_required("finance.view_expense_summary_nav", raise_exception=True)
 def expense_summary_export_excel(request):
     qs = Expense.objects.select_related("created_by", "batch").all()
     form, qs = _apply_filters(request, qs)
@@ -601,7 +608,6 @@ def expense_summary_export_excel(request):
             title = "Other Expense"
 
         record_by = ""
-
         if row.created_by:
             record_by = row.created_by.get_full_name() or row.created_by.username
 
