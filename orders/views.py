@@ -1028,15 +1028,9 @@ def order_invoice_pdf(request, pk):
 
         page.set_content(html, wait_until="networkidle")
         page.emulate_media(media="screen")
-
-        page.wait_for_function(
-            """
-            () => Array.from(document.images).every(
-                img => img.complete && img.naturalWidth > 0
-            )
-            """,
-            timeout=10000,
-        )
+        
+        page.wait_for_timeout(1500)
+        
 
         pdf = page.pdf(
             format="A4",
@@ -1271,14 +1265,8 @@ def order_invoice_png(request, pk):
         page.set_content(html, wait_until="networkidle")
         page.emulate_media(media="screen")
 
-        page.wait_for_function(
-            """
-            () => Array.from(document.images).every(
-                img => img.complete && img.naturalWidth > 0
-            )
-            """,
-            timeout=10000,
-        )
+        page.wait_for_timeout(1500)
+
 
         png = page.screenshot(
             type="png",
