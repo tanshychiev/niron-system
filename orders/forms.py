@@ -5,6 +5,9 @@ from inventory.models import Color, InventoryItem, Size
 from .models import Order, OrderDesign, OrderItem
 
 
+# =========================
+# MULTIPLE FILE SUPPORT
+# =========================
 class MultipleFileInput(forms.ClearableFileInput):
     allow_multiple_selected = True
 
@@ -24,11 +27,16 @@ class MultipleFileField(forms.FileField):
         return cleaned
 
 
+# =========================
+# ORDER FORM (FIXED)
+# =========================
 class OrderForm(forms.ModelForm):
-    deadline = forms.DateTimeField(
-        widget=forms.DateTimeInput(
+
+    # ✅ FIX: DATE ONLY (NO TIME)
+    deadline = forms.DateField(
+        widget=forms.DateInput(
             attrs={
-                "type": "datetime-local",
+                "type": "date",
                 "class": "form-control",
             }
         )
@@ -71,7 +79,9 @@ class OrderForm(forms.ModelForm):
         ]
         widgets = {
             "order_type": forms.Select(attrs={"class": "form-select"}),
-            "service_type": forms.Select(attrs={"class": "form-select", "id": "id_service_type"}),
+            "service_type": forms.Select(
+                attrs={"class": "form-select", "id": "id_service_type"}
+            ),
             "customer_name": forms.TextInput(
                 attrs={"class": "form-control", "placeholder": "Customer name"}
             ),
@@ -88,11 +98,15 @@ class OrderForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
         self.fields["customer_location"].required = False
         self.fields["remark"].required = False
         self.fields["phone"].required = False
 
 
+# =========================
+# DESIGN FORM
+# =========================
 class OrderDesignForm(forms.ModelForm):
     design_files = MultipleFileField(
         required=False,
@@ -117,6 +131,9 @@ class OrderDesignForm(forms.ModelForm):
         }
 
 
+# =========================
+# ORDER ITEM FORM
+# =========================
 class OrderItemForm(forms.ModelForm):
     description = forms.CharField(
         required=False,
@@ -157,7 +174,7 @@ class OrderItemForm(forms.ModelForm):
                 attrs={
                     "class": "form-control qty-input",
                     "placeholder": "Qty",
-                    "step": "0.01",
+                    "step": "1",
                     "min": "0",
                 }
             ),
@@ -193,6 +210,7 @@ class OrderItemForm(forms.ModelForm):
             is_active=True
         ).order_by("sort_order", "id")
 
+        # all optional (logic handled in clean)
         for name in [
             "shirt_item",
             "color",
@@ -236,6 +254,9 @@ class OrderItemForm(forms.ModelForm):
         return cleaned
 
 
+# =========================
+# FORMSET
+# =========================
 OrderItemFormSet = inlineformset_factory(
     OrderDesign,
     OrderItem,
@@ -245,6 +266,9 @@ OrderItemFormSet = inlineformset_factory(
 )
 
 
+# =========================
+# FILTER FORM
+# =========================
 class ProductionFilterForm(forms.Form):
     STATUS_ACTIVE = "ACTIVE"
     STATUS_ALL = "ALL"
@@ -273,10 +297,12 @@ class ProductionFilterForm(forms.Form):
     q = forms.CharField(
         required=False,
         label="Search",
-        widget=forms.TextInput(attrs={
-            "class": "form-control",
-            "placeholder": "Customer name or order no",
-        }),
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": "Customer name or order no",
+            }
+        ),
     )
 
     status = forms.ChoiceField(
@@ -290,10 +316,12 @@ class ProductionFilterForm(forms.Form):
     deadline = forms.DateField(
         required=False,
         label="Deadline",
-        widget=forms.DateInput(attrs={
-            "type": "date",
-            "class": "form-control",
-        }),
+        widget=forms.DateInput(
+            attrs={
+                "type": "date",
+                "class": "form-control",
+            }
+        ),
     )
 
     sort = forms.ChoiceField(

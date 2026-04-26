@@ -56,7 +56,7 @@ class Order(models.Model):
     customer_name = models.CharField(max_length=120)
     phone = models.CharField(max_length=30, blank=True, default="")
     customer_location = models.CharField(max_length=255, blank=True, default="")
-    deadline = models.DateTimeField()
+    deadline = models.DateField()
 
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,

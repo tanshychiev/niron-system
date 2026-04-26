@@ -612,7 +612,12 @@ def production_list(request):
         data["sort"] = ProductionFilterForm.SORT_DEADLINE_ASC
 
     form = ProductionFilterForm(data)
-    qs = Order.objects.filter(is_deleted=False).prefetch_related("items")
+
+    qs = (
+        Order.objects
+        .filter(is_deleted=False)
+        .prefetch_related("items")
+    )
 
     if form.is_valid():
         keyword = (form.cleaned_data.get("q") or "").strip()
@@ -621,7 +626,10 @@ def production_list(request):
         sort = form.cleaned_data.get("sort") or ProductionFilterForm.SORT_DEADLINE_ASC
 
         if keyword:
-            qs = qs.filter(Q(customer_name__icontains=keyword) | Q(order_no__icontains=keyword))
+            qs = qs.filter(
+                Q(customer_name__icontains=keyword) |
+                Q(order_no__icontains=keyword)
+            )
 
         cancel_status = _get_cancel_status()
 
@@ -644,19 +652,9 @@ def production_list(request):
         else:
             qs = qs.order_by("deadline", "id")
     else:
-        qs = qs.filter(status__in=[Order.STATUS_PENDING, Order.STATUS_PROCESSING]).order_by("deadline", "id")
-
-    summary_totals = qs.aggregate(total_pcs_sum=Sum("total_pcs"), done_pcs_sum=Sum("done_pcs"))
-
-    total_project_pending = qs.count()
-    total_pcs_sum = Decimal(summary_totals["total_pcs_sum"] or 0)
-    done_pcs_sum = Decimal(summary_totals["done_pcs_sum"] or 0)
-
-    total_cloth_done = done_pcs_sum
-    total_cloth_pending = total_pcs_sum - done_pcs_sum
-
-    if total_cloth_pending < 0:
-        total_cloth_pending = Decimal("0")
+        qs = qs.filter(
+            status__in=[Order.STATUS_PENDING, Order.STATUS_PROCESSING]
+        ).order_by("deadline", "id")
 
     paginator = Paginator(qs, 50)
     page_obj = paginator.get_page(request.GET.get("page"))
@@ -664,15 +662,29 @@ def production_list(request):
 
     rows = []
 
+    total_project_pending = qs.count()
+    total_cloth_done = Decimal("0")
+    total_cloth_pending = Decimal("0")
+
     for idx, order in enumerate(page_obj.object_list, start=1):
+        total_qty = sum(Decimal(item.quantity or 0) for item in order.items.all())
+        done_qty = sum(Decimal(item.done_qty or 0) for item in order.items.all())
+
+        remaining_qty = total_qty - done_qty
+        if remaining_qty < 0:
+            remaining_qty = Decimal("0")
+
+        total_cloth_done += done_qty
+        total_cloth_pending += remaining_qty
+
         rows.append(
             {
                 "no": start_no + idx,
                 "order": order,
                 "countdown_text": _format_countdown(order.deadline),
                 "status_color": _status_badge(order.status),
-                "total_qty": Decimal(order.total_pcs or 0),
-                "done_qty": Decimal(order.done_pcs or 0),
+                "total_qty": total_qty,
+                "done_qty": done_qty,
             }
         )
 
@@ -690,8 +702,6 @@ def production_list(request):
             "now": timezone.now(),
         },
     )
-
-
 @login_required
 @permission_required("orders.view_order", raise_exception=True)
 def order_list_export_excel(request):
@@ -832,8 +842,24 @@ def order_create(request):
 @permission_required("orders.view_order", raise_exception=True)
 def order_detail(request, pk):
     order = get_object_or_404(_get_prefetched_order_queryset(), pk=pk)
-    return render(request, "orders/order_detail.html", {"order": order})
 
+    total_pcs = order.items.aggregate(total=Sum("quantity"))["total"] or Decimal("0")
+    done_pcs = order.items.aggregate(total=Sum("done_qty"))["total"] or Decimal("0")
+
+    remaining_pcs = total_pcs - done_pcs
+    if remaining_pcs < 0:
+        remaining_pcs = Decimal("0")
+
+    return render(
+        request,
+        "orders/order_detail.html",
+        {
+            "order": order,
+            "total_pcs": total_pcs,
+            "done_pcs": done_pcs,
+            "remaining_pcs": remaining_pcs,
+        },
+    )
 
 @login_required
 @permission_required("orders.view_order", raise_exception=True)
