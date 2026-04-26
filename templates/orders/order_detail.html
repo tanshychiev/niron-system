@@ -335,19 +335,48 @@
             </div>
         </div>
 
-        <div class="detail-card">
-            <h3 class="detail-title">Payment</h3>
-            <div class="info-list">
-                <div class="info-row"><div class="info-label">Total</div><div class="info-value amount-strong">${{ order.total_amount }}</div></div>
-                <div class="info-row"><div class="info-label">Deposit</div><div class="info-value">${{ order.deposit_amount }}</div></div>
-                <div class="info-row"><div class="info-label">Paid</div><div class="info-value">${{ order.paid_amount }}</div></div>
-                <div class="info-row"><div class="info-label">Balance</div><div class="info-value amount-strong">${{ order.balance_amount }}</div></div>
-                <div class="info-row"><div class="info-label">Total PCS</div><div class="info-value">{{ order.total_pcs }}</div></div>
-                <div class="info-row"><div class="info-label">Done PCS</div><div class="info-value">{{ order.done_pcs }}</div></div>
-                <div class="info-row"><div class="info-label">Remaining PCS</div><div class="info-value">{{ order.remaining_pcs }}</div></div>
-            </div>
+       <div class="detail-card">
+    <h3 class="detail-title">Payment</h3>
+    <div class="info-list">
+
+        <div class="info-row">
+            <div class="info-label">Total</div>
+            <div class="info-value amount-strong">${{ order.total_amount }}</div>
         </div>
+
+        <div class="info-row">
+            <div class="info-label">Deposit</div>
+            <div class="info-value">${{ order.deposit_amount }}</div>
+        </div>
+
+        <div class="info-row">
+            <div class="info-label">Paid</div>
+            <div class="info-value">${{ order.paid_amount }}</div>
+        </div>
+
+        <div class="info-row">
+            <div class="info-label">Balance</div>
+            <div class="info-value amount-strong">${{ order.balance_amount }}</div>
+        </div>
+
+        <!-- ✅ FIXED PART -->
+        <div class="info-row">
+            <div class="info-label">Total PCS</div>
+            <div class="info-value">{{ total_pcs|floatformat:0 }}</div>
+        </div>
+
+        <div class="info-row">
+            <div class="info-label">Done PCS</div>
+            <div class="info-value">{{ done_pcs|floatformat:0 }}</div>
+        </div>
+
+        <div class="info-row">
+            <div class="info-label">Remaining PCS</div>
+            <div class="info-value">{{ remaining_pcs|floatformat:0 }}</div>
+        </div>
+
     </div>
+</div>
 
     <div class="detail-card">
         <h3 class="detail-title">Designs</h3>
