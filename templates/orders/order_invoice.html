@@ -2,6 +2,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<base href="{{ request.scheme }}://{{ request.get_host }}/">    
 <meta charset="UTF-8">
 <title>Invoice {{ order.order_no }}</title>
 
@@ -321,7 +322,7 @@ html, body {
             <div class="design-img-wrap">
                 {% for file in design.files.all %}
                     {% if forloop.first %}
-                        <img src="{{ file.image.url }}" alt="Design">
+                       <img src="{{ file.image.url }}">
                     {% endif %}
                 {% empty %}
                     <div class="no-image">No design image</div>
@@ -371,15 +372,15 @@ html, body {
         <div class="signature-area">
             <div class="signature-label">Signature</div>
 
-            <div class="signature-space">
-                {% if printed_by %}
-                    <img class="signature-img"
-                         src="{% static 'signatures/' %}{{ printed_by.username }}.png"
-                         alt="Signature">
-                {% else %}
-                    Signature image here
-                {% endif %}
-            </div>
+           <div class="signature-space">
+    {% if printed_by %}
+        <img class="signature-img"
+             src="{{ request.scheme }}://{{ request.get_host }}{% static 'signatures/' %}{{ printed_by.username }}.png"
+             alt="Signature">
+    {% else %}
+        <span>Signature</span>
+    {% endif %}
+</div>
 
             <div class="signature-line"></div>
 
