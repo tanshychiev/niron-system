@@ -1043,8 +1043,9 @@ def order_invoice_pdf(request, pk):
         browser.close()
 
     response = HttpResponse(pdf, content_type="application/pdf")
-    response["Content-Disposition"] = 'attachment; filename="invoice.pdf"'
-    return response
+    filename = f"{order.customer_name}_{order.order_no}.pdf"
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    
 
 @login_required
 @permission_required("orders.change_order", raise_exception=True)
@@ -1271,5 +1272,6 @@ def order_invoice_png(request, pk):
         browser.close()
 
     response = HttpResponse(png, content_type="image/png")
-    response["Content-Disposition"] = 'attachment; filename="invoice.png"'
+    filename = f"{order.customer_name}_{order.order_no}.png"
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
     return response
