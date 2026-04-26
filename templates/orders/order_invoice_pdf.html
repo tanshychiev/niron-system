@@ -2,18 +2,30 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Invoice PDF {{ order.order_no }}</title>
+    <title>Invoice {{ order.order_no }}</title>
+
     <style>
+        @page {
+            size: A4;
+            margin: 10mm;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
         body {
             margin: 0;
-            padding: 30px;
+            padding: 24px;
             font-family: Arial, sans-serif;
             color: #111827;
-            background: white;
+            background: #f5f0e6;
         }
 
         .toolbar {
-            margin-bottom: 20px;
+            margin-bottom: 18px;
             text-align: right;
         }
 
@@ -27,6 +39,17 @@
             color: white;
         }
 
+        .invoice-page {
+            width: 100%;
+            max-width: 210mm;
+            min-height: 297mm;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            padding: 26px;
+            box-shadow: 0 18px 45px rgba(17, 24, 39, .10);
+        }
+
         .head {
             display: flex;
             justify-content: space-between;
@@ -37,50 +60,64 @@
 
         .brand {
             font-size: 30px;
-            font-weight: 800;
+            font-weight: 900;
         }
 
         .sub {
             color: #6b7280;
-            font-size: 13px;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+
+        .invoice-title {
+            text-align: right;
+        }
+
+        .invoice-title-main {
+            font-size: 28px;
+            font-weight: 900;
         }
 
         .meta-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 18px;
-            margin-bottom: 20px;
+            gap: 14px;
+            margin-bottom: 18px;
         }
 
         .box {
-            border: 1px solid #ddd;
+            border: 1px solid #d9dde5;
             border-radius: 12px;
             padding: 14px;
+            background: #fff;
         }
 
         .box h3 {
             margin: 0 0 10px;
-            font-size: 13px;
+            font-size: 12px;
             text-transform: uppercase;
             color: #6b7280;
+            letter-spacing: .8px;
         }
 
         .line {
             margin-bottom: 6px;
-            font-size: 14px;
+            font-size: 13px;
+            line-height: 1.35;
         }
 
         .design-stack {
             display: grid;
             gap: 16px;
-            margin-top: 20px;
+            margin-top: 18px;
         }
 
         .design-card {
-            border: 1px solid #ddd;
+            border: 1px solid #d9dde5;
             border-radius: 14px;
             padding: 14px;
             page-break-inside: avoid;
+            background: #fff;
         }
 
         .design-head {
@@ -94,12 +131,12 @@
         .design-badge {
             display: inline-flex;
             align-items: center;
-            padding: 6px 10px;
+            padding: 7px 12px;
             border-radius: 999px;
             background: #f8f6ef;
-            border: 1px solid #ddd;
+            border: 1px solid #d9dde5;
             font-size: 12px;
-            font-weight: 800;
+            font-weight: 900;
         }
 
         .design-remark {
@@ -115,17 +152,17 @@
         }
 
         .design-chip {
-            padding: 6px 10px;
+            padding: 7px 12px;
             border-radius: 10px;
             background: #faf8f2;
-            border: 1px solid #ddd;
+            border: 1px solid #d9dde5;
             font-size: 12px;
-            font-weight: 800;
+            font-weight: 900;
         }
 
         .design-grid {
             display: grid;
-            grid-template-columns: 240px minmax(0, 1fr);
+            grid-template-columns: 220px minmax(0, 1fr);
             gap: 14px;
         }
 
@@ -140,7 +177,8 @@
             height: 100px;
             object-fit: cover;
             border-radius: 8px;
-            border: 1px solid #ddd;
+            border: 1px solid #d9dde5;
+            background: #f8fafc;
         }
 
         table {
@@ -150,8 +188,8 @@
         }
 
         th, td {
-            padding: 10px 8px;
-            border-bottom: 1px solid #ddd;
+            padding: 9px 7px;
+            border-bottom: 1px solid #d9dde5;
             text-align: left;
             font-size: 12px;
             vertical-align: top;
@@ -161,30 +199,32 @@
             font-size: 10px;
             text-transform: uppercase;
             color: #6b7280;
+            font-weight: 900;
         }
 
         .summary {
-            width: 300px;
+            width: 290px;
             margin-left: auto;
-            margin-top: 20px;
+            margin-top: 22px;
         }
 
         .summary-row,
         .summary-total {
             display: flex;
             justify-content: space-between;
-            padding: 10px 0;
+            padding: 9px 0;
         }
 
         .summary-row {
-            border-bottom: 1px solid #ddd;
+            border-bottom: 1px solid #d9dde5;
+            font-size: 14px;
         }
 
         .summary-total {
             border-top: 2px solid #111827;
-            margin-top: 10px;
-            font-size: 24px;
-            font-weight: 800;
+            margin-top: 8px;
+            font-size: 23px;
+            font-weight: 900;
         }
 
         .empty-note {
@@ -193,154 +233,163 @@
         }
 
         @media print {
+            body {
+                padding: 0;
+                background: white;
+            }
+
             .toolbar {
                 display: none;
             }
 
-            body {
+            .invoice-page {
+                width: 100%;
+                min-height: auto;
+                box-shadow: none;
+                border-radius: 0;
                 padding: 0;
             }
         }
     </style>
 </head>
+
 <body>
     <div class="toolbar">
-        <button class="btn" onclick="window.print()">Save as PDF</button>
+        <button class="btn" onclick="window.print()">Download PNG / Print</button>
     </div>
 
-    <div class="head">
-        <div>
-            <div class="brand">Niron</div>
-            <div class="sub">Custom Printing Invoice</div>
-        </div>
-        <div style="text-align:right;">
-            <div style="font-size:28px;font-weight:800;">Invoice</div>
-            <div class="sub">{{ order.order_no }}</div>
-        </div>
-    </div>
-
-    <div class="meta-grid">
-        <div class="box">
-            <h3>Customer</h3>
-            <div class="line"><strong>Name:</strong> {{ order.customer_name|default:"-" }}</div>
-            <div class="line"><strong>Phone:</strong> {{ order.phone|default:"-" }}</div>
-            <div class="line"><strong>Location:</strong> {{ order.customer_location|default:"-" }}</div>
-            <div class="line"><strong>Remark:</strong> {{ order.remark|default:"-" }}</div>
-        </div>
-
-        <div class="box">
-            <h3>Order Info</h3>
-            <div class="line"><strong>Type:</strong> {{ order.get_order_type_display }}</div>
-            <div class="line"><strong>Status:</strong> {{ order.get_status_display }}</div>
-            <div class="line"><strong>Deadline:</strong> {{ order.deadline }}</div>
-            <div class="line"><strong>Created:</strong> {{ order.created_at }}</div>
-        </div>
-    </div>
-
-    <div class="design-stack">
-        {% for design in order.designs.all %}
-        <div class="design-card">
-            <div class="design-head">
-                <div>
-                    <div class="design-badge">{{ design.display_name }}</div>
-                    {% if design.remark %}
-                    <div class="design-remark">{{ design.remark }}</div>
-                    {% endif %}
-                </div>
-
-                <div class="design-meta">
-                    <div class="design-chip">PCS {{ design.total_pcs }}</div>
-                    <div class="design-chip">Amount ${{ design.total_amount }}</div>
-                </div>
+    <div class="invoice-page">
+        <div class="head">
+            <div>
+                <div class="brand">Niron Kampu</div>
+                <div class="sub">Custom Printing Invoice</div>
             </div>
 
-            <div class="design-grid">
-                <div class="box">
-                    <h3>Design Images</h3>
-                    <div class="image-grid">
-                        {% for img in design.files.all %}
-                        <img src="{{ img.image.url }}" alt="Design">
-                        {% empty %}
-                        <div class="empty-note">No design images.</div>
-                        {% endfor %}
+            <div class="invoice-title">
+                <div class="invoice-title-main">Invoice</div>
+                <div class="sub">{{ order.order_no }}</div>
+            </div>
+        </div>
+
+        <div class="meta-grid">
+            <div class="box">
+                <h3>Customer</h3>
+                <div class="line"><strong>Name:</strong> {{ order.customer_name|default:"-" }}</div>
+                <div class="line"><strong>Phone:</strong> {{ order.phone|default:"-" }}</div>
+                <div class="line"><strong>Location:</strong> {{ order.customer_location|default:"-" }}</div>
+                <div class="line"><strong>Remark:</strong> {{ order.remark|default:"-" }}</div>
+            </div>
+
+            <div class="box">
+                <h3>Order Info</h3>
+                <div class="line"><strong>Type:</strong> {{ order.get_order_type_display }}</div>
+                <div class="line"><strong>Deadline:</strong> {{ order.deadline|date:"Y-m-d"|default:"-" }}</div>
+                <div class="line"><strong>Created:</strong> {{ order.created_at|date:"Y-m-d" }}</div>
+            </div>
+        </div>
+
+        <div class="design-stack">
+            {% for design in order.designs.all %}
+            <div class="design-card">
+                <div class="design-head">
+                    <div>
+                        <div class="design-badge">{{ design.display_name }}</div>
+
+                        {% if design.remark %}
+                        <div class="design-remark">{{ design.remark }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="design-meta">
+                        <div class="design-chip">PCS {{ design.total_pcs }}</div>
+                        <div class="design-chip">Amount ${{ design.total_amount }}</div>
                     </div>
                 </div>
 
-                <div class="box">
-                    <h3>Items</h3>
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Mode</th>
-                                <th>Description</th>
-                                <th>Item</th>
-                                <th>Color</th>
-                                <th>Size</th>
-                                <th>Qty</th>
-                                <th>Unit Price</th>
-                                <th>Total</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for item in design.items.all %}
-                            <tr>
-                                <td>{{ item.get_item_mode_display }}</td>
-                                <td>{{ item.description|default:"-" }}</td>
-                                <td>
-                                    {% if item.item_mode == "FILM" %}
-                                        {{ item.film_item|default:"-" }}
-                                    {% else %}
-                                        {{ item.shirt_item|default:"-" }}
-                                    {% endif %}
-                                </td>
-                                <td>{{ item.color|default:"-" }}</td>
-                                <td>{{ item.size|default:"-" }}</td>
-                                <td>{{ item.quantity }}</td>
-                                <td>${{ item.unit_price }}</td>
-                                <td>${{ item.line_total }}</td>
-                            </tr>
+                <div class="design-grid">
+                    <div class="box">
+                        <h3>Design Images</h3>
+                        <div class="image-grid">
+                            {% for img in design.files.all %}
+                            <img src="{{ img.image.url }}" alt="Design">
                             {% empty %}
-                            <tr>
-                                <td colspan="8">No items in this design.</td>
-                            </tr>
+                            <div class="empty-note">No design images.</div>
                             {% endfor %}
-                        </tbody>
-                    </table>
+                        </div>
+                    </div>
+
+                    <div class="box">
+                        <h3>Items</h3>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Mode</th>
+                                    <th>Description</th>
+                                    <th>Item</th>
+                                    <th>Color</th>
+                                    <th>Size</th>
+                                    <th>Qty</th>
+                                    <th>Unit Price</th>
+                                    <th>Total</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                {% for item in design.items.all %}
+                                <tr>
+                                    <td>{{ item.get_item_mode_display }}</td>
+                                    <td>{{ item.description|default:"-" }}</td>
+                                    <td>
+                                        {% if item.item_mode == "FILM" %}
+                                            {{ item.film_item|default:"-" }}
+                                        {% else %}
+                                            {{ item.shirt_item|default:"-" }}
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ item.color|default:"-" }}</td>
+                                    <td>{{ item.size|default:"-" }}</td>
+                                    <td>{{ item.quantity }}</td>
+                                    <td>${{ item.unit_price }}</td>
+                                    <td>${{ item.line_total }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="8">No items in this design.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
+            {% empty %}
+            <div class="box">
+                <div class="empty-note">No designs found.</div>
+            </div>
+            {% endfor %}
         </div>
-        {% empty %}
-        <div class="box">
-            <div class="empty-note">No designs found.</div>
-        </div>
-        {% endfor %}
-    </div>
 
-    <div class="summary">
-        <div class="summary-row">
-            <span>Total</span>
-            <span>${{ order.total_amount }}</span>
-        </div>
-        <div class="summary-row">
-            <span>Deposit</span>
-            <span>${{ order.deposit_amount }}</span>
-        </div>
-        <div class="summary-row">
-            <span>Paid</span>
-            <span>${{ order.paid_amount }}</span>
-        </div>
-        <div class="summary-total">
-            <span>Balance</span>
-            <span>${{ order.balance_amount }}</span>
+        <div class="summary">
+            <div class="summary-row">
+                <span>Total</span>
+                <span>${{ order.total_amount }}</span>
+            </div>
+
+            <div class="summary-row">
+                <span>Deposit</span>
+                <span>${{ order.deposit_amount }}</span>
+            </div>
+
+            <div class="summary-row">
+                <span>Paid</span>
+                <span>${{ order.paid_amount }}</span>
+            </div>
+
+            <div class="summary-total">
+                <span>Balance</span>
+                <span>${{ order.balance_amount }}</span>
+            </div>
         </div>
     </div>
-
-    <script>
-        window.onload = function () {
-            setTimeout(function () {
-                window.print();
-            }, 300);
-        };
-    </script>
 </body>
 </html>

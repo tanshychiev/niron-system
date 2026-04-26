@@ -359,9 +359,9 @@
                         <td>
                             {% if row.obj.deadline %}
                                 {% if row.is_late %}
-                                    <span class="late-text">{{ row.obj.deadline|date:"Y-m-d H:i" }}</span>
+                                    <span class="late-text">{{ row.obj.deadline|date:"Y-m-d" }}</span>
                                 {% else %}
-                                    {{ row.obj.deadline|date:"Y-m-d H:i" }}
+                                    {{ row.obj.deadline|date:"Y-m-d" }}
                                 {% endif %}
                             {% else %}
                                 -

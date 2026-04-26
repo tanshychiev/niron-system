@@ -7,7 +7,9 @@
 {% block top_actions %}
 <a href="{% url 'order_list' %}" class="btn btn-light">Back to Orders</a>
 <a href="{% url 'order_edit' order.pk %}" class="btn btn-light">Edit Order</a>
-<a href="{% url 'order_invoice' order.pk %}" class="btn btn-light" target="_blank">Save Invoice PNG</a>
+<a href="{% url 'order_invoice_png' order.pk %}" class="btn btn-light">
+    ⬇ Download PNG
+</a>
 
 <a href="{% url 'order_invoice_pdf' order.pk %}"
    class="btn btn-primary"

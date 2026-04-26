@@ -26,6 +26,14 @@ from .models import (
 )
 from .services import restore_stock_for_order, deduct_stock_for_order
 
+import re
+
+
+def _safe_download_name(value, fallback="file"):
+    value = str(value or "").strip()
+    value = re.sub(r'[\\/*?:"<>|]+', "", value)
+    value = re.sub(r"\s+", "_", value)
+    return value or fallback
 
 def _stringify(value):
     if value is None:
@@ -132,23 +140,20 @@ def _format_countdown(deadline):
     if not deadline:
         return "-"
 
-    now = timezone.now()
+    today = timezone.localdate()
 
-    if now > deadline:
+    if deadline < today:
         return "Overdue"
 
-    diff = deadline - now
-    total_hours = int(diff.total_seconds() // 3600)
-    days = total_hours // 24
-    hours = total_hours % 24
+    diff_days = (deadline - today).days
 
-    if days > 0 and hours > 0:
-        return f"{days}day {hours}h" if days == 1 else f"{days}days {hours}h"
+    if diff_days == 0:
+        return "Today"
 
-    if days > 0:
-        return f"{days}day" if days == 1 else f"{days}days"
+    if diff_days == 1:
+        return "1day"
 
-    return f"{hours}h"
+    return f"{diff_days}days"
 
 
 def _get_prefetched_order_queryset():
@@ -564,16 +569,23 @@ def order_list(request):
     pending_count = qs.filter(status=Order.STATUS_PENDING).count()
     done_count = qs.filter(status=Order.STATUS_DONE).count()
 
-    now = timezone.now()
+    # ✅ FIX: use DATE instead of datetime
+    today = timezone.localdate()
 
     for order in qs:
         cloth_qty, film_meter = _get_order_totals_by_service(order)
+
         total_amount = Decimal(order.total_amount or 0)
         paid_amount = Decimal(order.paid_amount or 0)
         deposit_amount = Decimal(order.deposit_amount or 0)
         balance_amount = total_amount - deposit_amount - paid_amount
 
-        is_late = bool(order.deadline and order.status != Order.STATUS_DONE and order.deadline < now)
+        # ✅ FIX: compare date with date (no error anymore)
+        is_late = bool(
+            order.deadline
+            and order.status != Order.STATUS_DONE
+            and order.deadline < today
+        )
 
         rows.append(
             {
@@ -601,7 +613,6 @@ def order_list(request):
     }
 
     return render(request, "orders/order_list.html", context)
-
 
 @login_required
 @permission_required("orders.view_order", raise_exception=True)
@@ -1000,8 +1011,6 @@ def order_invoice_pdf(request, pk):
         request=request,
     )
 
-    base_url = request.build_absolute_uri("/")
-
     with sync_playwright() as p:
         browser = p.chromium.launch(args=["--no-sandbox"])
         page = browser.new_page()
@@ -1021,8 +1030,12 @@ def order_invoice_pdf(request, pk):
 
         browser.close()
 
+    customer = _safe_download_name(order.customer_name, "customer")
+    order_no = _safe_download_name(order.order_no, "invoice")
+    filename = f"{customer}_{order_no}.pdf"
+
     response = HttpResponse(pdf, content_type="application/pdf")
-    response["Content-Disposition"] = f'attachment; filename="Invoice_{order.order_no}.pdf"'
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
     return response
 
 @login_required
@@ -1209,3 +1222,35 @@ def order_trash_list(request):
             "total_orders": qs.count(),
         },
     )
+
+@login_required
+@permission_required("orders.view_order", raise_exception=True)
+def order_invoice_png(request, pk):
+    order = get_object_or_404(_get_prefetched_order_queryset(), pk=pk)
+
+    html = render_to_string(
+        "orders/order_invoice.html",
+        {
+            "order": order,
+            "print_mode": True,
+        },
+        request=request,
+    )
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(args=["--no-sandbox"])
+        page = browser.new_page(viewport={"width": 1200, "height": 1600})
+        page.set_content(html, wait_until="networkidle")
+        page.emulate_media(media="screen")
+
+        png = page.screenshot(full_page=True, type="png")
+
+        browser.close()
+
+    customer = _safe_download_name(order.customer_name, "customer")
+    order_no = _safe_download_name(order.order_no, "invoice")
+    filename = f"{customer}_{order_no}.png"
+
+    response = HttpResponse(png, content_type="image/png")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
