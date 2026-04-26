@@ -994,52 +994,59 @@ def production_update(request, pk):
 @permission_required("orders.view_order", raise_exception=True)
 def order_invoice(request, pk):
     order = get_object_or_404(_get_prefetched_order_queryset(), pk=pk)
+    printed_by = order.created_by or request.user
 
     return render(
         request,
         "orders/order_invoice.html",
         {
             "order": order,
-            "printed_by": request.user,
+            "printed_by": printed_by,
         },
     )
+
 
 @login_required
 @permission_required("orders.view_order", raise_exception=True)
 def order_invoice_pdf(request, pk):
     order = get_object_or_404(_get_prefetched_order_queryset(), pk=pk)
+    printed_by = order.created_by or request.user
 
     html = render_to_string(
         "orders/order_invoice.html",
         {
             "order": order,
             "print_mode": True,
-            "printed_by": request.user,
+            "printed_by": printed_by,
         },
         request=request,
     )
 
     with sync_playwright() as p:
         browser = p.chromium.launch(args=["--no-sandbox"])
-        page = browser.new_page(
-            viewport={
-                "width": 794,
-                "height": 1123,
-            }
-        )
+        page = browser.new_page(viewport={"width": 794, "height": 1123})
 
         page.set_content(html, wait_until="networkidle")
-        page.emulate_media(media="print")
+        page.emulate_media(media="screen")
+
+        page.wait_for_function(
+            """
+            () => Array.from(document.images).every(
+                img => img.complete && img.naturalWidth > 0
+            )
+            """,
+            timeout=10000,
+        )
 
         pdf = page.pdf(
             format="A4",
             print_background=True,
             prefer_css_page_size=True,
             margin={
-                "top": "0",
-                "right": "0",
-                "bottom": "0",
-                "left": "0",
+                "top": "0mm",
+                "right": "0mm",
+                "bottom": "0mm",
+                "left": "0mm",
             },
         )
 
@@ -1241,13 +1248,14 @@ def order_trash_list(request):
 @permission_required("orders.view_order", raise_exception=True)
 def order_invoice_png(request, pk):
     order = get_object_or_404(_get_prefetched_order_queryset(), pk=pk)
+    printed_by = order.created_by or request.user
 
     html = render_to_string(
         "orders/order_invoice.html",
         {
             "order": order,
             "print_mode": True,
-            "printed_by": request.user,
+            "printed_by": printed_by,
         },
         request=request,
     )
@@ -1256,15 +1264,21 @@ def order_invoice_png(request, pk):
         browser = p.chromium.launch(args=["--no-sandbox"])
 
         page = browser.new_page(
-            viewport={
-                "width": 794,
-                "height": 1123,
-            },
+            viewport={"width": 794, "height": 1123},
             device_scale_factor=2,
         )
 
         page.set_content(html, wait_until="networkidle")
         page.emulate_media(media="screen")
+
+        page.wait_for_function(
+            """
+            () => Array.from(document.images).every(
+                img => img.complete && img.naturalWidth > 0
+            )
+            """,
+            timeout=10000,
+        )
 
         png = page.screenshot(
             type="png",
