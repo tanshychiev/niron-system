@@ -12,6 +12,9 @@ from decimal import Decimal, ROUND_HALF_UP
 from inventory.models import Color, InventoryItem, Size
 from openpyxl import Workbook
 
+from django.template.loader import get_template
+from xhtml2pdf import pisa
+
 from .forms import OrderForm, ProductionFilterForm
 from .models import (
     Order,
@@ -987,8 +990,26 @@ def order_invoice(request, pk):
 @permission_required("orders.view_order", raise_exception=True)
 def order_invoice_pdf(request, pk):
     order = get_object_or_404(_get_prefetched_order_queryset(), pk=pk)
-    return render(request, "orders/order_invoice_pdf.html", {"order": order, "print_mode": True})
 
+    template = get_template("orders/order_invoice_pdf.html")
+    html = template.render({
+        "order": order,
+        "print_mode": True,
+    })
+
+    response = HttpResponse(content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="Invoice_{order.order_no}.pdf"'
+
+    pisa_status = pisa.CreatePDF(
+        html,
+        dest=response,
+        link_callback=lambda uri, rel: request.build_absolute_uri(uri)
+    )
+
+    if pisa_status.err:
+        return HttpResponse("PDF error", status=500)
+
+    return response
 
 @login_required
 @permission_required("orders.change_order", raise_exception=True)

@@ -8,25 +8,32 @@
 <a href="{% url 'order_list' %}" class="btn btn-light">Back to Orders</a>
 <a href="{% url 'order_edit' order.pk %}" class="btn btn-light">Edit Order</a>
 <a href="{% url 'order_invoice' order.pk %}" class="btn btn-light" target="_blank">Save Invoice PNG</a>
-<a href="{% url 'order_invoice_pdf' order.pk %}" class="btn btn-primary" target="_blank">Save Invoice PDF</a>
+
+<a href="{% url 'order_invoice_pdf' order.pk %}"
+   class="btn btn-primary"
+   onclick="this.innerText='Downloading PDF...';">
+    Download Invoice PDF
+</a>
 {% endblock %}
 
 {% block extra_css %}
 <style>
     .detail-shell {
-        max-width: 1440px;
-        margin: 0 auto;
+        width: 100%;
+        max-width: none;
+        margin: 0;
     }
 
     .detail-grid-2 {
         display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: minmax(0, 1.25fr) minmax(360px, .75fr);
         gap: 20px;
         margin-bottom: 22px;
+        align-items: stretch;
     }
 
     .detail-card {
-        background: rgba(255,255,255,.94);
+        background: rgba(255,255,255,.96);
         border: 1px solid var(--line);
         border-radius: 24px;
         box-shadow: var(--shadow);
@@ -34,24 +41,30 @@
         margin-bottom: 22px;
     }
 
+    .detail-grid-2 .detail-card {
+        margin-bottom: 0;
+        height: 100%;
+    }
+
     .detail-title {
         margin: 0 0 16px;
         font-size: 18px;
-        font-weight: 800;
+        font-weight: 900;
         color: var(--text);
     }
 
     .info-list {
         display: grid;
-        gap: 10px;
+        gap: 0;
     }
 
     .info-row {
-        display: flex;
-        justify-content: space-between;
-        gap: 14px;
-        padding: 10px 0;
+        display: grid;
+        grid-template-columns: 150px minmax(0, 1fr);
+        gap: 16px;
+        padding: 11px 0;
         border-bottom: 1px solid var(--line);
+        align-items: start;
     }
 
     .info-row:last-child {
@@ -60,33 +73,38 @@
 
     .info-label {
         font-size: 12px;
-        font-weight: 800;
+        font-weight: 900;
         color: var(--muted);
         text-transform: uppercase;
         letter-spacing: .8px;
+        line-height: 1.4;
     }
 
     .info-value {
         font-size: 14px;
-        font-weight: 600;
+        font-weight: 700;
         color: var(--text);
         text-align: right;
+        line-height: 1.45;
+        word-break: break-word;
     }
 
     .status-badge {
         display: inline-flex;
         align-items: center;
+        justify-content: center;
         padding: 6px 10px;
         border-radius: 999px;
         background: var(--accent-soft);
         color: var(--accent-dark);
         font-size: 12px;
-        font-weight: 800;
+        font-weight: 900;
         border: 1px solid #f0d38c;
+        white-space: nowrap;
     }
 
     .amount-strong {
-        font-weight: 800;
+        font-weight: 900;
         color: var(--text);
     }
 
@@ -119,7 +137,7 @@
         background: #f8f6ef;
         border: 1px solid var(--line);
         font-size: 12px;
-        font-weight: 800;
+        font-weight: 900;
         color: var(--text);
     }
 
@@ -127,12 +145,14 @@
         font-size: 13px;
         color: var(--muted);
         margin-top: 6px;
+        font-weight: 600;
     }
 
     .design-meta-box {
         display: flex;
         gap: 10px;
         flex-wrap: wrap;
+        justify-content: flex-end;
     }
 
     .design-mini {
@@ -141,14 +161,16 @@
         border: 1px solid var(--line);
         background: #fff;
         font-size: 12px;
-        font-weight: 700;
+        font-weight: 800;
         color: var(--text);
+        white-space: nowrap;
     }
 
     .design-grid {
         display: grid;
         grid-template-columns: 340px minmax(0, 1fr);
         gap: 18px;
+        align-items: start;
     }
 
     .design-images {
@@ -161,7 +183,7 @@
     .design-images-title,
     .design-items-title {
         font-size: 13px;
-        font-weight: 800;
+        font-weight: 900;
         color: var(--muted);
         text-transform: uppercase;
         letter-spacing: .8px;
@@ -204,9 +226,11 @@
     .empty-note {
         color: var(--muted);
         font-size: 13px;
+        font-weight: 700;
     }
 
     .table-wrap {
+        width: 100%;
         overflow-x: auto;
         border: 1px solid var(--line);
         border-radius: 18px;
@@ -233,8 +257,13 @@
         text-transform: uppercase;
         letter-spacing: .8px;
         color: var(--muted);
-        font-weight: 800;
+        font-weight: 900;
         white-space: nowrap;
+        background: #fbfaf6;
+    }
+
+    .detail-table tr:last-child td {
+        border-bottom: none;
     }
 
     .item-type-badge {
@@ -243,12 +272,13 @@
         padding: 5px 9px;
         border-radius: 999px;
         font-size: 11px;
-        font-weight: 800;
+        font-weight: 900;
         letter-spacing: .4px;
         text-transform: uppercase;
         background: #f8f6ef;
         border: 1px solid var(--line);
         color: var(--text);
+        white-space: nowrap;
     }
 
     .history-list {
@@ -277,7 +307,7 @@
         padding: 5px 9px;
         border-radius: 999px;
         font-size: 11px;
-        font-weight: 800;
+        font-weight: 900;
         text-transform: uppercase;
         background: #f8f6ef;
         border: 1px solid var(--line);
@@ -286,12 +316,12 @@
     .history-meta {
         font-size: 12px;
         color: var(--muted);
-        font-weight: 700;
+        font-weight: 800;
     }
 
     .history-field {
         font-size: 13px;
-        font-weight: 800;
+        font-weight: 900;
         color: var(--text);
         margin-bottom: 6px;
         word-break: break-word;
@@ -304,15 +334,65 @@
         word-break: break-word;
     }
 
-    .history-old { color: #b42318; }
-    .history-new { color: #027a48; }
-    .history-remark { margin-top: 8px; font-size: 12px; color: var(--muted); }
-    .empty-state { color: var(--muted); font-size: 14px; }
+    .history-old {
+        color: #b42318;
+    }
+
+    .history-new {
+        color: #027a48;
+    }
+
+    .history-remark {
+        margin-top: 8px;
+        font-size: 12px;
+        color: var(--muted);
+        font-weight: 700;
+    }
+
+    .empty-state {
+        color: var(--muted);
+        font-size: 14px;
+        font-weight: 700;
+        padding: 10px 0;
+    }
 
     @media (max-width: 1100px) {
         .detail-grid-2,
         .design-grid {
             grid-template-columns: 1fr;
+        }
+
+        .design-meta-box {
+            justify-content: flex-start;
+        }
+    }
+
+    @media (max-width: 640px) {
+        .detail-card {
+            padding: 16px;
+            border-radius: 18px;
+        }
+
+        .info-row {
+            grid-template-columns: 1fr;
+            gap: 4px;
+        }
+
+        .info-value {
+            text-align: left;
+        }
+
+        .design-card-wrap {
+            padding: 14px;
+            border-radius: 18px;
+        }
+
+        .design-image-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .design-image-card img {
+            height: 120px;
         }
     }
 </style>
@@ -320,62 +400,99 @@
 
 {% block content %}
 <div class="detail-shell">
+
     <div class="detail-grid-2">
         <div class="detail-card">
             <h3 class="detail-title">Order Info</h3>
+
             <div class="info-list">
-                <div class="info-row"><div class="info-label">Order No</div><div class="info-value">{{ order.order_no }}</div></div>
-                <div class="info-row"><div class="info-label">Customer</div><div class="info-value">{{ order.customer_name|default:"-" }}</div></div>
-                <div class="info-row"><div class="info-label">Phone</div><div class="info-value">{{ order.phone|default:"-" }}</div></div>
-                <div class="info-row"><div class="info-label">Location</div><div class="info-value">{{ order.customer_location|default:"-" }}</div></div>
-                <div class="info-row"><div class="info-label">Type</div><div class="info-value"><span class="status-badge">{{ order.get_order_type_display }}</span></div></div>
-                <div class="info-row"><div class="info-label">Deadline</div><div class="info-value">{{ order.deadline }}</div></div>
-                <div class="info-row"><div class="info-label">Status</div><div class="info-value"><span class="status-badge">{{ order.get_status_display }}</span></div></div>
-                <div class="info-row"><div class="info-label">Remark</div><div class="info-value">{{ order.remark|default:"-" }}</div></div>
+                <div class="info-row">
+                    <div class="info-label">Order No</div>
+                    <div class="info-value">{{ order.order_no }}</div>
+                </div>
+
+                <div class="info-row">
+                    <div class="info-label">Customer</div>
+                    <div class="info-value">{{ order.customer_name|default:"-" }}</div>
+                </div>
+
+                <div class="info-row">
+                    <div class="info-label">Phone</div>
+                    <div class="info-value">{{ order.phone|default:"-" }}</div>
+                </div>
+
+                <div class="info-row">
+                    <div class="info-label">Location</div>
+                    <div class="info-value">{{ order.customer_location|default:"-" }}</div>
+                </div>
+
+                <div class="info-row">
+                    <div class="info-label">Type</div>
+                    <div class="info-value">
+                        <span class="status-badge">{{ order.get_order_type_display }}</span>
+                    </div>
+                </div>
+
+                <div class="info-row">
+                    <div class="info-label">Deadline</div>
+                    <div class="info-value">{{ order.deadline|default:"-" }}</div>
+                </div>
+
+                <div class="info-row">
+                    <div class="info-label">Status</div>
+                    <div class="info-value">
+                        <span class="status-badge">{{ order.get_status_display }}</span>
+                    </div>
+                </div>
+
+                <div class="info-row">
+                    <div class="info-label">Remark</div>
+                    <div class="info-value">{{ order.remark|default:"-" }}</div>
+                </div>
             </div>
         </div>
 
         <div class="detail-card">
-    <h3 class="detail-title">Payment</h3>
-    <div class="info-list">
+            <h3 class="detail-title">Payment</h3>
 
-        <div class="info-row">
-            <div class="info-label">Total</div>
-            <div class="info-value amount-strong">${{ order.total_amount }}</div>
+            <div class="info-list">
+                <div class="info-row">
+                    <div class="info-label">Total</div>
+                    <div class="info-value amount-strong">${{ order.total_amount }}</div>
+                </div>
+
+                <div class="info-row">
+                    <div class="info-label">Deposit</div>
+                    <div class="info-value">${{ order.deposit_amount }}</div>
+                </div>
+
+                <div class="info-row">
+                    <div class="info-label">Paid</div>
+                    <div class="info-value">${{ order.paid_amount }}</div>
+                </div>
+
+                <div class="info-row">
+                    <div class="info-label">Balance</div>
+                    <div class="info-value amount-strong">${{ order.balance_amount }}</div>
+                </div>
+
+                <div class="info-row">
+                    <div class="info-label">Total PCS</div>
+                    <div class="info-value">{{ order.total_pcs }}</div>
+                </div>
+
+                <div class="info-row">
+                    <div class="info-label">Done PCS</div>
+                    <div class="info-value">{{ order.done_pcs }}</div>
+                </div>
+
+                <div class="info-row">
+                    <div class="info-label">Remaining PCS</div>
+                    <div class="info-value">{{ order.remaining_pcs }}</div>
+                </div>
+            </div>
         </div>
-
-        <div class="info-row">
-            <div class="info-label">Deposit</div>
-            <div class="info-value">${{ order.deposit_amount }}</div>
-        </div>
-
-        <div class="info-row">
-            <div class="info-label">Paid</div>
-            <div class="info-value">${{ order.paid_amount }}</div>
-        </div>
-
-        <div class="info-row">
-            <div class="info-label">Balance</div>
-            <div class="info-value amount-strong">${{ order.balance_amount }}</div>
-        </div>
-
-        <div class="info-row">
-            <div class="info-label">Total PCS</div>
-            <div class="info-value">{{ total_pcs|floatformat:0 }}</div>
-        </div>
-
-        <div class="info-row">
-            <div class="info-label">Done PCS</div>
-            <div class="info-value">{{ done_pcs|floatformat:0 }}</div>
-        </div>
-
-        <div class="info-row">
-            <div class="info-label">Remaining PCS</div>
-            <div class="info-value">{{ remaining_pcs|floatformat:0 }}</div>
-        </div>
-
     </div>
-</div>
 
     <div class="detail-card">
         <h3 class="detail-title">Designs</h3>
@@ -386,6 +503,7 @@
                 <div class="design-card-head">
                     <div>
                         <div class="design-badge">{{ design.display_name }}</div>
+
                         {% if design.remark %}
                         <div class="design-remark">{{ design.remark }}</div>
                         {% endif %}
@@ -402,6 +520,7 @@
                 <div class="design-grid">
                     <div class="design-images">
                         <div class="design-images-title">Design Images</div>
+
                         <div class="design-image-grid">
                             {% for file in design.files.all %}
                             <a href="{{ file.image.url }}" class="design-image-card" target="_blank">
@@ -416,6 +535,7 @@
 
                     <div class="design-items">
                         <div class="design-items-title">Items</div>
+
                         <div class="table-wrap">
                             <table class="detail-table">
                                 <thead>
@@ -433,11 +553,18 @@
                                         <th>Total</th>
                                     </tr>
                                 </thead>
+
                                 <tbody>
                                     {% for item in design.items.all %}
                                     <tr>
-                                        <td><span class="item-type-badge">{{ item.get_item_mode_display }}</span></td>
+                                        <td>
+                                            <span class="item-type-badge">
+                                                {{ item.get_item_mode_display }}
+                                            </span>
+                                        </td>
+
                                         <td>{{ item.description|default:"-" }}</td>
+
                                         <td>
                                             {% if item.item_mode == "FILM" %}
                                                 {{ item.film_item|default:"-" }}
@@ -445,6 +572,7 @@
                                                 {{ item.shirt_item|default:"-" }}
                                             {% endif %}
                                         </td>
+
                                         <td>{{ item.color|default:"-" }}</td>
                                         <td>{{ item.size|default:"-" }}</td>
                                         <td>{{ item.manual_film_meter|default:"0" }}</td>
@@ -455,7 +583,11 @@
                                         <td>${{ item.line_total }}</td>
                                     </tr>
                                     {% empty %}
-                                    <tr><td colspan="11" class="empty-state">No items in this design.</td></tr>
+                                    <tr>
+                                        <td colspan="11" class="empty-state">
+                                            No items in this design.
+                                        </td>
+                                    </tr>
                                     {% endfor %}
                                 </tbody>
                             </table>
@@ -471,6 +603,7 @@
 
     <div class="detail-card">
         <h3 class="detail-title">Stock Deduction</h3>
+
         <div class="table-wrap">
             <table class="detail-table">
                 <thead>
@@ -481,16 +614,21 @@
                         <th>Unit Cost</th>
                     </tr>
                 </thead>
+
                 <tbody>
                     {% for c in order.stock_consumptions.all %}
                     <tr>
                         <td>{{ c.batch_item.batch.batch_no }}</td>
                         <td>{{ c.batch_item }}</td>
                         <td>{{ c.consumed_qty }}</td>
-                        <td>{{ c.unit_cost }}</td>
+                        <td>${{ c.unit_cost }}</td>
                     </tr>
                     {% empty %}
-                    <tr><td colspan="4" class="empty-state">No stock consumption yet.</td></tr>
+                    <tr>
+                        <td colspan="4" class="empty-state">
+                            No stock consumption yet.
+                        </td>
+                    </tr>
                     {% endfor %}
                 </tbody>
             </table>
@@ -508,6 +646,7 @@
                     <div>
                         <span class="history-badge">{{ h.get_action_display }}</span>
                     </div>
+
                     <div class="history-meta">
                         {{ h.changed_by|default:"System" }} • {{ h.created_at }}
                     </div>
@@ -517,10 +656,15 @@
 
                 <div class="history-change">
                     {% if h.old_value %}
-                    <div class="history-old"><strong>Old:</strong> {{ h.old_value }}</div>
+                    <div class="history-old">
+                        <strong>Old:</strong> {{ h.old_value }}
+                    </div>
                     {% endif %}
+
                     {% if h.new_value %}
-                    <div class="history-new"><strong>New:</strong> {{ h.new_value }}</div>
+                    <div class="history-new">
+                        <strong>New:</strong> {{ h.new_value }}
+                    </div>
                     {% endif %}
                 </div>
 
@@ -534,5 +678,6 @@
         <div class="empty-state">No history yet.</div>
         {% endif %}
     </div>
+
 </div>
 {% endblock %}
