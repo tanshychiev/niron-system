@@ -1015,7 +1015,7 @@ def order_invoice_pdf(request, pk):
         {
             "order": order,
             "print_mode": True,
-            "printed_by": request.user,  # ✅ FIXED
+            "printed_by": request.user,
         },
         request=request,
     )
@@ -1026,7 +1026,11 @@ def order_invoice_pdf(request, pk):
 
         page.set_content(html, wait_until="networkidle")
         page.emulate_media(media="screen")
-        page.wait_for_timeout(1500)
+
+        # ✅ wait for images (IMPORTANT for signature)
+        page.wait_for_function("""
+        () => Array.from(document.images).every(img => img.complete && img.naturalWidth > 0)
+        """, timeout=10000)
 
         pdf = page.pdf(
             format="A4",
@@ -1042,10 +1046,14 @@ def order_invoice_pdf(request, pk):
 
         browser.close()
 
+    # ✅ SAFE filename (no space error)
+    safe_name = (order.customer_name or "customer").replace(" ", "_")
+    filename = f"{safe_name}_{order.order_no}.pdf"
+
     response = HttpResponse(pdf, content_type="application/pdf")
-    filename = f"{order.customer_name}_{order.order_no}.pdf"
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
-    
+
+    return response  # 🔥 VERY IMPORTANT (your error was here)   
 
 @login_required
 @permission_required("orders.change_order", raise_exception=True)
