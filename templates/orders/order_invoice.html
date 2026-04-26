@@ -373,9 +373,13 @@ html, body {
             <div class="signature-label">Signature</div>
 
            <div class="signature-space">
-    <img class="signature-img"
-         src="/static/signatures/{{ printed_by.username }}.png?v=1"
-         alt="Signature">
+    {% if printed_by %}
+        <img class="signature-img"
+             src="{{ request.scheme }}://{{ request.get_host }}/static/signatures/{{ printed_by.username }}.png?v=3"
+             alt="Signature">
+    {% else %}
+        <span>Signature</span>
+    {% endif %}
 </div>
 
             <div class="signature-line"></div>
