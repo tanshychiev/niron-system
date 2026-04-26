@@ -12,8 +12,8 @@ from decimal import Decimal, ROUND_HALF_UP
 from inventory.models import Color, InventoryItem, Size
 from openpyxl import Workbook
 
-from django.template.loader import get_template
-from xhtml2pdf import pisa
+from django.template.loader import render_to_string
+from playwright.sync_api import sync_playwright
 
 from .forms import OrderForm, ProductionFilterForm
 from .models import (
@@ -991,24 +991,38 @@ def order_invoice(request, pk):
 def order_invoice_pdf(request, pk):
     order = get_object_or_404(_get_prefetched_order_queryset(), pk=pk)
 
-    template = get_template("orders/order_invoice_pdf.html")
-    html = template.render({
-        "order": order,
-        "print_mode": True,
-    })
-
-    response = HttpResponse(content_type="application/pdf")
-    response["Content-Disposition"] = f'attachment; filename="Invoice_{order.order_no}.pdf"'
-
-    pisa_status = pisa.CreatePDF(
-        html,
-        dest=response,
-        link_callback=lambda uri, rel: request.build_absolute_uri(uri)
+    html = render_to_string(
+        "orders/order_invoice.html",
+        {
+            "order": order,
+            "print_mode": True,
+        },
+        request=request,
     )
 
-    if pisa_status.err:
-        return HttpResponse("PDF error", status=500)
+    base_url = request.build_absolute_uri("/")
 
+    with sync_playwright() as p:
+        browser = p.chromium.launch(args=["--no-sandbox"])
+        page = browser.new_page()
+        page.set_content(html, wait_until="networkidle")
+        page.emulate_media(media="screen")
+
+        pdf = page.pdf(
+            format="A4",
+            print_background=True,
+            margin={
+                "top": "10mm",
+                "right": "10mm",
+                "bottom": "10mm",
+                "left": "10mm",
+            },
+        )
+
+        browser.close()
+
+    response = HttpResponse(pdf, content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="Invoice_{order.order_no}.pdf"'
     return response
 
 @login_required
