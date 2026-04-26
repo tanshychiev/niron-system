@@ -330,6 +330,22 @@
             70px;
     }
 
+    body.service-retail-mode .item-header-row,
+    body.service-retail-mode .item-input-row {
+        min-width: 1120px;
+        grid-template-columns:
+            200px
+            150px
+            170px
+            110px
+            90px
+            90px
+            220px
+            120px
+            110px
+            70px;
+    }
+
     .item-header-row {
         padding: 0 2px 10px;
         border-bottom: 1px solid var(--line);
@@ -367,6 +383,156 @@
         background: #F8F6EF;
         font-weight: 700;
     }
+
+    /* ===== RETAIL SALE FLEXIBLE ROW MODE =====
+       Shirt row: Description | Item | Color | Size | Qty | Unit Price | Unit Name | Total | Remove
+       Material row: Description | Item wider | Qty | Unit Price | Unit Name | Total | Remove
+    */
+    body.service-retail-mode .item-board {
+        overflow-x: visible;
+    }
+
+    body.service-retail-mode .item-header-row {
+        display: none !important;
+    }
+
+    body.service-retail-mode .item-row {
+        padding: 14px;
+        border-radius: 20px;
+        margin-bottom: 14px;
+    }
+
+    body.service-retail-mode .item-input-row {
+        min-width: 0 !important;
+        width: 100%;
+        align-items: end;
+        gap: 10px;
+    }
+
+    body.service-retail-mode .item-row.mode-shirt .item-input-row {
+        grid-template-columns:
+            minmax(150px, 1.1fr)
+            minmax(210px, 1.35fr)
+            minmax(130px, .9fr)
+            minmax(110px, .75fr)
+            90px
+            110px
+            92px
+            110px
+            60px;
+    }
+
+    body.service-retail-mode .item-row.mode-material .item-input-row {
+        grid-template-columns:
+            minmax(160px, 1.1fr)
+            minmax(360px, 2.3fr)
+            100px
+            120px
+            92px
+            120px
+            60px;
+    }
+
+    body.service-retail-mode .item-row.mode-material .col-color,
+    body.service-retail-mode .item-row.mode-material .col-size,
+    body.service-retail-mode .item-row.mode-material .col-shirt,
+    body.service-retail-mode .item-row.mode-material .col-film-item,
+    body.service-retail-mode .item-row.mode-material .col-film-meter {
+        display: none !important;
+    }
+
+    body.service-retail-mode .item-row.mode-shirt .col-shirt,
+    body.service-retail-mode .item-row.mode-shirt .col-film-item,
+    body.service-retail-mode .item-row.mode-shirt .col-film-meter {
+        display: none !important;
+    }
+
+    body.service-retail-mode .item-row .service-retail-only {
+        display: block !important;
+    }
+
+    body.service-retail-mode .item-row .field::before,
+    body.service-retail-mode .item-row .remove-inline::before {
+        display: block;
+        font-size: 11px;
+        font-weight: 900;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: .7px;
+        margin-bottom: 7px;
+        line-height: 1;
+    }
+
+    body.service-retail-mode .item-row .col-description::before { content: "Description"; }
+    body.service-retail-mode .item-row .col-retail-item::before { content: "Item"; }
+    body.service-retail-mode .item-row .col-color::before { content: "Color"; }
+    body.service-retail-mode .item-row .col-size::before { content: "Size"; }
+    body.service-retail-mode .item-row .col-qty::before { content: "Qty"; }
+    body.service-retail-mode .item-row .col-unit-price::before { content: "Price / Unit"; }
+    body.service-retail-mode .item-row .col-unit-name::before { content: "Unit"; }
+    body.service-retail-mode .item-row .col-total::before { content: "Total"; }
+    body.service-retail-mode .item-row .remove-inline::before { content: "Remove"; }
+
+    body.service-retail-mode .unit-name-view {
+        text-align: center;
+        font-weight: 900;
+        text-transform: uppercase;
+        background: #F3F5F9;
+        border-color: #E4E7EC;
+    }
+
+    body.service-retail-mode .item-row.mode-material .retail-item-select {
+        border-color: #F59E0B;
+        box-shadow: 0 0 0 2px rgba(245, 158, 11, .12);
+    }
+
+    body.service-retail-mode .item-row.mode-shirt .retail-item-select {
+        border-color: #10B981;
+        box-shadow: 0 0 0 2px rgba(16, 185, 129, .10);
+    }
+
+    body.service-retail-mode .item-row::after {
+        display: inline-flex;
+        margin-top: 8px;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 900;
+        line-height: 1;
+    }
+
+    body.service-retail-mode .item-row.mode-material::after {
+        content: "Material";
+        color: #B45309;
+        background: #FFF7ED;
+        border: 1px solid #FED7AA;
+    }
+
+    body.service-retail-mode .item-row.mode-shirt::after {
+        content: "Shirt";
+        color: #047857;
+        background: #ECFDF5;
+        border: 1px solid #A7F3D0;
+    }
+
+    @media (max-width: 1100px) {
+        body.service-retail-mode .item-row.mode-shirt .item-input-row,
+        body.service-retail-mode .item-row.mode-material .item-input-row {
+            grid-template-columns: 1fr 1fr;
+        }
+
+        body.service-retail-mode .item-row .remove-inline {
+            justify-content: flex-start;
+        }
+    }
+
+    @media (max-width: 700px) {
+        body.service-retail-mode .item-row.mode-shirt .item-input-row,
+        body.service-retail-mode .item-row.mode-material .item-input-row {
+            grid-template-columns: 1fr;
+        }
+    }
+
 
     .remove-inline {
         display: flex;
@@ -706,15 +872,7 @@
 
         {% if messages %}
             {% for message in messages %}
-                <div class="
-                    {% if message.tags == 'success' %}
-                        niron-alert-success
-                    {% elif message.tags == 'warning' %}
-                        niron-alert-warning
-                    {% else %}
-                        niron-alert-error
-                    {% endif %}
-                ">
+                <div class="{% if message.tags == 'success' %}niron-alert-success{% elif message.tags == 'warning' %}niron-alert-warning{% else %}niron-alert-error{% endif %}">
                     {{ message }}
                 </div>
             {% endfor %}
@@ -792,7 +950,7 @@
             <div class="qb-head">
                 <div>
                     <h2 class="qb-title">Design Blocks</h2>
-                    <div class="qb-sub">Each design has its own images and rows</div>
+                    <div class="qb-sub">Each design has its own images and item rows</div>
                 </div>
                 <button type="button" class="btn btn-primary" id="add-design-btn">Add Design</button>
             </div>
@@ -863,6 +1021,7 @@
                         <div class="item-board">
                             <div class="item-header-row">
                                 <div class="col-description">Description</div>
+                                <div class="col-retail-item service-retail-only">Item</div>
                                 <div class="col-shirt service-full-only">Shirt Item</div>
                                 <div class="col-color service-full-only">Color</div>
                                 <div class="col-size service-full-only">Size</div>
@@ -870,23 +1029,39 @@
                                 <div class="col-film-item service-film-only">Film Item</div>
                                 <div class="col-film-meter service-film-only">Film Meter</div>
                                 <div class="col-unit-price">Unit Price</div>
+                                <div class="col-unit-name service-retail-only">Unit</div>
                                 <div class="col-total">Total</div>
                                 <div class="col-action">Action</div>
                             </div>
 
                             <div class="items-container">
                                 {% for item in design.items.all %}
-                                <div class="item-row" data-item-index="{{ forloop.counter0 }}">
+                                <div class="item-row {% if item.shirt_item_id %}mode-shirt{% elif item.material_item_id %}mode-material{% endif %}" data-item-index="{{ forloop.counter0 }}">
                                     <input type="hidden" name="design-{{ forloop.parentloop.counter0 }}-item-{{ forloop.counter0 }}-id" value="{{ item.id }}">
                                     <input type="hidden" name="design-{{ forloop.parentloop.counter0 }}-item-{{ forloop.counter0 }}-DELETE" value="0" class="item-delete-input">
+
+                                    <input type="hidden" name="design-{{ forloop.parentloop.counter0 }}-item-{{ forloop.counter0 }}-shirt_item" class="retail-shirt-hidden" value="{{ item.shirt_item_id|default:'' }}">
+                                    <input type="hidden" name="design-{{ forloop.parentloop.counter0 }}-item-{{ forloop.counter0 }}-material_item" class="retail-material-hidden" value="{{ item.material_item_id|default:'' }}">
 
                                     <div class="item-input-row">
                                         <div class="field col-description">
                                             <input type="text" name="design-{{ forloop.parentloop.counter0 }}-item-{{ forloop.counter0 }}-description" class="form-control" value="{{ item.description }}">
                                         </div>
 
+                                        <div class="field col-retail-item service-retail-only">
+                                            <select class="form-select retail-item-select">
+                                                <option value="">---------</option>
+                                                {% for opt in shirt_items %}
+                                                <option value="shirt:{{ opt.id }}" data-unit="pcs" {% if item.shirt_item_id == opt.id %}selected{% endif %}>{{ opt }}</option>
+                                                {% endfor %}
+                                                {% for opt in material_items %}
+                                                <option value="material:{{ opt.id }}" data-unit="{{ opt.unit|default:'pcs' }}" {% if item.material_item_id == opt.id %}selected{% endif %}>{{ opt }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+
                                         <div class="field col-shirt service-full-only">
-                                            <select name="design-{{ forloop.parentloop.counter0 }}-item-{{ forloop.counter0 }}-shirt_item" class="form-select shirt-select">
+                                            <select name="design-{{ forloop.parentloop.counter0 }}-item-{{ forloop.counter0 }}-shirt_item_full" class="form-select shirt-select">
                                                 <option value="">---------</option>
                                                 {% for opt in shirt_items %}
                                                 <option value="{{ opt.id }}" {% if item.shirt_item_id == opt.id %}selected{% endif %}>{{ opt }}</option>
@@ -933,6 +1108,10 @@
                                             <input type="number" step="0.01" min="0" name="design-{{ forloop.parentloop.counter0 }}-item-{{ forloop.counter0 }}-unit_price" class="form-control unit-price-input" value="{{ item.unit_price }}">
                                         </div>
 
+                                        <div class="field col-unit-name service-retail-only">
+                                            <input type="text" class="form-control unit-name-view" value="pcs" readonly>
+                                        </div>
+
                                         <div class="field col-total">
                                             <input type="text" class="line-total-view" value="{{ item.line_total }}" readonly>
                                         </div>
@@ -943,17 +1122,32 @@
                                     </div>
                                 </div>
                                 {% empty %}
-                                <div class="item-row" data-item-index="0">
-                                    <input type="hidden" name="design-0-item-0-id" value="">
-                                    <input type="hidden" name="design-0-item-0-DELETE" value="0" class="item-delete-input">
+                                <div class="item-row mode-shirt" data-item-index="0">
+                                    <input type="hidden" name="design-{{ forloop.parentloop.counter0 }}-item-0-id" value="">
+                                    <input type="hidden" name="design-{{ forloop.parentloop.counter0 }}-item-0-DELETE" value="0" class="item-delete-input">
+
+                                    <input type="hidden" name="design-{{ forloop.parentloop.counter0 }}-item-0-shirt_item" class="retail-shirt-hidden" value="">
+                                    <input type="hidden" name="design-{{ forloop.parentloop.counter0 }}-item-0-material_item" class="retail-material-hidden" value="">
 
                                     <div class="item-input-row">
                                         <div class="field col-description">
-                                            <input type="text" name="design-0-item-0-description" class="form-control" value="">
+                                            <input type="text" name="design-{{ forloop.parentloop.counter0 }}-item-0-description" class="form-control" value="">
+                                        </div>
+
+                                        <div class="field col-retail-item service-retail-only">
+                                            <select class="form-select retail-item-select">
+                                                <option value="">---------</option>
+                                                {% for opt in shirt_items %}
+                                                <option value="shirt:{{ opt.id }}" data-unit="pcs">{{ opt }}</option>
+                                                {% endfor %}
+                                                {% for opt in material_items %}
+                                                <option value="material:{{ opt.id }}" data-unit="{{ opt.unit|default:'pcs' }}">{{ opt }}</option>
+                                                {% endfor %}
+                                            </select>
                                         </div>
 
                                         <div class="field col-shirt service-full-only">
-                                            <select name="design-0-item-0-shirt_item" class="form-select shirt-select">
+                                            <select name="design-{{ forloop.parentloop.counter0 }}-item-0-shirt_item_full" class="form-select shirt-select">
                                                 <option value="">---------</option>
                                                 {% for opt in shirt_items %}
                                                 <option value="{{ opt.id }}">{{ opt }}</option>
@@ -962,7 +1156,7 @@
                                         </div>
 
                                         <div class="field col-color service-full-only">
-                                            <select name="design-0-item-0-color" class="form-select color-select">
+                                            <select name="design-{{ forloop.parentloop.counter0 }}-item-0-color" class="form-select color-select">
                                                 <option value="">---------</option>
                                                 {% for opt in colors %}
                                                 <option value="{{ opt.id }}">{{ opt }}</option>
@@ -971,7 +1165,7 @@
                                         </div>
 
                                         <div class="field col-size service-full-only">
-                                            <select name="design-0-item-0-size" class="form-select size-select">
+                                            <select name="design-{{ forloop.parentloop.counter0 }}-item-0-size" class="form-select size-select">
                                                 <option value="">---------</option>
                                                 {% for opt in sizes %}
                                                 <option value="{{ opt.id }}">{{ opt }}</option>
@@ -980,11 +1174,11 @@
                                         </div>
 
                                         <div class="field col-qty">
-                                            <input type="number" step="1" min="0" name="design-0-item-0-quantity" class="form-control qty-input" value="">
+                                            <input type="number" step="1" min="0" name="design-{{ forloop.parentloop.counter0 }}-item-0-quantity" class="form-control qty-input" value="">
                                         </div>
 
                                         <div class="field col-film-item service-film-only">
-                                            <select name="design-0-item-0-film_item" class="form-select film-select">
+                                            <select name="design-{{ forloop.parentloop.counter0 }}-item-0-film_item" class="form-select film-select">
                                                 <option value="">---------</option>
                                                 {% for opt in film_items %}
                                                 <option value="{{ opt.id }}">{{ opt }}</option>
@@ -993,11 +1187,15 @@
                                         </div>
 
                                         <div class="field col-film-meter service-film-only">
-                                            <input type="number" step="0.0001" min="0" name="design-0-item-0-film_meter" class="form-control film-meter-input" value="">
+                                            <input type="number" step="0.0001" min="0" name="design-{{ forloop.parentloop.counter0 }}-item-0-film_meter" class="form-control film-meter-input" value="">
                                         </div>
 
                                         <div class="field col-unit-price">
-                                            <input type="number" step="0.01" min="0" name="design-0-item-0-unit_price" class="form-control unit-price-input" value="">
+                                            <input type="number" step="0.01" min="0" name="design-{{ forloop.parentloop.counter0 }}-item-0-unit_price" class="form-control unit-price-input" value="">
+                                        </div>
+
+                                        <div class="field col-unit-name service-retail-only">
+                                            <input type="text" class="form-control unit-name-view" value="pcs" readonly>
                                         </div>
 
                                         <div class="field col-total">
@@ -1067,6 +1265,7 @@
                         <div class="item-board">
                             <div class="item-header-row">
                                 <div class="col-description">Description</div>
+                                <div class="col-retail-item service-retail-only">Item</div>
                                 <div class="col-shirt service-full-only">Shirt Item</div>
                                 <div class="col-color service-full-only">Color</div>
                                 <div class="col-size service-full-only">Size</div>
@@ -1074,22 +1273,38 @@
                                 <div class="col-film-item service-film-only">Film Item</div>
                                 <div class="col-film-meter service-film-only">Film Meter</div>
                                 <div class="col-unit-price">Unit Price</div>
+                                <div class="col-unit-name service-retail-only">Unit</div>
                                 <div class="col-total">Total</div>
                                 <div class="col-action">Action</div>
                             </div>
 
                             <div class="items-container">
-                                <div class="item-row" data-item-index="0">
+                                <div class="item-row mode-shirt" data-item-index="0">
                                     <input type="hidden" name="design-0-item-0-id" value="">
                                     <input type="hidden" name="design-0-item-0-DELETE" value="0" class="item-delete-input">
+
+                                    <input type="hidden" name="design-0-item-0-shirt_item" class="retail-shirt-hidden" value="">
+                                    <input type="hidden" name="design-0-item-0-material_item" class="retail-material-hidden" value="">
 
                                     <div class="item-input-row">
                                         <div class="field col-description">
                                             <input type="text" name="design-0-item-0-description" class="form-control" value="">
                                         </div>
 
+                                        <div class="field col-retail-item service-retail-only">
+                                            <select class="form-select retail-item-select">
+                                                <option value="">---------</option>
+                                                {% for opt in shirt_items %}
+                                                <option value="shirt:{{ opt.id }}" data-unit="pcs">{{ opt }}</option>
+                                                {% endfor %}
+                                                {% for opt in material_items %}
+                                                <option value="material:{{ opt.id }}" data-unit="{{ opt.unit|default:'pcs' }}">{{ opt }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+
                                         <div class="field col-shirt service-full-only">
-                                            <select name="design-0-item-0-shirt_item" class="form-select shirt-select">
+                                            <select name="design-0-item-0-shirt_item_full" class="form-select shirt-select">
                                                 <option value="">---------</option>
                                                 {% for opt in shirt_items %}
                                                 <option value="{{ opt.id }}">{{ opt }}</option>
@@ -1136,6 +1351,10 @@
                                             <input type="number" step="0.01" min="0" name="design-0-item-0-unit_price" class="form-control unit-price-input" value="">
                                         </div>
 
+                                        <div class="field col-unit-name service-retail-only">
+                                            <input type="text" class="form-control unit-name-view" value="pcs" readonly>
+                                        </div>
+
                                         <div class="field col-total">
                                             <input type="text" class="line-total-view" value="0.00" readonly>
                                         </div>
@@ -1164,7 +1383,7 @@
                 <div class="summary-note">
                     <div class="summary-note-title">Order Summary</div>
                     <div class="summary-note-text">
-                        Full = shirt inventory only. Film Only = film inventory only. Print & Heat Press = service only, no inventory deduction.
+                        Full Order = deduct shirt inventory. Retail Sale = use one Item field for shirt or material. Film Only = deduct film inventory. Print & Heat Press = service only, no inventory deduction.
                     </div>
                 </div>
 
@@ -1204,7 +1423,13 @@
             </div>
 
             <div class="submit-row">
-                <button class="btn btn-primary" type="submit">{{ submit_label|default:"Save Order" }}</button>
+                <button type="submit" name="save_order" value="1" class="btn btn-primary">
+                    Save Order
+                </button>
+
+                <button type="submit" name="save_complete" value="1" class="btn btn-success">
+                    Save & Complete
+                </button>
             </div>
         </div>
     </form>
@@ -1270,6 +1495,7 @@
         <div class="item-board">
             <div class="item-header-row">
                 <div class="col-description">Description</div>
+                <div class="col-retail-item service-retail-only">Item</div>
                 <div class="col-shirt service-full-only">Shirt Item</div>
                 <div class="col-color service-full-only">Color</div>
                 <div class="col-size service-full-only">Size</div>
@@ -1277,6 +1503,7 @@
                 <div class="col-film-item service-film-only">Film Item</div>
                 <div class="col-film-meter service-film-only">Film Meter</div>
                 <div class="col-unit-price">Unit Price</div>
+                <div class="col-unit-name service-retail-only">Unit</div>
                 <div class="col-total">Total</div>
                 <div class="col-action">Action</div>
             </div>
@@ -1289,17 +1516,32 @@
 </template>
 
 <template id="item-row-template">
-    <div class="item-row" data-item-index="__ITEM_INDEX__">
+    <div class="item-row mode-shirt" data-item-index="__ITEM_INDEX__">
         <input type="hidden" name="design-__DESIGN_INDEX__-item-__ITEM_INDEX__-id" value="">
         <input type="hidden" name="design-__DESIGN_INDEX__-item-__ITEM_INDEX__-DELETE" value="0" class="item-delete-input">
+
+        <input type="hidden" name="design-__DESIGN_INDEX__-item-__ITEM_INDEX__-shirt_item" class="retail-shirt-hidden" value="">
+        <input type="hidden" name="design-__DESIGN_INDEX__-item-__ITEM_INDEX__-material_item" class="retail-material-hidden" value="">
 
         <div class="item-input-row">
             <div class="field col-description">
                 <input type="text" name="design-__DESIGN_INDEX__-item-__ITEM_INDEX__-description" class="form-control" value="">
             </div>
 
+            <div class="field col-retail-item service-retail-only">
+                <select class="form-select retail-item-select">
+                    <option value="">---------</option>
+                    {% for opt in shirt_items %}
+                    <option value="shirt:{{ opt.id }}" data-unit="pcs">{{ opt }}</option>
+                    {% endfor %}
+                    {% for opt in material_items %}
+                    <option value="material:{{ opt.id }}" data-unit="{{ opt.unit|default:'pcs' }}">{{ opt }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
             <div class="field col-shirt service-full-only">
-                <select name="design-__DESIGN_INDEX__-item-__ITEM_INDEX__-shirt_item" class="form-select shirt-select">
+                <select name="design-__DESIGN_INDEX__-item-__ITEM_INDEX__-shirt_item_full" class="form-select shirt-select">
                     <option value="">---------</option>
                     {% for opt in shirt_items %}
                     <option value="{{ opt.id }}">{{ opt }}</option>
@@ -1346,7 +1588,11 @@
                 <input type="number" step="0.01" min="0" name="design-__DESIGN_INDEX__-item-__ITEM_INDEX__-unit_price" class="form-control unit-price-input" value="">
             </div>
 
-            <div class="field col-total">
+            <div class="field col-unit-name service-retail-only">
+                                            <input type="text" class="form-control unit-name-view" value="pcs" readonly>
+                                        </div>
+
+                                        <div class="field col-total">
                 <input type="text" class="line-total-view" value="0.00" readonly>
             </div>
 
@@ -1400,77 +1646,6 @@ document.addEventListener("DOMContentLoaded", function () {
         statusBadge.textContent = text;
     }
 
-    if (customerInput && dropdown && statusBadge) {
-        customerInput.setAttribute("autocomplete", "off");
-
-        customerInput.addEventListener("input", function () {
-            const keyword = customerInput.value.trim();
-
-            setCustomerBadge("new", "New customer");
-
-            if (keyword.length < 1) {
-                dropdown.style.display = "none";
-                dropdown.innerHTML = "";
-                return;
-            }
-
-            fetch(`/customers/search/?q=${encodeURIComponent(keyword)}`)
-                .then(res => res.json())
-                .then(data => {
-                    dropdown.innerHTML = "";
-
-                    const foundExact = data.find(c =>
-                        (c.name || "").toLowerCase() === keyword.toLowerCase()
-                    );
-
-                    if (foundExact) {
-                        setCustomerBadge("old", "Existing customer");
-                    } else {
-                        setCustomerBadge("new", "New customer");
-                    }
-
-                    if (!data.length) {
-                        dropdown.style.display = "none";
-                        return;
-                    }
-
-                    data.forEach(c => {
-                        const div = document.createElement("div");
-                        div.className = "customer-option";
-                        div.innerHTML = `
-                            <strong>${escapeHtml(c.name)}</strong>
-                            <small>${escapeHtml(c.phone || "-")} • ${escapeHtml(c.location || "-")}</small>
-                        `;
-
-                        div.addEventListener("click", function () {
-                            customerInput.value = c.name || "";
-                            if (phoneInput) phoneInput.value = c.phone || "";
-                            if (locationInput) locationInput.value = c.location || "";
-
-                            dropdown.style.display = "none";
-                            setCustomerBadge("old", "Old customer selected");
-                        });
-
-                        dropdown.appendChild(div);
-                    });
-
-                    dropdown.style.display = "block";
-                })
-                .catch(() => {
-                    dropdown.style.display = "none";
-                    setCustomerBadge("new", "New customer");
-                });
-        });
-
-        document.addEventListener("click", function (e) {
-            const wrap = customerInput.closest(".customer-field");
-
-            if (wrap && !wrap.contains(e.target)) {
-                dropdown.style.display = "none";
-            }
-        });
-    }
-
     function openPreviewModal(src) {
         if (!imagePreviewModal || !modalPreviewImage) return;
         modalPreviewImage.src = src;
@@ -1497,9 +1672,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const allDesigns = document.querySelectorAll(".design-block");
         const visibleDesigns = getVisibleDesigns();
 
-        if (designTotalInput) {
-            designTotalInput.value = allDesigns.length;
-        }
+        if (designTotalInput) designTotalInput.value = allDesigns.length;
 
         visibleDesigns.forEach((block, idx) => {
             const no = block.querySelector(".design-number");
@@ -1507,15 +1680,9 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
-    function getDesignKey(designBlock) {
-        return designBlock.dataset.designIndex;
-    }
-
     function ensureDesignStore(designBlock) {
-        const key = getDesignKey(designBlock);
-        if (!designFileStore.has(key)) {
-            designFileStore.set(key, []);
-        }
+        const key = designBlock.dataset.designIndex;
+        if (!designFileStore.has(key)) designFileStore.set(key, []);
         return key;
     }
 
@@ -1525,36 +1692,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
         const key = ensureDesignStore(designBlock);
         const storedFiles = designFileStore.get(key) || [];
-
         const dt = new DataTransfer();
+
         storedFiles.forEach(file => dt.items.add(file));
         fileInput.files = dt.files;
-    }
-
-    function addFilesToDesign(designBlock, files) {
-        if (!designBlock || !files) return;
-
-        const key = ensureDesignStore(designBlock);
-        const arr = designFileStore.get(key) || [];
-
-        Array.from(files || []).forEach(file => {
-            if (!file.type || !file.type.startsWith("image/")) return;
-
-            const duplicate = arr.some(
-                oldFile =>
-                    oldFile.name === file.name &&
-                    oldFile.size === file.size &&
-                    oldFile.lastModified === file.lastModified
-            );
-
-            if (!duplicate) {
-                arr.push(file);
-            }
-        });
-
-        designFileStore.set(key, arr);
-        rebuildDesignInputFiles(designBlock);
-        renderDesignPreview(designBlock);
     }
 
     function renderDesignPreview(designBlock) {
@@ -1586,33 +1727,49 @@ document.addEventListener("DOMContentLoaded", function () {
 
                 previewGrid.appendChild(box);
 
-                const openBtn = box.querySelector(".preview-open-btn");
-                if (openBtn) {
-                    openBtn.addEventListener("click", function () {
-                        openPreviewModal(openBtn.dataset.src);
-                    });
-                }
+                box.querySelector(".preview-open-btn").addEventListener("click", function () {
+                    openPreviewModal(this.dataset.src);
+                });
 
-                const removeBtn = box.querySelector(".preview-remove");
-                if (removeBtn) {
-                    removeBtn.addEventListener("click", function () {
-                        const arr = designFileStore.get(key) || [];
-                        arr.splice(index, 1);
-                        designFileStore.set(key, arr);
-                        rebuildDesignInputFiles(designBlock);
-                        renderDesignPreview(designBlock);
-                    });
-                }
+                box.querySelector(".preview-remove").addEventListener("click", function () {
+                    const arr = designFileStore.get(key) || [];
+                    arr.splice(index, 1);
+                    designFileStore.set(key, arr);
+                    rebuildDesignInputFiles(designBlock);
+                    renderDesignPreview(designBlock);
+                });
             };
 
             reader.readAsDataURL(file);
         });
     }
 
+    function addFilesToDesign(designBlock, files) {
+        if (!designBlock || !files) return;
+
+        const key = ensureDesignStore(designBlock);
+        const arr = designFileStore.get(key) || [];
+
+        Array.from(files).forEach(file => {
+            if (!file.type || !file.type.startsWith("image/")) return;
+
+            const duplicate = arr.some(oldFile =>
+                oldFile.name === file.name &&
+                oldFile.size === file.size &&
+                oldFile.lastModified === file.lastModified
+            );
+
+            if (!duplicate) arr.push(file);
+        });
+
+        designFileStore.set(key, arr);
+        rebuildDesignInputFiles(designBlock);
+        renderDesignPreview(designBlock);
+    }
+
     function forceQtyInteger(input) {
         if (!input || input.value === "") return;
-        const rounded = Math.round(num(input.value));
-        input.value = rounded;
+        input.value = Math.round(num(input.value));
     }
 
     function updateTotals() {
@@ -1636,22 +1793,20 @@ document.addEventListener("DOMContentLoaded", function () {
                 lineTotal = num(qtyInput?.value) * num(unitPriceInput?.value);
             }
 
-            if (lineTotalView) {
-                lineTotalView.value = lineTotal.toFixed(2);
-            }
-
+            if (lineTotalView) lineTotalView.value = lineTotal.toFixed(2);
             itemsTotal += lineTotal;
         });
 
-        const itemsTotalEl = document.getElementById("items-total");
         const discountEl = document.querySelector('input[name="discount_amount"]');
         const shippingEl = document.querySelector('input[name="shipping_fee"]');
         const depositEl = document.getElementById("deposit-amount");
         const paidEl = document.getElementById("paid-amount");
-        const amountDueEl = document.getElementById("amount-due");
 
         const grandTotal = itemsTotal - num(discountEl?.value) + num(shippingEl?.value);
         const amountDue = grandTotal - num(depositEl?.value) - num(paidEl?.value);
+
+        const itemsTotalEl = document.getElementById("items-total");
+        const amountDueEl = document.getElementById("amount-due");
 
         if (itemsTotalEl) itemsTotalEl.value = itemsTotal.toFixed(2);
         if (amountDueEl) amountDueEl.value = amountDue.toFixed(2);
@@ -1668,7 +1823,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
             row.querySelectorAll("input, select, textarea").forEach(el => {
                 if (!el.name) return;
-
                 el.name = el.name.replace(
                     /design-\d+-item-\d+-/g,
                     `design-${designIndex}-item-${itemIndex}-`
@@ -1677,8 +1831,83 @@ document.addEventListener("DOMContentLoaded", function () {
         });
 
         const itemTotal = designBlock.querySelector(".item-total");
-        if (itemTotal) {
-            itemTotal.value = rows.length;
+        if (itemTotal) itemTotal.value = rows.length;
+    }
+
+    function getRetailMode(row) {
+        const retailItem = row.querySelector(".retail-item-select");
+        const value = retailItem?.value || "";
+
+        if (value.startsWith("shirt:")) return "shirt";
+        if (value.startsWith("material:")) return "material";
+
+        return "";
+    }
+
+    function applyRetailItemMode(row) {
+        if (getServiceType() !== "RETAIL") return;
+
+        const retailItem = row.querySelector(".retail-item-select");
+        const shirtHidden = row.querySelector(".retail-shirt-hidden");
+        const materialHidden = row.querySelector(".retail-material-hidden");
+        const unitNameView = row.querySelector(".unit-name-view");
+
+        const shirtBox = row.querySelector(".col-shirt");
+        const colorBox = row.querySelector(".col-color");
+        const sizeBox = row.querySelector(".col-size");
+        const filmBox = row.querySelector(".col-film-item");
+        const filmMeterBox = row.querySelector(".col-film-meter");
+
+        const shirtSelect = row.querySelector(".shirt-select");
+        const colorSelect = row.querySelector(".color-select");
+        const sizeSelect = row.querySelector(".size-select");
+        const filmSelect = row.querySelector(".film-select");
+        const filmMeterInput = row.querySelector(".film-meter-input");
+
+        const value = retailItem?.value || "";
+        const option = retailItem?.selectedOptions ? retailItem.selectedOptions[0] : null;
+        const parts = value.split(":");
+        const type = parts[0] || "shirt";
+        const id = parts[1] || "";
+
+        row.classList.remove("mode-shirt", "mode-material");
+
+        if (shirtHidden) shirtHidden.value = "";
+        if (materialHidden) materialHidden.value = "";
+        if (shirtSelect) shirtSelect.value = "";
+        if (filmSelect) filmSelect.value = "";
+        if (filmMeterInput) filmMeterInput.value = "";
+
+        filmBox?.classList.add("is-hidden");
+        filmMeterBox?.classList.add("is-hidden");
+        shirtBox?.classList.add("is-hidden");
+
+        if (type === "material") {
+            row.classList.add("mode-material");
+            if (materialHidden) materialHidden.value = id;
+            if (unitNameView) unitNameView.value = option?.dataset?.unit || "pcs";
+
+            colorBox?.classList.add("is-hidden");
+            sizeBox?.classList.add("is-hidden");
+
+            if (colorSelect) {
+                colorSelect.value = "";
+                colorSelect.disabled = false;
+            }
+            if (sizeSelect) {
+                sizeSelect.value = "";
+                sizeSelect.disabled = false;
+            }
+        } else {
+            row.classList.add("mode-shirt");
+            if (shirtHidden) shirtHidden.value = id;
+            if (unitNameView) unitNameView.value = "pcs";
+
+            colorBox?.classList.remove("is-hidden");
+            sizeBox?.classList.remove("is-hidden");
+
+            if (colorSelect) colorSelect.disabled = false;
+            if (sizeSelect) sizeSelect.disabled = false;
         }
     }
 
@@ -1688,24 +1917,32 @@ document.addEventListener("DOMContentLoaded", function () {
         document.body.classList.toggle("service-full-mode", serviceType === "FULL");
         document.body.classList.toggle("service-film-only-mode", serviceType === "FILM_ONLY");
         document.body.classList.toggle("service-print-mode", serviceType === "PRINT_HEATPRESS");
+        document.body.classList.toggle("service-retail-mode", serviceType === "RETAIL");
 
         if (serviceHelpText) {
             if (serviceType === "FULL") {
-                serviceHelpText.textContent = "Full Order: show shirt columns only. Total = Qty × Unit Price.";
+                serviceHelpText.textContent = "Full Order: choose shirt, color, size. Total = Qty × Unit Price.";
             } else if (serviceType === "FILM_ONLY") {
-                serviceHelpText.textContent = "Film Only: show film columns only. Total = Film Meter × Unit Price.";
+                serviceHelpText.textContent = "Film Only: choose film item. Total = Film Meter × Unit Price.";
             } else if (serviceType === "PRINT_HEATPRESS") {
                 serviceHelpText.textContent = "Print & Heat Press: service only, no inventory deduction. Total = Qty × Unit Price.";
+            } else if (serviceType === "RETAIL") {
+                serviceHelpText.textContent = "Retail Sale: choose Shirt or Material in Item. Shirt needs Color/Size. Material uses wider Item and hides Color/Size.";
             } else {
                 serviceHelpText.textContent = "";
             }
         }
 
         const showFull = serviceType === "FULL";
+        const showRetail = serviceType === "RETAIL";
         const showFilm = serviceType === "FILM_ONLY";
 
         document.querySelectorAll(".service-full-only").forEach(el => {
-            el.classList.toggle("is-hidden", !showFull);
+            el.classList.toggle("is-hidden", !showFull && !showRetail);
+        });
+
+        document.querySelectorAll(".service-retail-only").forEach(el => {
+            el.classList.toggle("is-hidden", !showRetail);
         });
 
         document.querySelectorAll(".service-film-only").forEach(el => {
@@ -1719,22 +1956,58 @@ document.addEventListener("DOMContentLoaded", function () {
             const sizeSelect = row.querySelector(".size-select");
             const filmSelect = row.querySelector(".film-select");
             const filmMeterInput = row.querySelector(".film-meter-input");
+            const retailItemSelect = row.querySelector(".retail-item-select");
+            const retailShirtHidden = row.querySelector(".retail-shirt-hidden");
+            const retailMaterialHidden = row.querySelector(".retail-material-hidden");
 
             if (qtyInput) qtyInput.setAttribute("step", "1");
 
             if (serviceType === "FULL") {
+                if (retailItemSelect) retailItemSelect.value = "";
+                if (retailShirtHidden) retailShirtHidden.value = "";
+                if (retailMaterialHidden) retailMaterialHidden.value = "";
                 if (filmSelect) filmSelect.value = "";
                 if (filmMeterInput) filmMeterInput.value = "";
-            } else if (serviceType === "FILM_ONLY") {
+
+                row.querySelector(".col-shirt")?.classList.remove("is-hidden");
+                row.querySelector(".col-color")?.classList.remove("is-hidden");
+                row.querySelector(".col-size")?.classList.remove("is-hidden");
+
+                if (colorSelect) colorSelect.disabled = false;
+                if (sizeSelect) sizeSelect.disabled = false;
+            }
+
+            if (serviceType === "RETAIL") {
+                if (shirtSelect) shirtSelect.value = "";
+                if (filmSelect) filmSelect.value = "";
+                if (filmMeterInput) filmMeterInput.value = "";
+                applyRetailItemMode(row);
+            }
+
+            if (serviceType === "FILM_ONLY") {
                 if (shirtSelect) shirtSelect.value = "";
                 if (colorSelect) colorSelect.value = "";
                 if (sizeSelect) sizeSelect.value = "";
-            } else if (serviceType === "PRINT_HEATPRESS") {
+                if (retailItemSelect) retailItemSelect.value = "";
+                if (retailShirtHidden) retailShirtHidden.value = "";
+                if (retailMaterialHidden) retailMaterialHidden.value = "";
+
+                if (colorSelect) colorSelect.disabled = false;
+                if (sizeSelect) sizeSelect.disabled = false;
+            }
+
+            if (serviceType === "PRINT_HEATPRESS") {
                 if (shirtSelect) shirtSelect.value = "";
                 if (colorSelect) colorSelect.value = "";
                 if (sizeSelect) sizeSelect.value = "";
+                if (retailItemSelect) retailItemSelect.value = "";
+                if (retailShirtHidden) retailShirtHidden.value = "";
+                if (retailMaterialHidden) retailMaterialHidden.value = "";
                 if (filmSelect) filmSelect.value = "";
                 if (filmMeterInput) filmMeterInput.value = "";
+
+                if (colorSelect) colorSelect.disabled = false;
+                if (sizeSelect) sizeSelect.disabled = false;
             }
         });
 
@@ -1744,17 +2017,29 @@ document.addEventListener("DOMContentLoaded", function () {
     function bindRowEvents(row) {
         row.querySelectorAll(".qty-input").forEach(el => {
             el.setAttribute("step", "1");
-
             el.addEventListener("input", function () {
-                if (getServiceType() !== "FILM_ONLY") {
-                    forceQtyInteger(el);
-                }
+                if (getServiceType() !== "FILM_ONLY") forceQtyInteger(el);
                 updateTotals();
             });
         });
 
         row.querySelectorAll(".film-meter-input, .unit-price-input").forEach(el => {
             el.addEventListener("input", updateTotals);
+        });
+
+        row.querySelectorAll(".retail-item-select").forEach(el => {
+            el.addEventListener("change", function () {
+                applyRetailItemMode(row);
+                updateTotals();
+            });
+        });
+
+        row.querySelectorAll(".shirt-select, .film-select").forEach(el => {
+            el.addEventListener("change", updateTotals);
+        });
+
+        row.querySelectorAll(".color-select, .size-select").forEach(el => {
+            el.addEventListener("change", updateTotals);
         });
 
         const removeBtn = row.querySelector(".remove-row-btn");
@@ -1768,26 +2053,18 @@ document.addEventListener("DOMContentLoaded", function () {
 
                 if (visibleRows.length <= 1) {
                     row.querySelectorAll('input[type="text"], input[type="number"]').forEach(input => {
-                        if (!input.classList.contains("line-total-view")) {
-                            input.value = "";
-                        }
+                        if (!input.classList.contains("line-total-view")) input.value = "";
                     });
 
                     row.querySelectorAll("select").forEach(select => {
                         select.selectedIndex = 0;
+                        select.disabled = false;
                     });
 
-                    const deleteInput = row.querySelector(".item-delete-input");
-                    const idInput = row.querySelector('input[name$="-id"]');
+                    row.querySelectorAll('input[type="hidden"]').forEach(input => {
+                        if (!input.classList.contains("item-delete-input")) input.value = "";
+                    });
 
-                    if (deleteInput && idInput && idInput.value) {
-                        deleteInput.value = "1";
-                        row.style.display = "none";
-                    } else if (deleteInput) {
-                        deleteInput.value = "0";
-                    }
-
-                    refreshItemNames(designBlock);
                     applyServiceTypeLayout();
                     updateTotals();
                     return;
@@ -1859,7 +2136,6 @@ document.addEventListener("DOMContentLoaded", function () {
         ensureDesignStore(designBlock);
         bindDesignFileInput(designBlock);
         bindPreviewOpens(designBlock);
-
         designBlock.querySelectorAll(".item-row").forEach(bindRowEvents);
 
         if (addRowBtn) {
@@ -1908,6 +2184,68 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
+    if (customerInput && dropdown && statusBadge) {
+        customerInput.setAttribute("autocomplete", "off");
+
+        customerInput.addEventListener("input", function () {
+            const keyword = customerInput.value.trim();
+            setCustomerBadge("new", "New customer");
+
+            if (keyword.length < 1) {
+                dropdown.style.display = "none";
+                dropdown.innerHTML = "";
+                return;
+            }
+
+            fetch(`/customers/search/?q=${encodeURIComponent(keyword)}`)
+                .then(res => res.json())
+                .then(data => {
+                    dropdown.innerHTML = "";
+
+                    const foundExact = data.find(c =>
+                        (c.name || "").toLowerCase() === keyword.toLowerCase()
+                    );
+
+                    setCustomerBadge(foundExact ? "old" : "new", foundExact ? "Existing customer" : "New customer");
+
+                    if (!data.length) {
+                        dropdown.style.display = "none";
+                        return;
+                    }
+
+                    data.forEach(c => {
+                        const div = document.createElement("div");
+                        div.className = "customer-option";
+                        div.innerHTML = `
+                            <strong>${escapeHtml(c.name)}</strong>
+                            <small>${escapeHtml(c.phone || "-")} • ${escapeHtml(c.location || "-")}</small>
+                        `;
+
+                        div.addEventListener("click", function () {
+                            customerInput.value = c.name || "";
+                            if (phoneInput) phoneInput.value = c.phone || "";
+                            if (locationInput) locationInput.value = c.location || "";
+                            dropdown.style.display = "none";
+                            setCustomerBadge("old", "Old customer selected");
+                        });
+
+                        dropdown.appendChild(div);
+                    });
+
+                    dropdown.style.display = "block";
+                })
+                .catch(() => {
+                    dropdown.style.display = "none";
+                    setCustomerBadge("new", "New customer");
+                });
+        });
+
+        document.addEventListener("click", function (e) {
+            const wrap = customerInput.closest(".customer-field");
+            if (wrap && !wrap.contains(e.target)) dropdown.style.display = "none";
+        });
+    }
+
     if (addDesignBtn) {
         addDesignBtn.addEventListener("click", function () {
             const designIndex = document.querySelectorAll(".design-block").length;
@@ -1943,13 +2281,11 @@ document.addEventListener("DOMContentLoaded", function () {
                 const blob = item.getAsFile();
 
                 if (blob) {
-                    const file = new File(
+                    files.push(new File(
                         [blob],
                         `pasted-screenshot-${Date.now()}-${index}.png`,
                         { type: blob.type || "image/png" }
-                    );
-
-                    files.push(file);
+                    ));
                 }
             }
         });
@@ -1961,7 +2297,6 @@ document.addEventListener("DOMContentLoaded", function () {
         const targetDesign = focusedDesign || visibleDesigns[visibleDesigns.length - 1];
 
         if (!targetDesign) return;
-
         addFilesToDesign(targetDesign, files);
     });
 
@@ -1986,17 +2321,15 @@ document.addEventListener("DOMContentLoaded", function () {
 
     if (imagePreviewModal) {
         imagePreviewModal.addEventListener("click", function (e) {
-            if (e.target === imagePreviewModal) {
-                closePreviewModal();
-            }
+            if (e.target === imagePreviewModal) closePreviewModal();
         });
     }
-
 
     if (orderForm) {
         orderForm.addEventListener("submit", function (e) {
             const serviceType = getServiceType();
             let hasError = false;
+            let errorMessage = "";
 
             if (serviceType !== "FILM_ONLY") {
                 document.querySelectorAll(".qty-input").forEach(input => {
@@ -2006,6 +2339,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
             document.querySelectorAll(".item-row").forEach(row => {
                 if (row.style.display === "none") return;
+
+                const retailMode = getRetailMode(row);
+                const retailShirt = row.querySelector(".retail-shirt-hidden")?.value;
+                const retailMaterial = row.querySelector(".retail-material-hidden")?.value;
 
                 const shirt = row.querySelector(".shirt-select")?.value;
                 const color = row.querySelector(".color-select")?.value;
@@ -2017,28 +2354,40 @@ document.addEventListener("DOMContentLoaded", function () {
 
                 if (serviceType === "FULL" && (!shirt || !color || !size || qty <= 0 || price <= 0)) {
                     hasError = true;
+                    errorMessage = "Please fill Shirt Item, Color, Size, Qty, and Unit Price.";
                 }
 
                 if (serviceType === "FILM_ONLY" && (!film || filmMeter <= 0 || price <= 0)) {
                     hasError = true;
+                    errorMessage = "Please fill Film Item, Film Meter, and Unit Price.";
                 }
 
                 if (serviceType === "PRINT_HEATPRESS" && (qty <= 0 || price <= 0)) {
                     hasError = true;
+                    errorMessage = "Please fill Qty and Unit Price.";
+                }
+
+                if (serviceType === "RETAIL") {
+                    if (!retailMode || qty <= 0 || price <= 0) {
+                        hasError = true;
+                        errorMessage = "Retail Sale: choose Item, then fill Qty and Unit Price.";
+                    }
+
+                    if (retailMode === "shirt" && (!retailShirt || !color || !size)) {
+                        hasError = true;
+                        errorMessage = "Retail shirt sale requires Item, Color, and Size.";
+                    }
+
+                    if (retailMode === "material" && !retailMaterial) {
+                        hasError = true;
+                        errorMessage = "Retail material sale requires Material Item.";
+                    }
                 }
             });
 
             if (hasError) {
                 e.preventDefault();
-
-                if (serviceType === "FULL") {
-                    alert("Please fill Shirt Item, Color, Size, Qty, and Unit Price.");
-                } else if (serviceType === "FILM_ONLY") {
-                    alert("Please fill Film Item, Film Meter, and Unit Price.");
-                } else {
-                    alert("Please fill Qty and Unit Price.");
-                }
-
+                alert(errorMessage || "Please check required fields.");
                 return;
             }
 

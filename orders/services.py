@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 
-from inventory.models import InventoryBatch, InventoryBatchItem
+from inventory.models import InventoryBatch, InventoryBatchItem, InventoryItem
 from .models import StockConsumption
 
 
@@ -46,29 +46,56 @@ def _available_fifo_qty(item, color=None, size=None):
     return total
 
 
+def _retail_color_size_for_line(order, line):
+    if order.service_type != order.SERVICE_RETAIL:
+        return line.color, line.size
+
+    # Retail material → no color/size
+    if line.material_item:
+        return None, None
+
+    return line.color, line.size
+
+
 def get_order_shortages(order):
     shortages = []
 
+    # Film Only and Print & Heat Press do not deduct stock
+    if order.service_type in [order.SERVICE_FILM_ONLY, order.SERVICE_PRINT_HEATPRESS]:
+        return shortages
+
     lines = order.items.select_related(
         "shirt_item",
+        "material_item",
         "film_item",
         "color",
         "size",
     )
 
     for line in lines:
-        if not line.shirt_item:
-            continue
-
         needed = Decimal(line.quantity or 0)
 
         if needed <= 0:
             continue
 
+        # Retail material stock
+        if order.service_type == order.SERVICE_RETAIL and line.material_item:
+            stock_item = line.material_item
+            color = None
+            size = None
+
+        # Full order / Retail shirt stock
+        elif line.shirt_item:
+            stock_item = line.shirt_item
+            color, size = _retail_color_size_for_line(order, line)
+
+        else:
+            continue
+
         available = _available_fifo_qty(
-            line.shirt_item,
-            color=line.color,
-            size=line.size,
+            stock_item,
+            color=color,
+            size=size,
         )
 
         shortage = needed - available
@@ -76,8 +103,8 @@ def get_order_shortages(order):
         if shortage > 0:
             shortages.append(
                 {
-                    "type": "shirt",
-                    "label": _variant_text(line.shirt_item, line.color, line.size),
+                    "type": "stock",
+                    "label": _variant_text(stock_item, color, size),
                     "needed": needed,
                     "available": available,
                     "shortage": shortage,
@@ -85,7 +112,6 @@ def get_order_shortages(order):
             )
 
     return shortages
-
 
 def build_shortage_message(shortages):
     if not shortages:
@@ -108,7 +134,7 @@ def _get_or_create_shortage_batch():
             "supplier": "Auto Shortage",
             "received_date": timezone.localdate(),
             "status": InventoryBatch.STATUS_FINAL,
-            "note": "Auto-created for negative cloth stock when order is created without enough stock.",
+            "note": "Auto-created for negative stock when order is created without enough stock.",
         },
     )
     return batch
@@ -203,6 +229,10 @@ def deduct_stock_for_order(order, allow_shortage=False):
     if order.stock_deducted:
         return []
 
+    # Film Only and Print & Heat Press do not deduct stock
+    if order.service_type in [order.SERVICE_FILM_ONLY, order.SERVICE_PRINT_HEATPRESS]:
+        return []
+
     shortages = get_order_shortages(order)
 
     if shortages and not allow_shortage:
@@ -212,44 +242,49 @@ def deduct_stock_for_order(order, allow_shortage=False):
 
     lines = order.items.select_related(
         "shirt_item",
+        "material_item",
         "film_item",
         "color",
         "size",
     )
 
     for line in lines:
-        if not line.shirt_item:
-            continue
-
         qty_needed = Decimal(line.quantity or 0)
 
         if qty_needed <= 0:
             continue
 
-        shirt_remaining = _consume_fifo(
-            line.shirt_item,
+        if order.service_type == order.SERVICE_RETAIL and line.material_item:
+            stock_item = line.material_item
+            color = None
+            size = None
+        elif line.shirt_item:
+            stock_item = line.shirt_item
+            color, size = _retail_color_size_for_line(order, line)
+        else:
+            continue
+
+        remaining = _consume_fifo(
+            stock_item,
             qty_needed,
             order,
             line,
-            color=line.color,
-            size=line.size,
+            color=color,
+            size=size,
             allow_shortage=allow_shortage,
         )
 
-        if shirt_remaining > 0:
-            unresolved.append(
-                {
-                    "type": "shirt",
-                    "label": _variant_text(line.shirt_item, line.color, line.size),
-                    "shortage": shirt_remaining,
-                }
-            )
+        if remaining > 0:
+            unresolved.append({
+                "type": "stock",
+                "label": _variant_text(stock_item, color, size),
+                "shortage": remaining,
+            })
 
     order.stock_deducted = True
     order.save(update_fields=["stock_deducted"])
 
     return unresolved
-
 
 @transaction.atomic
 def restore_stock_for_order(order):

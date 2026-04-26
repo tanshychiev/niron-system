@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+
+{% block title %}Customer Payments{% endblock %}
+{% block page_title %}Customer Payments{% endblock %}
+{% block page_subtitle %}Track unpaid and partial payments first{% endblock %}
+
+{% block content %}
+
+<style>
+.payment-head {
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:16px;
+}
+
+.payment-grid {
+    display:grid;
+    grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr auto auto;
+    gap:10px;
+    align-items:end;
+}
+
+.shop-badge {
+    padding:6px 12px;
+    border-radius:999px;
+    font-size:12px;
+    font-weight:800;
+    color:white;
+}
+.shop-niron { background:#9E7957; }
+.shop-kampu { background:#1E3A8A; }
+
+@media (max-width: 1100px) {
+    .payment-grid {
+        grid-template-columns:1fr 1fr;
+    }
+}
+</style>
+
+<div class="form-card">
+    <div class="payment-head">
+        <h2 style="margin:0;">Search</h2>
+
+        <a class="btn-primary"
+           href="{% url 'customer_payment_export_excel' %}?keyword={{ keyword|urlencode }}&payment_status={{ payment_status|urlencode }}&shop_type={{ shop_type|urlencode }}&created_date_from={{ created_date_from|urlencode }}&created_date_to={{ created_date_to|urlencode }}">
+            Download Excel
+        </a>
+    </div>
+
+    <form method="get" class="payment-grid">
+
+        <input type="text" name="keyword" placeholder="Search order, customer, phone" value="{{ keyword }}">
+
+        <!-- ONLY 3 STATUS -->
+        <select name="payment_status">
+            <option value="UNPAID_PARTIAL" {% if payment_status == "UNPAID_PARTIAL" %}selected{% endif %}>
+                Unpaid + Partial Paid
+            </option>
+            <option value="ALL" {% if payment_status == "ALL" %}selected{% endif %}>
+                All
+            </option>
+            <option value="PAID" {% if payment_status == "PAID" %}selected{% endif %}>
+                Paid
+            </option>
+        </select>
+
+        <select name="shop_type">
+            <option value="">All Shop</option>
+            <option value="NIRON" {% if shop_type == "NIRON" %}selected{% endif %}>Niron</option>
+            <option value="KAMPU" {% if shop_type == "KAMPU" %}selected{% endif %}>Kampu</option>
+        </select>
+
+        <input type="date" name="created_date_from" value="{{ created_date_from }}">
+        <input type="date" name="created_date_to" value="{{ created_date_to }}">
+
+        <button type="submit" class="btn-primary">Search</button>
+        <a href="{% url 'customer_payment_list' %}" class="btn-secondary">Reset</a>
+
+    </form>
+</div>
+
+<div class="table-card">
+    <table class="app-table">
+        <thead>
+            <tr>
+                <th>Order No</th>
+                <th>Created</th>
+                <th>Customer</th>
+                <th>Phone</th>
+                <th>Shop</th>
+                <th>Service</th>
+                <th>Total</th>
+                <th>Deposit</th>
+                <th>Paid</th>
+                <th>Balance</th>
+                <th>Status</th>
+                <th>Update Payment</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            {% for row in rows %}
+            <tr>
+                <td>{{ row.order.order_no }}</td>
+                <td>{{ row.order.created_at|date:"Y-m-d H:i" }}</td>
+                <td>{{ row.order.customer_name }}</td>
+                <td>{{ row.order.phone }}</td>
+
+                <td>
+                    {% if row.order.order_type == "NIRON" %}
+                        <span class="shop-badge shop-niron">Niron</span>
+                    {% elif row.order.order_type == "KAMPU" %}
+                        <span class="shop-badge shop-kampu">Kampu</span>
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+
+                <td>{{ row.order.get_service_type_display }}</td>
+                <td>${{ row.total }}</td>
+                <td>${{ row.deposit }}</td>
+                <td>${{ row.paid }}</td>
+                <td><strong>${{ row.balance }}</strong></td>
+
+                <td>
+                    {% if row.status == "PAID" %}
+                        <span style="color:green;font-weight:800;">Paid</span>
+                    {% elif row.status == "PARTIAL" %}
+                        <span style="color:#d97706;font-weight:800;">Partial</span>
+                    {% else %}
+                        <span style="color:#dc2626;font-weight:800;">Unpaid</span>
+                    {% endif %}
+                </td>
+
+                <td>
+                    {% if row.status == "PAID" %}
+                        <span style="color:#6b7280;">Completed</span>
+                    {% else %}
+                    <form method="post" style="display:flex;gap:8px;align-items:center;">
+                        {% csrf_token %}
+                        <input type="hidden" name="order_id" value="{{ row.order.id }}">
+
+                        <input 
+                            type="number" 
+                            step="0.01" 
+                            name="add_paid" 
+                            placeholder="Amount"
+                            style="width:110px;"
+                        >
+
+                        <button type="submit" class="btn btn-light">
+                            Pay
+                        </button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="12">No data found</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% endblock %}

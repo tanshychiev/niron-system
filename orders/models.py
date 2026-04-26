@@ -33,11 +33,23 @@ class Order(models.Model):
     SERVICE_FULL = "FULL"
     SERVICE_FILM_ONLY = "FILM_ONLY"
     SERVICE_PRINT_HEATPRESS = "PRINT_HEATPRESS"
+    SERVICE_RETAIL = "RETAIL"
 
     SERVICE_CHOICES = [
         (SERVICE_FULL, "Full Order"),
         (SERVICE_FILM_ONLY, "Film Only"),
         (SERVICE_PRINT_HEATPRESS, "Print & Heat Press"),
+        (SERVICE_RETAIL, "Retail Sale"),
+    ]
+
+    PAYMENT_PENDING = "PENDING"
+    PAYMENT_PARTIAL = "PARTIAL"
+    PAYMENT_PAID = "PAID"
+
+    PAYMENT_CHOICES = [
+        (PAYMENT_PENDING, "Pending"),
+        (PAYMENT_PARTIAL, "Partial"),
+        (PAYMENT_PAID, "Paid"),
     ]
 
     # ===== BASIC =====
@@ -70,6 +82,12 @@ class Order(models.Model):
     total_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     deposit_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     paid_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    payment_status = models.CharField(
+        max_length=20,
+        choices=PAYMENT_CHOICES,
+        default=PAYMENT_PENDING,
+    )
 
     # ===== STATUS =====
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
@@ -110,6 +128,14 @@ class Order(models.Model):
         )
 
     @property
+    def payment_status_display(self):
+        if self.balance_amount <= 0:
+            return "Paid"
+        if (self.deposit_amount or Decimal("0")) > 0 or (self.paid_amount or Decimal("0")) > 0:
+            return "Partial"
+        return "Pending"
+
+    @property
     def remaining_pcs(self):
         return (self.total_pcs or Decimal("0")) - (self.done_pcs or Decimal("0"))
 
@@ -119,7 +145,17 @@ class Order(models.Model):
                 Order.objects.order_by("-id").values_list("id", flat=True).first() or 0
             ) + 1
             self.order_no = f"NR-{last_id:06d}"
+
+        if self.balance_amount <= 0:
+            self.payment_status = self.PAYMENT_PAID
+        elif (self.deposit_amount or Decimal("0")) > 0 or (self.paid_amount or Decimal("0")) > 0:
+            self.payment_status = self.PAYMENT_PARTIAL
+        else:
+            self.payment_status = self.PAYMENT_PENDING
+
         super().save(*args, **kwargs)
+
+
 class OrderDesign(models.Model):
     order = models.ForeignKey(
         Order,
@@ -167,6 +203,7 @@ class OrderDesign(models.Model):
         return total
 
 
+
 class OrderItem(models.Model):
     order = models.ForeignKey(
         Order,
@@ -183,6 +220,7 @@ class OrderItem(models.Model):
 
     description = models.CharField(max_length=200, blank=True, default="")
 
+    # FULL / RETAIL cloth
     shirt_item = models.ForeignKey(
         InventoryItem,
         on_delete=models.PROTECT,
@@ -205,6 +243,7 @@ class OrderItem(models.Model):
         null=True,
     )
 
+    # FILM ONLY service item - no stock deduction
     film_item = models.ForeignKey(
         InventoryItem,
         on_delete=models.PROTECT,
@@ -219,16 +258,21 @@ class OrderItem(models.Model):
         validators=[MinValueValidator(Decimal("0"))],
     )
 
-    # Cloth qty = PCS only.
-    # Must allow 0 because Film Only uses quantity = 0.
+    # RETAIL material item - stock deduction
+    material_item = models.ForeignKey(
+        InventoryItem,
+        on_delete=models.PROTECT,
+        related_name="order_material_items",
+        blank=True,
+        null=True,
+    )
+
     quantity = models.DecimalField(
         max_digits=12,
         decimal_places=0,
         validators=[MinValueValidator(Decimal("0"))],
         default=0,
     )
-
-    # Done qty = PCS only.
     done_qty = models.DecimalField(
         max_digits=12,
         decimal_places=0,
@@ -248,12 +292,12 @@ class OrderItem(models.Model):
         ordering = ["id"]
 
     def __str__(self):
-        base_name = self.description or (
-            str(self.shirt_item)
-            if self.shirt_item
-            else str(self.film_item)
-            if self.film_item
-            else f"Item {self.pk}"
+        base_name = (
+            self.description
+            or str(self.shirt_item or "")
+            or str(self.material_item or "")
+            or str(self.film_item or "")
+            or f"Item {self.pk}"
         )
         return f"{self.order.order_no} - {base_name}"
 
@@ -273,41 +317,74 @@ class OrderItem(models.Model):
                 raise ValidationError({"color": "Full Order requires color."})
             if not self.size:
                 raise ValidationError({"size": "Full Order requires size."})
-            if not self.quantity or Decimal(self.quantity) < 1:
+            if Decimal(self.quantity or 0) < 1:
                 raise ValidationError({"quantity": "Full Order requires cloth quantity."})
-            if not self.unit_price or Decimal(self.unit_price) <= 0:
+            if Decimal(self.unit_price or 0) <= 0:
                 raise ValidationError({"unit_price": "Full Order requires unit price."})
 
             self.quantity = Decimal(self.quantity).quantize(Decimal("1"))
             self.film_item = None
+            self.material_item = None
             self.film_meter = Decimal("0")
 
         elif service_type == Order.SERVICE_FILM_ONLY:
             if not self.film_item:
                 raise ValidationError({"film_item": "Film Only requires film item."})
-            if not self.film_meter or Decimal(self.film_meter) <= 0:
+            if Decimal(self.film_meter or 0) <= 0:
                 raise ValidationError({"film_meter": "Film Only requires film meter."})
-            if not self.unit_price or Decimal(self.unit_price) <= 0:
+            if Decimal(self.unit_price or 0) <= 0:
                 raise ValidationError({"unit_price": "Film Only requires unit price."})
 
             self.quantity = Decimal("0")
             self.done_qty = Decimal("0")
             self.shirt_item = None
+            self.material_item = None
             self.color = None
             self.size = None
 
         elif service_type == Order.SERVICE_PRINT_HEATPRESS:
-            if not self.quantity or Decimal(self.quantity) < 1:
+            if Decimal(self.quantity or 0) < 1:
                 raise ValidationError({"quantity": "Print & Heat Press requires quantity."})
-            if not self.unit_price or Decimal(self.unit_price) <= 0:
+            if Decimal(self.unit_price or 0) <= 0:
                 raise ValidationError({"unit_price": "Print & Heat Press requires unit price."})
 
             self.quantity = Decimal(self.quantity).quantize(Decimal("1"))
             self.shirt_item = None
+            self.material_item = None
             self.color = None
             self.size = None
             self.film_item = None
             self.film_meter = Decimal("0")
+
+        elif service_type == Order.SERVICE_RETAIL:
+            has_shirt = bool(self.shirt_item)
+            has_material = bool(self.material_item)
+
+            if not has_shirt and not has_material:
+                raise ValidationError("Retail Sale requires shirt item OR material item.")
+
+            if has_shirt and has_material:
+                raise ValidationError("Retail Sale cannot choose both shirt and material in one row.")
+
+            if Decimal(self.quantity or 0) < 1:
+                raise ValidationError({"quantity": "Retail Sale requires quantity."})
+            if Decimal(self.unit_price or 0) <= 0:
+                raise ValidationError({"unit_price": "Retail Sale requires unit price."})
+
+            self.quantity = Decimal(self.quantity).quantize(Decimal("1"))
+            self.film_item = None
+            self.film_meter = Decimal("0")
+
+            if has_shirt:
+                if not self.color:
+                    raise ValidationError({"color": "Retail shirt sale requires color."})
+                if not self.size:
+                    raise ValidationError({"size": "Retail shirt sale requires size."})
+                self.material_item = None
+            else:
+                self.shirt_item = None
+                self.color = None
+                self.size = None
 
         if Decimal(self.done_qty or 0) > Decimal(self.quantity or 0):
             raise ValidationError({"done_qty": "Done qty cannot be greater than quantity."})
@@ -319,10 +396,10 @@ class OrderItem(models.Model):
         if self.order and self.order.service_type == Order.SERVICE_FILM_ONLY:
             self.quantity = Decimal("0")
             self.done_qty = Decimal("0")
-            self.line_total = (Decimal(self.film_meter or 0) * Decimal(self.unit_price or 0))
+            self.line_total = Decimal(self.film_meter or 0) * Decimal(self.unit_price or 0)
         else:
             self.quantity = Decimal(self.quantity or 0).quantize(Decimal("1"))
-            self.line_total = (Decimal(self.quantity or 0) * Decimal(self.unit_price or 0))
+            self.line_total = Decimal(self.quantity or 0) * Decimal(self.unit_price or 0)
 
         self.full_clean()
         super().save(*args, **kwargs)
@@ -331,6 +408,8 @@ class OrderItem(models.Model):
     def remaining_qty(self):
         remaining = Decimal(self.quantity or 0) - Decimal(self.done_qty or 0)
         return remaining if remaining > 0 else Decimal("0")
+
+
 class StockConsumption(models.Model):
     order = models.ForeignKey(
         Order,

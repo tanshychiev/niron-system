@@ -27,6 +27,7 @@ from .models import (
 from .services import restore_stock_for_order, deduct_stock_for_order
 
 import re
+from openpyxl.styles import Font, PatternFill
 
 
 def _safe_download_name(value, fallback="file"):
@@ -84,6 +85,7 @@ def _snapshot_item(item):
         "description": item.description,
         "shirt_item": str(item.shirt_item) if item.shirt_item else "",
         "film_item": str(item.film_item) if item.film_item else "",
+        "material_item": str(item.material_item) if item.material_item else "",
         "color": str(item.color) if item.color else "",
         "size": str(item.size) if item.size else "",
         "quantity": str(item.quantity or 0),
@@ -166,6 +168,7 @@ def _get_prefetched_order_queryset():
                     queryset=OrderItem.objects.select_related(
                         "shirt_item",
                         "film_item",
+                        "material_item",
                         "color",
                         "size",
                         "design",
@@ -182,17 +185,26 @@ def _get_prefetched_order_queryset():
         "stock_consumptions__batch_item__item",
     )
 
-
 def _order_form_context_base():
     return {
         "shirt_items": InventoryItem.objects.filter(
             item_type=InventoryItem.TYPE_SHIRT,
             is_active=True,
         ).order_by("code", "name"),
+
         "film_items": InventoryItem.objects.filter(
             item_type=InventoryItem.TYPE_FILM,
             is_active=True,
         ).order_by("code", "name"),
+
+        # Retail Material list:
+        # show Film + Ink + all material items, but do not show Shirt
+        "material_items": InventoryItem.objects.filter(
+            is_active=True,
+        ).exclude(
+            item_type=InventoryItem.TYPE_SHIRT,
+        ).order_by("item_type", "code", "name"),
+
         "colors": Color.objects.filter(is_active=True).order_by("name"),
         "sizes": Size.objects.filter(is_active=True).order_by("sort_order", "id"),
     }
@@ -205,50 +217,47 @@ def _build_design_payloads_from_post(request):
     for design_index in range(design_total):
         prefix = f"design-{design_index}"
 
-        design_id = request.POST.get(f"{prefix}-id") or ""
-        design_name = (request.POST.get(f"{prefix}-name") or "").strip()
-        design_remark = (request.POST.get(f"{prefix}-remark") or "").strip()
-        delete_design = request.POST.get(f"{prefix}-DELETE") == "1"
         item_total = int(request.POST.get(f"{prefix}-item_total", 0) or 0)
-
         items = []
 
         for item_index in range(item_total):
             item_prefix = f"{prefix}-item-{item_index}"
-            delete_item = request.POST.get(f"{item_prefix}-DELETE") == "1"
 
             qty = _decimal_or_zero(
                 request.POST.get(f"{item_prefix}-quantity")
             ).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
 
-            items.append(
-                {
-                    "id": request.POST.get(f"{item_prefix}-id") or "",
-                    "description": (request.POST.get(f"{item_prefix}-description") or "").strip(),
-                    "shirt_item_id": request.POST.get(f"{item_prefix}-shirt_item") or None,
-                    "film_item_id": request.POST.get(f"{item_prefix}-film_item") or None,
-                    "color_id": request.POST.get(f"{item_prefix}-color") or None,
-                    "size_id": request.POST.get(f"{item_prefix}-size") or None,
-                    "quantity": qty,
-                    "unit_price": _decimal_or_zero(request.POST.get(f"{item_prefix}-unit_price")),
-                    "film_meter": _decimal_or_zero(request.POST.get(f"{item_prefix}-film_meter")),
-                    "delete": delete_item,
-                }
-            )
+            items.append({
+                "id": request.POST.get(f"{item_prefix}-id") or "",
+                "description": (request.POST.get(f"{item_prefix}-description") or "").strip(),
 
-        payloads.append(
-            {
-                "id": design_id,
-                "name": design_name,
-                "remark": design_remark,
-                "delete": delete_design,
-                "files": request.FILES.getlist(f"{prefix}-design_files"),
-                "items": items,
-            }
-        )
+                # FULL / RETAIL cloth
+                "shirt_item_id": request.POST.get(f"{item_prefix}-shirt_item") or None,
+                "color_id": request.POST.get(f"{item_prefix}-color") or None,
+                "size_id": request.POST.get(f"{item_prefix}-size") or None,
+
+                # FILM service only
+                "film_item_id": request.POST.get(f"{item_prefix}-film_item") or None,
+                "film_meter": _decimal_or_zero(request.POST.get(f"{item_prefix}-film_meter")),
+
+                # RETAIL material only
+                "material_item_id": request.POST.get(f"{item_prefix}-material_item") or None,
+
+                "quantity": qty,
+                "unit_price": _decimal_or_zero(request.POST.get(f"{item_prefix}-unit_price")),
+                "delete": request.POST.get(f"{item_prefix}-DELETE") == "1",
+            })
+
+        payloads.append({
+            "id": request.POST.get(f"{prefix}-id") or "",
+            "name": (request.POST.get(f"{prefix}-name") or "").strip(),
+            "remark": (request.POST.get(f"{prefix}-remark") or "").strip(),
+            "delete": request.POST.get(f"{prefix}-DELETE") == "1",
+            "files": request.FILES.getlist(f"{prefix}-design_files"),
+            "items": items,
+        })
 
     return payloads
-
 
 def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
     total_amount = Decimal("0")
@@ -293,15 +302,6 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
                 remark=design_data["remark"],
                 sort_order=next_sort_order,
             )
-            _log_order_history(
-                order=order,
-                action=OrderHistory.ACTION_DESIGN_ADD,
-                field_name="design",
-                old_value="",
-                new_value=_snapshot_design(design),
-                user=user,
-                remark=f"Design created: {design.display_name}",
-            )
         else:
             design.name = design_data["name"]
             design.remark = design_data["remark"]
@@ -325,15 +325,6 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
 
             if delete_item:
                 if item:
-                    _log_order_history(
-                        order=order,
-                        action=OrderHistory.ACTION_ITEM_DELETE,
-                        field_name=f"item#{item.pk}",
-                        old_value=old_item_data,
-                        new_value="",
-                        user=user,
-                        remark=f"Item removed from {design.display_name}",
-                    )
                     item.delete()
                 continue
 
@@ -341,6 +332,7 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
                 not item_data["description"]
                 and not item_data["shirt_item_id"]
                 and not item_data["film_item_id"]
+                and not item_data["material_item_id"]
                 and item_data["quantity"] <= 0
                 and item_data["unit_price"] <= 0
                 and item_data["film_meter"] <= 0
@@ -357,12 +349,11 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
                     or item_data["quantity"] <= 0
                     or item_data["unit_price"] <= 0
                 ):
-                    raise ValidationError(
-                        "Full Order requires Shirt Item, Color, Size, Qty, and Unit Price."
-                    )
+                    raise ValidationError("Full Order requires Shirt Item, Color, Size, Qty, and Unit Price.")
 
                 item_data["quantity"] = item_data["quantity"].quantize(Decimal("1"))
                 item_data["film_item_id"] = None
+                item_data["material_item_id"] = None
                 item_data["film_meter"] = Decimal("0")
 
             elif order.service_type == Order.SERVICE_FILM_ONLY:
@@ -371,27 +362,52 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
                     or item_data["film_meter"] <= 0
                     or item_data["unit_price"] <= 0
                 ):
-                    raise ValidationError(
-                        "Film Only requires Film Item, Film Meter, and Unit Price."
-                    )
+                    raise ValidationError("Film Only requires Film Item, Film Meter, and Unit Price.")
 
                 item_data["shirt_item_id"] = None
+                item_data["material_item_id"] = None
                 item_data["color_id"] = None
                 item_data["size_id"] = None
                 item_data["quantity"] = Decimal("0")
 
             elif order.service_type == Order.SERVICE_PRINT_HEATPRESS:
                 if item_data["quantity"] <= 0 or item_data["unit_price"] <= 0:
-                    raise ValidationError(
-                        "Print & Heat Press requires Qty and Unit Price."
-                    )
+                    raise ValidationError("Print & Heat Press requires Qty and Unit Price.")
 
                 item_data["quantity"] = item_data["quantity"].quantize(Decimal("1"))
                 item_data["shirt_item_id"] = None
                 item_data["film_item_id"] = None
+                item_data["material_item_id"] = None
                 item_data["color_id"] = None
                 item_data["size_id"] = None
                 item_data["film_meter"] = Decimal("0")
+
+            elif order.service_type == Order.SERVICE_RETAIL:
+                has_shirt = bool(item_data["shirt_item_id"])
+                has_material = bool(item_data["material_item_id"])
+
+                if not has_shirt and not has_material:
+                    raise ValidationError("Retail Sale requires Shirt Item or Material Item.")
+
+                if has_shirt and has_material:
+                    raise ValidationError("Retail Sale cannot choose Shirt and Material in the same row.")
+
+                if item_data["quantity"] <= 0 or item_data["unit_price"] <= 0:
+                    raise ValidationError("Retail Sale requires Qty and Unit Price.")
+
+                item_data["quantity"] = item_data["quantity"].quantize(Decimal("1"))
+                item_data["film_item_id"] = None
+                item_data["film_meter"] = Decimal("0")
+
+                if has_shirt:
+                    if not item_data["color_id"] or not item_data["size_id"]:
+                        raise ValidationError("Retail shirt sale requires Color and Size.")
+
+                    item_data["material_item_id"] = None
+                else:
+                    item_data["shirt_item_id"] = None
+                    item_data["color_id"] = None
+                    item_data["size_id"] = None
 
             if item is None:
                 item = OrderItem.objects.create(
@@ -400,21 +416,12 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
                     description=item_data["description"],
                     shirt_item_id=item_data["shirt_item_id"],
                     film_item_id=item_data["film_item_id"],
+                    material_item_id=item_data["material_item_id"],
                     color_id=item_data["color_id"],
                     size_id=item_data["size_id"],
                     quantity=item_data["quantity"],
                     unit_price=item_data["unit_price"],
                     film_meter=item_data["film_meter"],
-                )
-
-                _log_order_history(
-                    order=order,
-                    action=OrderHistory.ACTION_ITEM_ADD,
-                    field_name="item",
-                    old_value="",
-                    new_value=_snapshot_item(item),
-                    user=user,
-                    remark=f"Item added in {design.display_name}",
                 )
             else:
                 item.order = order
@@ -422,27 +429,13 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
                 item.description = item_data["description"]
                 item.shirt_item_id = item_data["shirt_item_id"]
                 item.film_item_id = item_data["film_item_id"]
+                item.material_item_id = item_data["material_item_id"]
                 item.color_id = item_data["color_id"]
                 item.size_id = item_data["size_id"]
                 item.quantity = item_data["quantity"]
                 item.unit_price = item_data["unit_price"]
                 item.film_meter = item_data["film_meter"]
                 item.save()
-
-                new_item_data = _snapshot_item(item)
-                if old_item_data:
-                    for key, old_val in old_item_data.items():
-                        new_val = new_item_data.get(key)
-                        if _stringify(old_val) != _stringify(new_val):
-                            _log_order_history(
-                                order=order,
-                                action=OrderHistory.ACTION_ITEM_EDIT,
-                                field_name=f"item#{item.pk}.{key}",
-                                old_value=old_val,
-                                new_value=new_val,
-                                user=user,
-                                remark=f"Item updated in {design.display_name}",
-                            )
 
             kept_item_ids.add(str(item.pk))
             has_item_or_file = True
@@ -454,11 +447,7 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
                 total_pcs += Decimal(item.quantity or 0)
 
         for f in design_data["files"]:
-            OrderDesignFile.objects.create(
-                order=order,
-                design=design,
-                image=f,
-            )
+            OrderDesignFile.objects.create(order=order, design=design, image=f)
             has_item_or_file = True
 
         if not has_item_or_file:
@@ -475,7 +464,6 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
                 design.delete()
 
     return total_amount, total_pcs
-
 
 def _get_order_totals_by_service(order):
     if order.service_type == Order.SERVICE_FULL:
@@ -772,13 +760,17 @@ def order_create(request):
         if form.is_valid():
             try:
                 with transaction.atomic():
+                    save_complete = request.POST.get("save_complete") == "1"
+
                     order = form.save(commit=False)
-                    order.status = Order.STATUS_PENDING
                     order.customer = _get_or_create_customer_from_request(request)
 
                     if request.user.is_authenticated and not order.created_by_id:
                         order.created_by = request.user
 
+                    order.status = Order.STATUS_PENDING
+                    order.done_pcs = Decimal("0")
+                    order.stock_deducted = False
                     order.save()
 
                     design_payloads = _build_design_payloads_from_post(request)
@@ -799,9 +791,13 @@ def order_create(request):
                     order.deposit_amount = deposit_amount
                     order.paid_amount = paid_amount
                     order.total_pcs = total_pcs
-                    order.done_pcs = Decimal("0")
-                    order.status = Order.STATUS_PENDING
-                    order.stock_deducted = False
+
+                    if save_complete:
+                        order.done_pcs = total_pcs
+                        order.status = Order.STATUS_DONE
+                    else:
+                        order.done_pcs = Decimal("0")
+                        order.status = Order.STATUS_PENDING
 
                     order.save(update_fields=[
                         "customer",
@@ -815,7 +811,15 @@ def order_create(request):
                         "created_by",
                     ])
 
-                    deduct_stock_for_order(order, allow_shortage=True)
+                    if save_complete:
+                        for item in order.items.all():
+                            item.done_qty = item.quantity
+                            item.save(update_fields=["done_qty"])
+
+                    # FULL and RETAIL deduct stock.
+                    # FILM_ONLY and PRINT_HEATPRESS do NOT deduct stock.
+                    if order.service_type in [Order.SERVICE_FULL, Order.SERVICE_RETAIL]:
+                        deduct_stock_for_order(order, allow_shortage=True)
 
                     _log_order_history(
                         order=order,
@@ -824,13 +828,14 @@ def order_create(request):
                         old_value="",
                         new_value=order.order_no,
                         user=request.user,
-                        remark="Order created. Cloth stock deducted automatically. Film was not deducted.",
+                        remark="Order created.",
                     )
 
-                messages.success(
-                    request,
-                    f"Order {order.order_no} created successfully. Cloth stock deducted automatically. Film was not deducted."
-                )
+                if save_complete:
+                    messages.success(request, f"Order {order.order_no} saved and completed.")
+                else:
+                    messages.success(request, f"Order {order.order_no} created successfully.")
+
                 return redirect("order_detail", pk=order.pk)
 
             except ValidationError as e:
@@ -850,7 +855,6 @@ def order_create(request):
             **_order_form_context_base(),
         },
     )
-
 
 @login_required
 @permission_required("orders.view_order", raise_exception=True)
@@ -1282,4 +1286,183 @@ def order_invoice_png(request, pk):
     response = HttpResponse(png, content_type="image/png")
     filename = f"{order.customer_name}_{order.order_no}.png"
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
+
+
+
+@login_required
+@permission_required("orders.change_order", raise_exception=True)
+def customer_payment_list(request):
+    # ===== GET FILTERS =====
+    keyword = (request.GET.get("keyword") or "").strip()
+    payment_status = (request.GET.get("payment_status") or "UNPAID_PARTIAL").strip()
+    shop_type = (request.GET.get("shop_type") or "").strip()
+    created_date_from = (request.GET.get("created_date_from") or "").strip()
+    created_date_to = (request.GET.get("created_date_to") or "").strip()
+
+    # ===== BASE QUERY =====
+    qs = Order.objects.filter(is_deleted=False).order_by("-created_at", "-id")
+
+    # ===== SEARCH =====
+    if keyword:
+        qs = qs.filter(
+            Q(order_no__icontains=keyword)
+            | Q(customer_name__icontains=keyword)
+            | Q(phone__icontains=keyword)
+        )
+
+    # ===== SHOP FILTER =====
+    if shop_type:
+        qs = qs.filter(order_type=shop_type)
+
+    # ===== DATE FILTER =====
+    if created_date_from:
+        qs = qs.filter(created_at__date__gte=created_date_from)
+
+    if created_date_to:
+        qs = qs.filter(created_at__date__lte=created_date_to)
+
+    # ===== PAYMENT UPDATE =====
+    if request.method == "POST":
+        order_id = request.POST.get("order_id")
+        add_paid = Decimal(request.POST.get("add_paid") or "0")
+
+        if add_paid <= 0:
+            messages.error(request, "Please enter payment amount.")
+            return redirect("customer_payment_list")
+
+        order = get_object_or_404(Order, pk=order_id, is_deleted=False)
+
+        order.paid_amount = Decimal(order.paid_amount or 0) + add_paid
+        order.save(update_fields=["paid_amount"])
+
+        messages.success(request, f"Payment updated for {order.order_no}.")
+        return redirect("customer_payment_list")
+
+    # ===== BUILD TABLE =====
+    rows = []
+
+    for order in qs:
+        total = Decimal(order.total_amount or 0)
+        deposit = Decimal(order.deposit_amount or 0)
+        paid = Decimal(order.paid_amount or 0)
+        balance = total - deposit - paid
+
+        # ===== STATUS =====
+        if balance <= 0:
+            status = "PAID"
+        elif deposit > 0 or paid > 0:
+            status = "PARTIAL"
+        else:
+            status = "UNPAID"
+
+        # ===== STATUS FILTER (THIS IS YOUR PART) =====
+        if payment_status == "UNPAID_PARTIAL":
+            if status not in ["UNPAID", "PARTIAL"]:
+                continue
+        elif payment_status == "PAID":
+            if status != "PAID":
+                continue
+        elif payment_status == "ALL":
+            pass
+
+        rows.append({
+            "order": order,
+            "total": total,
+            "deposit": deposit,
+            "paid": paid,
+            "balance": balance,
+            "status": status,
+        })
+
+    # ===== RENDER =====
+    return render(request, "orders/customer_payment_list.html", {
+        "rows": rows,
+        "keyword": keyword,
+        "payment_status": payment_status,
+        "shop_type": shop_type,
+        "created_date_from": created_date_from,
+        "created_date_to": created_date_to,
+    })
+@login_required
+@permission_required("orders.change_order", raise_exception=True)
+def customer_payment_export_excel(request):
+    keyword = (request.GET.get("keyword") or "").strip()
+    payment_status = (request.GET.get("payment_status") or "UNPAID_PARTIAL").strip()
+    shop_type = (request.GET.get("shop_type") or "").strip()
+    created_date_from = (request.GET.get("created_date_from") or "").strip()
+    created_date_to = (request.GET.get("created_date_to") or "").strip()
+
+    qs = Order.objects.filter(is_deleted=False).order_by("-created_at", "-id")
+
+    if keyword:
+        qs = qs.filter(
+            Q(order_no__icontains=keyword)
+            | Q(customer_name__icontains=keyword)
+            | Q(phone__icontains=keyword)
+        )
+
+    if shop_type:
+        qs = qs.filter(order_type=shop_type)
+
+    if created_date_from:
+        qs = qs.filter(created_at__date__gte=created_date_from)
+
+    if created_date_to:
+        qs = qs.filter(created_at__date__lte=created_date_to)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Customer Payments"
+
+    ws.append([
+        "Order No", "Created At", "Customer", "Phone",
+        "Shop Type", "Service Type",
+        "Total", "Deposit", "Paid", "Balance", "Payment Status",
+        "Exported At",
+    ])
+
+    for cell in ws[1]:
+        cell.font = Font(bold=True)
+        cell.fill = PatternFill("solid", fgColor="FFF3D6")
+
+    for order in qs:
+        total = Decimal(order.total_amount or 0)
+        deposit = Decimal(order.deposit_amount or 0)
+        paid = Decimal(order.paid_amount or 0)
+        balance = total - deposit - paid
+
+        if balance <= 0:
+            status = "PAID"
+        elif deposit > 0 or paid > 0:
+            status = "PARTIAL"
+        else:
+            status = "UNPAID"
+
+        if payment_status == "UNPAID_PARTIAL":
+            if status not in ["UNPAID", "PARTIAL"]:
+                continue
+        elif payment_status and status != payment_status:
+            continue
+
+        ws.append([
+            order.order_no,
+            order.created_at.strftime("%Y-%m-%d %H:%M") if order.created_at else "",
+            order.customer_name,
+            order.phone,
+            order.get_order_type_display(),
+            order.get_service_type_display(),
+            float(total),
+            float(deposit),
+            float(paid),
+            float(balance),
+            status,
+            timezone.now().strftime("%Y-%m-%d %H:%M"),
+        ])
+
+    response = HttpResponse(
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response["Content-Disposition"] = 'attachment; filename="customer_payments.xlsx"'
+    wb.save(response)
     return response
