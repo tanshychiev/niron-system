@@ -26,11 +26,10 @@ html, body {
 }
 
 .invoice-page {
-    width: 210mm;
-    min-height: 297mm;
-    padding: 14mm;
-    margin: 0 auto;
-    background: #fff;
+    width: 100%;
+    height: 100%;
+    padding: 8mm;   /* smaller padding */
+    margin: 0;      /* REMOVE auto center */
 }
 
 /* HEADER */
@@ -39,19 +38,19 @@ html, body {
     justify-content: space-between;
     align-items: flex-start;
     border-bottom: 2px solid #111827;
-    padding-bottom: 8mm;
+    padding-bottom: 7mm;
 }
 
 .brand {
-    font-size: 52px;
-    line-height: 1;
+    font-size: 58px;
+    line-height: .95;
     font-weight: 900;
     color: #8b451f;
 }
 
 .subtitle {
     margin-top: 5px;
-    font-size: 11px;
+    font-size: 12px;
     color: #6b7280;
 }
 
@@ -61,29 +60,29 @@ html, body {
 
 .invoice-title h1 {
     margin: 0;
-    font-size: 28px;
+    font-size: 32px;
     font-weight: 900;
 }
 
 .invoice-no {
     margin-top: 6px;
-    font-size: 11px;
+    font-size: 12px;
     color: #6b7280;
 }
 
 /* INFO */
 .info-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8mm;
-    margin-top: 10mm;
+    grid-template-columns: 1.15fr .85fr;
+    gap: 7mm;
+    margin-top: 8mm;
 }
 
 .info-box {
     border: 1px solid #e5e7eb;
-    border-radius: 14px;
-    padding: 7mm;
-    min-height: 38mm;
+    border-radius: 12px;
+    padding: 6mm;
+    min-height: 33mm;
 }
 
 .box-title {
@@ -91,24 +90,20 @@ html, body {
     font-weight: 900;
     color: #8b451f;
     text-transform: uppercase;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
 }
 
 .info-line {
     font-size: 12px;
-    margin-bottom: 8px;
-}
-
-.info-line strong {
-    color: #111827;
+    margin-bottom: 7px;
 }
 
 /* DESIGN */
 .design-card {
-    margin-top: 10mm;
+    margin-top: 8mm;
     border: 1px solid #e5e7eb;
-    border-radius: 14px;
-    padding: 7mm;
+    border-radius: 12px;
+    padding: 6mm;
     page-break-inside: avoid;
 }
 
@@ -116,24 +111,24 @@ html, body {
     display: inline-block;
     background: #8b451f;
     color: #fff;
-    padding: 8px 14px;
+    padding: 7px 13px;
     border-radius: 8px;
     font-size: 12px;
     font-weight: 900;
-    margin-bottom: 7mm;
+    margin-bottom: 5mm;
 }
 
 .design-content {
     display: grid;
-    grid-template-columns: 50mm 1fr;
-    gap: 8mm;
+    grid-template-columns: 42mm 1fr;
+    gap: 6mm;
     align-items: start;
 }
 
 .design-img-wrap {
-    width: 50mm;
-    height: 50mm;
-    border-radius: 14px;
+    width: 42mm;
+    height: 42mm;
+    border-radius: 12px;
     overflow: hidden;
     background: #f3f4f6;
     border: 1px solid #e5e7eb;
@@ -142,7 +137,7 @@ html, body {
 .design-img-wrap img {
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain;
 }
 
 .no-image {
@@ -165,27 +160,27 @@ html, body {
     font-size: 10px;
     text-transform: uppercase;
     text-align: left;
-    padding: 9px 7px;
+    padding: 8px 6px;
     border-bottom: 1px solid #8b451f;
 }
 
 .item-table td {
     font-size: 12px;
-    padding: 12px 7px;
+    padding: 10px 6px;
     border-bottom: 1px dashed #d1d5db;
 }
 
 /* BOTTOM */
 .bottom-section {
     display: grid;
-    grid-template-columns: 1fr 82mm;
-    gap: 18mm;
-    margin-top: 16mm;
+    grid-template-columns: 1fr 78mm;
+    gap: 14mm;
+    margin-top: 12mm;
     align-items: start;
 }
 
 .summary {
-    width: 82mm;
+    width: 78mm;
 }
 
 .summary-row {
@@ -220,13 +215,13 @@ html, body {
     border-radius: 8px;
     font-size: 11px;
     font-weight: 900;
-    margin-bottom: 7px;
+    margin-bottom: 6px;
 }
 
 .signature-space {
-    width: 48mm;
-    height: 20mm;
-    margin-bottom: 5px;
+    width: 62mm;
+    height: 25mm;
+    margin-bottom: 4px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -234,42 +229,48 @@ html, body {
     font-size: 11px;
     border: 1px dashed #e6d6cc;
     border-radius: 8px;
+    overflow: hidden;
+}
+
+.signature-img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
 }
 
 .signature-line {
-    width: 48mm;
+    width: 62mm;
     border-bottom: 1px solid #111827;
-    margin: 4px 0 12px;
+    margin: 4px 0 10px;
 }
 
 .issue-box {
-    display: grid;
-    grid-template-columns: 30px 1fr;
-    gap: 10px;
-    align-items: center;
-    margin-top: 14px;
-}
-
-.issue-icon {
-    width: 28px;
-    height: 28px;
-    border: 1px solid #8b451f;
-    color: #8b451f;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    margin-top: 8px;
 }
 
 .issue-name {
-    font-size: 12px;
-    font-weight: 800;
+    font-size: 13px;
+    font-weight: 900;
+    margin-top: 2px;
 }
 
 .issue-date {
     font-size: 11px;
     color: #6b7280;
-    margin-top: 2px;
+    margin-top: 3px;
+}
+
+@media print {
+    html, body {
+        width: 210mm;
+        height: 297mm;
+    }
+
+    .invoice-page {
+        margin: 0;
+        width: 210mm;
+        min-height: 297mm;
+    }
 }
 </style>
 </head>
@@ -306,7 +307,7 @@ html, body {
 
         <div class="info-box">
             <div class="box-title">Order Info</div>
-            <div class="info-line"><strong>Service Type:</strong> {{ order.get_service_type_display }}</div>
+            <div class="info-line"><strong>Service Type:</strong> {{ order.get_service_type_display|default:"-" }}</div>
             <div class="info-line"><strong>Deadline:</strong> {{ order.deadline|date:"Y-m-d"|default:"-" }}</div>
             <div class="info-line"><strong>Created:</strong> {{ order.created_at|date:"Y-m-d, g:i a" }}</div>
         </div>
@@ -371,30 +372,33 @@ html, body {
             <div class="signature-label">Signature</div>
 
             <div class="signature-space">
-    {% if printed_by %}
-        <img class="signature-img"
-             src="{% static 'signatures/' %}{{ printed_by.username }}.png"
-             alt="Signature">
-    {% else %}
-        Signature image here
-    {% endif %}
-</div>
+                {% if printed_by %}
+                    <img class="signature-img"
+                         src="{% static 'signatures/' %}{{ printed_by.username }}.png"
+                         alt="Signature">
+                {% else %}
+                    Signature image here
+                {% endif %}
+            </div>
 
             <div class="signature-line"></div>
 
             <div class="issue-box">
-                <div class="issue-icon">⌾</div>
-                <div>
-                    <div class="issue-label">Issue By</div>
-                    <div class="issue-name">
-    {% if printed_by.first_name or printed_by.last_name %}
-        {{ printed_by.first_name }} {{ printed_by.last_name }}
-    {% else %}
-        {{ printed_by.username }}
-    {% endif %}
-</div>
-                    <div class="issue-date">{% now "Y-m-d, g:i a" %}</div>
+                <div class="issue-label">Issue By</div>
+
+                <div class="issue-name">
+                    {% if printed_by %}
+                        {% if printed_by.first_name or printed_by.last_name %}
+                            {{ printed_by.first_name }} {{ printed_by.last_name }}
+                        {% else %}
+                            {{ printed_by.username }}
+                        {% endif %}
+                    {% else %}
+                        -
+                    {% endif %}
                 </div>
+
+                <div class="issue-date">{% now "Y-m-d, g:i a" %}</div>
             </div>
         </div>
 

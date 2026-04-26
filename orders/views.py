@@ -994,8 +994,15 @@ def production_update(request, pk):
 @permission_required("orders.view_order", raise_exception=True)
 def order_invoice(request, pk):
     order = get_object_or_404(_get_prefetched_order_queryset(), pk=pk)
-    return render(request, "orders/order_invoice.html", {"order": order})
 
+    return render(
+        request,
+        "orders/order_invoice.html",
+        {
+            "order": order,
+            "printed_by": request.user,
+        },
+    )
 
 @login_required
 @permission_required("orders.view_order", raise_exception=True)
@@ -1007,24 +1014,32 @@ def order_invoice_pdf(request, pk):
         {
             "order": order,
             "print_mode": True,
+            "printed_by": request.user,
         },
         request=request,
     )
 
     with sync_playwright() as p:
         browser = p.chromium.launch(args=["--no-sandbox"])
-        page = browser.new_page()
+        page = browser.new_page(
+            viewport={
+                "width": 794,
+                "height": 1123,
+            }
+        )
+
         page.set_content(html, wait_until="networkidle")
-        page.emulate_media(media="screen")
+        page.emulate_media(media="print")
 
         pdf = page.pdf(
             format="A4",
             print_background=True,
+            prefer_css_page_size=True,
             margin={
-                "top": "10mm",
-                "right": "10mm",
-                "bottom": "10mm",
-                "left": "10mm",
+                "top": "0",
+                "right": "0",
+                "bottom": "0",
+                "left": "0",
             },
         )
 
@@ -1037,7 +1052,6 @@ def order_invoice_pdf(request, pk):
     response = HttpResponse(pdf, content_type="application/pdf")
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
     return response
-
 @login_required
 @permission_required("orders.change_order", raise_exception=True)
 def order_edit(request, pk):
@@ -1233,17 +1247,35 @@ def order_invoice_png(request, pk):
         {
             "order": order,
             "print_mode": True,
+            "printed_by": request.user,
         },
         request=request,
     )
 
     with sync_playwright() as p:
         browser = p.chromium.launch(args=["--no-sandbox"])
-        page = browser.new_page(viewport={"width": 1200, "height": 1600})
+
+        page = browser.new_page(
+            viewport={
+                "width": 794,
+                "height": 1123,
+            },
+            device_scale_factor=2,
+        )
+
         page.set_content(html, wait_until="networkidle")
         page.emulate_media(media="screen")
 
-        png = page.screenshot(full_page=True, type="png")
+        png = page.screenshot(
+            type="png",
+            full_page=False,
+            clip={
+                "x": 0,
+                "y": 0,
+                "width": 794,
+                "height": 1123,
+            },
+        )
 
         browser.close()
 

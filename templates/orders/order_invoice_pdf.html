@@ -1,395 +1,329 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Invoice {{ order.order_no }}</title>
+<meta charset="UTF-8">
+<title>Invoice {{ order.order_no }}</title>
 
-    <style>
-        @page {
-            size: A4;
-            margin: 10mm;
-        }
+<style>
+@page {
+    size: A4;
+    margin: 0;
+}
 
-        * {
-            box-sizing: border-box;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-        }
+* {
+    box-sizing: border-box;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
 
-        body {
-            margin: 0;
-            padding: 24px;
-            font-family: Arial, sans-serif;
-            color: #111827;
-            background: #f5f0e6;
-        }
+html, body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    font-family: Arial, sans-serif;
+    background: #fff;
+    color: #111827;
+}
 
-        .toolbar {
-            margin-bottom: 18px;
-            text-align: right;
-        }
+/* 🔥 KEY FIX */
+.invoice-page {
+    width: 100%;
+    height: 100%;
+    padding: 8mm;
+    display: flex;
+    flex-direction: column;
+}
 
-        .btn {
-            border: none;
-            border-radius: 8px;
-            padding: 10px 14px;
-            cursor: pointer;
-            font-weight: 700;
-            background: #E89B14;
-            color: white;
-        }
+/* HEADER */
+.header {
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 2px solid #111827;
+    padding-bottom: 6mm;
+}
 
-        .invoice-page {
-            width: 100%;
-            max-width: 210mm;
-            min-height: 297mm;
-            margin: 0 auto;
-            background: white;
-            border-radius: 16px;
-            padding: 26px;
-            box-shadow: 0 18px 45px rgba(17, 24, 39, .10);
-        }
+.brand {
+    font-size: 56px;
+    font-weight: 900;
+    color: #8b451f;
+}
 
-        .head {
-            display: flex;
-            justify-content: space-between;
-            border-bottom: 2px solid #111827;
-            padding-bottom: 14px;
-            margin-bottom: 18px;
-        }
+.subtitle {
+    font-size: 12px;
+    color: #6b7280;
+}
 
-        .brand {
-            font-size: 30px;
-            font-weight: 900;
-        }
+.invoice-title h1 {
+    margin: 0;
+    font-size: 30px;
+}
 
-        .sub {
-            color: #6b7280;
-            font-size: 12px;
-            margin-top: 4px;
-        }
+/* INFO */
+.info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6mm;
+    margin-top: 6mm;
+}
 
-        .invoice-title {
-            text-align: right;
-        }
+.info-box {
+    border: 1px solid #e5e7eb;
+    padding: 5mm;
+    border-radius: 10px;
+}
 
-        .invoice-title-main {
-            font-size: 28px;
-            font-weight: 900;
-        }
+.box-title {
+    font-weight: bold;
+    color: #8b451f;
+    margin-bottom: 6px;
+}
 
-        .meta-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 14px;
-            margin-bottom: 18px;
-        }
+/* DESIGN */
+.design-card {
+    margin-top: 6mm;
+    border: 1px solid #e5e7eb;
+    padding: 5mm;
+    border-radius: 10px;
+}
 
-        .box {
-            border: 1px solid #d9dde5;
-            border-radius: 12px;
-            padding: 14px;
-            background: #fff;
-        }
+.design-badge {
+    background: #8b451f;
+    color: #fff;
+    padding: 5px 10px;
+    font-weight: bold;
+    display: inline-block;
+    border-radius: 6px;
+    margin-bottom: 5mm;
+}
 
-        .box h3 {
-            margin: 0 0 10px;
-            font-size: 12px;
-            text-transform: uppercase;
-            color: #6b7280;
-            letter-spacing: .8px;
-        }
+.design-content {
+    display: grid;
+    grid-template-columns: 40mm 1fr;
+    gap: 5mm;
+}
 
-        .line {
-            margin-bottom: 6px;
-            font-size: 13px;
-            line-height: 1.35;
-        }
+.design-img-wrap {
+    width: 40mm;
+    height: 40mm;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    overflow: hidden;
+}
 
-        .design-stack {
-            display: grid;
-            gap: 16px;
-            margin-top: 18px;
-        }
+.design-img-wrap img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
 
-        .design-card {
-            border: 1px solid #d9dde5;
-            border-radius: 14px;
-            padding: 14px;
-            page-break-inside: avoid;
-            background: #fff;
-        }
+/* TABLE */
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
 
-        .design-head {
-            display: flex;
-            justify-content: space-between;
-            gap: 12px;
-            flex-wrap: wrap;
-            margin-bottom: 12px;
-        }
+th {
+    font-size: 10px;
+    border-bottom: 1px solid #000;
+    padding: 6px;
+}
 
-        .design-badge {
-            display: inline-flex;
-            align-items: center;
-            padding: 7px 12px;
-            border-radius: 999px;
-            background: #f8f6ef;
-            border: 1px solid #d9dde5;
-            font-size: 12px;
-            font-weight: 900;
-        }
+td {
+    font-size: 11px;
+    padding: 7px;
+    border-bottom: 1px dashed #ccc;
+}
 
-        .design-remark {
-            margin-top: 5px;
-            color: #6b7280;
-            font-size: 12px;
-        }
+/* 🔥 FOOTER PUSH DOWN */
+.bottom-section {
+    margin-top: auto;
+    display: flex;
+    justify-content: space-between;
+}
 
-        .design-meta {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
+/* SIGNATURE */
+.signature-area {
+    width: 65mm;
+}
 
-        .design-chip {
-            padding: 7px 12px;
-            border-radius: 10px;
-            background: #faf8f2;
-            border: 1px solid #d9dde5;
-            font-size: 12px;
-            font-weight: 900;
-        }
+.signature-space {
+    height: 25mm;
+}
 
-        .design-grid {
-            display: grid;
-            grid-template-columns: 220px minmax(0, 1fr);
-            gap: 14px;
-        }
+.signature-img {
+    max-width: 100%;
+    max-height: 100%;
+}
 
-        .image-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 8px;
-        }
+.signature-line {
+    border-bottom: 1px solid #000;
+    margin: 5px 0;
+}
 
-        .image-grid img {
-            width: 100%;
-            height: 100px;
-            object-fit: cover;
-            border-radius: 8px;
-            border: 1px solid #d9dde5;
-            background: #f8fafc;
-        }
+.issue-name {
+    font-weight: bold;
+}
 
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 6px;
-        }
+.issue-date {
+    font-size: 11px;
+    color: #666;
+}
 
-        th, td {
-            padding: 9px 7px;
-            border-bottom: 1px solid #d9dde5;
-            text-align: left;
-            font-size: 12px;
-            vertical-align: top;
-        }
+/* SUMMARY */
+.summary {
+    width: 70mm;
+}
 
-        th {
-            font-size: 10px;
-            text-transform: uppercase;
-            color: #6b7280;
-            font-weight: 900;
-        }
+.summary-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    border-bottom: 1px solid #ddd;
+}
 
-        .summary {
-            width: 290px;
-            margin-left: auto;
-            margin-top: 22px;
-        }
+.balance-row {
+    font-size: 18px;
+    font-weight: bold;
+    border-top: 2px solid #000;
+    padding-top: 6px;
+}
 
-        .summary-row,
-        .summary-total {
-            display: flex;
-            justify-content: space-between;
-            padding: 9px 0;
-        }
-
-        .summary-row {
-            border-bottom: 1px solid #d9dde5;
-            font-size: 14px;
-        }
-
-        .summary-total {
-            border-top: 2px solid #111827;
-            margin-top: 8px;
-            font-size: 23px;
-            font-weight: 900;
-        }
-
-        .empty-note {
-            color: #6b7280;
-            font-size: 12px;
-        }
-
-        @media print {
-            body {
-                padding: 0;
-                background: white;
-            }
-
-            .toolbar {
-                display: none;
-            }
-
-            .invoice-page {
-                width: 100%;
-                min-height: auto;
-                box-shadow: none;
-                border-radius: 0;
-                padding: 0;
-            }
-        }
-    </style>
+/* 🔥 FORCE FULL HEIGHT IN PDF */
+@media print {
+    html, body {
+        height: 100%;
+    }
+}
+</style>
 </head>
 
 <body>
-    <div class="toolbar">
-        <button class="btn" onclick="window.print()">Download PNG / Print</button>
+<div class="invoice-page">
+
+    <!-- HEADER -->
+    <div class="header">
+        <div>
+            <div class="brand">
+                {% if order.order_type == "KAMPU" %}Kampu{% else %}Niron{% endif %}
+            </div>
+            <div class="subtitle">Custom Printing Invoice</div>
+        </div>
+
+        <div class="invoice-title">
+            <h1>Invoice</h1>
+            <div>{{ order.order_no }}</div>
+        </div>
     </div>
 
-    <div class="invoice-page">
-        <div class="head">
-            <div>
-                <div class="brand">Niron Kampu</div>
-                <div class="sub">Custom Printing Invoice</div>
-            </div>
-
-            <div class="invoice-title">
-                <div class="invoice-title-main">Invoice</div>
-                <div class="sub">{{ order.order_no }}</div>
-            </div>
+    <!-- INFO -->
+    <div class="info-grid">
+        <div class="info-box">
+            <div class="box-title">Customer</div>
+            <div>{{ order.customer_name }}</div>
+            <div>{{ order.phone }}</div>
+            <div>{{ order.customer_location }}</div>
+            <div>{{ order.remark }}</div>
         </div>
 
-        <div class="meta-grid">
-            <div class="box">
-                <h3>Customer</h3>
-                <div class="line"><strong>Name:</strong> {{ order.customer_name|default:"-" }}</div>
-                <div class="line"><strong>Phone:</strong> {{ order.phone|default:"-" }}</div>
-                <div class="line"><strong>Location:</strong> {{ order.customer_location|default:"-" }}</div>
-                <div class="line"><strong>Remark:</strong> {{ order.remark|default:"-" }}</div>
-            </div>
-
-            <div class="box">
-                <h3>Order Info</h3>
-                <div class="line"><strong>Type:</strong> {{ order.get_order_type_display }}</div>
-                <div class="line"><strong>Deadline:</strong> {{ order.deadline|date:"Y-m-d"|default:"-" }}</div>
-                <div class="line"><strong>Created:</strong> {{ order.created_at|date:"Y-m-d" }}</div>
-            </div>
+        <div class="info-box">
+            <div class="box-title">Order</div>
+            <div>{{ order.get_service_type_display }}</div>
+            <div>{{ order.deadline|date:"Y-m-d" }}</div>
+            <div>{{ order.created_at|date:"Y-m-d H:i" }}</div>
         </div>
+    </div>
 
-        <div class="design-stack">
-            {% for design in order.designs.all %}
-            <div class="design-card">
-                <div class="design-head">
-                    <div>
-                        <div class="design-badge">{{ design.display_name }}</div>
+    <!-- DESIGNS -->
+    {% for design in order.designs.all %}
+    <div class="design-card">
+        <div class="design-badge">{{ design.display_name }}</div>
 
-                        {% if design.remark %}
-                        <div class="design-remark">{{ design.remark }}</div>
+        <div class="design-content">
+            <div class="design-img-wrap">
+                {% for file in design.files.all %}
+                    {% if forloop.first %}
+                        <img src="{{ file.image.url }}">
+                    {% endif %}
+                {% empty %}
+                    No image
+                {% endfor %}
+            </div>
+
+            <table>
+                <tr>
+                    <th>Item</th><th>Color</th><th>Size</th>
+                    <th>Qty</th><th>Price</th><th>Total</th>
+                </tr>
+
+                {% for item in design.items.all %}
+                <tr>
+                    <td>
+                        {% if item.item_mode == "FILM" %}
+                            {{ item.film_item }}
+                        {% else %}
+                            {{ item.shirt_item }}
                         {% endif %}
-                    </div>
+                    </td>
+                    <td>{{ item.color }}</td>
+                    <td>{{ item.size }}</td>
+                    <td>{{ item.quantity }}</td>
+                    <td>${{ item.unit_price }}</td>
+                    <td>${{ item.line_total }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+    </div>
+    {% endfor %}
 
-                    <div class="design-meta">
-                        <div class="design-chip">PCS {{ design.total_pcs }}</div>
-                        <div class="design-chip">Amount ${{ design.total_amount }}</div>
-                    </div>
-                </div>
+    <!-- FOOTER -->
+    <div class="bottom-section">
 
-                <div class="design-grid">
-                    <div class="box">
-                        <h3>Design Images</h3>
-                        <div class="image-grid">
-                            {% for img in design.files.all %}
-                            <img src="{{ img.image.url }}" alt="Design">
-                            {% empty %}
-                            <div class="empty-note">No design images.</div>
-                            {% endfor %}
-                        </div>
-                    </div>
+        <!-- SIGNATURE -->
+        <div class="signature-area">
+            <div>Signature</div>
 
-                    <div class="box">
-                        <h3>Items</h3>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Mode</th>
-                                    <th>Description</th>
-                                    <th>Item</th>
-                                    <th>Color</th>
-                                    <th>Size</th>
-                                    <th>Qty</th>
-                                    <th>Unit Price</th>
-                                    <th>Total</th>
-                                </tr>
-                            </thead>
-
-                            <tbody>
-                                {% for item in design.items.all %}
-                                <tr>
-                                    <td>{{ item.get_item_mode_display }}</td>
-                                    <td>{{ item.description|default:"-" }}</td>
-                                    <td>
-                                        {% if item.item_mode == "FILM" %}
-                                            {{ item.film_item|default:"-" }}
-                                        {% else %}
-                                            {{ item.shirt_item|default:"-" }}
-                                        {% endif %}
-                                    </td>
-                                    <td>{{ item.color|default:"-" }}</td>
-                                    <td>{{ item.size|default:"-" }}</td>
-                                    <td>{{ item.quantity }}</td>
-                                    <td>${{ item.unit_price }}</td>
-                                    <td>${{ item.line_total }}</td>
-                                </tr>
-                                {% empty %}
-                                <tr>
-                                    <td colspan="8">No items in this design.</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+            <div class="signature-space">
+                {% if printed_by %}
+                    <img class="signature-img"
+                         src="{% static 'signatures/' %}{{ printed_by.username }}.png">
+                {% endif %}
             </div>
-            {% empty %}
-            <div class="box">
-                <div class="empty-note">No designs found.</div>
+
+            <div class="signature-line"></div>
+
+            <div>Issue By</div>
+            <div class="issue-name">
+                {{ printed_by.get_full_name|default:printed_by.username }}
             </div>
-            {% endfor %}
+            <div class="issue-date">{% now "Y-m-d H:i" %}</div>
         </div>
 
+        <!-- SUMMARY -->
         <div class="summary">
             <div class="summary-row">
                 <span>Total</span>
                 <span>${{ order.total_amount }}</span>
             </div>
-
             <div class="summary-row">
                 <span>Deposit</span>
                 <span>${{ order.deposit_amount }}</span>
             </div>
-
             <div class="summary-row">
                 <span>Paid</span>
                 <span>${{ order.paid_amount }}</span>
             </div>
 
-            <div class="summary-total">
+            <div class="balance-row">
                 <span>Balance</span>
                 <span>${{ order.balance_amount }}</span>
             </div>
         </div>
+
     </div>
+
+</div>
 </body>
 </html>
