@@ -2,6 +2,8 @@ from django import forms
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.models import Group, Permission, User
 
+from .models import UserProfile
+
 
 class LoginForm(AuthenticationForm):
     username = forms.CharField(
@@ -43,11 +45,7 @@ class UserCreateForm(forms.ModelForm):
         queryset=Group.objects.all().order_by("name"),
         required=False,
         empty_label="Select role",
-        widget=forms.Select(
-            attrs={
-                "class": "form-select",
-            }
-        ),
+        widget=forms.Select(attrs={"class": "form-select"}),
         label="Role",
     )
 
@@ -84,6 +82,8 @@ class UserCreateForm(forms.ModelForm):
             if selected_group:
                 user.groups.add(selected_group)
 
+            UserProfile.objects.get_or_create(user=user)
+
         return user
 
 
@@ -110,11 +110,7 @@ class UserEditForm(forms.ModelForm):
         queryset=Group.objects.all().order_by("name"),
         required=False,
         empty_label="Select role",
-        widget=forms.Select(
-            attrs={
-                "class": "form-select",
-            }
-        ),
+        widget=forms.Select(attrs={"class": "form-select"}),
         label="Role",
     )
 
@@ -163,7 +159,23 @@ class UserEditForm(forms.ModelForm):
             if selected_group:
                 user.groups.add(selected_group)
 
+            UserProfile.objects.get_or_create(user=user)
+
         return user
+
+
+class UserProfileForm(forms.ModelForm):
+    class Meta:
+        model = UserProfile
+        fields = ["signature"]
+        widgets = {
+            "signature": forms.ClearableFileInput(
+                attrs={
+                    "class": "form-control",
+                    "accept": "image/*",
+                }
+            )
+        }
 
 
 class RoleForm(forms.ModelForm):

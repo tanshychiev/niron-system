@@ -994,14 +994,13 @@ def production_update(request, pk):
 @permission_required("orders.view_order", raise_exception=True)
 def order_invoice(request, pk):
     order = get_object_or_404(_get_prefetched_order_queryset(), pk=pk)
-    printed_by = order.created_by or request.user
 
     return render(
         request,
         "orders/order_invoice.html",
         {
             "order": order,
-            "printed_by": printed_by,
+            "printed_by": request.user,  # ✅ FIXED
         },
     )
 
@@ -1010,14 +1009,13 @@ def order_invoice(request, pk):
 @permission_required("orders.view_order", raise_exception=True)
 def order_invoice_pdf(request, pk):
     order = get_object_or_404(_get_prefetched_order_queryset(), pk=pk)
-    printed_by = order.created_by or request.user
 
     html = render_to_string(
         "orders/order_invoice.html",
         {
             "order": order,
             "print_mode": True,
-            "printed_by": printed_by,
+            "printed_by": request.user,  # ✅ FIXED
         },
         request=request,
     )
@@ -1028,9 +1026,7 @@ def order_invoice_pdf(request, pk):
 
         page.set_content(html, wait_until="networkidle")
         page.emulate_media(media="screen")
-        
         page.wait_for_timeout(1500)
-        
 
         pdf = page.pdf(
             format="A4",
@@ -1046,13 +1042,10 @@ def order_invoice_pdf(request, pk):
 
         browser.close()
 
-    customer = _safe_download_name(order.customer_name, "customer")
-    order_no = _safe_download_name(order.order_no, "invoice")
-    filename = f"{customer}_{order_no}.pdf"
-
     response = HttpResponse(pdf, content_type="application/pdf")
-    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    response["Content-Disposition"] = 'attachment; filename="invoice.pdf"'
     return response
+
 @login_required
 @permission_required("orders.change_order", raise_exception=True)
 def order_edit(request, pk):
@@ -1242,21 +1235,19 @@ def order_trash_list(request):
 @permission_required("orders.view_order", raise_exception=True)
 def order_invoice_png(request, pk):
     order = get_object_or_404(_get_prefetched_order_queryset(), pk=pk)
-    printed_by = order.created_by or request.user
 
     html = render_to_string(
         "orders/order_invoice.html",
         {
             "order": order,
             "print_mode": True,
-            "printed_by": printed_by,
+            "printed_by": request.user,  # ✅ FIXED
         },
         request=request,
     )
 
     with sync_playwright() as p:
         browser = p.chromium.launch(args=["--no-sandbox"])
-
         page = browser.new_page(
             viewport={"width": 794, "height": 1123},
             device_scale_factor=2,
@@ -1264,9 +1255,7 @@ def order_invoice_png(request, pk):
 
         page.set_content(html, wait_until="networkidle")
         page.emulate_media(media="screen")
-
         page.wait_for_timeout(1500)
-
 
         png = page.screenshot(
             type="png",
@@ -1281,10 +1270,6 @@ def order_invoice_png(request, pk):
 
         browser.close()
 
-    customer = _safe_download_name(order.customer_name, "customer")
-    order_no = _safe_download_name(order.order_no, "invoice")
-    filename = f"{customer}_{order_no}.png"
-
     response = HttpResponse(png, content_type="image/png")
-    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    response["Content-Disposition"] = 'attachment; filename="invoice.png"'
     return response

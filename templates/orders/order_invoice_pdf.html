@@ -286,11 +286,14 @@ td {
             <div>Signature</div>
 
             <div class="signature-space">
-                {% if printed_by %}
-                    <img class="signature-img"
-                         src="{% static 'signatures/' %}{{ printed_by.username }}.png">
-                {% endif %}
-            </div>
+    {% if printed_by and printed_by.profile.signature %}
+        <img class="signature-img"
+             src="{{ request.scheme }}://{{ request.get_host }}{{ printed_by.profile.signature.url }}"
+             alt="Signature">
+    {% else %}
+        <span>No Signature</span>
+    {% endif %}
+</div>
 
             <div class="signature-line"></div>
 

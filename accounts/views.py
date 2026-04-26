@@ -1,15 +1,14 @@
+from collections import defaultdict
+
 from django.contrib import messages
-from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required, permission_required
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Group, Permission, User
 from django.shortcuts import get_object_or_404, redirect, render
 
-from .forms import LoginForm, UserCreateForm, UserEditForm
-from django.contrib.auth.decorators import login_required, permission_required
-from django.contrib.auth.models import Group, Permission
-from collections import defaultdict
-from django.contrib.auth.models import Group, Permission
-from .forms import RoleForm
+from .forms import LoginForm, RoleForm, UserCreateForm, UserEditForm, UserProfileForm
+from .models import UserProfile
+
 
 def login_view(request):
     if request.user.is_authenticated:
@@ -40,56 +39,82 @@ def user_list(request):
     users = User.objects.prefetch_related("groups").order_by("username")
     return render(request, "accounts/user_list.html", {"users": users})
 
-
 @login_required
 @permission_required("auth.add_user", raise_exception=True)
 def user_create(request):
     if request.method == "POST":
         form = UserCreateForm(request.POST)
-        if form.is_valid():
-            form.save()
+        profile_form = UserProfileForm(request.POST, request.FILES)
+
+        if form.is_valid() and profile_form.is_valid():
+            user_obj = form.save()
+            profile, _ = UserProfile.objects.get_or_create(user=user_obj)
+
+            profile_form = UserProfileForm(
+                request.POST,
+                request.FILES,
+                instance=profile,
+            )
+            profile_form.save()
+
             messages.success(request, "User created successfully.")
             return redirect("user_list")
     else:
         form = UserCreateForm()
+        profile_form = UserProfileForm()
 
-    return render(request, "accounts/user_form.html", {
-        "form": form,
-        "page_title": "Create User",
-        "submit_label": "Save User",
-    })
-
+    return render(
+        request,
+        "accounts/user_form.html",
+        {
+            "form": form,
+            "profile_form": profile_form,
+            "page_title": "Create User",
+            "submit_label": "Save User",
+        },
+    )
 
 @login_required
 @permission_required("auth.change_user", raise_exception=True)
 def user_edit(request, pk):
     user_obj = get_object_or_404(User, pk=pk)
+    profile, _ = UserProfile.objects.get_or_create(user=user_obj)
 
     if request.method == "POST":
         form = UserEditForm(request.POST, instance=user_obj)
-        if form.is_valid():
+        profile_form = UserProfileForm(
+            request.POST,
+            request.FILES,
+            instance=profile,
+        )
+
+        if form.is_valid() and profile_form.is_valid():
             form.save()
+            profile_form.save()
             messages.success(request, "User updated successfully.")
             return redirect("user_list")
     else:
         form = UserEditForm(instance=user_obj)
+        profile_form = UserProfileForm(instance=profile)
 
-    return render(request, "accounts/user_form.html", {
-        "form": form,
-        "page_title": "Edit User",
-        "submit_label": "Update User",
-    })
+    return render(
+        request,
+        "accounts/user_form.html",
+        {
+            "form": form,
+            "profile_form": profile_form,
+            "user_obj": user_obj,
+            "page_title": "Edit User",
+            "submit_label": "Update User",
+        },
+    )
+
+
 @login_required
 @permission_required("auth.view_group", raise_exception=True)
 def role_list(request):
     roles = Group.objects.prefetch_related("permissions").order_by("name")
-    return render(
-        request,
-        "accounts/role_list.html",
-        {
-            "roles": roles,
-        },
-    )
+    return render(request, "accounts/role_list.html", {"roles": roles})
 
 
 @login_required
@@ -106,11 +131,6 @@ def permission_list(request):
             "permissions": permissions,
         },
     )
-@login_required
-@permission_required("auth.view_group", raise_exception=True)
-def role_list(request):
-    roles = Group.objects.prefetch_related("permissions").order_by("name")
-    return render(request, "accounts/role_list.html", {"roles": roles})
 
 
 @login_required
@@ -118,6 +138,7 @@ def role_list(request):
 def role_create(request):
     if request.method == "POST":
         form = RoleForm(request.POST)
+
         if form.is_valid():
             form.save()
             messages.success(request, "Role created successfully.")
@@ -127,7 +148,8 @@ def role_create(request):
 
     grouped_permissions = defaultdict(list)
     for perm in Permission.objects.select_related("content_type").order_by(
-        "content_type__app_label", "codename"
+        "content_type__app_label",
+        "codename",
     ):
         grouped_permissions[perm.content_type.app_label.upper()].append(perm)
 
@@ -150,6 +172,7 @@ def role_edit(request, pk):
 
     if request.method == "POST":
         form = RoleForm(request.POST, instance=role)
+
         if form.is_valid():
             form.save()
             messages.success(request, "Role updated successfully.")
@@ -159,7 +182,8 @@ def role_edit(request, pk):
 
     grouped_permissions = defaultdict(list)
     for perm in Permission.objects.select_related("content_type").order_by(
-        "content_type__app_label", "codename"
+        "content_type__app_label",
+        "codename",
     ):
         grouped_permissions[perm.content_type.app_label.upper()].append(perm)
 

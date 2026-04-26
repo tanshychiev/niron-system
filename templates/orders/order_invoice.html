@@ -372,13 +372,13 @@ html, body {
         <div class="signature-area">
             <div class="signature-label">Signature</div>
 
-           <div class="signature-space">
-    {% if printed_by %}
+          <div class="signature-space">
+    {% if printed_by and printed_by.profile.signature %}
         <img class="signature-img"
-             src="{{ request.scheme }}://{{ request.get_host }}/static/signatures/{{ printed_by.username }}.png?v=3"
+             src="{{ request.scheme }}://{{ request.get_host }}{{ printed_by.profile.signature.url }}"
              alt="Signature">
     {% else %}
-        <span>Signature</span>
+        <span>No Signature</span>
     {% endif %}
 </div>
 

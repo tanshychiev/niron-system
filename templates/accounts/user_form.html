@@ -6,11 +6,7 @@
 
 {% block extra_css %}
 <style>
-    .user-form-wrap {
-        max-width: 900px;
-        margin: 0 auto;
-    }
-
+    .user-form-wrap { max-width: 900px; margin: 0 auto; }
     .user-form-card {
         background: rgba(255,255,255,.9);
         border: 1px solid var(--line);
@@ -18,46 +14,23 @@
         padding: 28px;
         box-shadow: var(--shadow);
     }
-
-    .section-title {
-        font-size: 18px;
-        font-weight: 800;
-        margin-bottom: 6px;
-    }
-
-    .section-subtitle {
-        font-size: 13px;
-        color: var(--muted);
-        margin-bottom: 18px;
-    }
-
+    .section-title { font-size: 18px; font-weight: 800; margin-bottom: 6px; }
+    .section-subtitle { font-size: 13px; color: var(--muted); margin-bottom: 18px; }
     .grid-2 {
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 16px;
         margin-bottom: 18px;
     }
-
-    .field {
-        margin-bottom: 16px;
-    }
-
-    .field label {
-        font-size: 13px;
-        font-weight: 700;
-        margin-bottom: 6px;
-        display: block;
-    }
-
-    .roles-panel,
-    .status-panel {
+    .field { margin-bottom: 16px; }
+    .field label { font-size: 13px; font-weight: 700; margin-bottom: 6px; display: block; }
+    .roles-panel, .status-panel, .signature-panel {
         background: var(--bg-soft);
         border: 1px solid var(--line);
         border-radius: 18px;
         padding: 18px;
         margin-bottom: 20px;
     }
-
     .form-select {
         width: 100%;
         padding: 12px;
@@ -66,12 +39,10 @@
         font-size: 14px;
         font-weight: 600;
     }
-
     .form-select:focus {
         border-color: var(--accent);
         box-shadow: 0 0 0 4px rgba(232,155,20,.12);
     }
-
     .status-switch {
         display: flex;
         align-items: center;
@@ -81,30 +52,30 @@
         border-radius: 14px;
         padding: 14px;
     }
-
-    .status-switch input {
-        width: 18px;
-        height: 18px;
+    .status-switch input { width: 18px; height: 18px; }
+    .signature-preview {
+        margin-top: 12px;
+        background: white;
+        border: 1px dashed var(--line);
+        border-radius: 14px;
+        padding: 14px;
+        width: fit-content;
     }
-
-    .error-text {
-        color: #B42318;
-        font-size: 12px;
-        font-weight: 700;
-        margin-top: 6px;
+    .signature-preview img {
+        max-width: 240px;
+        max-height: 90px;
+        object-fit: contain;
+        display: block;
     }
-
+    .error-text { color: #B42318; font-size: 12px; font-weight: 700; margin-top: 6px; }
     .actions {
         display: flex;
         justify-content: flex-end;
         gap: 10px;
         margin-top: 10px;
     }
-
     @media (max-width: 768px) {
-        .grid-2 {
-            grid-template-columns: 1fr;
-        }
+        .grid-2 { grid-template-columns: 1fr; }
     }
 </style>
 {% endblock %}
@@ -112,7 +83,7 @@
 {% block content %}
 <div class="user-form-wrap">
     <div class="user-form-card">
-        <form method="post">
+        <form method="post" enctype="multipart/form-data">
             {% csrf_token %}
 
             {% if form.non_field_errors %}
@@ -199,6 +170,24 @@
                 </div>
             {% endif %}
 
+            <div class="signature-panel">
+                <div class="section-title">Signature</div>
+                <div class="section-subtitle">Upload this user's invoice signature</div>
+
+                <div class="field">
+                    {{ profile_form.signature }}
+                    {% if profile_form.signature.errors %}
+                        <div class="error-text">{{ profile_form.signature.errors|join:", " }}</div>
+                    {% endif %}
+                </div>
+
+                {% if user_obj and user_obj.profile.signature %}
+                    <div class="signature-preview">
+                        <img src="{{ user_obj.profile.signature.url }}" alt="Current signature">
+                    </div>
+                {% endif %}
+            </div>
+
             <div class="roles-panel">
                 <div class="section-title">Role</div>
                 <div class="section-subtitle">Select one role for this user</div>
@@ -230,12 +219,8 @@
             </div>
 
             <div class="actions">
-                <button type="submit" class="btn-primary">
-                    {{ submit_label }}
-                </button>
-                <a href="{% url 'user_list' %}" class="btn-secondary">
-                    Back to List
-                </a>
+                <button type="submit" class="btn-primary">{{ submit_label }}</button>
+                <a href="{% url 'user_list' %}" class="btn-secondary">Back to List</a>
             </div>
         </form>
     </div>
