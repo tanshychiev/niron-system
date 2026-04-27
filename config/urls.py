@@ -12,6 +12,7 @@ urlpatterns = [
     path("inventory/", include("inventory.urls")),
     path("finance/", include("finance.urls")),
     path("customers/", include("customers.urls")),
+    path("expenses/", include("expenses.urls")),  # ✅ ADD THIS
 ]
 
 # media (for signature upload)
