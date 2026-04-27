@@ -221,8 +221,8 @@ def _build_design_payloads_from_post(request):
 
     for design_index in range(design_total):
         prefix = f"design-{design_index}"
-
         item_total = int(request.POST.get(f"{prefix}-item_total", 0) or 0)
+
         items = []
 
         for item_index in range(item_total):
@@ -231,6 +231,9 @@ def _build_design_payloads_from_post(request):
             qty = _decimal_or_zero(
                 request.POST.get(f"{item_prefix}-quantity")
             ).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+
+            film_meter = _money2(request.POST.get(f"{item_prefix}-film_meter"))
+            unit_price = _money2(request.POST.get(f"{item_prefix}-unit_price"))
 
             items.append({
                 "id": request.POST.get(f"{item_prefix}-id") or "",
@@ -241,12 +244,12 @@ def _build_design_payloads_from_post(request):
                 "size_id": request.POST.get(f"{item_prefix}-size") or None,
 
                 "film_item_id": request.POST.get(f"{item_prefix}-film_item") or None,
-                "film_meter": _money2(request.POST.get(f"{item_prefix}-film_meter")),
+                "film_meter": film_meter,
 
                 "material_item_id": request.POST.get(f"{item_prefix}-material_item") or None,
 
                 "quantity": qty,
-                "unit_price": _money2(request.POST.get(f"{item_prefix}-unit_price")),
+                "unit_price": unit_price,
                 "delete": request.POST.get(f"{item_prefix}-DELETE") == "1",
             })
 
@@ -262,7 +265,7 @@ def _build_design_payloads_from_post(request):
     return payloads
 
 def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
-    total_amount = Decimal("0")
+    total_amount = Decimal("0.00")
     total_pcs = Decimal("0")
 
     existing_designs = {str(d.pk): d for d in order.designs.all()}
@@ -320,15 +323,19 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
 
             if item_id and item_id in existing_items:
                 item = existing_items[item_id]
-                old_item_data = _snapshot_item(item)
             else:
                 item = None
-                old_item_data = None
 
             if delete_item:
                 if item:
                     item.delete()
                 continue
+
+            item_data["quantity"] = _decimal_or_zero(item_data.get("quantity")).quantize(
+                Decimal("1"), rounding=ROUND_HALF_UP
+            )
+            item_data["film_meter"] = _money2(item_data.get("film_meter"))
+            item_data["unit_price"] = _money2(item_data.get("unit_price"))
 
             is_blank_item = (
                 not item_data["description"]
@@ -353,10 +360,9 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
                 ):
                     raise ValidationError("Full Order requires Shirt Item, Color, Size, Qty, and Unit Price.")
 
-                item_data["quantity"] = item_data["quantity"].quantize(Decimal("1"))
                 item_data["film_item_id"] = None
                 item_data["material_item_id"] = None
-                item_data["film_meter"] = Decimal("0")
+                item_data["film_meter"] = Decimal("0.00")
 
             elif order.service_type == Order.SERVICE_FILM_ONLY:
                 if (
@@ -376,13 +382,12 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
                 if item_data["quantity"] <= 0 or item_data["unit_price"] <= 0:
                     raise ValidationError("Print & Heat Press requires Qty and Unit Price.")
 
-                item_data["quantity"] = item_data["quantity"].quantize(Decimal("1"))
                 item_data["shirt_item_id"] = None
                 item_data["film_item_id"] = None
                 item_data["material_item_id"] = None
                 item_data["color_id"] = None
                 item_data["size_id"] = None
-                item_data["film_meter"] = Decimal("0")
+                item_data["film_meter"] = Decimal("0.00")
 
             elif order.service_type == Order.SERVICE_RETAIL:
                 has_shirt = bool(item_data["shirt_item_id"])
@@ -397,19 +402,22 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
                 if item_data["quantity"] <= 0 or item_data["unit_price"] <= 0:
                     raise ValidationError("Retail Sale requires Qty and Unit Price.")
 
-                item_data["quantity"] = item_data["quantity"].quantize(Decimal("1"))
                 item_data["film_item_id"] = None
-                item_data["film_meter"] = Decimal("0")
+                item_data["film_meter"] = Decimal("0.00")
 
                 if has_shirt:
                     if not item_data["color_id"] or not item_data["size_id"]:
                         raise ValidationError("Retail shirt sale requires Color and Size.")
-
                     item_data["material_item_id"] = None
                 else:
                     item_data["shirt_item_id"] = None
                     item_data["color_id"] = None
                     item_data["size_id"] = None
+
+            if order.service_type == Order.SERVICE_FILM_ONLY:
+                line_total = _money2(item_data["film_meter"] * item_data["unit_price"])
+            else:
+                line_total = _money2(item_data["quantity"] * item_data["unit_price"])
 
             if item is None:
                 item = OrderItem.objects.create(
@@ -424,6 +432,7 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
                     quantity=item_data["quantity"],
                     unit_price=item_data["unit_price"],
                     film_meter=item_data["film_meter"],
+                    line_total=line_total,
                 )
             else:
                 item.order = order
@@ -437,15 +446,14 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
                 item.quantity = item_data["quantity"]
                 item.unit_price = item_data["unit_price"]
                 item.film_meter = item_data["film_meter"]
+                item.line_total = line_total
                 item.save()
 
             kept_item_ids.add(str(item.pk))
             has_item_or_file = True
-            total_amount += _money2(item.line_total or 0)
+            total_amount += line_total
 
-            if order.service_type == Order.SERVICE_FILM_ONLY:
-                total_pcs += Decimal("0")
-            else:
+            if order.service_type != Order.SERVICE_FILM_ONLY:
                 total_pcs += Decimal(item.quantity or 0)
 
         for f in design_data["files"]:
@@ -465,7 +473,7 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
             if str(design.pk) not in kept_design_ids:
                 design.delete()
 
-    return total_amount, total_pcs
+    return _money2(total_amount), total_pcs
 
 def _get_order_totals_by_service(order):
     if order.service_type == Order.SERVICE_FULL:
@@ -645,7 +653,7 @@ def production_list(request):
             qs = qs.filter(status=cancel_status)
 
         if deadline:
-            qs = qs.filter(deadline__date=deadline)
+            qs = qs.filter(deadline=deadline)
 
         if sort == ProductionFilterForm.SORT_CREATED_DESC:
             qs = qs.order_by("-created_at", "-id")

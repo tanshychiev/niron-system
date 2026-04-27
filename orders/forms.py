@@ -1,3 +1,5 @@
+from decimal import Decimal, ROUND_HALF_UP
+
 from django import forms
 from django.forms import inlineformset_factory
 
@@ -5,9 +7,12 @@ from inventory.models import Color, InventoryItem, Size
 from .models import Order, OrderDesign, OrderItem
 
 
-# =========================
-# MULTIPLE FILE SUPPORT
-# =========================
+def decimal2(value):
+    if value in [None, ""]:
+        return Decimal("0.00")
+    return Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
 class MultipleFileInput(forms.ClearableFileInput):
     allow_multiple_selected = True
 
@@ -27,30 +32,16 @@ class MultipleFileField(forms.FileField):
         return cleaned
 
 
-# =========================
-# ORDER FORM (FIXED)
-# =========================
 class OrderForm(forms.ModelForm):
-
-    # ✅ FIX: DATE ONLY (NO TIME)
     deadline = forms.DateField(
-        widget=forms.DateInput(
-            attrs={
-                "type": "date",
-                "class": "form-control",
-            }
-        )
+        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"})
     )
 
     shipping_fee = forms.DecimalField(
         required=False,
         initial=0,
         widget=forms.NumberInput(
-            attrs={
-                "class": "form-control",
-                "step": "0.01",
-                "placeholder": "0.00",
-            }
+            attrs={"class": "form-control", "step": "0.01", "placeholder": "0.00"}
         ),
     )
 
@@ -58,11 +49,7 @@ class OrderForm(forms.ModelForm):
         required=False,
         initial=0,
         widget=forms.NumberInput(
-            attrs={
-                "class": "form-control",
-                "step": "0.01",
-                "placeholder": "0.00",
-            }
+            attrs={"class": "form-control", "step": "0.01", "placeholder": "0.00"}
         ),
     )
 
@@ -103,18 +90,18 @@ class OrderForm(forms.ModelForm):
         self.fields["remark"].required = False
         self.fields["phone"].required = False
 
+    def clean_shipping_fee(self):
+        return decimal2(self.cleaned_data.get("shipping_fee"))
 
-# =========================
-# DESIGN FORM
-# =========================
+    def clean_discount_amount(self):
+        return decimal2(self.cleaned_data.get("discount_amount"))
+
+
 class OrderDesignForm(forms.ModelForm):
     design_files = MultipleFileField(
         required=False,
         widget=MultipleFileInput(
-            attrs={
-                "accept": "image/*",
-                "class": "form-control",
-            }
+            attrs={"accept": "image/*", "class": "form-control"}
         ),
     )
 
@@ -131,17 +118,11 @@ class OrderDesignForm(forms.ModelForm):
         }
 
 
-# =========================
-# ORDER ITEM FORM
-# =========================
 class OrderItemForm(forms.ModelForm):
     description = forms.CharField(
         required=False,
         widget=forms.TextInput(
-            attrs={
-                "class": "form-control",
-                "placeholder": "Description",
-            }
+            attrs={"class": "form-control", "placeholder": "Description"}
         ),
     )
 
@@ -166,7 +147,7 @@ class OrderItemForm(forms.ModelForm):
                 attrs={
                     "class": "form-control film-meter-input",
                     "placeholder": "Film meter",
-                    "step": "0.0001",
+                    "step": "0.01",
                     "min": "0",
                 }
             ),
@@ -210,7 +191,6 @@ class OrderItemForm(forms.ModelForm):
             is_active=True
         ).order_by("sort_order", "id")
 
-        # all optional (logic handled in clean)
         for name in [
             "shirt_item",
             "color",
@@ -221,6 +201,12 @@ class OrderItemForm(forms.ModelForm):
             "unit_price",
         ]:
             self.fields[name].required = False
+
+    def clean_film_meter(self):
+        return decimal2(self.cleaned_data.get("film_meter"))
+
+    def clean_unit_price(self):
+        return decimal2(self.cleaned_data.get("unit_price"))
 
     def clean(self):
         cleaned = super().clean()
@@ -254,9 +240,6 @@ class OrderItemForm(forms.ModelForm):
         return cleaned
 
 
-# =========================
-# FORMSET
-# =========================
 OrderItemFormSet = inlineformset_factory(
     OrderDesign,
     OrderItem,
@@ -266,9 +249,6 @@ OrderItemFormSet = inlineformset_factory(
 )
 
 
-# =========================
-# FILTER FORM
-# =========================
 class ProductionFilterForm(forms.Form):
     STATUS_ACTIVE = "ACTIVE"
     STATUS_ALL = "ALL"
@@ -294,40 +274,10 @@ class ProductionFilterForm(forms.Form):
         (SORT_CREATED_ASC, "Created oldest first"),
     ]
 
-    q = forms.CharField(
-        required=False,
-        label="Search",
-        widget=forms.TextInput(
-            attrs={
-                "class": "form-control",
-                "placeholder": "Customer name or order no",
-            }
-        ),
-    )
-
-    status = forms.ChoiceField(
-        required=False,
-        label="Status",
-        initial=STATUS_ACTIVE,
-        choices=STATUS_CHOICES,
-        widget=forms.Select(attrs={"class": "form-select"}),
-    )
-
+    q = forms.CharField(required=False)
+    status = forms.ChoiceField(required=False, initial=STATUS_ACTIVE, choices=STATUS_CHOICES)
     deadline = forms.DateField(
         required=False,
-        label="Deadline",
-        widget=forms.DateInput(
-            attrs={
-                "type": "date",
-                "class": "form-control",
-            }
-        ),
+        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
     )
-
-    sort = forms.ChoiceField(
-        required=False,
-        label="Sort",
-        initial=SORT_DEADLINE_ASC,
-        choices=SORT_CHOICES,
-        widget=forms.Select(attrs={"class": "form-select"}),
-    )
+    sort = forms.ChoiceField(required=False, initial=SORT_DEADLINE_ASC, choices=SORT_CHOICES)
