@@ -2,15 +2,12 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<base href="{{ request.scheme }}://{{ request.get_host }}/">    
+<base href="{{ request.scheme }}://{{ request.get_host }}/">
 <meta charset="UTF-8">
 <title>Invoice {{ order.order_no }}</title>
 
 <style>
-@page {
-    size: A4;
-    margin: 0;
-}
+@page { size: A4; margin: 0; }
 
 * {
     box-sizing: border-box;
@@ -27,11 +24,28 @@ html, body {
 }
 
 .invoice-page {
-    width: 100%;
-    height: 100%;
-    padding: 8mm;   /* smaller padding */
-    margin: 0;      /* REMOVE auto center */
+    width: 210mm;
+    min-height: 297mm;
+    padding: 8mm;
+    margin: 0 auto;
 }
+
+/* THEME */
+{% if order.order_type == "KAMPU" %}
+:root {
+    --brand: #063949;
+    --soft: #eef9ff;
+    --light: #e0f2fe;
+}
+.brand-logo-text { color: #063949; }
+{% else %}
+:root {
+    --brand: #8b451f;
+    --soft: #fbf3ec;
+    --light: #f7eee8;
+}
+.brand-logo-text { color: #8b451f; }
+{% endif %}
 
 /* HEADER */
 .header {
@@ -42,11 +56,10 @@ html, body {
     padding-bottom: 7mm;
 }
 
-.brand {
+.brand-logo-text {
     font-size: 58px;
     line-height: .95;
     font-weight: 900;
-    color: #8b451f;
 }
 
 .subtitle {
@@ -89,7 +102,7 @@ html, body {
 .box-title {
     font-size: 12px;
     font-weight: 900;
-    color: #8b451f;
+    color: var(--brand);
     text-transform: uppercase;
     margin-bottom: 8px;
 }
@@ -108,15 +121,27 @@ html, body {
     page-break-inside: avoid;
 }
 
+.design-top-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 5mm;
+}
+
 .design-badge {
     display: inline-block;
-    background: #8b451f;
+    background: var(--brand);
     color: #fff;
     padding: 7px 13px;
     border-radius: 8px;
     font-size: 12px;
     font-weight: 900;
-    margin-bottom: 5mm;
+}
+
+.service-pill {
+    font-size: 12px;
+    font-weight: 900;
+    color: var(--brand);
 }
 
 .design-content {
@@ -148,6 +173,7 @@ html, body {
     justify-content: center;
     font-size: 11px;
     color: #6b7280;
+    text-align: center;
 }
 
 /* TABLE */
@@ -157,18 +183,26 @@ html, body {
 }
 
 .item-table th {
-    color: #8b451f;
+    background: var(--brand);
+    color: #fff;
     font-size: 10px;
     text-transform: uppercase;
     text-align: left;
     padding: 8px 6px;
-    border-bottom: 1px solid #8b451f;
 }
 
 .item-table td {
     font-size: 12px;
     padding: 10px 6px;
     border-bottom: 1px dashed #d1d5db;
+}
+
+.text-right {
+    text-align: right;
+}
+
+.text-center {
+    text-align: center;
 }
 
 /* BOTTOM */
@@ -202,6 +236,10 @@ html, body {
     font-weight: 900;
 }
 
+.balance-row span:last-child {
+    color: var(--brand);
+}
+
 /* SIGNATURE */
 .signature-area {
     min-height: 45mm;
@@ -210,8 +248,8 @@ html, body {
 .signature-label,
 .issue-label {
     display: inline-block;
-    color: #8b451f;
-    background: #f7eee8;
+    color: var(--brand);
+    background: var(--light);
     padding: 6px 12px;
     border-radius: 8px;
     font-size: 11px;
@@ -281,7 +319,7 @@ html, body {
 
     <div class="header">
         <div>
-            <div class="brand">
+            <div class="brand-logo-text">
                 {% if order.order_type == "KAMPU" %}
                     Kampu
                 {% else %}
@@ -308,6 +346,7 @@ html, body {
 
         <div class="info-box">
             <div class="box-title">Order Info</div>
+            <div class="info-line"><strong>Order Type:</strong> {{ order.get_order_type_display|default:"-" }}</div>
             <div class="info-line"><strong>Service Type:</strong> {{ order.get_service_type_display|default:"-" }}</div>
             <div class="info-line"><strong>Deadline:</strong> {{ order.deadline|date:"Y-m-d"|default:"-" }}</div>
             <div class="info-line"><strong>Created:</strong> {{ order.created_at|date:"Y-m-d, g:i a" }}</div>
@@ -316,13 +355,16 @@ html, body {
 
     {% for design in order.designs.all %}
     <div class="design-card">
-        <div class="design-badge">{{ design.display_name }}</div>
+        <div class="design-top-line">
+            <div class="design-badge">{{ design.display_name }}</div>
+            <div class="service-pill">Service: {{ order.get_service_type_display }}</div>
+        </div>
 
         <div class="design-content">
             <div class="design-img-wrap">
                 {% for file in design.files.all %}
                     {% if forloop.first %}
-                       <img src="{{ file.image.url }}">
+                        <img src="{{ file.image.url }}">
                     {% endif %}
                 {% empty %}
                     <div class="no-image">No design image</div>
@@ -331,35 +373,103 @@ html, body {
 
             <table class="item-table">
                 <thead>
+                    {% if order.service_type == "FILM_ONLY" %}
+                    <tr>
+                        <th>Description</th>
+                        <th>Film Item</th>
+                        <th class="text-center">Film Meter</th>
+                        <th class="text-right">Unit Price</th>
+                        <th class="text-right">Total</th>
+                    </tr>
+
+                    {% elif order.service_type == "PRINT_HEATPRESS" %}
+                    <tr>
+                        <th>Description</th>
+                        <th class="text-center">Qty</th>
+                        <th class="text-right">Unit Price</th>
+                        <th class="text-right">Total</th>
+                    </tr>
+
+                    {% elif order.service_type == "RETAIL" %}
                     <tr>
                         <th>Item</th>
                         <th>Color</th>
                         <th>Size</th>
-                        <th>Qty</th>
-                        <th>Unit Price</th>
-                        <th>Total</th>
+                        <th class="text-center">Qty</th>
+                        <th class="text-right">Unit Price</th>
+                        <th class="text-right">Total</th>
                     </tr>
+
+                    {% else %}
+                    <tr>
+                        <th>Item</th>
+                        <th>Color</th>
+                        <th>Size</th>
+                        <th class="text-center">Qty</th>
+                        <th class="text-right">Unit Price</th>
+                        <th class="text-right">Total</th>
+                    </tr>
+                    {% endif %}
                 </thead>
 
                 <tbody>
                     {% for item in design.items.all %}
-                    <tr>
-                        <td>
-                            {% if item.item_mode == "FILM" %}
-                                {{ item.film_item|default:"-" }}
-                            {% else %}
-                                {{ item.shirt_item|default:"-" }}
-                            {% endif %}
-                        </td>
-                        <td>{{ item.color|default:"-" }}</td>
-                        <td>{{ item.size|default:"-" }}</td>
-                        <td>{{ item.quantity }}</td>
-                        <td>${{ item.unit_price }}</td>
-                        <td>${{ item.line_total }}</td>
-                    </tr>
+
+                        {% if order.service_type == "FILM_ONLY" %}
+                        <tr>
+                            <td>{{ item.description|default:"-" }}</td>
+                            <td>{{ item.film_item|default:"-" }}</td>
+                            <td class="text-center">{{ item.film_meter|floatformat:2 }}</td>
+                            <td class="text-right">${{ item.unit_price|floatformat:2 }}</td>
+                            <td class="text-right">${{ item.line_total|floatformat:2 }}</td>
+                        </tr>
+
+                        {% elif order.service_type == "PRINT_HEATPRESS" %}
+                        <tr>
+                            <td>{{ item.description|default:"-" }}</td>
+                            <td class="text-center">{{ item.quantity|floatformat:0 }}</td>
+                            <td class="text-right">${{ item.unit_price|floatformat:2 }}</td>
+                            <td class="text-right">${{ item.line_total|floatformat:2 }}</td>
+                        </tr>
+
+                        {% elif order.service_type == "RETAIL" %}
+                        <tr>
+                            <td>
+                                {% if item.shirt_item %}
+                                    {{ item.shirt_item }}
+                                {% elif item.material_item %}
+                                    {{ item.material_item }}
+                                {% else %}
+                                    {{ item.description|default:"-" }}
+                                {% endif %}
+                            </td>
+                            <td>{{ item.color|default:"-" }}</td>
+                            <td>{{ item.size|default:"-" }}</td>
+                            <td class="text-center">{{ item.quantity|floatformat:0 }}</td>
+                            <td class="text-right">${{ item.unit_price|floatformat:2 }}</td>
+                            <td class="text-right">${{ item.line_total|floatformat:2 }}</td>
+                        </tr>
+
+                        {% else %}
+                        <tr>
+                            <td>{{ item.shirt_item|default:item.description|default:"-" }}</td>
+                            <td>{{ item.color|default:"-" }}</td>
+                            <td>{{ item.size|default:"-" }}</td>
+                            <td class="text-center">{{ item.quantity|floatformat:0 }}</td>
+                            <td class="text-right">${{ item.unit_price|floatformat:2 }}</td>
+                            <td class="text-right">${{ item.line_total|floatformat:2 }}</td>
+                        </tr>
+                        {% endif %}
+
                     {% empty %}
                     <tr>
-                        <td colspan="6">No items in this design.</td>
+                        {% if order.service_type == "FILM_ONLY" %}
+                            <td colspan="5">No items in this design.</td>
+                        {% elif order.service_type == "PRINT_HEATPRESS" %}
+                            <td colspan="4">No items in this design.</td>
+                        {% else %}
+                            <td colspan="6">No items in this design.</td>
+                        {% endif %}
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -372,56 +482,54 @@ html, body {
         <div class="signature-area">
             <div class="signature-label">Signature</div>
 
-          <div class="signature-space">
-    {% if printed_by and printed_by.profile.signature %}
-        <img class="signature-img"
-             src="{{ request.scheme }}://{{ request.get_host }}{{ printed_by.profile.signature.url }}"
-             alt="Signature">
-    {% else %}
-        <span>No Signature</span>
-    {% endif %}
-</div>
+            <div class="signature-space">
+                {% if printed_signature_url %}
+                    <img src="{{ printed_signature_url }}" class="signature-img">
+                {% elif signature_url %}
+                    <img src="{{ signature_url }}" class="signature-img">
+                {% else %}
+                    No Signature
+                {% endif %}
+            </div>
 
             <div class="signature-line"></div>
 
             <div class="issue-box">
                 <div class="issue-label">Issue By</div>
-
                 <div class="issue-name">
-                    {% if printed_by %}
-                        {% if printed_by.first_name or printed_by.last_name %}
-                            {{ printed_by.first_name }} {{ printed_by.last_name }}
+                    {% if order.created_by %}
+                        {% if order.created_by.get_full_name %}
+                            {{ order.created_by.get_full_name }}
                         {% else %}
-                            {{ printed_by.username }}
+                            {{ order.created_by.username }}
                         {% endif %}
                     {% else %}
                         -
                     {% endif %}
                 </div>
-
-                <div class="issue-date">{% now "Y-m-d, g:i a" %}</div>
+                <div class="issue-date">{{ order.created_at|date:"Y-m-d, g:i a" }}</div>
             </div>
         </div>
 
         <div class="summary">
             <div class="summary-row">
                 <span>Total</span>
-                <span>${{ order.total_amount }}</span>
+                <span>${{ order.total_amount|floatformat:2 }}</span>
             </div>
 
             <div class="summary-row">
                 <span>Deposit</span>
-                <span>${{ order.deposit_amount }}</span>
+                <span>${{ order.deposit_amount|floatformat:2 }}</span>
             </div>
 
             <div class="summary-row">
                 <span>Paid</span>
-                <span>${{ order.paid_amount }}</span>
+                <span>${{ order.paid_amount|floatformat:2 }}</span>
             </div>
 
             <div class="balance-row">
                 <span>Balance</span>
-                <span>${{ order.balance_amount }}</span>
+                <span>${{ order.balance_amount|floatformat:2 }}</span>
             </div>
         </div>
     </div>

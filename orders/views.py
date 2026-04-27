@@ -999,12 +999,18 @@ def production_update(request, pk):
 def order_invoice(request, pk):
     order = get_object_or_404(_get_prefetched_order_queryset(), pk=pk)
 
+    template = (
+        "orders/order_invoice_kampu.html"
+        if (order.order_type or "").upper() == "KAMPU"
+        else "orders/order_invoice.html"
+    )
+
     return render(
         request,
-        "orders/order_invoice.html",
+        template,
         {
             "order": order,
-            "printed_by": request.user,  # ✅ FIXED
+            "printed_by": request.user,
         },
     )
 
@@ -1014,8 +1020,14 @@ def order_invoice(request, pk):
 def order_invoice_pdf(request, pk):
     order = get_object_or_404(_get_prefetched_order_queryset(), pk=pk)
 
+    template = (
+        "orders/order_invoice_kampu.html"
+        if (order.order_type or "").upper() == "KAMPU"
+        else "orders/order_invoice.html"
+    )
+
     html = render_to_string(
-        "orders/order_invoice.html",
+        template,
         {
             "order": order,
             "print_mode": True,
@@ -1031,10 +1043,7 @@ def order_invoice_pdf(request, pk):
         page.set_content(html, wait_until="networkidle")
         page.emulate_media(media="screen")
 
-        # ✅ wait for images (IMPORTANT for signature)
-        page.wait_for_function("""
-        () => Array.from(document.images).every(img => img.complete && img.naturalWidth > 0)
-        """, timeout=10000)
+        page.wait_for_timeout(1500)
 
         pdf = page.pdf(
             format="A4",
@@ -1050,14 +1059,12 @@ def order_invoice_pdf(request, pk):
 
         browser.close()
 
-    # ✅ SAFE filename (no space error)
-    safe_name = (order.customer_name or "customer").replace(" ", "_")
+    safe_name = _safe_download_name(order.customer_name, "customer")
     filename = f"{safe_name}_{order.order_no}.pdf"
 
     response = HttpResponse(pdf, content_type="application/pdf")
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
-
-    return response  # 🔥 VERY IMPORTANT (your error was here)   
+    return response
 
 @login_required
 @permission_required("orders.change_order", raise_exception=True)
@@ -1249,12 +1256,18 @@ def order_trash_list(request):
 def order_invoice_png(request, pk):
     order = get_object_or_404(_get_prefetched_order_queryset(), pk=pk)
 
+    template = (
+        "orders/order_invoice_kampu.html"
+        if (order.order_type or "").upper() == "KAMPU"
+        else "orders/order_invoice.html"
+    )
+
     html = render_to_string(
-        "orders/order_invoice.html",
+        template,
         {
             "order": order,
             "print_mode": True,
-            "printed_by": request.user,  # ✅ FIXED
+            "printed_by": request.user,
         },
         request=request,
     )
@@ -1283,11 +1296,12 @@ def order_invoice_png(request, pk):
 
         browser.close()
 
+    safe_name = _safe_download_name(order.customer_name, "customer")
+    filename = f"{safe_name}_{order.order_no}.png"
+
     response = HttpResponse(png, content_type="image/png")
-    filename = f"{order.customer_name}_{order.order_no}.png"
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
     return response
-
 
 
 @login_required

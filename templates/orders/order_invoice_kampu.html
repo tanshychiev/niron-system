@@ -1,0 +1,521 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<base href="{{ request.scheme }}://{{ request.get_host }}/">
+<meta charset="UTF-8">
+<title>Kampu Invoice {{ order.order_no }}</title>
+
+<style>
+@page { size: A4; margin: 0; }
+
+* {
+    box-sizing: border-box;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+    background: #fff;
+    font-family: Arial, sans-serif;
+    color: #0B2F3D;
+}
+
+.page {
+    width: 210mm;
+    min-height: 297mm;
+    margin: 0 auto;
+    padding: 6mm 8mm 0;
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.logo img {
+    max-width: 75mm;
+    max-height: 24mm;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    display: block;
+}
+
+.invoice-head {
+    text-align: right;
+}
+
+.invoice-head h1 {
+    margin: 0;
+    font-size: 28pt;
+    font-weight: 900;
+    color: #073848;
+}
+
+.invoice-no {
+    margin-top: 6px;
+    padding: 5px 10px;
+    background: #073848;
+    color: #fff;
+    font-size: 12pt;
+    font-weight: 900;
+    border-radius: 4px;
+}
+
+.cmyk-top {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    height: 3mm;
+    margin: 4mm -8mm 5mm;
+}
+
+.pink { background:#F20A78; }
+.blue { background:#12AEEA; }
+.yellow { background:#FFC400; }
+.dark { background:#073848; }
+
+.info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6mm;
+    margin-bottom: 4mm;
+}
+
+.info-box {
+    border: 1px solid #D7DEE4;
+    border-radius: 5px;
+    padding: 3mm 4mm;
+    min-height: 28mm;
+}
+
+.info-title {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 8.5pt;
+    font-weight: 900;
+    margin-bottom: 2mm;
+}
+
+.icon {
+    width: 6mm;
+    height: 6mm;
+    border-radius: 50%;
+    color: #fff;
+    font-size: 8pt;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.icon.pink { background:#F20A78; }
+.icon.blue { background:#12AEEA; }
+.icon.yellow { background:#FFC400; }
+
+.info-row {
+    display: grid;
+    grid-template-columns: 20mm 3mm 1fr;
+    font-size: 8.5pt;
+    margin-bottom: 1.5mm;
+}
+
+.design-card {
+    border: 1px solid #D7DEE4;
+    border-radius: 5px;
+    margin-bottom: 3mm;
+    padding: 0 4mm 4mm;
+}
+
+.design-badge {
+    background: #073848;
+    color: #fff;
+    padding: 5px 12px;
+    font-size: 10pt;
+    font-weight: 900;
+    margin-bottom: 3mm;
+}
+
+.design-content {
+    display: grid;
+    grid-template-columns: 38mm 1fr;
+    gap: 5mm;
+}
+
+.design-img {
+    width: 38mm;
+    height: 38mm;
+    border: 1px dashed #ccc;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9pt;
+    color: #999;
+    overflow: hidden;
+}
+
+.design-img img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.item-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.item-table th {
+    background: #073848;
+    color: #fff;
+    padding: 5px;
+    font-size: 7pt;
+    text-align: left;
+}
+
+.item-table td {
+    padding: 6px;
+    font-size: 8.5pt;
+    border-bottom: 1px dashed #ccc;
+}
+
+.text-center { text-align: center; }
+.text-right { text-align: right; }
+
+.bottom-grid {
+    display: grid;
+    grid-template-columns: 1fr 75mm;
+    gap: 5mm;
+    margin-top: 3mm;
+}
+
+.label-line {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 9pt;
+    margin-bottom: 2mm;
+    font-weight: 700;
+}
+
+.signature-box {
+    height: 16mm;
+    border: 1px dashed #F20A78;
+    font-size: 8pt;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #9CA3AF;
+}
+
+.signature-box img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.issue {
+    margin-top: 3mm;
+}
+
+.issue-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 8.5pt;
+}
+
+.issue-user {
+    font-weight: 900;
+}
+
+.issue-date {
+    font-size: 7pt;
+    color: #64748B;
+}
+
+.summary {
+    border: 1px solid #D7DEE4;
+}
+
+.summary-inner {
+    padding: 3mm;
+}
+
+.summary-row {
+    font-size: 9pt;
+    padding: 2mm 0;
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 1px solid #E5E7EB;
+}
+
+.balance-box {
+    padding: 3mm;
+    min-height: 14mm;
+    background: linear-gradient(90deg,#F20A78,#12AEEA,#FFC400);
+    color: #fff;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.balance-label {
+    font-size: 10pt;
+}
+
+.balance-value {
+    font-size: 16pt;
+    font-weight: 900;
+}
+
+.footer-line {
+    margin-top: 3mm;
+    border-top: 1px solid #073848;
+}
+
+.footer {
+    font-size: 8pt;
+    padding: 3mm;
+}
+
+.footer-strip {
+    height: 6mm;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    margin: 0 -8mm;
+}
+</style>
+</head>
+
+<body>
+<div class="page">
+
+    <div class="header">
+        <div class="logo">
+            <img src="{% static 'img/kampu_logo.png' %}" alt="Kampu Kolor">
+        </div>
+
+        <div class="invoice-head">
+            <h1>INVOICE</h1>
+            <div class="invoice-no">{{ order.order_no }}</div>
+        </div>
+    </div>
+
+    <div class="cmyk-top">
+        <div class="pink"></div>
+        <div class="blue"></div>
+        <div class="yellow"></div>
+        <div class="dark"></div>
+    </div>
+
+    <div class="info-grid">
+        <div class="info-box">
+            <div class="info-title">
+                <span class="icon pink">👤</span>
+                Customer Information
+            </div>
+            <div class="info-row"><strong>Name</strong><span>:</span><span>{{ order.customer_name|default:"-" }}</span></div>
+            <div class="info-row"><strong>Phone</strong><span>:</span><span>{{ order.phone|default:"-" }}</span></div>
+            <div class="info-row"><strong>Location</strong><span>:</span><span>{{ order.customer_location|default:"-" }}</span></div>
+            <div class="info-row"><strong>Remark</strong><span>:</span><span>{{ order.remark|default:"-" }}</span></div>
+        </div>
+
+        <div class="info-box">
+            <div class="info-title">
+                <span class="icon blue">📋</span>
+                Order Information
+            </div>
+            <div class="info-row"><strong>Service Type</strong><span>:</span><span>{{ order.get_service_type_display|default:"-" }}</span></div>
+            <div class="info-row"><strong>Deadline</strong><span>:</span><span>{{ order.deadline|date:"Y-m-d"|default:"-" }}</span></div>
+            <div class="info-row"><strong>Created</strong><span>:</span><span>{{ order.created_at|date:"Y-m-d, g:i a" }}</span></div>
+        </div>
+    </div>
+
+    {% for design in order.designs.all %}
+    <div class="design-card">
+        <div class="design-badge">{{ design.display_name }}</div>
+
+        <div class="design-content">
+            <div class="design-img">
+                {% for file in design.files.all %}
+                    {% if forloop.first %}
+                        <img src="{{ file.image.url }}" alt="Design">
+                    {% endif %}
+                {% empty %}
+                    <div>NO IMAGE</div>
+                {% endfor %}
+            </div>
+
+            <table class="item-table">
+                <thead>
+                    {% if order.service_type == "FILM_ONLY" %}
+                    <tr>
+                        <th>Description</th>
+                        <th>Film Item</th>
+                        <th class="text-center">Film Meter</th>
+                        <th class="text-right">Unit Price</th>
+                        <th class="text-right">Total</th>
+                    </tr>
+                    {% elif order.service_type == "PRINT_HEATPRESS" %}
+                    <tr>
+                        <th>Description</th>
+                        <th class="text-center">Qty</th>
+                        <th class="text-right">Unit Price</th>
+                        <th class="text-right">Total</th>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <th>Item</th>
+                        <th>Color</th>
+                        <th>Size</th>
+                        <th class="text-center">Qty</th>
+                        <th class="text-right">Unit Price</th>
+                        <th class="text-right">Total</th>
+                    </tr>
+                    {% endif %}
+                </thead>
+
+                <tbody>
+                    {% for item in design.items.all %}
+                        {% if order.service_type == "FILM_ONLY" %}
+                        <tr>
+                            <td>{{ item.description|default:"-" }}</td>
+                            <td>{{ item.film_item|default:"-" }}</td>
+                            <td class="text-center">{{ item.film_meter|floatformat:2 }}</td>
+                            <td class="text-right">${{ item.unit_price|floatformat:2 }}</td>
+                            <td class="text-right">${{ item.line_total|floatformat:2 }}</td>
+                        </tr>
+                        {% elif order.service_type == "PRINT_HEATPRESS" %}
+                        <tr>
+                            <td>{{ item.description|default:"-" }}</td>
+                            <td class="text-center">{{ item.quantity|floatformat:0 }}</td>
+                            <td class="text-right">${{ item.unit_price|floatformat:2 }}</td>
+                            <td class="text-right">${{ item.line_total|floatformat:2 }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td>
+                                {% if item.shirt_item %}
+                                    {{ item.shirt_item }}
+                                {% elif item.material_item %}
+                                    {{ item.material_item }}
+                                {% else %}
+                                    {{ item.description|default:"-" }}
+                                {% endif %}
+                            </td>
+                            <td>{{ item.color|default:"-" }}</td>
+                            <td>{{ item.size|default:"-" }}</td>
+                            <td class="text-center">{{ item.quantity|floatformat:0 }}</td>
+                            <td class="text-right">${{ item.unit_price|floatformat:2 }}</td>
+                            <td class="text-right">${{ item.line_total|floatformat:2 }}</td>
+                        </tr>
+                        {% endif %}
+                    {% empty %}
+                    <tr>
+                        {% if order.service_type == "FILM_ONLY" %}
+                            <td colspan="5">No items</td>
+                        {% elif order.service_type == "PRINT_HEATPRESS" %}
+                            <td colspan="4">No items</td>
+                        {% else %}
+                            <td colspan="6">No items</td>
+                        {% endif %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endfor %}
+
+    <div class="bottom-grid">
+        <div>
+            <div class="signature">
+                <div class="label-line">
+                    <span class="icon pink">✎</span>
+                    Signature
+                </div>
+
+                <div class="signature-box">
+                    {% if printed_signature_url %}
+                        <img src="{{ printed_signature_url }}" alt="Signature">
+                    {% elif signature_url %}
+                        <img src="{{ signature_url }}" alt="Signature">
+                    {% else %}
+                        No Signature
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="issue">
+                <div class="issue-row">
+                    <span class="icon blue">👤</span>
+                    <strong>Issued By:</strong>
+
+                    <span class="issue-user">
+                        {% if printed_by %}
+                            {% if printed_by.get_full_name %}
+                                {{ printed_by.get_full_name }}
+                            {% else %}
+                                {{ printed_by.username }}
+                            {% endif %}
+                        {% elif order.created_by %}
+                            {% if order.created_by.get_full_name %}
+                                {{ order.created_by.get_full_name }}
+                            {% else %}
+                                {{ order.created_by.username }}
+                            {% endif %}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </span>
+
+                    <span class="issue-date">{% now "Y-m-d, g:i a" %}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="summary">
+            <div class="summary-inner">
+                <div class="summary-row">
+                    <span>Total</span>
+                    <span>${{ order.total_amount|floatformat:2 }}</span>
+                </div>
+                <div class="summary-row">
+                    <span>Deposit</span>
+                    <span>${{ order.deposit_amount|floatformat:2 }}</span>
+                </div>
+                <div class="summary-row">
+                    <span>Paid</span>
+                    <span>${{ order.paid_amount|floatformat:2 }}</span>
+                </div>
+            </div>
+
+            <div class="balance-box">
+                <div class="balance-label">Balance Due</div>
+                <div class="balance-value">${{ order.balance_amount|floatformat:2 }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer-line"></div>
+
+    <div class="footer">
+        <div>☎ +855 96 979 9631</div>
+        <div>✉ info@kampu.com</div>
+        <div>📍Toul Sangkae Phnom Penh, Cambodia</div>
+    </div>
+
+    <div class="footer-strip">
+        <div class="pink"></div>
+        <div class="blue"></div>
+        <div class="yellow"></div>
+        <div class="dark"></div>
+    </div>
+
+</div>
+</body>
+</html>
