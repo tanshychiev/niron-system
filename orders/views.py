@@ -47,7 +47,12 @@ def _decimal_or_zero(value):
         return Decimal(str(value or 0))
     except Exception:
         return Decimal("0")
-
+    
+def _money2(value):
+    try:
+        return _decimal_or_zero(value).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    except Exception:
+        return Decimal("0.00")
 
 def _log_order_history(order, action, field_name="", old_value="", new_value="", user=None, remark=""):
     OrderHistory.objects.create(
@@ -231,20 +236,17 @@ def _build_design_payloads_from_post(request):
                 "id": request.POST.get(f"{item_prefix}-id") or "",
                 "description": (request.POST.get(f"{item_prefix}-description") or "").strip(),
 
-                # FULL / RETAIL cloth
                 "shirt_item_id": request.POST.get(f"{item_prefix}-shirt_item") or None,
                 "color_id": request.POST.get(f"{item_prefix}-color") or None,
                 "size_id": request.POST.get(f"{item_prefix}-size") or None,
 
-                # FILM service only
                 "film_item_id": request.POST.get(f"{item_prefix}-film_item") or None,
-                "film_meter": _decimal_or_zero(request.POST.get(f"{item_prefix}-film_meter")),
+                "film_meter": _money2(request.POST.get(f"{item_prefix}-film_meter")),
 
-                # RETAIL material only
                 "material_item_id": request.POST.get(f"{item_prefix}-material_item") or None,
 
                 "quantity": qty,
-                "unit_price": _decimal_or_zero(request.POST.get(f"{item_prefix}-unit_price")),
+                "unit_price": _money2(request.POST.get(f"{item_prefix}-unit_price")),
                 "delete": request.POST.get(f"{item_prefix}-DELETE") == "1",
             })
 
@@ -439,7 +441,7 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
 
             kept_item_ids.add(str(item.pk))
             has_item_or_file = True
-            total_amount += Decimal(item.line_total or 0)
+            total_amount += _money2(item.line_total or 0)
 
             if order.service_type == Order.SERVICE_FILM_ONLY:
                 total_pcs += Decimal("0")
@@ -782,12 +784,12 @@ def order_create(request):
                         is_edit=False,
                     )
 
-                    discount_amount = _decimal_or_zero(request.POST.get("discount_amount"))
-                    shipping_fee = _decimal_or_zero(request.POST.get("shipping_fee"))
-                    deposit_amount = _decimal_or_zero(request.POST.get("deposit_amount"))
-                    paid_amount = _decimal_or_zero(request.POST.get("paid_amount"))
+                    discount_amount = _money2(request.POST.get("discount_amount"))
+                    shipping_fee = _money2(request.POST.get("shipping_fee"))
+                    deposit_amount = _money2(request.POST.get("deposit_amount"))
+                    paid_amount = _money2(request.POST.get("paid_amount"))
 
-                    order.total_amount = total_amount - discount_amount + shipping_fee
+                    order.total_amount = _money2(total_amount - discount_amount + shipping_fee)
                     order.deposit_amount = deposit_amount
                     order.paid_amount = paid_amount
                     order.total_pcs = total_pcs
@@ -816,8 +818,6 @@ def order_create(request):
                             item.done_qty = item.quantity
                             item.save(update_fields=["done_qty"])
 
-                    # FULL and RETAIL deduct stock.
-                    # FILM_ONLY and PRINT_HEATPRESS do NOT deduct stock.
                     if order.service_type in [Order.SERVICE_FULL, Order.SERVICE_RETAIL]:
                         deduct_stock_for_order(order, allow_shortage=True)
 
@@ -1091,12 +1091,12 @@ def order_edit(request, pk):
                         is_edit=True,
                     )
 
-                    discount_amount = _decimal_or_zero(request.POST.get("discount_amount"))
-                    shipping_fee = _decimal_or_zero(request.POST.get("shipping_fee"))
-                    deposit_amount = _decimal_or_zero(request.POST.get("deposit_amount"))
-                    paid_amount = _decimal_or_zero(request.POST.get("paid_amount"))
+                    discount_amount = _money2(request.POST.get("discount_amount"))
+                    shipping_fee = _money2(request.POST.get("shipping_fee"))
+                    deposit_amount = _money2(request.POST.get("deposit_amount"))
+                    paid_amount = _money2(request.POST.get("paid_amount"))
 
-                    order.total_amount = total_amount - discount_amount + shipping_fee
+                    order.total_amount = _money2(total_amount - discount_amount + shipping_fee)
                     order.deposit_amount = deposit_amount
                     order.paid_amount = paid_amount
                     order.total_pcs = total_pcs
@@ -1154,7 +1154,6 @@ def order_edit(request, pk):
             **_order_form_context_base(),
         },
     )
-
 
 @login_required
 @permission_required("orders.delete_order", raise_exception=True)
@@ -1339,7 +1338,7 @@ def customer_payment_list(request):
     # ===== PAYMENT UPDATE =====
     if request.method == "POST":
         order_id = request.POST.get("order_id")
-        add_paid = Decimal(request.POST.get("add_paid") or "0")
+        add_paid = _money2(request.POST.get("add_paid"))
 
         if add_paid <= 0:
             messages.error(request, "Please enter payment amount.")
@@ -1347,7 +1346,7 @@ def customer_payment_list(request):
 
         order = get_object_or_404(Order, pk=order_id, is_deleted=False)
 
-        order.paid_amount = Decimal(order.paid_amount or 0) + add_paid
+        order.paid_amount = _money2(Decimal(order.paid_amount or 0) + add_paid)
         order.save(update_fields=["paid_amount"])
 
         messages.success(request, f"Payment updated for {order.order_no}.")
