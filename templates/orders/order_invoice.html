@@ -30,24 +30,13 @@ html, body {
     margin: 0 auto;
 }
 
-/* THEME */
-{% if order.order_type == "KAMPU" %}
-:root {
-    --brand: #063949;
-    --soft: #eef9ff;
-    --light: #e0f2fe;
-}
-.brand-logo-text { color: #063949; }
-{% else %}
+/* NIRON THEME */
 :root {
     --brand: #8b451f;
     --soft: #fbf3ec;
     --light: #f7eee8;
 }
-.brand-logo-text { color: #8b451f; }
-{% endif %}
 
-/* HEADER */
 .header {
     display: flex;
     justify-content: space-between;
@@ -60,6 +49,7 @@ html, body {
     font-size: 58px;
     line-height: .95;
     font-weight: 900;
+    color: var(--brand);
 }
 
 .subtitle {
@@ -84,7 +74,6 @@ html, body {
     color: #6b7280;
 }
 
-/* INFO */
 .info-grid {
     display: grid;
     grid-template-columns: 1.15fr .85fr;
@@ -112,7 +101,6 @@ html, body {
     margin-bottom: 7px;
 }
 
-/* DESIGN */
 .design-card {
     margin-top: 8mm;
     border: 1px solid #e5e7eb;
@@ -176,7 +164,6 @@ html, body {
     text-align: center;
 }
 
-/* TABLE */
 .item-table {
     width: 100%;
     border-collapse: collapse;
@@ -197,15 +184,9 @@ html, body {
     border-bottom: 1px dashed #d1d5db;
 }
 
-.text-right {
-    text-align: right;
-}
+.text-right { text-align: right; }
+.text-center { text-align: center; }
 
-.text-center {
-    text-align: center;
-}
-
-/* BOTTOM */
 .bottom-section {
     display: grid;
     grid-template-columns: 1fr 78mm;
@@ -240,7 +221,6 @@ html, body {
     color: var(--brand);
 }
 
-/* SIGNATURE */
 .signature-area {
     min-height: 45mm;
 }
@@ -298,19 +278,6 @@ html, body {
     color: #6b7280;
     margin-top: 3px;
 }
-
-@media print {
-    html, body {
-        width: 210mm;
-        height: 297mm;
-    }
-
-    .invoice-page {
-        margin: 0;
-        width: 210mm;
-        min-height: 297mm;
-    }
-}
 </style>
 </head>
 
@@ -319,13 +286,7 @@ html, body {
 
     <div class="header">
         <div>
-            <div class="brand-logo-text">
-                {% if order.order_type == "KAMPU" %}
-                    Kampu
-                {% else %}
-                    Niron
-                {% endif %}
-            </div>
+            <div class="brand-logo-text">Niron</div>
             <div class="subtitle">Custom Printing Invoice</div>
         </div>
 
@@ -392,7 +353,7 @@ html, body {
 
                     {% elif order.service_type == "RETAIL" %}
                     <tr>
-                        <th>Item</th>
+                        <th>Item / Material</th>
                         <th>Color</th>
                         <th>Size</th>
                         <th class="text-center">Qty</th>
@@ -402,7 +363,7 @@ html, body {
 
                     {% else %}
                     <tr>
-                        <th>Item</th>
+                        <th>Shirt Item</th>
                         <th>Color</th>
                         <th>Size</th>
                         <th class="text-center">Qty</th>
@@ -452,7 +413,15 @@ html, body {
 
                         {% else %}
                         <tr>
-                            <td>{{ item.shirt_item|default:item.description|default:"-" }}</td>
+                            <td>
+                                {% if item.shirt_item %}
+                                    {{ item.shirt_item }}
+                                {% elif item.description %}
+                                    {{ item.description }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
                             <td>{{ item.color|default:"-" }}</td>
                             <td>{{ item.size|default:"-" }}</td>
                             <td class="text-center">{{ item.quantity|floatformat:0 }}</td>
@@ -495,9 +464,15 @@ html, body {
             <div class="signature-line"></div>
 
             <div class="issue-box">
-                <div class="issue-label">Issue By</div>
-                <div class="issue-name">
-                    {% if order.created_by %}
+                <span class="issue-label">Issue By</span>
+                <span class="issue-name">
+                    {% if printed_by %}
+                        {% if printed_by.get_full_name %}
+                            {{ printed_by.get_full_name }}
+                        {% else %}
+                            {{ printed_by.username }}
+                        {% endif %}
+                    {% elif order.created_by %}
                         {% if order.created_by.get_full_name %}
                             {{ order.created_by.get_full_name }}
                         {% else %}
@@ -506,8 +481,8 @@ html, body {
                     {% else %}
                         -
                     {% endif %}
-                </div>
-                <div class="issue-date">{{ order.created_at|date:"Y-m-d, g:i a" }}</div>
+                </span>
+                <div class="issue-date">{% now "Y-m-d, g:i a" %}</div>
             </div>
         </div>
 
