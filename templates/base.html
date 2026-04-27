@@ -582,27 +582,11 @@
     </button>
 
     <div class="nav-submenu" id="menu-finance">
-
-        {% if perms.finance.view_expense_summary_nav %}
-        <a class="nav-link" href="/expenses/">Expense Summary</a>
-        {% endif %}
-
-        {% if perms.finance.view_other_expense_nav %}
-        <a class="nav-link" href="/expenses/other/">Other Expense</a>
-        {% endif %}
-
-        {% if perms.finance.view_batch_expense_nav %}
-        <a class="nav-link" href="/expenses/batch/">Batch Expense</a>
-        {% endif %}
-
-        {% if perms.finance.view_operating_expense_nav %}
-        <a class="nav-link" href="/expenses/operating/">Operating Expense</a>
-        {% endif %}
-
-        {% if perms.finance.view_profit_dashboard_nav %}
-        <a class="nav-link" href="/profit-dashboard/">Profit Dashboard</a>
-        {% endif %}
-
+        <a class="nav-link" href="/finance/expenses/">Expense Summary</a>
+        <a class="nav-link" href="/finance/expenses/other/">Other Expense</a>
+        <a class="nav-link" href="/finance/expenses/batch/">Batch Expense</a>
+        <a class="nav-link" href="/finance/expenses/operating/">Operating Expense</a>
+        <a class="nav-link" href="/finance/profit-dashboard/">Profit Dashboard</a>
     </div>
 </div>
 {% endif %}
