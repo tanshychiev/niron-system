@@ -452,13 +452,11 @@ html, body {
             <div class="signature-label">Signature</div>
 
             <div class="signature-space">
-                {% if printed_signature_url %}
-                    <img src="{{ printed_signature_url }}" class="signature-img">
-                {% elif signature_url %}
-                    <img src="{{ signature_url }}" class="signature-img">
-                {% else %}
-                    No Signature
-                {% endif %}
+               {% if signature_url %}
+    <img src="{{ signature_url }}" class="signature-img">
+{% else %}
+    No Signature
+{% endif %}
             </div>
 
             <div class="signature-line"></div>

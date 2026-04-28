@@ -11,6 +11,7 @@ from customers.models import Customer
 from decimal import Decimal, ROUND_HALF_UP
 from inventory.models import Color, InventoryItem, Size
 from openpyxl import Workbook
+from django.templatetags.static import static
 
 from django.template.loader import render_to_string
 from playwright.sync_api import sync_playwright
@@ -1002,24 +1003,51 @@ def production_update(request, pk):
 
     return redirect("production_detail", pk=order.pk)
 
-@login_required
-@permission_required("orders.view_order", raise_exception=True)
-def order_invoice(request, pk):
-    order = get_object_or_404(_get_prefetched_order_queryset(), pk=pk)
-
-    template = (
+def _get_invoice_template(order):
+    return (
         "orders/order_invoice_kampu.html"
         if (order.order_type or "").upper() == "KAMPU"
         else "orders/order_invoice.html"
     )
 
+
+def _get_invoice_logo_path(order):
+    if (order.order_type or "").upper() == "KAMPU":
+        return "img/kampu_logo.png"
+    return "img/niron_logo.png"
+
+
+def _get_user_signature_url(request):
+    try:
+        profile = getattr(request.user, "profile", None)
+        signature = getattr(profile, "signature", None)
+        if signature:
+            return request.build_absolute_uri(signature.url)
+    except Exception:
+        pass
+    return None
+
+
+def _get_invoice_context(request, order, print_mode=False):
+    return {
+        "order": order,
+        "print_mode": print_mode,
+        "printed_by": request.user,
+        "logo_url": request.build_absolute_uri(static(_get_invoice_logo_path(order))),
+        "signature_url": _get_user_signature_url(request),
+    }
+
+
+@login_required
+@permission_required("orders.view_order", raise_exception=True)
+def order_invoice(request, pk):
+    order = get_object_or_404(_get_prefetched_order_queryset(), pk=pk)
+    template = _get_invoice_template(order)
+
     return render(
         request,
         template,
-        {
-            "order": order,
-            "printed_by": request.user,
-        },
+        _get_invoice_context(request, order, print_mode=False),
     )
 
 
@@ -1027,20 +1055,11 @@ def order_invoice(request, pk):
 @permission_required("orders.view_order", raise_exception=True)
 def order_invoice_pdf(request, pk):
     order = get_object_or_404(_get_prefetched_order_queryset(), pk=pk)
-
-    template = (
-        "orders/order_invoice_kampu.html"
-        if (order.order_type or "").upper() == "KAMPU"
-        else "orders/order_invoice.html"
-    )
+    template = _get_invoice_template(order)
 
     html = render_to_string(
         template,
-        {
-            "order": order,
-            "print_mode": True,
-            "printed_by": request.user,
-        },
+        _get_invoice_context(request, order, print_mode=True),
         request=request,
     )
 
@@ -1050,7 +1069,6 @@ def order_invoice_pdf(request, pk):
 
         page.set_content(html, wait_until="networkidle")
         page.emulate_media(media="screen")
-
         page.wait_for_timeout(1500)
 
         pdf = page.pdf(
@@ -1073,6 +1091,7 @@ def order_invoice_pdf(request, pk):
     response = HttpResponse(pdf, content_type="application/pdf")
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
     return response
+
 
 @login_required
 @permission_required("orders.change_order", raise_exception=True)
@@ -1262,20 +1281,11 @@ def order_trash_list(request):
 @permission_required("orders.view_order", raise_exception=True)
 def order_invoice_png(request, pk):
     order = get_object_or_404(_get_prefetched_order_queryset(), pk=pk)
-
-    template = (
-        "orders/order_invoice_kampu.html"
-        if (order.order_type or "").upper() == "KAMPU"
-        else "orders/order_invoice.html"
-    )
+    template = _get_invoice_template(order)
 
     html = render_to_string(
         template,
-        {
-            "order": order,
-            "print_mode": True,
-            "printed_by": request.user,
-        },
+        _get_invoice_context(request, order, print_mode=True),
         request=request,
     )
 

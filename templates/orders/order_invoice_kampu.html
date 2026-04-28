@@ -187,7 +187,7 @@ html, body {
 
 .bottom-grid {
     display: grid;
-    grid-template-columns: 1fr 75mm;
+    grid-template-columns: 60mm 1fr;
     gap: 5mm;
     margin-top: 3mm;
 }
@@ -294,10 +294,9 @@ html, body {
 <body>
 <div class="page">
 
-    <div class="header">
-        <div class="logo">
-            <img src="{% static 'img/kampu_logo.png' %}" alt="Kampu Kolor">
-        </div>
+    <div class="header"><div class="logo">
+    <img src="{{ logo_url }}" alt="Kampu Logo">
+</div>
 
         <div class="invoice-head">
             <h1>INVOICE</h1>
@@ -440,13 +439,11 @@ html, body {
                 </div>
 
                 <div class="signature-box">
-                    {% if printed_signature_url %}
-                        <img src="{{ printed_signature_url }}" alt="Signature">
-                    {% elif signature_url %}
-                        <img src="{{ signature_url }}" alt="Signature">
-                    {% else %}
-                        No Signature
-                    {% endif %}
+                    {% if signature_url %}
+    <img src="{{ signature_url }}" alt="Signature">
+{% else %}
+    No Signature
+{% endif %}
                 </div>
             </div>
 
