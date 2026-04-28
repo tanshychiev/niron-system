@@ -30,6 +30,9 @@ from .services import restore_stock_for_order, deduct_stock_for_order
 import re
 from openpyxl.styles import Font, PatternFill
 
+import os
+from django.conf import settings
+
 
 def _safe_download_name(value, fallback="file"):
     value = str(value or "").strip()
@@ -1029,11 +1032,18 @@ def _get_user_signature_url(request):
 
 
 def _get_invoice_context(request, order, print_mode=False):
+    logo_path = _get_invoice_logo_path(order)
+
+    if print_mode:
+        logo_url = "file://" + os.path.join(settings.STATIC_ROOT, logo_path)
+    else:
+        logo_url = request.build_absolute_uri(static(logo_path))
+
     return {
         "order": order,
         "print_mode": print_mode,
         "printed_by": request.user,
-        "logo_url": request.build_absolute_uri(static(_get_invoice_logo_path(order))),
+        "logo_url": logo_url,
         "signature_url": _get_user_signature_url(request),
     }
 
