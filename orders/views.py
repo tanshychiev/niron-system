@@ -13,6 +13,7 @@ from inventory.models import Color, InventoryItem, Size
 from openpyxl import Workbook
 from django.templatetags.static import static
 
+
 from django.template.loader import render_to_string
 from playwright.sync_api import sync_playwright
 
@@ -918,7 +919,6 @@ def order_detail(request, pk):
 def production_detail(request, pk):
     order = get_object_or_404(_get_prefetched_order_queryset(), pk=pk, is_deleted=False)
 
-    # ✅ ALWAYS calculate from items
     total_pcs = order.items.aggregate(total=Sum("quantity"))["total"] or Decimal("0")
     done_pcs = order.items.aggregate(total=Sum("done_qty"))["total"] or Decimal("0")
 
@@ -934,6 +934,7 @@ def production_detail(request, pk):
             "total_pcs": total_pcs,
             "done_pcs": done_pcs,
             "remaining_pcs": remaining_pcs,
+            "now": timezone.localdate(),   # ✅ ADD THIS
         },
     )
 
@@ -1258,6 +1259,7 @@ def order_trash(request, pk):
         return redirect("order_trash_list")
 
     return redirect("order_detail", pk=order.pk)
+
 @login_required
 @permission_required("orders.change_order", raise_exception=True)
 @transaction.atomic
@@ -1270,7 +1272,6 @@ def order_restore(request, pk):
         order.deleted_by = None
         order.deleted_reason = ""
 
-        # Restore = create that order again
         order.status = Order.STATUS_PENDING
         order.done_pcs = Decimal("0")
 
@@ -1283,7 +1284,11 @@ def order_restore(request, pk):
             "done_pcs",
         ])
 
-        if not order.stock_deducted:
+        # 🟢 ALWAYS deduct again for FULL + RETAIL
+        if order.service_type in [
+            Order.SERVICE_FULL,
+            Order.SERVICE_RETAIL,
+        ]:
             deduct_stock_for_order(order, allow_shortage=True)
 
         messages.success(request, f"Order {order.order_no} restored and stock deducted again.")

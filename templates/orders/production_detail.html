@@ -40,7 +40,7 @@
             <div class="mini-label">Deadline</div>
             <div class="mini-value">
                 {% if order.deadline %}
-                    {{ order.deadline|date:"Y-m-d H:i" }}
+                    {{ order.deadline|date:"Y-m-d" }}
                 {% else %}
                     -
                 {% endif %}
