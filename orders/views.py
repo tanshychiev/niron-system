@@ -846,7 +846,13 @@ def order_create(request):
                             item.done_qty = item.quantity
                             item.save(update_fields=["done_qty"])
 
-                    if order.service_type in [Order.SERVICE_FULL, Order.SERVICE_RETAIL]:
+                    # ✅ Stock deduct only FULL + RETAIL
+                    # ✅ FILM_ONLY no stock deduct
+                    # ✅ PRINT_HEATPRESS no stock deduct
+                    if order.service_type in [
+                        Order.SERVICE_FULL,
+                        Order.SERVICE_RETAIL,
+                    ]:
                         deduct_stock_for_order(order, allow_shortage=True)
 
                     _log_order_history(
@@ -1133,6 +1139,11 @@ def order_edit(request, pk):
         if form.is_valid():
             try:
                 with transaction.atomic():
+
+                    # 🔴 STEP 1: restore old stock
+                    if order.stock_deducted:
+                        restore_stock_for_order(order)
+
                     order = form.save(commit=False)
                     order.customer = _get_or_create_customer_from_request(request)
                     order.save()
@@ -1182,6 +1193,13 @@ def order_edit(request, pk):
                         "done_pcs",
                         "status",
                     ])
+
+                    # 🟢 STEP 2: deduct new stock
+                    if order.service_type in [
+                        Order.SERVICE_FULL,
+                        Order.SERVICE_RETAIL,
+                    ]:
+                        deduct_stock_for_order(order, allow_shortage=True)
 
                     after_order = _snapshot_order(order)
                     _log_order_changes(order, before_order, after_order, request.user)
@@ -1272,6 +1290,7 @@ def order_restore(request, pk):
         return redirect("order_detail", pk=order.pk)
 
     return redirect("order_trash_list")
+
 @login_required
 @permission_required("orders.view_order", raise_exception=True)
 def order_trash_list(request):

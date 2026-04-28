@@ -1061,7 +1061,7 @@
                                         </div>
 
                                         <div class="field col-shirt service-full-only">
-                                            <select name="design-{{ forloop.parentloop.counter0 }}-item-{{ forloop.counter0 }}-shirt_item_full" class="form-select shirt-select">
+                                            <select name="design-{{ forloop.parentloop.counter0 }}-item-{{ forloop.counter0 }}-shirt_item" class="form-select shirt-select">
                                                 <option value="">---------</option>
                                                 {% for opt in shirt_items %}
                                                 <option value="{{ opt.id }}" {% if item.shirt_item_id == opt.id %}selected{% endif %}>{{ opt }}</option>
@@ -1147,7 +1147,7 @@
                                         </div>
 
                                         <div class="field col-shirt service-full-only">
-                                            <select name="design-{{ forloop.parentloop.counter0 }}-item-0-shirt_item_full" class="form-select shirt-select">
+                                            <select name="design-{{ forloop.parentloop.counter0 }}-item-0-shirt_item" class="form-select shirt-select">
                                                 <option value="">---------</option>
                                                 {% for opt in shirt_items %}
                                                 <option value="{{ opt.id }}">{{ opt }}</option>
@@ -1304,7 +1304,7 @@
                                         </div>
 
                                         <div class="field col-shirt service-full-only">
-                                            <select name="design-0-item-0-shirt_item_full" class="form-select shirt-select">
+                                            <select name="design-0-item-0-shirt_item" class="form-select shirt-select">
                                                 <option value="">---------</option>
                                                 {% for opt in shirt_items %}
                                                 <option value="{{ opt.id }}">{{ opt }}</option>
@@ -1541,7 +1541,7 @@
             </div>
 
             <div class="field col-shirt service-full-only">
-                <select name="design-__DESIGN_INDEX__-item-__ITEM_INDEX__-shirt_item_full" class="form-select shirt-select">
+                <select name="design-__DESIGN_INDEX__-item-__ITEM_INDEX__-shirt_item" class="form-select shirt-select">
                     <option value="">---------</option>
                     {% for opt in shirt_items %}
                     <option value="{{ opt.id }}">{{ opt }}</option>
@@ -1867,7 +1867,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const value = retailItem?.value || "";
         const option = retailItem?.selectedOptions ? retailItem.selectedOptions[0] : null;
         const parts = value.split(":");
-        const type = parts[0] || "shirt";
+        const type = parts[0] || "";
         const id = parts[1] || "";
 
         row.classList.remove("mode-shirt", "mode-material");
@@ -1884,6 +1884,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         if (type === "material") {
             row.classList.add("mode-material");
+
             if (materialHidden) materialHidden.value = id;
             if (unitNameView) unitNameView.value = option?.dataset?.unit || "pcs";
 
@@ -1894,13 +1895,16 @@ document.addEventListener("DOMContentLoaded", function () {
                 colorSelect.value = "";
                 colorSelect.disabled = false;
             }
+
             if (sizeSelect) {
                 sizeSelect.value = "";
                 sizeSelect.disabled = false;
             }
-        } else {
+        } else if (type === "shirt") {
             row.classList.add("mode-shirt");
+
             if (shirtHidden) shirtHidden.value = id;
+            if (shirtSelect) shirtSelect.value = id;
             if (unitNameView) unitNameView.value = "pcs";
 
             colorBox?.classList.remove("is-hidden");
@@ -1908,6 +1912,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
             if (colorSelect) colorSelect.disabled = false;
             if (sizeSelect) sizeSelect.disabled = false;
+        } else {
+            row.classList.add("mode-shirt");
+
+            if (unitNameView) unitNameView.value = "pcs";
+            colorBox?.classList.remove("is-hidden");
+            sizeBox?.classList.remove("is-hidden");
         }
     }
 
@@ -1978,7 +1988,6 @@ document.addEventListener("DOMContentLoaded", function () {
             }
 
             if (serviceType === "RETAIL") {
-                if (shirtSelect) shirtSelect.value = "";
                 if (filmSelect) filmSelect.value = "";
                 if (filmMeterInput) filmMeterInput.value = "";
                 applyRetailItemMode(row);
@@ -2265,6 +2274,7 @@ document.addEventListener("DOMContentLoaded", function () {
             const block = wrapper.firstElementChild;
             designsContainer.appendChild(block);
 
+            refreshItemNames(block);
             bindDesignEvents(block);
             updateDesignMeta();
             applyServiceTypeLayout();
@@ -2331,6 +2341,14 @@ document.addEventListener("DOMContentLoaded", function () {
             let hasError = false;
             let errorMessage = "";
 
+            document.querySelectorAll(".design-block").forEach(block => {
+                refreshItemNames(block);
+            });
+
+            document.querySelectorAll(".item-row").forEach(row => {
+                applyRetailItemMode(row);
+            });
+
             if (serviceType !== "FILM_ONLY") {
                 document.querySelectorAll(".qty-input").forEach(input => {
                     forceQtyInteger(input);
@@ -2373,7 +2391,7 @@ document.addEventListener("DOMContentLoaded", function () {
                         errorMessage = "Retail Sale: choose Item, then fill Qty and Unit Price.";
                     }
 
-                    if (retailMode === "shirt" && (!retailShirt || !color || !size)) {
+                    if (retailMode === "shirt" && (!retailShirt || !shirt || !color || !size)) {
                         hasError = true;
                         errorMessage = "Retail shirt sale requires Item, Color, and Size.";
                     }
@@ -2401,4 +2419,5 @@ document.addEventListener("DOMContentLoaded", function () {
     updateTotals();
 });
 </script>
+
 {% endblock %}
