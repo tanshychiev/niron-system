@@ -32,7 +32,23 @@ from openpyxl.styles import Font, PatternFill
 
 import os
 from django.conf import settings
+import base64
 
+def _image_to_base64_data_uri(path):
+    try:
+        with open(path, "rb") as f:
+            data = base64.b64encode(f.read()).decode("utf-8")
+
+        ext = os.path.splitext(path)[1].lower()
+        mime = "image/png"
+        if ext in [".jpg", ".jpeg"]:
+            mime = "image/jpeg"
+        elif ext == ".webp":
+            mime = "image/webp"
+
+        return f"data:{mime};base64,{data}"
+    except Exception:
+        return ""
 
 def _safe_download_name(value, fallback="file"):
     value = str(value or "").strip()
@@ -1034,8 +1050,10 @@ def _get_user_signature_url(request):
 def _get_invoice_context(request, order, print_mode=False):
     logo_path = _get_invoice_logo_path(order)
 
-    if print_mode:
-        logo_url = "file://" + os.path.join(settings.STATIC_ROOT, logo_path)
+    logo_file_path = os.path.join(settings.STATIC_ROOT, logo_path)
+
+    if os.path.exists(logo_file_path):
+        logo_url = _image_to_base64_data_uri(logo_file_path)
     else:
         logo_url = request.build_absolute_uri(static(logo_path))
 
