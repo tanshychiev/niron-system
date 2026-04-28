@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+
+{% block title %}Payment Detail{% endblock %}
+{% block page_title %}Payment Detail{% endblock %}
+{% block page_subtitle %}Payment history and undo records{% endblock %}
+
+{% block top_actions %}
+<a href="{% url 'customer_payment_list' %}" class="btn btn-light">Back to Payments</a>
+{% endblock %}
+
+{% block content %}
+<style>
+.payment-detail-grid {
+    display:grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap:14px;
+    margin-bottom:18px;
+}
+
+.pay-card {
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:18px;
+    padding:16px;
+    box-shadow:var(--shadow);
+}
+
+.pay-label {
+    font-size:12px;
+    font-weight:800;
+    color:var(--muted);
+    text-transform:uppercase;
+    margin-bottom:8px;
+}
+
+.pay-value {
+    font-size:22px;
+    font-weight:900;
+    color:var(--text);
+}
+
+.action-pay {
+    color:#16a34a;
+    font-weight:900;
+}
+
+.action-undo {
+    color:#dc2626;
+    font-weight:900;
+}
+
+@media (max-width: 900px) {
+    .payment-detail-grid {
+        grid-template-columns:1fr 1fr;
+    }
+}
+
+@media (max-width: 600px) {
+    .payment-detail-grid {
+        grid-template-columns:1fr;
+    }
+}
+</style>
+
+<div class="form-card">
+    <h2 style="margin-top:0;">{{ order.order_no }}</h2>
+
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;">
+        <div><strong>Customer:</strong> {{ order.customer_name|default:"-" }}</div>
+        <div><strong>Phone:</strong> {{ order.phone|default:"-" }}</div>
+        <div><strong>Shop:</strong> {{ order.get_order_type_display }}</div>
+        <div><strong>Service:</strong> {{ order.get_service_type_display }}</div>
+        <div><strong>Created:</strong> {{ order.created_at|date:"Y-m-d H:i" }}</div>
+        <div><strong>Status:</strong> {{ order.get_status_display }}</div>
+    </div>
+</div>
+
+<div class="payment-detail-grid">
+    <div class="pay-card">
+        <div class="pay-label">Total</div>
+        <div class="pay-value">${{ total }}</div>
+    </div>
+
+    <div class="pay-card">
+        <div class="pay-label">Deposit</div>
+        <div class="pay-value">${{ deposit }}</div>
+    </div>
+
+    <div class="pay-card">
+        <div class="pay-label">Paid</div>
+        <div class="pay-value">${{ paid }}</div>
+    </div>
+
+    <div class="pay-card">
+        <div class="pay-label">Balance</div>
+        <div class="pay-value">${{ balance }}</div>
+    </div>
+</div>
+
+<div class="table-card">
+    <div style="padding:16px 18px;border-bottom:1px solid var(--line);">
+        <h2 style="margin:0;">Payment History</h2>
+    </div>
+
+    <table class="app-table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Action</th>
+                <th>Amount</th>
+                <th>Reason</th>
+                <th>Recorded By</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            {% for log in logs %}
+            <tr>
+                <td>{{ log.created_at|date:"Y-m-d H:i" }}</td>
+
+                <td>
+                    {% if log.action == "PAY" %}
+                        <span class="action-pay">Pay</span>
+                    {% elif log.action == "UNDO" %}
+                        <span class="action-undo">Undo</span>
+                    {% else %}
+                        {{ log.action }}
+                    {% endif %}
+                </td>
+
+                <td>${{ log.amount }}</td>
+                <td>{{ log.reason|default:"-" }}</td>
+
+                <td>
+                    {% if log.created_by %}
+                        {{ log.created_by.username }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="5">No payment history yet.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

@@ -2,7 +2,7 @@
 
 {% block title %}Customer Payments{% endblock %}
 {% block page_title %}Customer Payments{% endblock %}
-{% block page_subtitle %}Track unpaid and partial payments first{% endblock %}
+{% block page_subtitle %}Track unpaid, partial, paid, and payment history{% endblock %}
 
 {% block content %}
 
@@ -12,11 +12,13 @@
     justify-content:space-between;
     align-items:center;
     margin-bottom:16px;
+    gap:12px;
+    flex-wrap:wrap;
 }
 
 .payment-grid {
     display:grid;
-    grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr auto auto;
+    grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr 1fr auto auto;
     gap:10px;
     align-items:end;
 }
@@ -28,12 +30,55 @@
     font-weight:800;
     color:white;
 }
+
 .shop-niron { background:#9E7957; }
 .shop-kampu { background:#1E3A8A; }
+
+.pay-actions {
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    min-width:320px;
+}
+
+.pay-form,
+.undo-form {
+    display:flex;
+    gap:8px;
+    align-items:center;
+    flex-wrap:wrap;
+    margin:0;
+}
+
+.pay-form input,
+.undo-form input {
+    height:36px;
+    border-radius:10px;
+}
+
+.order-link {
+    font-weight:900;
+    text-decoration:none;
+    color:#111827;
+}
+
+.order-link:hover {
+    text-decoration:underline;
+}
 
 @media (max-width: 1100px) {
     .payment-grid {
         grid-template-columns:1fr 1fr;
+    }
+}
+
+@media (max-width: 700px) {
+    .payment-grid {
+        grid-template-columns:1fr;
+    }
+
+    .pay-actions {
+        min-width:0;
     }
 }
 </style>
@@ -43,26 +88,20 @@
         <h2 style="margin:0;">Search</h2>
 
         <a class="btn-primary"
-           href="{% url 'customer_payment_export_excel' %}?keyword={{ keyword|urlencode }}&payment_status={{ payment_status|urlencode }}&shop_type={{ shop_type|urlencode }}&created_date_from={{ created_date_from|urlencode }}&created_date_to={{ created_date_to|urlencode }}">
+           href="{% url 'customer_payment_export_excel' %}?keyword={{ keyword|urlencode }}&payment_status={{ payment_status|urlencode }}&shop_type={{ shop_type|urlencode }}&service_type={{ service_type|urlencode }}&created_date_from={{ created_date_from|urlencode }}&created_date_to={{ created_date_to|urlencode }}">
             Download Excel
         </a>
     </div>
 
     <form method="get" class="payment-grid">
-
         <input type="text" name="keyword" placeholder="Search order, customer, phone" value="{{ keyword }}">
 
-        <!-- ONLY 3 STATUS -->
         <select name="payment_status">
             <option value="UNPAID_PARTIAL" {% if payment_status == "UNPAID_PARTIAL" %}selected{% endif %}>
                 Unpaid + Partial Paid
             </option>
-            <option value="ALL" {% if payment_status == "ALL" %}selected{% endif %}>
-                All
-            </option>
-            <option value="PAID" {% if payment_status == "PAID" %}selected{% endif %}>
-                Paid
-            </option>
+            <option value="ALL" {% if payment_status == "ALL" %}selected{% endif %}>All</option>
+            <option value="PAID" {% if payment_status == "PAID" %}selected{% endif %}>Paid</option>
         </select>
 
         <select name="shop_type">
@@ -71,12 +110,23 @@
             <option value="KAMPU" {% if shop_type == "KAMPU" %}selected{% endif %}>Kampu</option>
         </select>
 
+        <select name="service_type">
+            <option value="">All Services</option>
+            <option value="EXCEPT_FILM" {% if service_type == "EXCEPT_FILM" %}selected{% endif %}>
+                All (Except Film)
+            </option>
+            {% for value,label in service_type_choices %}
+                <option value="{{ value }}" {% if service_type == value %}selected{% endif %}>
+                    {{ label }}
+                </option>
+            {% endfor %}
+        </select>
+
         <input type="date" name="created_date_from" value="{{ created_date_from }}">
         <input type="date" name="created_date_to" value="{{ created_date_to }}">
 
         <button type="submit" class="btn-primary">Search</button>
         <a href="{% url 'customer_payment_list' %}" class="btn-secondary">Reset</a>
-
     </form>
 </div>
 
@@ -102,10 +152,15 @@
         <tbody>
             {% for row in rows %}
             <tr>
-                <td>{{ row.order.order_no }}</td>
+                <td>
+                    <a class="order-link" href="{% url 'customer_payment_detail' row.order.pk %}">
+                        {{ row.order.order_no }}
+                    </a>
+                </td>
+
                 <td>{{ row.order.created_at|date:"Y-m-d H:i" }}</td>
                 <td>{{ row.order.customer_name }}</td>
-                <td>{{ row.order.phone }}</td>
+                <td>{{ row.order.phone|default:"-" }}</td>
 
                 <td>
                     {% if row.order.order_type == "NIRON" %}
@@ -134,26 +189,57 @@
                 </td>
 
                 <td>
-                    {% if row.status == "PAID" %}
-                        <span style="color:#6b7280;">Completed</span>
-                    {% else %}
-                    <form method="post" style="display:flex;gap:8px;align-items:center;">
-                        {% csrf_token %}
-                        <input type="hidden" name="order_id" value="{{ row.order.id }}">
+                    <div class="pay-actions">
+                        {% if row.status != "PAID" %}
+                        <form method="post" class="pay-form">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="PAY">
+                            <input type="hidden" name="order_id" value="{{ row.order.id }}">
 
-                        <input 
-                            type="number" 
-                            step="0.01" 
-                            name="add_paid" 
-                            placeholder="Amount"
-                            style="width:110px;"
-                        >
+                            <input
+                                type="number"
+                                step="0.01"
+                                min="0.01"
+                                name="add_paid"
+                                placeholder="Amount"
+                                required
+                                style="width:110px;"
+                            >
 
-                        <button type="submit" class="btn btn-light">
-                            Pay
-                        </button>
-                    </form>
-                    {% endif %}
+                            <button type="submit" class="btn btn-light">Pay</button>
+                        </form>
+                        {% else %}
+                            <span style="color:#6b7280;font-weight:700;">Completed</span>
+                        {% endif %}
+
+                        {% if row.paid > 0 %}
+                        <form method="post" class="undo-form" onsubmit="return confirm('Undo this payment? Make sure reason is correct.');">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="UNDO">
+                            <input type="hidden" name="order_id" value="{{ row.order.id }}">
+
+                            <input
+                                type="number"
+                                step="0.01"
+                                min="0.01"
+                                name="undo_amount"
+                                placeholder="Undo"
+                                required
+                                style="width:90px;"
+                            >
+
+                            <input
+                                type="text"
+                                name="undo_reason"
+                                placeholder="Reason required"
+                                required
+                                style="width:140px;"
+                            >
+
+                            <button type="submit" class="btn btn-light">Undo</button>
+                        </form>
+                        {% endif %}
+                    </div>
                 </td>
             </tr>
             {% empty %}

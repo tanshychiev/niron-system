@@ -25,6 +25,7 @@ from .models import (
     OrderHistory,
     OrderItem,
     OrderProgress,
+    OrderPaymentLog,
 )
 from .services import restore_stock_for_order, deduct_stock_for_order
 
@@ -549,6 +550,7 @@ def order_list(request):
     keyword = (request.GET.get("keyword") or "").strip()
     status = (request.GET.get("status") or "").strip()
     order_type = (request.GET.get("order_type") or "").strip()
+    service_type = (request.GET.get("service_type") or "").strip()
     created_date_from = (request.GET.get("created_date_from") or "").strip()
     created_date_to = (request.GET.get("created_date_to") or "").strip()
     show_trash = request.GET.get("trash") == "1"
@@ -577,6 +579,12 @@ def order_list(request):
     if order_type:
         qs = qs.filter(order_type=order_type)
 
+    if service_type:
+        if service_type == "EXCEPT_FILM":
+            qs = qs.exclude(service_type=Order.SERVICE_FILM_ONLY)
+        else:
+            qs = qs.filter(service_type=service_type)
+
     if created_date_from:
         qs = qs.filter(created_at__date__gte=created_date_from)
 
@@ -588,7 +596,6 @@ def order_list(request):
     pending_count = qs.filter(status=Order.STATUS_PENDING).count()
     done_count = qs.filter(status=Order.STATUS_DONE).count()
 
-    # ✅ FIX: use DATE instead of datetime
     today = timezone.localdate()
 
     for order in qs:
@@ -599,28 +606,26 @@ def order_list(request):
         deposit_amount = Decimal(order.deposit_amount or 0)
         balance_amount = total_amount - deposit_amount - paid_amount
 
-        # ✅ FIX: compare date with date (no error anymore)
         is_late = bool(
             order.deadline
             and order.status != Order.STATUS_DONE
             and order.deadline < today
         )
 
-        rows.append(
-            {
-                "obj": order,
-                "cloth_qty": cloth_qty,
-                "film_meter": film_meter,
-                "balance_amount": balance_amount,
-                "is_late": is_late,
-            }
-        )
+        rows.append({
+            "obj": order,
+            "cloth_qty": cloth_qty,
+            "film_meter": film_meter,
+            "balance_amount": balance_amount,
+            "is_late": is_late,
+        })
 
     context = {
         "rows": rows,
         "keyword": keyword,
         "status": status,
         "order_type": order_type,
+        "service_type": service_type,
         "created_date_from": created_date_from,
         "created_date_to": created_date_to,
         "show_trash": show_trash,
@@ -629,6 +634,7 @@ def order_list(request):
         "done_count": done_count,
         "status_choices": getattr(Order, "STATUS_CHOICES", []),
         "order_type_choices": getattr(Order, "TYPE_CHOICES", []),
+        "service_type_choices": getattr(Order, "SERVICE_CHOICES", []),
     }
 
     return render(request, "orders/order_list.html", context)
@@ -645,6 +651,9 @@ def production_list(request):
         data["sort"] = ProductionFilterForm.SORT_DEADLINE_ASC
 
     form = ProductionFilterForm(data)
+
+    shop_type = (request.GET.get("shop_type") or "").strip()
+    service_type = (request.GET.get("service_type") or "").strip()
 
     qs = (
         Order.objects
@@ -676,6 +685,15 @@ def production_list(request):
         if deadline:
             qs = qs.filter(deadline=deadline)
 
+        if shop_type:
+            qs = qs.filter(order_type=shop_type)
+
+        if service_type:
+            if service_type == "EXCEPT_FILM":
+                qs = qs.exclude(service_type=Order.SERVICE_FILM_ONLY)
+            else:
+                qs = qs.filter(service_type=service_type)
+
         if sort == ProductionFilterForm.SORT_CREATED_DESC:
             qs = qs.order_by("-created_at", "-id")
         elif sort == ProductionFilterForm.SORT_CREATED_ASC:
@@ -685,16 +703,24 @@ def production_list(request):
         else:
             qs = qs.order_by("deadline", "id")
     else:
-        qs = qs.filter(
-            status__in=[Order.STATUS_PENDING, Order.STATUS_PROCESSING]
-        ).order_by("deadline", "id")
+        qs = qs.filter(status__in=[Order.STATUS_PENDING, Order.STATUS_PROCESSING])
+
+        if shop_type:
+            qs = qs.filter(order_type=shop_type)
+
+        if service_type:
+            if service_type == "EXCEPT_FILM":
+                qs = qs.exclude(service_type=Order.SERVICE_FILM_ONLY)
+            else:
+                qs = qs.filter(service_type=service_type)
+
+        qs = qs.order_by("deadline", "id")
 
     paginator = Paginator(qs, 50)
     page_obj = paginator.get_page(request.GET.get("page"))
     start_no = (page_obj.number - 1) * paginator.per_page
 
     rows = []
-
     total_project_pending = qs.count()
     total_cloth_done = Decimal("0")
     total_cloth_pending = Decimal("0")
@@ -710,16 +736,14 @@ def production_list(request):
         total_cloth_done += done_qty
         total_cloth_pending += remaining_qty
 
-        rows.append(
-            {
-                "no": start_no + idx,
-                "order": order,
-                "countdown_text": _format_countdown(order.deadline),
-                "status_color": _status_badge(order.status),
-                "total_qty": total_qty,
-                "done_qty": done_qty,
-            }
-        )
+        rows.append({
+            "no": start_no + idx,
+            "order": order,
+            "countdown_text": _format_countdown(order.deadline),
+            "status_color": _status_badge(order.status),
+            "total_qty": total_qty,
+            "done_qty": done_qty,
+        })
 
     return render(
         request,
@@ -732,9 +756,14 @@ def production_list(request):
             "total_project_pending": total_project_pending,
             "total_cloth_pending": total_cloth_pending,
             "total_cloth_done": total_cloth_done,
-            "now": timezone.now(),
+            "now": timezone.localdate(),
+            "shop_type": shop_type,
+            "service_type": service_type,
+            "shop_type_choices": getattr(Order, "TYPE_CHOICES", []),
+            "service_type_choices": getattr(Order, "SERVICE_CHOICES", []),
         },
     )
+
 @login_required
 @permission_required("orders.view_order", raise_exception=True)
 def order_list_export_excel(request):
@@ -1376,17 +1405,15 @@ def order_invoice_png(request, pk):
 @login_required
 @permission_required("orders.change_order", raise_exception=True)
 def customer_payment_list(request):
-    # ===== GET FILTERS =====
     keyword = (request.GET.get("keyword") or "").strip()
     payment_status = (request.GET.get("payment_status") or "UNPAID_PARTIAL").strip()
     shop_type = (request.GET.get("shop_type") or "").strip()
+    service_type = (request.GET.get("service_type") or "").strip()
     created_date_from = (request.GET.get("created_date_from") or "").strip()
     created_date_to = (request.GET.get("created_date_to") or "").strip()
 
-    # ===== BASE QUERY =====
     qs = Order.objects.filter(is_deleted=False).order_by("-created_at", "-id")
 
-    # ===== SEARCH =====
     if keyword:
         qs = qs.filter(
             Q(order_no__icontains=keyword)
@@ -1394,35 +1421,79 @@ def customer_payment_list(request):
             | Q(phone__icontains=keyword)
         )
 
-    # ===== SHOP FILTER =====
     if shop_type:
         qs = qs.filter(order_type=shop_type)
 
-    # ===== DATE FILTER =====
+    if service_type:
+        if service_type == "EXCEPT_FILM":
+            qs = qs.exclude(service_type=Order.SERVICE_FILM_ONLY)
+        else:
+            qs = qs.filter(service_type=service_type)
+
     if created_date_from:
         qs = qs.filter(created_at__date__gte=created_date_from)
 
     if created_date_to:
         qs = qs.filter(created_at__date__lte=created_date_to)
 
-    # ===== PAYMENT UPDATE =====
     if request.method == "POST":
+        action = request.POST.get("action")
         order_id = request.POST.get("order_id")
-        add_paid = _money2(request.POST.get("add_paid"))
-
-        if add_paid <= 0:
-            messages.error(request, "Please enter payment amount.")
-            return redirect("customer_payment_list")
-
         order = get_object_or_404(Order, pk=order_id, is_deleted=False)
 
-        order.paid_amount = _money2(Decimal(order.paid_amount or 0) + add_paid)
-        order.save(update_fields=["paid_amount"])
+        if action == "PAY":
+            add_paid = _money2(request.POST.get("add_paid"))
 
-        messages.success(request, f"Payment updated for {order.order_no}.")
-        return redirect("customer_payment_list")
+            if add_paid <= 0:
+                messages.error(request, "Please enter payment amount.")
+                return redirect("customer_payment_list")
 
-    # ===== BUILD TABLE =====
+            order.paid_amount = _money2(Decimal(order.paid_amount or 0) + add_paid)
+            order.save(update_fields=["paid_amount"])
+
+            OrderPaymentLog.objects.create(
+                order=order,
+                action=OrderPaymentLog.ACTION_PAY,
+                amount=add_paid,
+                reason="Payment received",
+                created_by=request.user,
+            )
+
+            messages.success(request, f"Payment added for {order.order_no}.")
+            return redirect("customer_payment_list")
+
+        if action == "UNDO":
+            undo_amount = _money2(request.POST.get("undo_amount"))
+            reason = (request.POST.get("undo_reason") or "").strip()
+
+            if undo_amount <= 0:
+                messages.error(request, "Undo amount must be greater than 0.")
+                return redirect("customer_payment_list")
+
+            if not reason:
+                messages.error(request, "Undo reason is required.")
+                return redirect("customer_payment_list")
+
+            current_paid = Decimal(order.paid_amount or 0)
+
+            if undo_amount > current_paid:
+                messages.error(request, "Undo amount cannot be bigger than paid amount.")
+                return redirect("customer_payment_list")
+
+            order.paid_amount = _money2(current_paid - undo_amount)
+            order.save(update_fields=["paid_amount"])
+
+            OrderPaymentLog.objects.create(
+                order=order,
+                action=OrderPaymentLog.ACTION_UNDO,
+                amount=undo_amount,
+                reason=reason,
+                created_by=request.user,
+            )
+
+            messages.success(request, f"Payment undo saved for {order.order_no}.")
+            return redirect("customer_payment_list")
+
     rows = []
 
     for order in qs:
@@ -1431,7 +1502,6 @@ def customer_payment_list(request):
         paid = Decimal(order.paid_amount or 0)
         balance = total - deposit - paid
 
-        # ===== STATUS =====
         if balance <= 0:
             status = "PAID"
         elif deposit > 0 or paid > 0:
@@ -1439,7 +1509,6 @@ def customer_payment_list(request):
         else:
             status = "UNPAID"
 
-        # ===== STATUS FILTER (THIS IS YOUR PART) =====
         if payment_status == "UNPAID_PARTIAL":
             if status not in ["UNPAID", "PARTIAL"]:
                 continue
@@ -1458,15 +1527,17 @@ def customer_payment_list(request):
             "status": status,
         })
 
-    # ===== RENDER =====
     return render(request, "orders/customer_payment_list.html", {
         "rows": rows,
         "keyword": keyword,
         "payment_status": payment_status,
         "shop_type": shop_type,
+        "service_type": service_type,
         "created_date_from": created_date_from,
         "created_date_to": created_date_to,
+        "service_type_choices": getattr(Order, "SERVICE_CHOICES", []),
     })
+
 @login_required
 @permission_required("orders.change_order", raise_exception=True)
 def customer_payment_export_excel(request):
@@ -1549,3 +1620,26 @@ def customer_payment_export_excel(request):
     response["Content-Disposition"] = 'attachment; filename="customer_payments.xlsx"'
     wb.save(response)
     return response
+
+@login_required
+@permission_required("orders.change_order", raise_exception=True)
+def customer_payment_detail(request, pk):
+    order = get_object_or_404(
+        Order.objects.prefetch_related("payment_logs__created_by"),
+        pk=pk,
+        is_deleted=False,
+    )
+
+    total = Decimal(order.total_amount or 0)
+    deposit = Decimal(order.deposit_amount or 0)
+    paid = Decimal(order.paid_amount or 0)
+    balance = total - deposit - paid
+
+    return render(request, "orders/customer_payment_detail.html", {
+        "order": order,
+        "total": total,
+        "deposit": deposit,
+        "paid": paid,
+        "balance": balance,
+        "logs": order.payment_logs.all().order_by("-created_at", "-id"),
+    })

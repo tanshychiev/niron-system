@@ -37,7 +37,7 @@
 
 .filter-grid {
     display: grid;
-    grid-template-columns: 1.4fr 1fr 1fr 1fr auto auto;
+    grid-template-columns: 1.2fr 1fr 1fr 1fr 1fr 1fr auto auto;
     gap: 14px;
     align-items: end;
 }
@@ -53,25 +53,10 @@
     font-weight: 800;
 }
 
-.status-red {
-    background: #fef2f2;
-    color: #dc2626;
-}
-
-.status-yellow {
-    background: #fff7ed;
-    color: #d97706;
-}
-
-.status-blue {
-    background: #eff6ff;
-    color: #2563eb;
-}
-
-.status-green {
-    background: #ecfdf5;
-    color: #16a34a;
-}
+.status-red { background: #fef2f2; color: #dc2626; }
+.status-yellow { background: #fff7ed; color: #d97706; }
+.status-blue { background: #eff6ff; color: #2563eb; }
+.status-green { background: #ecfdf5; color: #16a34a; }
 
 .progress-text {
     font-weight: 900;
@@ -88,9 +73,15 @@
     color: #111827;
 }
 
-@media (max-width: 1000px) {
+.small-muted {
+    color: #6b7280;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+@media (max-width: 1200px) {
     .filter-grid {
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: 1fr 1fr 1fr;
     }
 }
 
@@ -114,6 +105,38 @@
         <div class="field">
             <label>{{ form.status.label }}</label>
             {{ form.status }}
+        </div>
+
+        <div class="field">
+            <label>Shop Type</label>
+            <select name="shop_type">
+                <option value="">All Shops</option>
+                {% for value,label in shop_type_choices %}
+                    <option value="{{ value }}" {% if shop_type == value %}selected{% endif %}>
+                        {{ label }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="field">
+            <label>Service Type</label>
+            <select name="service_type">
+
+                <option value="">All Services</option>
+
+                <!-- ✅ NEW OPTION -->
+                <option value="EXCEPT_FILM"
+                    {% if service_type == "EXCEPT_FILM" %}selected{% endif %}>
+                    All (Except Film)
+                </option>
+
+                {% for value,label in service_type_choices %}
+                    <option value="{{ value }}" {% if service_type == value %}selected{% endif %}>
+                        {{ label }}
+                    </option>
+                {% endfor %}
+            </select>
         </div>
 
         <div class="field">
@@ -162,6 +185,8 @@
                 <th>No.</th>
                 <th>Order No</th>
                 <th>Customer</th>
+                <th>Shop</th>
+                <th>Service</th>
                 <th>Created Date</th>
                 <th>Deadline</th>
                 <th>Countdown</th>
@@ -182,6 +207,8 @@
                 </td>
 
                 <td>{{ row.order.customer_name|default:"-" }}</td>
+                <td>{{ row.order.get_order_type_display|default:"-" }}</td>
+                <td>{{ row.order.get_service_type_display|default:"-" }}</td>
 
                 <td>
                     {% if row.order.created_at %}
@@ -211,7 +238,7 @@
                     <span class="progress-text">
                         {{ row.done_qty|default:0|floatformat:0 }}/{{ row.total_qty|default:0|floatformat:0 }}
                     </span>
-                    <span style="color:#6B7280;font-size:12px;">pcs</span>
+                    <span class="small-muted">pcs</span>
                 </td>
 
                 <td>
@@ -230,7 +257,7 @@
             </tr>
             {% empty %}
             <tr>
-                <td colspan="8">No orders found.</td>
+                <td colspan="10">No orders found.</td>
             </tr>
             {% endfor %}
         </tbody>
@@ -244,13 +271,13 @@
 
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
             {% if page_obj.has_previous %}
-                <a class="btn-secondary" href="?q={{ request.GET.q|urlencode }}&status={{ request.GET.status|urlencode }}&deadline={{ request.GET.deadline|urlencode }}&sort={{ request.GET.sort|urlencode }}&page={{ page_obj.previous_page_number }}">
+                <a class="btn-secondary" href="?q={{ request.GET.q|urlencode }}&status={{ request.GET.status|urlencode }}&shop_type={{ request.GET.shop_type|urlencode }}&service_type={{ request.GET.service_type|urlencode }}&deadline={{ request.GET.deadline|urlencode }}&sort={{ request.GET.sort|urlencode }}&page={{ page_obj.previous_page_number }}">
                     Previous
                 </a>
             {% endif %}
 
             {% if page_obj.has_next %}
-                <a class="btn-secondary" href="?q={{ request.GET.q|urlencode }}&status={{ request.GET.status|urlencode }}&deadline={{ request.GET.deadline|urlencode }}&sort={{ request.GET.sort|urlencode }}&page={{ page_obj.next_page_number }}">
+                <a class="btn-secondary" href="?q={{ request.GET.q|urlencode }}&status={{ request.GET.status|urlencode }}&shop_type={{ request.GET.shop_type|urlencode }}&service_type={{ request.GET.service_type|urlencode }}&deadline={{ request.GET.deadline|urlencode }}&sort={{ request.GET.sort|urlencode }}&page={{ page_obj.next_page_number }}">
                     Next
                 </a>
             {% endif %}

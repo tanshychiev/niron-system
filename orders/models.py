@@ -6,6 +6,7 @@ from django.core.validators import MinValueValidator
 from django.db import models
 from customers.models import Customer
 
+
 from inventory.models import Color, InventoryBatchItem, InventoryItem, Size
 
 
@@ -75,9 +76,7 @@ class Order(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name="created_orders",
     )
-
     # ===== MONEY =====
     total_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     deposit_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
@@ -500,3 +499,52 @@ class OrderHistory(models.Model):
 
     def __str__(self):
         return f"{self.order.order_no} - {self.action} - {self.field_name}"
+    
+class OrderPaymentLog(models.Model):
+    ACTION_PAY = "PAY"
+    ACTION_UNDO = "UNDO"
+
+    ACTION_CHOICES = [
+        (ACTION_PAY, "Pay"),
+        (ACTION_UNDO, "Undo"),
+    ]
+
+    order = models.ForeignKey(
+        "Order",
+        on_delete=models.CASCADE,
+        related_name="payment_logs",
+    )
+
+    action = models.CharField(
+        max_length=10,
+        choices=ACTION_CHOICES,
+    )
+
+    amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+    )
+
+    reason = models.TextField(
+        blank=True,
+        default="",
+    )
+
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,   # ✅ BEST PRACTICE (not direct User)
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="payment_logs",
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+    )
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self):
+        return f"{self.order.order_no} | {self.action} | ${self.amount}"

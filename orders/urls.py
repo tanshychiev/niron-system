@@ -16,7 +16,7 @@ urlpatterns = [
     # ===== CUSTOMER PAYMENTS =====
     path("customer-payments/", views.customer_payment_list, name="customer_payment_list"),
     path("customer-payments/export-excel/", views.customer_payment_export_excel, name="customer_payment_export_excel"),
-
+    path("customer-payments/<int:pk>/", views.customer_payment_detail, name="customer_payment_detail"),
     # ===== INVOICE =====
     path("<int:pk>/invoice/", views.order_invoice, name="order_invoice"),
     path("<int:pk>/invoice/png/", views.order_invoice_png, name="order_invoice_png"),
@@ -29,4 +29,5 @@ urlpatterns = [
 
     # ===== ORDER DETAIL (LAST) =====
     path("<int:pk>/", views.order_detail, name="order_detail"),
+    
 ]

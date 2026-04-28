@@ -58,7 +58,7 @@
 
     .filter-grid {
         display: grid;
-        grid-template-columns: 1.3fr .8fr .8fr .8fr .8fr auto;
+        grid-template-columns: 1.3fr .8fr .8fr .9fr .8fr .8fr auto;
         gap: 12px;
         align-items: end;
     }
@@ -142,25 +142,10 @@
         font-weight: 900;
     }
 
-    .status-pending {
-        background: #fff7ed;
-        color: #d97706;
-    }
-
-    .status-processing {
-        background: #eff6ff;
-        color: #2563eb;
-    }
-
-    .status-done {
-        background: #ecfdf5;
-        color: #16a34a;
-    }
-
-    .status-cancel {
-        background: #fef2f2;
-        color: #dc2626;
-    }
+    .status-pending { background: #fff7ed; color: #d97706; }
+    .status-processing { background: #eff6ff; color: #2563eb; }
+    .status-done { background: #ecfdf5; color: #16a34a; }
+    .status-cancel { background: #fef2f2; color: #dc2626; }
 
     .late-text {
         color: #dc2626;
@@ -265,6 +250,19 @@
                         <option value="">All Type</option>
                         {% for value, label in order_type_choices %}
                             <option value="{{ value }}" {% if order_type == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="field">
+                    <label>Service Type</label>
+                    <select name="service_type">
+                        <option value="">All Services</option>
+                        <option value="EXCEPT_FILM" {% if service_type == "EXCEPT_FILM" %}selected{% endif %}>
+                            All (Except Film)
+                        </option>
+                        {% for value, label in service_type_choices %}
+                            <option value="{{ value }}" {% if service_type == value %}selected{% endif %}>{{ label }}</option>
                         {% endfor %}
                     </select>
                 </div>
