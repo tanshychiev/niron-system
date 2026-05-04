@@ -8,6 +8,122 @@
 
 {% block content %}
 <style>
+    .dashboard-hero {
+        background: linear-gradient(135deg, rgba(255,255,255,.92), rgba(255,248,229,.92));
+        border: 1px solid var(--line);
+        border-radius: 28px;
+        box-shadow: var(--shadow);
+        padding: 30px 24px;
+        margin-bottom: 22px;
+        text-align: center;
+    }
+
+    .dashboard-hero h1 {
+        margin: 0 0 8px;
+        font-size: 34px;
+        font-weight: 950;
+        color: var(--text);
+        letter-spacing: -1px;
+    }
+
+    .dashboard-hero p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 800;
+    }
+
+    .dashboard-filter-card {
+        background: rgba(255,255,255,.94);
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        box-shadow: var(--shadow);
+        padding: 18px;
+        margin-bottom: 22px;
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 14px;
+        flex-wrap: wrap;
+    }
+
+    .filter-left {
+        display: flex;
+        align-items: end;
+        gap: 14px;
+        flex-wrap: wrap;
+    }
+
+    .filter-group {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+    }
+
+    .filter-group label {
+        font-size: 12px;
+        font-weight: 900;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: .5px;
+    }
+
+    .filter-group input {
+        height: 44px;
+        min-width: 190px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: #fff;
+        padding: 0 13px;
+        font-size: 14px;
+        font-weight: 800;
+        color: var(--text);
+        outline: none;
+    }
+
+    .filter-group input:focus {
+        border-color: #d99a00;
+        box-shadow: 0 0 0 4px rgba(217,154,0,.12);
+    }
+
+    .filter-btn,
+    .reset-btn {
+        height: 44px;
+        border-radius: 14px;
+        padding: 0 18px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: none;
+        text-decoration: none;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 950;
+        white-space: nowrap;
+    }
+
+    .filter-btn {
+        background: #d99a00;
+        color: #fff;
+        box-shadow: 0 10px 22px rgba(217,154,0,.22);
+    }
+
+    .reset-btn {
+        background: #fff7e3;
+        color: #9a6400;
+        border: 1px solid #f0d89f;
+    }
+
+    .date-note {
+        font-size: 13px;
+        font-weight: 850;
+        color: var(--muted);
+        background: #f8f6ef;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 10px 14px;
+    }
+
     .summary-grid {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
@@ -19,38 +135,52 @@
     .dash-card,
     .section-card,
     .mini-card {
-        background: rgba(255,255,255,.90);
+        background: rgba(255,255,255,.92);
         border: 1px solid var(--line);
         border-radius: 24px;
         box-shadow: var(--shadow);
+        padding: 22px;
     }
 
-    .summary-card,
-    .section-card,
-    .dash-card,
-    .mini-card {
-        padding: 22px;
+    .summary-card {
+        position: relative;
+        overflow: hidden;
+    }
+
+    .summary-card:before {
+        content: "";
+        position: absolute;
+        right: -40px;
+        top: -40px;
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+        background: rgba(217,154,0,.10);
     }
 
     .summary-label,
     .mini-label {
         font-size: 12px;
-        font-weight: 800;
+        font-weight: 900;
         letter-spacing: .8px;
         text-transform: uppercase;
         color: var(--muted);
         margin-bottom: 8px;
+        position: relative;
+        z-index: 2;
     }
 
     .summary-value {
         font-size: 32px;
-        font-weight: 900;
+        font-weight: 950;
         letter-spacing: -.8px;
+        position: relative;
+        z-index: 2;
     }
 
     .mini-value {
         font-size: 28px;
-        font-weight: 900;
+        font-weight: 950;
     }
 
     .blue { color: #1D4ED8; }
@@ -77,7 +207,9 @@
     .dash-title {
         margin: 0 0 16px;
         font-size: 20px;
-        font-weight: 900;
+        font-weight: 950;
+        color: var(--text);
+        letter-spacing: -.3px;
     }
 
     .section-head .section-title {
@@ -90,12 +222,13 @@
         border: 1px solid var(--line);
         background: #f8f6ef;
         font-size: 12px;
-        font-weight: 800;
+        font-weight: 900;
+        color: var(--text);
     }
 
     .metric-list {
         display: grid;
-        gap: 12px;
+        gap: 0;
     }
 
     .metric-row,
@@ -104,7 +237,7 @@
         display: flex;
         justify-content: space-between;
         gap: 14px;
-        padding: 10px 0;
+        padding: 11px 0;
         border-bottom: 1px solid var(--line);
     }
 
@@ -114,15 +247,17 @@
         border-bottom: none;
     }
 
-    .metric-name {
+    .metric-name,
+    .breakdown-row span {
         font-size: 13px;
         color: var(--muted);
-        font-weight: 700;
+        font-weight: 800;
     }
 
-    .metric-value {
+    .metric-value,
+    .breakdown-row strong {
         font-size: 15px;
-        font-weight: 900;
+        font-weight: 950;
         color: var(--text);
         text-align: right;
     }
@@ -136,7 +271,7 @@
 
     .chart-box {
         position: relative;
-        min-height: 320px;
+        min-height: 330px;
     }
 
     .recent-list {
@@ -146,18 +281,20 @@
     }
 
     .recent-title {
-        font-weight: 800;
-        margin-bottom: 4px;
+        font-weight: 900;
+        margin-bottom: 5px;
+        color: var(--text);
     }
 
     .recent-meta {
         color: var(--muted);
         font-size: 12px;
+        font-weight: 700;
     }
 
     .recent-amount {
         color: #B42318;
-        font-weight: 900;
+        font-weight: 950;
         white-space: nowrap;
     }
 
@@ -166,6 +303,13 @@
         grid-template-columns: repeat(4, 1fr);
         gap: 18px;
         margin-bottom: 20px;
+    }
+
+    .empty-text {
+        padding: 14px 0;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 800;
     }
 
     @media (max-width: 1200px) {
@@ -181,6 +325,29 @@
     }
 
     @media (max-width: 700px) {
+        .dashboard-hero {
+            padding: 24px 16px;
+        }
+
+        .dashboard-hero h1 {
+            font-size: 28px;
+        }
+
+        .dashboard-filter-card,
+        .filter-left {
+            display: grid;
+            grid-template-columns: 1fr;
+            width: 100%;
+        }
+
+        .filter-group input,
+        .filter-btn,
+        .reset-btn,
+        .date-note {
+            width: 100%;
+            min-width: 0;
+        }
+
         .summary-grid,
         .section-grid,
         .mini-grid {
@@ -190,8 +357,39 @@
         .chart-box {
             min-height: 260px;
         }
+
+        .summary-value {
+            font-size: 29px;
+        }
     }
 </style>
+
+<div class="dashboard-hero">
+    <h1>Profit Dashboard</h1>
+    <p>Niron, Kampu, totals, revenue, deposit, receivable, cloth and film overview</p>
+</div>
+
+<form method="get" class="dashboard-filter-card">
+    <div class="filter-left">
+        <div class="filter-group">
+            <label>Date From</label>
+            <input type="date" name="date_from" value="{{ date_from|date:'Y-m-d' }}">
+        </div>
+
+        <div class="filter-group">
+            <label>Date To</label>
+            <input type="date" name="date_to" value="{{ date_to|date:'Y-m-d' }}">
+        </div>
+
+        <button type="submit" class="filter-btn">Filter</button>
+
+        <a href="{% url 'profit_dashboard' %}" class="reset-btn">This Month</a>
+    </div>
+
+    <div class="date-note">
+        Showing: {{ date_from|date:"d M Y" }} - {{ date_to|date:"d M Y" }}
+    </div>
+</form>
 
 <div class="summary-grid">
     <div class="summary-card">
@@ -223,15 +421,40 @@
             <h3 class="section-title">Niron</h3>
             <div class="section-badge">Niron</div>
         </div>
+
         <div class="metric-list">
-            <div class="metric-row"><div class="metric-name">Total Amount</div><div class="metric-value">${{ niron.total_amount|floatformat:2 }}</div></div>
-            <div class="metric-row"><div class="metric-name">Deposit</div><div class="metric-value">${{ niron.deposit|floatformat:2 }}</div></div>
-            <div class="metric-row"><div class="metric-name">Paid</div><div class="metric-value">${{ niron.paid|floatformat:2 }}</div></div>
-            <div class="metric-row"><div class="metric-name">Receivable</div><div class="metric-value">${{ niron.receivable|floatformat:2 }}</div></div>
-            <div class="metric-row"><div class="metric-name">Cloth Sold</div><div class="metric-value">{{ niron.cloth_sold|floatformat:0 }}</div></div>
-            <div class="metric-row"><div class="metric-name">Cloth Revenue</div><div class="metric-value">${{ niron.cloth_revenue|floatformat:2 }}</div></div>
-            <div class="metric-row"><div class="metric-name">Film Sold</div><div class="metric-value">{{ niron.film_sold|floatformat:2 }}</div></div>
-            <div class="metric-row"><div class="metric-name">Film Revenue</div><div class="metric-value">${{ niron.film_revenue|floatformat:2 }}</div></div>
+            <div class="metric-row">
+                <div class="metric-name">Total Amount</div>
+                <div class="metric-value">${{ niron.total_amount|floatformat:2 }}</div>
+            </div>
+            <div class="metric-row">
+                <div class="metric-name">Deposit</div>
+                <div class="metric-value">${{ niron.deposit|floatformat:2 }}</div>
+            </div>
+            <div class="metric-row">
+                <div class="metric-name">Paid</div>
+                <div class="metric-value">${{ niron.paid|floatformat:2 }}</div>
+            </div>
+            <div class="metric-row">
+                <div class="metric-name">Receivable</div>
+                <div class="metric-value">${{ niron.receivable|floatformat:2 }}</div>
+            </div>
+            <div class="metric-row">
+                <div class="metric-name">Cloth Sold</div>
+                <div class="metric-value">{{ niron.cloth_sold|floatformat:0 }}</div>
+            </div>
+            <div class="metric-row">
+                <div class="metric-name">Cloth Revenue</div>
+                <div class="metric-value">${{ niron.cloth_revenue|floatformat:2 }}</div>
+            </div>
+            <div class="metric-row">
+                <div class="metric-name">Film Sold</div>
+                <div class="metric-value">{{ niron.film_sold|floatformat:2 }}</div>
+            </div>
+            <div class="metric-row">
+                <div class="metric-name">Film Revenue</div>
+                <div class="metric-value">${{ niron.film_revenue|floatformat:2 }}</div>
+            </div>
         </div>
     </div>
 
@@ -240,15 +463,40 @@
             <h3 class="section-title">Kampu</h3>
             <div class="section-badge">Kampu</div>
         </div>
+
         <div class="metric-list">
-            <div class="metric-row"><div class="metric-name">Total Amount</div><div class="metric-value">${{ kampu.total_amount|floatformat:2 }}</div></div>
-            <div class="metric-row"><div class="metric-name">Deposit</div><div class="metric-value">${{ kampu.deposit|floatformat:2 }}</div></div>
-            <div class="metric-row"><div class="metric-name">Paid</div><div class="metric-value">${{ kampu.paid|floatformat:2 }}</div></div>
-            <div class="metric-row"><div class="metric-name">Receivable</div><div class="metric-value">${{ kampu.receivable|floatformat:2 }}</div></div>
-            <div class="metric-row"><div class="metric-name">Cloth Sold</div><div class="metric-value">{{ kampu.cloth_sold|floatformat:0 }}</div></div>
-            <div class="metric-row"><div class="metric-name">Cloth Revenue</div><div class="metric-value">${{ kampu.cloth_revenue|floatformat:2 }}</div></div>
-            <div class="metric-row"><div class="metric-name">Film Sold</div><div class="metric-value">{{ kampu.film_sold|floatformat:2 }}</div></div>
-            <div class="metric-row"><div class="metric-name">Film Revenue</div><div class="metric-value">${{ kampu.film_revenue|floatformat:2 }}</div></div>
+            <div class="metric-row">
+                <div class="metric-name">Total Amount</div>
+                <div class="metric-value">${{ kampu.total_amount|floatformat:2 }}</div>
+            </div>
+            <div class="metric-row">
+                <div class="metric-name">Deposit</div>
+                <div class="metric-value">${{ kampu.deposit|floatformat:2 }}</div>
+            </div>
+            <div class="metric-row">
+                <div class="metric-name">Paid</div>
+                <div class="metric-value">${{ kampu.paid|floatformat:2 }}</div>
+            </div>
+            <div class="metric-row">
+                <div class="metric-name">Receivable</div>
+                <div class="metric-value">${{ kampu.receivable|floatformat:2 }}</div>
+            </div>
+            <div class="metric-row">
+                <div class="metric-name">Cloth Sold</div>
+                <div class="metric-value">{{ kampu.cloth_sold|floatformat:0 }}</div>
+            </div>
+            <div class="metric-row">
+                <div class="metric-name">Cloth Revenue</div>
+                <div class="metric-value">${{ kampu.cloth_revenue|floatformat:2 }}</div>
+            </div>
+            <div class="metric-row">
+                <div class="metric-name">Film Sold</div>
+                <div class="metric-value">{{ kampu.film_sold|floatformat:2 }}</div>
+            </div>
+            <div class="metric-row">
+                <div class="metric-name">Film Revenue</div>
+                <div class="metric-value">${{ kampu.film_revenue|floatformat:2 }}</div>
+            </div>
         </div>
     </div>
 
@@ -257,15 +505,40 @@
             <h3 class="section-title">Total</h3>
             <div class="section-badge">All</div>
         </div>
+
         <div class="metric-list">
-            <div class="metric-row"><div class="metric-name">Total Amount</div><div class="metric-value">${{ total.total_amount|floatformat:2 }}</div></div>
-            <div class="metric-row"><div class="metric-name">Deposit</div><div class="metric-value">${{ total.deposit|floatformat:2 }}</div></div>
-            <div class="metric-row"><div class="metric-name">Paid</div><div class="metric-value">${{ total.paid|floatformat:2 }}</div></div>
-            <div class="metric-row"><div class="metric-name">Receivable</div><div class="metric-value">${{ total.receivable|floatformat:2 }}</div></div>
-            <div class="metric-row"><div class="metric-name">Cloth Sold</div><div class="metric-value">{{ total.cloth_sold|floatformat:0 }}</div></div>
-            <div class="metric-row"><div class="metric-name">Cloth Revenue</div><div class="metric-value">${{ total.cloth_revenue|floatformat:2 }}</div></div>
-            <div class="metric-row"><div class="metric-name">Film Sold</div><div class="metric-value">{{ total.film_sold|floatformat:2 }}</div></div>
-            <div class="metric-row"><div class="metric-name">Film Revenue</div><div class="metric-value">${{ total.film_revenue|floatformat:2 }}</div></div>
+            <div class="metric-row">
+                <div class="metric-name">Total Amount</div>
+                <div class="metric-value">${{ total.total_amount|floatformat:2 }}</div>
+            </div>
+            <div class="metric-row">
+                <div class="metric-name">Deposit</div>
+                <div class="metric-value">${{ total.deposit|floatformat:2 }}</div>
+            </div>
+            <div class="metric-row">
+                <div class="metric-name">Paid</div>
+                <div class="metric-value">${{ total.paid|floatformat:2 }}</div>
+            </div>
+            <div class="metric-row">
+                <div class="metric-name">Receivable</div>
+                <div class="metric-value">${{ total.receivable|floatformat:2 }}</div>
+            </div>
+            <div class="metric-row">
+                <div class="metric-name">Cloth Sold</div>
+                <div class="metric-value">{{ total.cloth_sold|floatformat:0 }}</div>
+            </div>
+            <div class="metric-row">
+                <div class="metric-name">Cloth Revenue</div>
+                <div class="metric-value">${{ total.cloth_revenue|floatformat:2 }}</div>
+            </div>
+            <div class="metric-row">
+                <div class="metric-name">Film Sold</div>
+                <div class="metric-value">{{ total.film_sold|floatformat:2 }}</div>
+            </div>
+            <div class="metric-row">
+                <div class="metric-name">Film Revenue</div>
+                <div class="metric-value">${{ total.film_revenue|floatformat:2 }}</div>
+            </div>
         </div>
     </div>
 </div>
@@ -275,14 +548,17 @@
         <div class="mini-label">Total Cloth Sold</div>
         <div class="mini-value dark">{{ total.cloth_sold|floatformat:0 }}</div>
     </div>
+
     <div class="mini-card">
         <div class="mini-label">Total Film Sold</div>
         <div class="mini-value dark">{{ total.film_sold|floatformat:2 }}</div>
     </div>
+
     <div class="mini-card">
         <div class="mini-label">Total Paid</div>
         <div class="mini-value green">${{ total.paid|floatformat:2 }}</div>
     </div>
+
     <div class="mini-card">
         <div class="mini-label">Total Receivable</div>
         <div class="mini-value red">${{ total.receivable|floatformat:2 }}</div>
@@ -291,7 +567,7 @@
 
 <div class="dash-grid">
     <div class="dash-card">
-        <h3 class="dash-title">30 Days Revenue Trend</h3>
+        <h3 class="dash-title">Revenue Trend</h3>
         <div class="chart-box">
             <canvas id="revenueChart"></canvas>
         </div>
@@ -299,14 +575,17 @@
 
     <div class="dash-card">
         <h3 class="dash-title">Expense Breakdown</h3>
+
         <div class="breakdown-row">
             <span>Other Expense</span>
             <strong>${{ expense_by_type.other|floatformat:2 }}</strong>
         </div>
+
         <div class="breakdown-row">
             <span>Batch Expense</span>
             <strong>${{ expense_by_type.batch|floatformat:2 }}</strong>
         </div>
+
         <div class="breakdown-row">
             <span>Operating Expense</span>
             <strong>${{ expense_by_type.operating|floatformat:2 }}</strong>
@@ -316,7 +595,7 @@
 
 <div class="dash-grid">
     <div class="dash-card">
-        <h3 class="dash-title">30 Days Expense Trend</h3>
+        <h3 class="dash-title">Expense Trend</h3>
         <div class="chart-box">
             <canvas id="expenseChart"></canvas>
         </div>
@@ -324,6 +603,7 @@
 
     <div class="dash-card">
         <h3 class="dash-title">Recent Expenses</h3>
+
         <div class="recent-list">
             {% for row in recent_expenses %}
             <div class="recent-item">
@@ -337,15 +617,19 @@
                             Other Expense
                         {% endif %}
                     </div>
+
                     <div class="recent-meta">
-                        {{ row.created_at|date:"d M Y H:i" }} ·
-                        {{ row.created_by.get_full_name|default:row.created_by.username }}
+                        {{ row.created_at|date:"d M Y H:i" }}
+                        {% if row.created_by %}
+                            · {{ row.created_by.get_full_name|default:row.created_by.username }}
+                        {% endif %}
                     </div>
                 </div>
+
                 <div class="recent-amount">${{ row.amount|floatformat:2 }}</div>
             </div>
             {% empty %}
-            <div class="recent-meta">No recent expense.</div>
+            <div class="empty-text">No expense in this selected date.</div>
             {% endfor %}
         </div>
     </div>
@@ -360,7 +644,13 @@
     const expenseLabels = {{ expense_labels|safe }};
     const expenseValues = {{ expense_values|safe }};
 
+    const moneyFormat = new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD"
+    });
+
     const revenueCanvas = document.getElementById("revenueChart");
+
     if (revenueCanvas) {
         new Chart(revenueCanvas, {
             type: "line",
@@ -372,21 +662,27 @@
                         data: nironValues,
                         tension: 0.35,
                         fill: false,
-                        borderWidth: 3
+                        borderWidth: 3,
+                        pointRadius: 3,
+                        pointHoverRadius: 5
                     },
                     {
                         label: "Kampu",
                         data: kampuValues,
                         tension: 0.35,
                         fill: false,
-                        borderWidth: 3
+                        borderWidth: 3,
+                        pointRadius: 3,
+                        pointHoverRadius: 5
                     },
                     {
                         label: "Total",
                         data: totalValues,
                         tension: 0.35,
                         fill: true,
-                        borderWidth: 3
+                        borderWidth: 3,
+                        pointRadius: 3,
+                        pointHoverRadius: 5
                     }
                 ]
             },
@@ -399,12 +695,41 @@
                 },
                 plugins: {
                     legend: {
-                        position: "top"
+                        position: "top",
+                        labels: {
+                            usePointStyle: true,
+                            boxWidth: 8,
+                            font: {
+                                weight: "bold"
+                            }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return context.dataset.label + ": " + moneyFormat.format(context.parsed.y || 0);
+                            }
+                        }
                     }
                 },
                 scales: {
+                    x: {
+                        grid: {
+                            display: false
+                        },
+                        ticks: {
+                            maxRotation: 0,
+                            autoSkip: true,
+                            maxTicksLimit: 10
+                        }
+                    },
                     y: {
-                        beginAtZero: true
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return "$" + value;
+                            }
+                        }
                     }
                 }
             }
@@ -412,28 +737,65 @@
     }
 
     const expenseCanvas = document.getElementById("expenseChart");
+
     if (expenseCanvas) {
         new Chart(expenseCanvas, {
             type: "bar",
             data: {
                 labels: expenseLabels,
-                datasets: [{
-                    label: "Expense",
-                    data: expenseValues,
-                    borderWidth: 1
-                }]
+                datasets: [
+                    {
+                        label: "Expense",
+                        data: expenseValues,
+                        borderWidth: 1,
+                        borderRadius: 8
+                    }
+                ]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                interaction: {
+                    mode: "index",
+                    intersect: false
+                },
                 plugins: {
                     legend: {
-                        position: "top"
+                        position: "top",
+                        labels: {
+                            usePointStyle: true,
+                            boxWidth: 8,
+                            font: {
+                                weight: "bold"
+                            }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return "Expense: " + moneyFormat.format(context.parsed.y || 0);
+                            }
+                        }
                     }
                 },
                 scales: {
+                    x: {
+                        grid: {
+                            display: false
+                        },
+                        ticks: {
+                            maxRotation: 0,
+                            autoSkip: true,
+                            maxTicksLimit: 10
+                        }
+                    },
                     y: {
-                        beginAtZero: true
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return "$" + value;
+                            }
+                        }
                     }
                 }
             }
