@@ -23,6 +23,78 @@
     align-items:end;
 }
 
+.payment-summary {
+    display:grid;
+    grid-template-columns:repeat(4, minmax(180px, 1fr));
+    gap:14px;
+    margin:16px 0;
+}
+
+.summary-card {
+    background:#fffaf0;
+    border:1px solid #eadfca;
+    border-radius:18px;
+    padding:18px 20px;
+    box-shadow:0 8px 24px rgba(0,0,0,.04);
+    min-height:118px;
+}
+
+.summary-card.niron-card {
+    background:linear-gradient(135deg, #fffaf0, #f8efe3);
+}
+
+.summary-card.kampu-card {
+    background:linear-gradient(135deg, #eef4ff, #f8fbff);
+}
+
+.summary-card.total-card {
+    background:linear-gradient(135deg, #fff7ed, #ffffff);
+}
+
+.summary-card.money-card {
+    background:linear-gradient(135deg, #fff1f2, #ffffff);
+}
+
+.summary-label {
+    font-size:13px;
+    color:#8a7a62;
+    font-weight:900;
+    margin-bottom:8px;
+    text-transform:uppercase;
+    letter-spacing:.04em;
+}
+
+.summary-value {
+    font-size:30px;
+    font-weight:900;
+    color:#111827;
+    line-height:1;
+}
+
+.summary-sub {
+    margin-top:10px;
+    color:#6b7280;
+    font-size:13px;
+    font-weight:700;
+    line-height:1.45;
+}
+
+.summary-sub strong {
+    color:#111827;
+}
+
+.money-red {
+    color:#dc2626;
+}
+
+.money-blue {
+    color:#1E3A8A;
+}
+
+.money-brown {
+    color:#9E7957;
+}
+
 .shop-badge {
     padding:6px 12px;
     border-radius:999px;
@@ -66,6 +138,12 @@
     text-decoration:underline;
 }
 
+@media (max-width: 1200px) {
+    .payment-summary {
+        grid-template-columns:repeat(2, minmax(220px, 1fr));
+    }
+}
+
 @media (max-width: 1100px) {
     .payment-grid {
         grid-template-columns:1fr 1fr;
@@ -74,6 +152,10 @@
 
 @media (max-width: 700px) {
     .payment-grid {
+        grid-template-columns:1fr;
+    }
+
+    .payment-summary {
         grid-template-columns:1fr;
     }
 
@@ -130,6 +212,42 @@
     </form>
 </div>
 
+<div class="payment-summary">
+    <div class="summary-card niron-card">
+        <div class="summary-label">Niron Invoice Total</div>
+        <div class="summary-value money-brown">{{ niron_invoice_total }}</div>
+        <div class="summary-sub">
+            Invoice Amount: <strong>${{ niron_invoice_amount|floatformat:2 }}</strong><br>
+            Unpaid: <strong class="money-red">${{ niron_unpaid_money|floatformat:2 }}</strong>
+        </div>
+    </div>
+
+    <div class="summary-card kampu-card">
+        <div class="summary-label">Kampu Invoice Total</div>
+        <div class="summary-value money-blue">{{ kampu_invoice_total }}</div>
+        <div class="summary-sub">
+            Invoice Amount: <strong>${{ kampu_invoice_amount|floatformat:2 }}</strong><br>
+            Unpaid: <strong class="money-red">${{ kampu_unpaid_money|floatformat:2 }}</strong>
+        </div>
+    </div>
+
+    <div class="summary-card total-card">
+        <div class="summary-label">Niron + Kampu Invoice</div>
+        <div class="summary-value">{{ total_result_invoice }}</div>
+        <div class="summary-sub">
+            Total Invoice Amount: <strong>${{ total_all_invoice_amount|floatformat:2 }}</strong>
+        </div>
+    </div>
+
+    <div class="summary-card money-card">
+        <div class="summary-label">Total Unpaid Money</div>
+        <div class="summary-value money-red">${{ total_unpaid_money|floatformat:2 }}</div>
+        <div class="summary-sub">
+            Based on current search/filter result
+        </div>
+    </div>
+</div>
+
 <div class="table-card">
     <table class="app-table">
         <thead>
@@ -173,10 +291,10 @@
                 </td>
 
                 <td>{{ row.order.get_service_type_display }}</td>
-                <td>${{ row.total }}</td>
-                <td>${{ row.deposit }}</td>
-                <td>${{ row.paid }}</td>
-                <td><strong>${{ row.balance }}</strong></td>
+                <td>${{ row.total|floatformat:2 }}</td>
+                <td>${{ row.deposit|floatformat:2 }}</td>
+                <td>${{ row.paid|floatformat:2 }}</td>
+                <td><strong>${{ row.balance|floatformat:2 }}</strong></td>
 
                 <td>
                     {% if row.status == "PAID" %}

@@ -1496,6 +1496,18 @@ def customer_payment_list(request):
 
     rows = []
 
+    total_result_invoice = 0
+    total_all_invoice_amount = Decimal("0.00")
+    total_unpaid_money = Decimal("0.00")
+
+    niron_invoice_total = 0
+    niron_invoice_amount = Decimal("0.00")
+    niron_unpaid_money = Decimal("0.00")
+
+    kampu_invoice_total = 0
+    kampu_invoice_amount = Decimal("0.00")
+    kampu_unpaid_money = Decimal("0.00")
+
     for order in qs:
         total = Decimal(order.total_amount or 0)
         deposit = Decimal(order.deposit_amount or 0)
@@ -1518,6 +1530,26 @@ def customer_payment_list(request):
         elif payment_status == "ALL":
             pass
 
+        total_result_invoice += 1
+        total_all_invoice_amount += total
+
+        if balance > 0:
+            total_unpaid_money += balance
+
+        if order.order_type == "NIRON":
+            niron_invoice_total += 1
+            niron_invoice_amount += total
+
+            if balance > 0:
+                niron_unpaid_money += balance
+
+        elif order.order_type == "KAMPU":
+            kampu_invoice_total += 1
+            kampu_invoice_amount += total
+
+            if balance > 0:
+                kampu_unpaid_money += balance
+
         rows.append({
             "order": order,
             "total": total,
@@ -1536,7 +1568,20 @@ def customer_payment_list(request):
         "created_date_from": created_date_from,
         "created_date_to": created_date_to,
         "service_type_choices": getattr(Order, "SERVICE_CHOICES", []),
+
+        "total_result_invoice": total_result_invoice,
+        "total_all_invoice_amount": total_all_invoice_amount,
+        "total_unpaid_money": total_unpaid_money,
+
+        "niron_invoice_total": niron_invoice_total,
+        "niron_invoice_amount": niron_invoice_amount,
+        "niron_unpaid_money": niron_unpaid_money,
+
+        "kampu_invoice_total": kampu_invoice_total,
+        "kampu_invoice_amount": kampu_invoice_amount,
+        "kampu_unpaid_money": kampu_unpaid_money,
     })
+
 
 @login_required
 @permission_required("orders.change_order", raise_exception=True)
