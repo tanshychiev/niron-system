@@ -12,7 +12,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from inventory.models import Color, InventoryItem, Size
 from openpyxl import Workbook
 from django.templatetags.static import static
-
+import calendar
 
 from django.template.loader import render_to_string
 from playwright.sync_api import sync_playwright
@@ -551,9 +551,18 @@ def order_list(request):
     status = (request.GET.get("status") or "").strip()
     order_type = (request.GET.get("order_type") or "").strip()
     service_type = (request.GET.get("service_type") or "").strip()
+    show_trash = request.GET.get("trash") == "1"
+
+    today = timezone.localdate()
+    month_start = today.replace(day=1)
+
     created_date_from = (request.GET.get("created_date_from") or "").strip()
     created_date_to = (request.GET.get("created_date_to") or "").strip()
-    show_trash = request.GET.get("trash") == "1"
+
+    # Default order list = this month only
+    if not request.GET:
+        created_date_from = month_start.strftime("%Y-%m-%d")
+        created_date_to = today.strftime("%Y-%m-%d")
 
     qs = Order.objects.all().prefetch_related("items")
 
@@ -561,8 +570,6 @@ def order_list(request):
         qs = qs.filter(is_deleted=True)
     else:
         qs = qs.filter(is_deleted=False)
-
-    qs = qs.order_by("-created_at", "-id")
 
     if keyword:
         qs = qs.filter(
@@ -591,12 +598,46 @@ def order_list(request):
     if created_date_to:
         qs = qs.filter(created_at__date__lte=created_date_to)
 
-    rows = []
+    qs = qs.order_by("-created_at", "-id")
+
     total_orders = qs.count()
     pending_count = qs.filter(status=Order.STATUS_PENDING).count()
     done_count = qs.filter(status=Order.STATUS_DONE).count()
 
-    today = timezone.localdate()
+    money_totals = qs.aggregate(
+        total_money=Sum("total_amount"),
+        total_deposit=Sum("deposit_amount"),
+        total_paid=Sum("paid_amount"),
+    )
+
+    total_money = money_totals["total_money"] or Decimal("0.00")
+    total_deposit = money_totals["total_deposit"] or Decimal("0.00")
+    total_paid = money_totals["total_paid"] or Decimal("0.00")
+    total_balance = total_money - total_deposit - total_paid
+
+    # Money total visible only until 10 days after selected month ends.
+    # Example: search 2026-05-01 to 2026-05-31
+    # show until 2026-06-10, hide from 2026-06-11.
+    show_money_totals = False
+    money_visible_until = None
+
+    try:
+        selected_to_date = timezone.datetime.strptime(created_date_to, "%Y-%m-%d").date()
+
+        last_day = calendar.monthrange(
+            selected_to_date.year,
+            selected_to_date.month
+        )[1]
+
+        selected_month_end = selected_to_date.replace(day=last_day)
+        money_visible_until = selected_month_end + timezone.timedelta(days=5)
+
+        show_money_totals = today <= money_visible_until
+    except Exception:
+        show_money_totals = False
+        money_visible_until = None
+
+    rows = []
 
     for order in qs:
         cloth_qty, film_meter = _get_order_totals_by_service(order)
@@ -629,9 +670,18 @@ def order_list(request):
         "created_date_from": created_date_from,
         "created_date_to": created_date_to,
         "show_trash": show_trash,
+
         "total_orders": total_orders,
         "pending_count": pending_count,
         "done_count": done_count,
+
+        "total_money": total_money,
+        "total_deposit": total_deposit,
+        "total_paid": total_paid,
+        "total_balance": total_balance,
+        "show_money_totals": show_money_totals,
+        "money_visible_until": money_visible_until,
+
         "status_choices": getattr(Order, "STATUS_CHOICES", []),
         "order_type_choices": getattr(Order, "TYPE_CHOICES", []),
         "service_type_choices": getattr(Order, "SERVICE_CHOICES", []),
