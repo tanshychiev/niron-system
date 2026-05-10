@@ -7,7 +7,7 @@
 {% block top_actions %}
 <a href="{% url 'order_create' %}" class="btn btn-primary">Create Order</a>
 <a href="{% url 'order_trash_list' %}" class="btn btn-light">🗑 Trash</a>
-<a href="{% url 'order_list_export_excel' %}" class="btn btn-light">Export Excel</a>
+<a href="{% url 'order_list_export_excel' %}?keyword={{ keyword }}&status={{ status }}&order_type={{ order_type }}&service_type={{ service_type }}&created_date_from={{ created_date_from }}&created_date_to={{ created_date_to }}" class="btn btn-light">Export Excel</a>
 {% endblock %}
 
 {% block content %}
@@ -19,7 +19,7 @@
 
     .summary-grid {
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: repeat(5, minmax(0, 1fr));
         gap: 14px;
         margin-bottom: 18px;
     }
@@ -47,6 +47,21 @@
         color: var(--text);
     }
 
+    .summary-hidden {
+        margin-top: 8px;
+        font-size: 15px;
+        line-height: 1.4;
+        font-weight: 900;
+    }
+
+    .money-value {
+        color: #d97706;
+    }
+
+    .balance-value {
+        color: #dc2626;
+    }
+
     .filter-card {
         background: rgba(255,255,255,.94);
         border: 1px solid var(--line);
@@ -58,7 +73,7 @@
 
     .filter-grid {
         display: grid;
-        grid-template-columns: 1.3fr .8fr .8fr .9fr .8fr .8fr auto;
+        grid-template-columns: 1.3fr .8fr .8fr .9fr .8fr .8fr auto auto;
         gap: 12px;
         align-items: end;
     }
@@ -78,6 +93,18 @@
         width: 100%;
         height: 42px;
         border-radius: 12px;
+        border: 1px solid var(--line);
+        background: #fff;
+        padding: 0 12px;
+        font-size: 14px;
+        color: var(--text);
+    }
+
+    .field input:focus,
+    .field select:focus {
+        outline: none;
+        border-color: #f59e0b;
+        box-shadow: 0 0 0 3px rgba(245, 158, 11, .14);
     }
 
     .table-card {
@@ -95,7 +122,7 @@
     .orders-table {
         width: 100%;
         border-collapse: collapse;
-        min-width: 1220px;
+        min-width: 1320px;
     }
 
     .orders-table th,
@@ -142,14 +169,44 @@
         font-weight: 900;
     }
 
-    .status-pending { background: #fff7ed; color: #d97706; }
-    .status-processing { background: #eff6ff; color: #2563eb; }
-    .status-done { background: #ecfdf5; color: #16a34a; }
-    .status-cancel { background: #fef2f2; color: #dc2626; }
+    .status-pending {
+        background: #fff7ed;
+        color: #d97706;
+    }
+
+    .status-processing {
+        background: #eff6ff;
+        color: #2563eb;
+    }
+
+    .status-done {
+        background: #ecfdf5;
+        color: #16a34a;
+    }
+
+    .status-cancel {
+        background: #fef2f2;
+        color: #dc2626;
+    }
 
     .late-text {
         color: #dc2626;
         font-weight: 900;
+    }
+
+    .money-cell {
+        font-weight: 800;
+        color: #111827;
+    }
+
+    .balance-cell {
+        font-weight: 800;
+        color: #dc2626;
+    }
+
+    .money-hidden-cell {
+        color: var(--muted);
+        font-weight: 800;
     }
 
     .action-row {
@@ -186,10 +243,18 @@
         border: 1px solid var(--line);
     }
 
+    .btn-mini-light:hover {
+        background: #fff7ed;
+    }
+
     .btn-mini-danger {
         background: #fef2f2;
         color: #dc2626;
         border: 1px solid #fecaca;
+    }
+
+    .btn-mini-danger:hover {
+        background: #fee2e2;
     }
 
     .empty-state {
@@ -199,10 +264,44 @@
         font-weight: 700;
     }
 
-    @media (max-width: 1100px) {
+    .clear-link {
+        height: 42px;
+        border-radius: 12px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 16px;
+        background: #f8f6ef;
+        color: #1f2937;
+        border: 1px solid var(--line);
+        text-decoration: none;
+        font-size: 13px;
+        font-weight: 900;
+        white-space: nowrap;
+    }
+
+    .clear-link:hover {
+        background: #fff7ed;
+    }
+
+    @media (max-width: 1300px) {
+        .summary-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .filter-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @media (max-width: 700px) {
         .summary-grid,
         .filter-grid {
             grid-template-columns: 1fr;
+        }
+
+        .summary-value {
+            font-size: 24px;
         }
     }
 </style>
@@ -224,6 +323,28 @@
             <div class="summary-label">Done</div>
             <div class="summary-value">{{ done_count }}</div>
         </div>
+
+        <div class="summary-card">
+            <div class="summary-label">Total Money</div>
+            {% if show_money_totals %}
+                <div class="summary-value money-value">${{ total_money|floatformat:2 }}</div>
+            {% else %}
+                <div class="summary-hidden money-value">
+                    Hidden after 10 days
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="summary-card">
+            <div class="summary-label">Total Balance</div>
+            {% if show_money_totals %}
+                <div class="summary-value balance-value">${{ total_balance|floatformat:2 }}</div>
+            {% else %}
+                <div class="summary-hidden balance-value">
+                    Hidden after 10 days
+                </div>
+            {% endif %}
+        </div>
     </div>
 
     <div class="filter-card">
@@ -231,7 +352,12 @@
             <div class="filter-grid">
                 <div class="field">
                     <label>Search</label>
-                    <input type="text" name="keyword" value="{{ keyword }}" placeholder="Order no, customer, phone, location">
+                    <input
+                        type="text"
+                        name="keyword"
+                        value="{{ keyword }}"
+                        placeholder="Order no, customer, phone, location"
+                    >
                 </div>
 
                 <div class="field">
@@ -239,7 +365,9 @@
                     <select name="status">
                         <option value="">All Status</option>
                         {% for value, label in status_choices %}
-                            <option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>
+                            <option value="{{ value }}" {% if status == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
                         {% endfor %}
                     </select>
                 </div>
@@ -249,7 +377,9 @@
                     <select name="order_type">
                         <option value="">All Type</option>
                         {% for value, label in order_type_choices %}
-                            <option value="{{ value }}" {% if order_type == value %}selected{% endif %}>{{ label }}</option>
+                            <option value="{{ value }}" {% if order_type == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
                         {% endfor %}
                     </select>
                 </div>
@@ -259,27 +389,42 @@
                     <select name="service_type">
                         <option value="">All Services</option>
                         <option value="EXCEPT_FILM" {% if service_type == "EXCEPT_FILM" %}selected{% endif %}>
-                            All (Except Film)
+                            All Except Film
                         </option>
                         {% for value, label in service_type_choices %}
-                            <option value="{{ value }}" {% if service_type == value %}selected{% endif %}>{{ label }}</option>
+                            <option value="{{ value }}" {% if service_type == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
                         {% endfor %}
                     </select>
                 </div>
 
                 <div class="field">
                     <label>Created From</label>
-                    <input type="date" name="created_date_from" value="{{ created_date_from }}">
+                    <input
+                        type="date"
+                        name="created_date_from"
+                        value="{{ created_date_from }}"
+                    >
                 </div>
 
                 <div class="field">
                     <label>Created To</label>
-                    <input type="date" name="created_date_to" value="{{ created_date_to }}">
+                    <input
+                        type="date"
+                        name="created_date_to"
+                        value="{{ created_date_to }}"
+                    >
                 </div>
 
                 <div class="field">
                     <label>&nbsp;</label>
                     <button type="submit" class="btn btn-primary">Search</button>
+                </div>
+
+                <div class="field">
+                    <label>&nbsp;</label>
+                    <a href="{% url 'order_list' %}" class="clear-link">This Month</a>
                 </div>
             </div>
         </form>
@@ -332,7 +477,9 @@
                         </td>
 
                         <td>{{ row.obj.customer_name|default:"-" }}</td>
+
                         <td>{{ row.obj.get_order_type_display }}</td>
+
                         <td>{{ row.obj.get_service_type_display }}</td>
 
                         <td>
@@ -350,9 +497,24 @@
                         </td>
 
                         <td>{{ row.cloth_qty }}</td>
+
                         <td>{{ row.film_meter|floatformat:2 }}</td>
-                        <td>${{ row.obj.total_amount }}</td>
-                        <td>${{ row.balance_amount }}</td>
+
+                        <td class="{% if show_money_totals %}money-cell{% else %}money-hidden-cell{% endif %}">
+                            {% if show_money_totals %}
+                                ${{ row.obj.total_amount|floatformat:2 }}
+                            {% else %}
+                                Hidden
+                            {% endif %}
+                        </td>
+
+                        <td class="{% if show_money_totals %}balance-cell{% else %}money-hidden-cell{% endif %}">
+                            {% if show_money_totals %}
+                                ${{ row.balance_amount|floatformat:2 }}
+                            {% else %}
+                                Hidden
+                            {% endif %}
+                        </td>
 
                         <td>
                             {% if row.obj.deadline %}
@@ -368,27 +530,66 @@
 
                         <td>
                             <div class="action-row">
-                                <a href="{% url 'order_detail' row.obj.pk %}" class="btn-mini btn-mini-light">View</a>
-                                <a href="{% url 'order_edit' row.obj.pk %}" class="btn-mini btn-mini-light">Edit</a>
+                                <a href="{% url 'order_detail' row.obj.pk %}" class="btn-mini btn-mini-light">
+                                    View
+                                </a>
 
-                                <form method="post"
-                                      action="{% url 'order_trash' row.obj.pk %}"
-                                      class="inline-form trash-form">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="delete_reason" class="delete-reason-input">
-                                    <button type="submit" class="btn-mini btn-mini-danger">🗑</button>
-                                </form>
+                                {% if not show_trash %}
+                                    <a href="{% url 'order_edit' row.obj.pk %}" class="btn-mini btn-mini-light">
+                                        Edit
+                                    </a>
+
+                                    <form
+                                        method="post"
+                                        action="{% url 'order_trash' row.obj.pk %}"
+                                        class="inline-form trash-form"
+                                    >
+                                        {% csrf_token %}
+                                        <input
+                                            type="hidden"
+                                            name="reason"
+                                            value="Deleted from order list"
+                                        >
+                                        <button type="submit" class="btn-mini btn-mini-danger">
+                                            Trash
+                                        </button>
+                                    </form>
+                                {% else %}
+                                    <form
+                                        method="post"
+                                        action="{% url 'order_restore' row.obj.pk %}"
+                                        class="inline-form"
+                                    >
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn-mini btn-mini-light">
+                                            Restore
+                                        </button>
+                                    </form>
+                                {% endif %}
                             </div>
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
                         <td colspan="13">
-                            <div class="empty-state">No orders found.</div>
+                            <div class="empty-state">
+                                No orders found.
+                            </div>
                         </td>
                     </tr>
                     {% endfor %}
                 </tbody>
+
+                {% if rows and show_money_totals %}
+                <tfoot>
+                    <tr>
+                        <th colspan="9" style="text-align:right;">Filtered Total</th>
+                        <th class="money-cell">${{ total_money|floatformat:2 }}</th>
+                        <th class="balance-cell">${{ total_balance|floatformat:2 }}</th>
+                        <th colspan="2"></th>
+                    </tr>
+                </tfoot>
+                {% endif %}
             </table>
         </div>
     </div>
@@ -396,26 +597,17 @@
 </div>
 
 <script>
-document.addEventListener("DOMContentLoaded", function () {
-    document.querySelectorAll(".trash-form").forEach(function (form) {
-        form.addEventListener("submit", function (e) {
-            const reason = prompt("Why do you delete this order?");
+    document.addEventListener("DOMContentLoaded", function () {
+        const forms = document.querySelectorAll(".trash-form");
 
-            if (!reason || !reason.trim()) {
-                e.preventDefault();
-                alert("Delete reason is required.");
-                return false;
-            }
-
-            const ok = confirm("Move this order to trash? Stock will return.");
-            if (!ok) {
-                e.preventDefault();
-                return false;
-            }
-
-            form.querySelector(".delete-reason-input").value = reason.trim();
+        forms.forEach(function (form) {
+            form.addEventListener("submit", function (e) {
+                const ok = confirm("Move this order to trash?");
+                if (!ok) {
+                    e.preventDefault();
+                }
+            });
         });
     });
-});
 </script>
 {% endblock %}
