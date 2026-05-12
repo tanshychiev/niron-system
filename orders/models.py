@@ -77,6 +77,7 @@ class Order(models.Model):
         null=True,
         blank=True,
     )
+
     # ===== MONEY =====
     total_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     deposit_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
@@ -138,12 +139,43 @@ class Order(models.Model):
     def remaining_pcs(self):
         return (self.total_pcs or Decimal("0")) - (self.done_pcs or Decimal("0"))
 
+    @staticmethod
+    def generate_order_no():
+        """
+        Format:
+        NR-2605-001
+
+        26 = year
+        05 = month
+        001 = monthly running number
+
+        New month will restart from 001.
+        """
+        from django.utils import timezone
+
+        today = timezone.localdate()
+        prefix = f"NR-{today.strftime('%y%m')}-"
+
+        last_order = (
+            Order.objects
+            .filter(order_no__startswith=prefix)
+            .order_by("-order_no")
+            .first()
+        )
+
+        if last_order and last_order.order_no:
+            try:
+                last_number = int(last_order.order_no.split("-")[-1])
+            except (ValueError, IndexError):
+                last_number = 0
+        else:
+            last_number = 0
+
+        return f"{prefix}{last_number + 1:03d}"
+
     def save(self, *args, **kwargs):
         if not self.order_no:
-            last_id = (
-                Order.objects.order_by("-id").values_list("id", flat=True).first() or 0
-            ) + 1
-            self.order_no = f"NR-{last_id:06d}"
+            self.order_no = self.generate_order_no()
 
         if self.balance_amount <= 0:
             self.payment_status = self.PAYMENT_PAID
@@ -153,8 +185,6 @@ class Order(models.Model):
             self.payment_status = self.PAYMENT_PENDING
 
         super().save(*args, **kwargs)
-
-
 class OrderDesign(models.Model):
     order = models.ForeignKey(
         Order,
