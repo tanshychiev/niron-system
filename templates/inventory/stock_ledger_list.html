@@ -1,0 +1,564 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="ledger-page">
+  <div class="ledger-head">
+    <div>
+      <h1>Stock Ledger</h1>
+      <p>
+        Track every stock IN / OUT by date, invoice, batch, user, and remark.
+        Use “From Last Correct” after stock has been counted correctly.
+      </p>
+    </div>
+
+    <div class="head-actions">
+      <a href="{% url 'inventory_list' %}" class="btn-light">← Inventory</a>
+    </div>
+  </div>
+
+  {% if batch_item %}
+    <div class="variant-box">
+      <div>
+        <div class="variant-label">Selected Stock Row</div>
+        <h2>
+          {{ batch_item.item.name }}
+          {% if batch_item.color %}/ {{ batch_item.color.name }}{% endif %}
+          {% if batch_item.size %}/ {{ batch_item.size.name }}{% endif %}
+        </h2>
+        <p>Batch: {{ batch_item.batch.batch_no }} · Current Qty: {{ batch_item.qty_remaining|floatformat:0 }}</p>
+      </div>
+
+      <div class="variant-actions">
+        <a href="{% url 'correct_stock_count' batch_item.id %}" class="btn-dark">✓ Correct Count</a>
+
+        {% if only_correct_forward %}
+          <a href="{% url 'stock_ledger_by_batch_item' batch_item.id %}" class="btn-light">Show All</a>
+        {% else %}
+          <a href="{% url 'stock_ledger_by_batch_item' batch_item.id %}?from_correct=1" class="btn-light">From Last Correct</a>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+
+  {% if last_correct %}
+    <div class="correct-alert">
+      <strong>Last Correct Checkpoint:</strong>
+      {{ last_correct.created_at|date:"d/m/Y H:i" }}
+      · Qty {{ last_correct.qty_after|floatformat:0 }}
+      · {{ last_correct.correct_remark|default:last_correct.remark }}
+    </div>
+  {% elif only_correct_forward %}
+    <div class="warning-alert">
+      No correct checkpoint found yet. Please use Correct Count first.
+    </div>
+  {% endif %}
+
+  {% if not batch_item %}
+    <form method="get" class="filter-card">
+      <div class="filter-grid">
+        <div>
+          <label>Search Invoice / Batch / Remark</label>
+          <input type="text" name="q" value="{{ keyword|default:'' }}" placeholder="NR-2605-001, STK..., remark">
+        </div>
+
+        <div>
+          <label>Movement</label>
+          <select name="movement_type">
+            <option value="">All</option>
+            {% for value,label in movement_choices %}
+              <option value="{{ value }}" {% if movement_type == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label>Date From</label>
+          <input type="date" name="date_from" value="{{ date_from|default:'' }}">
+        </div>
+
+        <div>
+          <label>Date To</label>
+          <input type="date" name="date_to" value="{{ date_to|default:'' }}">
+        </div>
+
+        <div>
+          <label>Item</label>
+          <select name="item">
+            <option value="">All Items</option>
+            {% for item in items %}
+              <option value="{{ item.id }}" {% if selected_item_id|stringformat:"s" == item.id|stringformat:"s" %}selected{% endif %}>
+                {{ item.code }} - {{ item.name }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label>Color</label>
+          <select name="color">
+            <option value="">All Colors</option>
+            {% for color in colors %}
+              <option value="{{ color.id }}" {% if selected_color_id|stringformat:"s" == color.id|stringformat:"s" %}selected{% endif %}>
+                {{ color.name }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label>Size</label>
+          <select name="size">
+            <option value="">All Sizes</option>
+            {% for size in sizes %}
+              <option value="{{ size.id }}" {% if selected_size_id|stringformat:"s" == size.id|stringformat:"s" %}selected{% endif %}>
+                {{ size.name }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="check-row">
+          <label class="checkbox-label">
+            <input type="checkbox" name="from_correct" value="1" {% if only_correct_forward %}checked{% endif %}>
+            From Last Correct
+          </label>
+        </div>
+      </div>
+
+      <div class="filter-actions">
+        <button type="submit" class="btn-dark">Search</button>
+        <a href="{% url 'stock_ledger_list' %}" class="btn-light">Reset</a>
+      </div>
+    </form>
+  {% endif %}
+
+  <div class="table-card">
+    <div class="table-wrap">
+      <table class="ledger-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Item</th>
+            <th>Color</th>
+            <th>Size</th>
+            <th>Type</th>
+            <th>Invoice / Ref</th>
+            <th class="text-end">Before</th>
+            <th class="text-end in-col">IN</th>
+            <th class="text-end out-col">OUT</th>
+            <th class="text-end">After</th>
+            <th>By</th>
+            <th>Remark</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {% for row in rows %}
+            <tr class="{% if row.is_correct_checkpoint %}correct-row{% endif %}">
+              <td>
+                <div class="date-main">{{ row.created_at|date:"d/m/Y" }}</div>
+                <div class="date-sub">{{ row.created_at|date:"H:i" }}</div>
+              </td>
+
+              <td>
+                <strong>{{ row.batch_item.item.name }}</strong>
+                <div class="muted">{{ row.batch_item.item.code }}</div>
+              </td>
+
+              <td>
+                {% if row.batch_item.color %}
+                  {{ row.batch_item.color.name }}
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+
+              <td>
+                {% if row.batch_item.size %}
+                  {{ row.batch_item.size.name }}
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+
+              <td>
+                <span class="type-pill type-{{ row.movement_type }}">
+                  {{ row.get_movement_type_display }}
+                </span>
+                {% if row.is_correct_checkpoint %}
+                  <div class="correct-mini">Checkpoint</div>
+                {% endif %}
+              </td>
+
+              <td>
+                {% if row.reference_no %}
+                  <strong>{{ row.reference_no }}</strong>
+                {% elif row.order_no %}
+                  <strong>{{ row.order_no }}</strong>
+                {% elif row.batch_no %}
+                  <strong>{{ row.batch_no }}</strong>
+                {% else %}
+                  -
+                {% endif %}
+
+                {% if row.batch_no %}
+                  <div class="muted">Batch: {{ row.batch_no }}</div>
+                {% endif %}
+              </td>
+
+              <td class="text-end">{{ row.qty_before|floatformat:2 }}</td>
+
+              <td class="text-end in-col">
+                {% if row.qty_in %}
+                  +{{ row.qty_in|floatformat:2 }}
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+
+              <td class="text-end out-col">
+                {% if row.qty_out %}
+                  -{{ row.qty_out|floatformat:2 }}
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+
+              <td class="text-end after-col">{{ row.qty_after|floatformat:2 }}</td>
+
+              <td>
+                {% if row.created_by %}
+                  {{ row.created_by.username }}
+                {% else %}
+                  System
+                {% endif %}
+              </td>
+
+              <td>
+                {{ row.remark|default:"-" }}
+                {% if row.correct_remark %}
+                  <div class="muted">Correct: {{ row.correct_remark }}</div>
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="12" class="empty-td">No ledger record found.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<style>
+  .ledger-page{
+    max-width:1500px;
+    margin:26px auto;
+    padding:0 18px 46px;
+  }
+
+  .ledger-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:18px;
+    flex-wrap:wrap;
+    margin-bottom:22px;
+  }
+
+  .ledger-head h1{
+    margin:0;
+    font-size:38px;
+    font-weight:900;
+    letter-spacing:-.03em;
+    color:#0f172a;
+  }
+
+  .ledger-head p{
+    margin:8px 0 0;
+    color:#64748b;
+    font-size:15px;
+  }
+
+  .head-actions,
+  .filter-actions,
+  .variant-actions{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+
+  .btn-dark,
+  .btn-light{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-height:42px;
+    padding:11px 16px;
+    border-radius:14px;
+    font-weight:900;
+    text-decoration:none;
+    border:none;
+    cursor:pointer;
+  }
+
+  .btn-dark{
+    background:#0f172a;
+    color:#fff;
+    box-shadow:0 10px 22px rgba(15,23,42,.14);
+  }
+
+  .btn-light{
+    background:#fff;
+    color:#0f172a;
+    border:1px solid #e2e8f0;
+  }
+
+  .variant-box,
+  .filter-card,
+  .table-card{
+    background:#fff;
+    border:1px solid #e2e8f0;
+    border-radius:26px;
+    box-shadow:0 14px 34px rgba(15,23,42,.06);
+  }
+
+  .variant-box{
+    padding:18px;
+    margin-bottom:18px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:18px;
+    flex-wrap:wrap;
+  }
+
+  .variant-label{
+    color:#64748b;
+    font-size:12px;
+    font-weight:900;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+  }
+
+  .variant-box h2{
+    margin:4px 0;
+    font-size:22px;
+    font-weight:900;
+  }
+
+  .variant-box p{
+    margin:0;
+    color:#64748b;
+  }
+
+  .correct-alert,
+  .warning-alert{
+    padding:14px 16px;
+    border-radius:18px;
+    margin-bottom:16px;
+    font-weight:700;
+  }
+
+  .correct-alert{
+    background:#ecfdf5;
+    color:#166534;
+    border:1px solid #bbf7d0;
+  }
+
+  .warning-alert{
+    background:#fffbeb;
+    color:#92400e;
+    border:1px solid #fde68a;
+  }
+
+  .filter-card{
+    padding:18px;
+    margin-bottom:20px;
+  }
+
+  .filter-grid{
+    display:grid;
+    grid-template-columns:repeat(4,minmax(160px,1fr));
+    gap:14px;
+  }
+
+  .filter-grid label{
+    display:block;
+    margin-bottom:6px;
+    font-weight:900;
+    color:#334155;
+    font-size:13px;
+  }
+
+  .filter-grid input,
+  .filter-grid select{
+    width:100%;
+    min-height:42px;
+    border:1px solid #dbe2ea;
+    border-radius:14px;
+    padding:9px 12px;
+    outline:none;
+    font-weight:700;
+  }
+
+  .check-row{
+    display:flex;
+    align-items:end;
+  }
+
+  .checkbox-label{
+    display:flex !important;
+    align-items:center;
+    gap:9px;
+    margin:0 !important;
+    min-height:42px;
+  }
+
+  .checkbox-label input{
+    width:18px;
+    height:18px;
+    min-height:auto;
+  }
+
+  .filter-actions{
+    margin-top:16px;
+  }
+
+  .table-card{
+    overflow:hidden;
+  }
+
+  .table-wrap{
+    overflow:auto;
+  }
+
+  .ledger-table{
+    width:100%;
+    border-collapse:separate;
+    border-spacing:0;
+    min-width:1180px;
+  }
+
+  .ledger-table th{
+    background:#f8fafc;
+    color:#475569;
+    font-size:12px;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    padding:13px 12px;
+    border-bottom:1px solid #e2e8f0;
+    white-space:nowrap;
+  }
+
+  .ledger-table td{
+    padding:13px 12px;
+    border-bottom:1px solid #edf2f7;
+    vertical-align:top;
+    color:#0f172a;
+    font-size:14px;
+  }
+
+  .ledger-table tr:hover td{
+    background:#f8fafc;
+  }
+
+  .correct-row td{
+    background:#f0fdf4;
+  }
+
+  .date-main{
+    font-weight:900;
+    white-space:nowrap;
+  }
+
+  .date-sub,
+  .muted{
+    color:#64748b;
+    font-size:12px;
+    margin-top:3px;
+  }
+
+  .text-end{
+    text-align:right;
+  }
+
+  .in-col{
+    color:#15803d !important;
+    font-weight:900;
+  }
+
+  .out-col{
+    color:#dc2626 !important;
+    font-weight:900;
+  }
+
+  .after-col{
+    font-weight:900;
+  }
+
+  .type-pill{
+    display:inline-flex;
+    padding:6px 9px;
+    border-radius:999px;
+    background:#f1f5f9;
+    color:#334155;
+    font-weight:900;
+    font-size:12px;
+    white-space:nowrap;
+  }
+
+  .type-CORRECT{
+    background:#dcfce7;
+    color:#166534;
+  }
+
+  .type-STOCK_IN,
+  .type-ORDER_RESTORE,
+  .type-ADJUST_IN{
+    background:#ecfdf5;
+    color:#15803d;
+  }
+
+  .type-ORDER_OUT,
+  .type-ADJUST_OUT,
+  .type-BATCH_DELETE{
+    background:#fef2f2;
+    color:#dc2626;
+  }
+
+  .correct-mini{
+    margin-top:5px;
+    display:inline-flex;
+    padding:3px 7px;
+    border-radius:999px;
+    background:#16a34a;
+    color:#fff;
+    font-size:10px;
+    font-weight:900;
+  }
+
+  .empty-td{
+    text-align:center;
+    color:#94a3b8 !important;
+    padding:34px !important;
+    font-weight:800;
+  }
+
+  @media(max-width:900px){
+    .filter-grid{
+      grid-template-columns:1fr;
+    }
+
+    .ledger-head h1{
+      font-size:30px;
+    }
+
+    .variant-box{
+      align-items:flex-start;
+    }
+  }
+</style>
+{% endblock %}

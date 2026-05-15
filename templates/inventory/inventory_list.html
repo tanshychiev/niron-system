@@ -5,7 +5,9 @@
   <div class="inventory-head">
     <div>
       <h1>Inventory</h1>
-      <p class="sub">Cloth shows Available / In Process / Total. Material shows stock only.</p>
+      <p class="sub">
+        Cloth shows Available / In Process / Total. Use Stock Ledger to track every IN / OUT after correct count.
+      </p>
     </div>
 
     <div class="head-actions">
@@ -13,6 +15,7 @@
       <a href="{% url 'color_create' %}" class="btn-light">+ Create Color</a>
       <a href="{% url 'size_create' %}" class="btn-light">+ Create Size</a>
       <a href="{% url 'inventory_batch_create' %}" class="btn-light">+ Stock In</a>
+      <a href="{% url 'stock_ledger_list' %}" class="btn-ledger">📒 Stock Ledger</a>
     </div>
   </div>
 
@@ -79,6 +82,22 @@
                   <span class="sep">•</span>
                   <span>{{ card.item_style_label }}</span>
                 </div>
+
+                <div class="card-actions">
+                  <a
+                    href="{% url 'stock_ledger_list' %}?item={{ card.item_id }}&color={{ card.color_id }}&from_correct=1"
+                    class="mini-btn mini-ledger"
+                  >
+                    📒 Ledger
+                  </a>
+
+                  <a
+                    href="{% url 'stock_ledger_list' %}?item={{ card.item_id }}&color={{ card.color_id }}"
+                    class="mini-btn"
+                  >
+                    All History
+                  </a>
+                </div>
               </div>
             </div>
 
@@ -87,7 +106,17 @@
             <div class="size-wrap">
               {% for size_row in card.sizes %}
                 <div class="size-chip {% if size_row.available_qty < 0 %}shortage-size{% endif %}">
-                  <div class="size-name">{{ size_row.size_name }}</div>
+                  <div class="size-chip-head">
+                    <div class="size-name">{{ size_row.size_name }}</div>
+
+                    <a
+                      href="{% url 'stock_ledger_list' %}?item={{ card.item_id }}&color={{ card.color_id }}&size={{ size_row.size_id }}&from_correct=1"
+                      class="size-ledger-link"
+                      title="View ledger from last correct"
+                    >
+                      📒
+                    </a>
+                  </div>
 
                   <div class="size-values">
                     <div class="size-line available">
@@ -143,14 +172,16 @@
 
   <!-- =========================
        MATERIAL INVENTORY
-       Film / Ink / Powder / Other
-       No In Process / No Total
   ========================== -->
   <section class="material-section">
     <div class="section-head">
       <div class="section-title-row">
         <h2>Material Inventory</h2>
         <span class="count-pill">{{ materials|length }} item{{ materials|length|pluralize }}</span>
+      </div>
+
+      <div class="section-actions">
+        <a href="{% url 'material_usage' %}" class="btn-light small-btn">Use Material</a>
       </div>
     </div>
 
@@ -190,6 +221,15 @@
                 <span class="out-pill">OUT</span>
               {% endif %}
             </div>
+
+            <div class="material-actions">
+              <a href="{% url 'stock_ledger_list' %}?item={{ material.id }}&from_correct=1" class="mini-btn mini-ledger">
+                📒 Ledger
+              </a>
+              <a href="{% url 'stock_ledger_list' %}?item={{ material.id }}" class="mini-btn">
+                All History
+              </a>
+            </div>
           </div>
         </div>
       {% empty %}
@@ -218,6 +258,7 @@
               <th>Created By</th>
               <th>Received Date</th>
               <th class="text-end">Total Cloth</th>
+              <th class="text-end">Action</th>
             </tr>
           </thead>
 
@@ -233,10 +274,13 @@
                 <td>{{ batch.created_by|default:"-" }}</td>
                 <td>{{ batch.received_date|date:"d/m/Y" }}</td>
                 <td class="text-end">{{ batch.total_cloth|floatformat:0 }}</td>
+                <td class="text-end">
+                  <a href="{% url 'inventory_batch_detail' batch.id %}" class="table-action">View</a>
+                </td>
               </tr>
             {% empty %}
               <tr>
-                <td colspan="5" class="empty-td">No batches found.</td>
+                <td colspan="6" class="empty-td">No batches found.</td>
               </tr>
             {% endfor %}
           </tbody>
@@ -277,14 +321,22 @@
     font-size:16px;
   }
 
-  .head-actions{
+  .head-actions,
+  .section-actions,
+  .card-actions,
+  .material-actions{
     display:flex;
-    gap:12px;
+    gap:10px;
     flex-wrap:wrap;
   }
 
+  .head-actions{
+    gap:12px;
+  }
+
   .btn-dark,
-  .btn-light{
+  .btn-light,
+  .btn-ledger{
     display:inline-flex;
     align-items:center;
     justify-content:center;
@@ -294,6 +346,7 @@
     font-weight:800;
     font-size:14px;
     transition:.22s ease;
+    white-space:nowrap;
   }
 
   .btn-dark{
@@ -323,6 +376,56 @@
     color:#0f172a;
   }
 
+  .btn-ledger{
+    color:#064e3b;
+    border:1px solid #bbf7d0;
+    background:linear-gradient(180deg,#ecfdf5,#dcfce7);
+    box-shadow:0 6px 18px rgba(22,163,74,.12);
+  }
+
+  .btn-ledger:hover{
+    color:#064e3b;
+    transform:translateY(-1px);
+    background:#dcfce7;
+  }
+
+  .small-btn{
+    padding:10px 14px;
+    border-radius:14px;
+  }
+
+  .mini-btn{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-height:32px;
+    padding:7px 10px;
+    border-radius:12px;
+    text-decoration:none;
+    background:#fff;
+    border:1px solid #e2e8f0;
+    color:#334155;
+    font-size:12px;
+    font-weight:900;
+    box-shadow:0 4px 12px rgba(15,23,42,.04);
+  }
+
+  .mini-btn:hover{
+    background:#f8fafc;
+    color:#0f172a;
+  }
+
+  .mini-ledger{
+    background:#ecfdf5;
+    border-color:#bbf7d0;
+    color:#166534;
+  }
+
+  .mini-ledger:hover{
+    background:#dcfce7;
+    color:#064e3b;
+  }
+
   .style-section,
   .material-section,
   .batch-section{
@@ -335,6 +438,7 @@
     justify-content:space-between;
     gap:12px;
     margin-bottom:18px;
+    flex-wrap:wrap;
   }
 
   .section-title-row{
@@ -502,6 +606,10 @@
     color:#0f172a;
   }
 
+  .card-actions{
+    margin-top:12px;
+  }
+
   .meta-row{
     display:flex;
     align-items:center;
@@ -553,13 +661,39 @@
     background:linear-gradient(180deg,#ffffff,#fef2f2);
   }
 
+  .size-chip-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+    margin-bottom:10px;
+  }
+
   .size-name{
     font-size:20px;
     font-weight:900;
     line-height:1;
     color:#0f172a;
-    margin-bottom:10px;
     letter-spacing:-0.03em;
+  }
+
+  .size-ledger-link{
+    width:28px;
+    height:28px;
+    border-radius:999px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    text-decoration:none;
+    background:#ecfdf5;
+    border:1px solid #bbf7d0;
+    color:#166534;
+    font-size:13px;
+    flex-shrink:0;
+  }
+
+  .size-ledger-link:hover{
+    background:#dcfce7;
   }
 
   .size-values{
@@ -785,6 +919,10 @@
     margin-left:4px;
   }
 
+  .material-actions{
+    margin-top:12px;
+  }
+
   .out-pill{
     display:inline-flex;
     align-items:center;
@@ -846,6 +984,20 @@
     text-decoration:underline;
   }
 
+  .table-action{
+    color:#0f172a;
+    font-weight:900;
+    text-decoration:none;
+    border:1px solid #e2e8f0;
+    padding:7px 10px;
+    border-radius:12px;
+    background:#fff;
+  }
+
+  .table-action:hover{
+    background:#f8fafc;
+  }
+
   .text-end{
     text-align:right !important;
   }
@@ -878,7 +1030,8 @@
     }
 
     .btn-dark,
-    .btn-light{
+    .btn-light,
+    .btn-ledger{
       flex:1;
       min-width:130px;
     }

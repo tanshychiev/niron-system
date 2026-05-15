@@ -93,7 +93,6 @@ class InventoryItem(models.Model):
         (STYLE_BOXY, "Boxy"),
     ]
 
-    # ===== BASIC =====
     code = models.CharField(max_length=50, unique=True, blank=True)
     name = models.CharField(max_length=150)
 
@@ -116,7 +115,6 @@ class InventoryItem(models.Model):
         blank=True,
     )
 
-    # 🔥 IMAGE (ONLY USED FOR NON-SHIRT)
     image = models.ImageField(
         upload_to="inventory/items/",
         blank=True,
@@ -135,7 +133,6 @@ class InventoryItem(models.Model):
     def __str__(self):
         return f"{self.code} - {self.name}"
 
-    # ===== AUTO CODE =====
     def save(self, *args, **kwargs):
         if not self.code:
             name_lower = (self.name or "").strip().lower()
@@ -169,13 +166,12 @@ class InventoryItem(models.Model):
 
             self.code = code
 
-        # 👕 ONLY SHIRT uses style
+        # Only shirt uses style
         if self.item_type != self.TYPE_SHIRT:
             self.sample_style = ""
 
         super().save(*args, **kwargs)
 
-    # ===== TOTAL STOCK =====
     @property
     def total_stock(self):
         result = self.batch_items.filter(
@@ -183,6 +179,8 @@ class InventoryItem(models.Model):
             batch__is_deleted=False,
         ).aggregate(total=Sum("qty_remaining"))
         return result["total"] or Decimal("0")
+
+
 class InventoryBatch(models.Model):
     STATUS_DRAFT = "DRAFT"
     STATUS_FINAL = "FINAL"
@@ -237,7 +235,11 @@ class InventoryBatch(models.Model):
 
     @property
     def total_expense(self):
-        return (self.total_goods_cost or 0) + (self.shipping_cost or 0) + (self.extra_cost or 0)
+        return (
+            (self.total_goods_cost or Decimal("0"))
+            + (self.shipping_cost or Decimal("0"))
+            + (self.extra_cost or Decimal("0"))
+        )
 
     @property
     def total_cloth(self):
@@ -284,6 +286,7 @@ class InventoryBatchItem(models.Model):
         decimal_places=2,
         validators=[MinValueValidator(Decimal("0"))],
     )
+
     base_unit_cost = models.DecimalField(max_digits=12, decimal_places=4, default=0)
     final_unit_cost = models.DecimalField(max_digits=12, decimal_places=4, default=0)
     is_active = models.BooleanField(default=True)
@@ -368,6 +371,10 @@ class InventoryAdjustment(models.Model):
     adjustment_type = models.CharField(max_length=20, choices=TYPE_CHOICES)
     qty = models.DecimalField(max_digits=12, decimal_places=2)
     reason = models.TextField(blank=True, default="")
+
+    qty_before = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    qty_after = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
     created_at = models.DateTimeField(default=timezone.now)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -376,8 +383,6 @@ class InventoryAdjustment(models.Model):
         blank=True,
         related_name="inventory_adjustments_created",
     )
-    qty_before = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    qty_after = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
     class Meta:
         ordering = ["-created_at", "-id"]
@@ -388,3 +393,113 @@ class InventoryAdjustment(models.Model):
     def clean(self):
         if self.qty is not None and self.qty <= 0:
             raise ValidationError("Adjustment qty must be greater than 0.")
+
+
+class StockLedger(models.Model):
+    TYPE_CORRECT = "CORRECT"
+    TYPE_STOCK_IN = "STOCK_IN"
+    TYPE_ORDER_OUT = "ORDER_OUT"
+    TYPE_ORDER_RESTORE = "ORDER_RESTORE"
+    TYPE_ADJUST_IN = "ADJUST_IN"
+    TYPE_ADJUST_OUT = "ADJUST_OUT"
+    TYPE_BATCH_EDIT = "BATCH_EDIT"
+    TYPE_BATCH_DELETE = "BATCH_DELETE"
+    TYPE_OTHER = "OTHER"
+
+    TYPE_CHOICES = [
+        (TYPE_CORRECT, "Correct Count / Opening Balance"),
+        (TYPE_STOCK_IN, "Stock In"),
+        (TYPE_ORDER_OUT, "Order / Invoice Out"),
+        (TYPE_ORDER_RESTORE, "Order / Invoice Restore"),
+        (TYPE_ADJUST_IN, "Adjustment In"),
+        (TYPE_ADJUST_OUT, "Adjustment Out"),
+        (TYPE_BATCH_EDIT, "Batch Edit"),
+        (TYPE_BATCH_DELETE, "Batch Delete"),
+        (TYPE_OTHER, "Other"),
+    ]
+
+    SOURCE_CORRECT = "CORRECT"
+    SOURCE_STOCK_IN = "STOCK_IN"
+    SOURCE_ORDER = "ORDER"
+    SOURCE_ADJUSTMENT = "ADJUSTMENT"
+    SOURCE_BATCH = "BATCH"
+    SOURCE_SYSTEM = "SYSTEM"
+    SOURCE_OTHER = "OTHER"
+
+    SOURCE_CHOICES = [
+        (SOURCE_CORRECT, "Correct Count"),
+        (SOURCE_STOCK_IN, "Stock In"),
+        (SOURCE_ORDER, "Order / Invoice"),
+        (SOURCE_ADJUSTMENT, "Adjustment"),
+        (SOURCE_BATCH, "Batch"),
+        (SOURCE_SYSTEM, "System"),
+        (SOURCE_OTHER, "Other"),
+    ]
+
+    batch_item = models.ForeignKey(
+        InventoryBatchItem,
+        on_delete=models.PROTECT,
+        related_name="ledger_logs",
+    )
+
+    movement_type = models.CharField(max_length=30, choices=TYPE_CHOICES)
+
+    qty_before = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    qty_in = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    qty_out = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    qty_after = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    # Example: NR-2605-001, STK-20260515, ADJ-0001, CORRECT-0001
+    reference_no = models.CharField(max_length=80, blank=True, default="")
+
+    # Example: ORDER + order.id, ADJUSTMENT + adjustment.id, STOCK_IN + batch.id
+    source_type = models.CharField(
+        max_length=50,
+        choices=SOURCE_CHOICES,
+        blank=True,
+        default="",
+    )
+    source_id = models.PositiveIntegerField(null=True, blank=True)
+
+    # Snapshot fields for easy display/search even if source object changes later
+    order_id = models.PositiveIntegerField(null=True, blank=True)
+    order_no = models.CharField(max_length=80, blank=True, default="")
+    batch_no = models.CharField(max_length=80, blank=True, default="")
+
+    # Correct checkpoint: after this date, track only forward
+    is_correct_checkpoint = models.BooleanField(default=False)
+    correct_remark = models.CharField(max_length=255, blank=True, default="")
+
+    remark = models.TextField(blank=True, default="")
+
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="stock_ledger_created",
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["batch_item", "created_at"]),
+            models.Index(fields=["movement_type", "created_at"]),
+            models.Index(fields=["is_correct_checkpoint", "created_at"]),
+            models.Index(fields=["reference_no"]),
+            models.Index(fields=["order_no"]),
+            models.Index(fields=["batch_no"]),
+            models.Index(fields=["source_type", "source_id"]),
+        ]
+
+    def __str__(self):
+        return f"{self.batch_item} | {self.movement_type} | {self.qty_before} -> {self.qty_after}"
+
+    @property
+    def direction_label(self):
+        if self.qty_in and self.qty_in > 0:
+            return "IN"
+        if self.qty_out and self.qty_out > 0:
+            return "OUT"
+        return "NO CHANGE"

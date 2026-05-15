@@ -4,12 +4,11 @@ from decimal import Decimal
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import Q, Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
-from django.db.models import Q
 
-from orders.models import Order, OrderItem, StockConsumption
+from orders.models import Order, OrderItem
 
 from .forms import (
     ColorForm,
@@ -29,6 +28,14 @@ from .models import (
     InventoryBatchItem,
     InventoryItem,
     Size,
+    StockLedger,
+)
+from .stock_ledger import (
+    correct_stock_count,
+    log_adjustment,
+    log_batch_delete,
+    log_batch_edit,
+    log_stock_in,
 )
 
 
@@ -57,6 +64,7 @@ def _batch_snapshot(batch):
                 "size": row.size.name if row.size else "",
                 "qty_received": str(row.qty_received),
                 "qty_remaining": str(row.qty_remaining),
+                "is_active": row.is_active,
             }
             for row in batch.items.select_related("item", "color", "size").all()
         ],
@@ -137,9 +145,11 @@ def inventory_list(request):
 
         size_name = row.size.name if row.size else "-"
         size_sort = row.size.sort_order if row.size else 9999
+        size_key = row.size_id or 0
 
-        if size_name not in grouped[key]["sizes"]:
-            grouped[key]["sizes"][size_name] = {
+        if size_key not in grouped[key]["sizes"]:
+            grouped[key]["sizes"][size_key] = {
+                "size_id": row.size_id,
                 "size_name": size_name,
                 "size_sort": size_sort,
                 "stock_qty": 0,
@@ -148,7 +158,7 @@ def inventory_list(request):
                 "total_qty": 0,
             }
 
-        grouped[key]["sizes"][size_name]["stock_qty"] += stock_qty
+        grouped[key]["sizes"][size_key]["stock_qty"] += stock_qty
 
     progress_rows = (
         OrderItem.objects.select_related("shirt_item", "color", "size", "order")
@@ -180,9 +190,11 @@ def inventory_list(request):
 
         size_name = row.size.name if row.size else "-"
         size_sort = row.size.sort_order if row.size else 9999
+        size_key = row.size_id or 0
 
-        if size_name not in grouped[key]["sizes"]:
-            grouped[key]["sizes"][size_name] = {
+        if size_key not in grouped[key]["sizes"]:
+            grouped[key]["sizes"][size_key] = {
+                "size_id": row.size_id,
                 "size_name": size_name,
                 "size_sort": size_sort,
                 "stock_qty": 0,
@@ -191,7 +203,7 @@ def inventory_list(request):
                 "total_qty": 0,
             }
 
-        grouped[key]["sizes"][size_name]["in_progress_qty"] += in_progress_qty
+        grouped[key]["sizes"][size_key]["in_progress_qty"] += in_progress_qty
 
     variant_cards = []
 
@@ -307,6 +319,7 @@ def inventory_list(request):
         },
     )
 
+
 @login_required
 @permission_required("inventory.view_inventoryitem", raise_exception=True)
 def inventory_item_list(request):
@@ -361,6 +374,28 @@ def inventory_item_edit(request, pk):
             "submit_label": "Update Item",
         },
     )
+
+
+@login_required
+@permission_required("inventory.delete_inventoryitem", raise_exception=True)
+def inventory_item_delete(request, pk):
+    item = get_object_or_404(InventoryItem, pk=pk)
+
+    used_in_batch = InventoryBatchItem.objects.filter(item=item).exists()
+    used_in_order = OrderItem.objects.filter(
+        Q(shirt_item=item) | Q(film_item=item) | Q(material_item=item)
+    ).exists()
+
+    if used_in_batch or used_in_order:
+        messages.error(request, "Cannot delete. Item already used in stock or orders.")
+        return redirect("inventory_item_list")
+
+    if request.method == "POST":
+        item.delete()
+        messages.success(request, "Item deleted successfully.")
+        return redirect("inventory_item_list")
+
+    return render(request, "inventory/inventory_item_delete.html", {"item": item})
 
 
 @login_required
@@ -505,11 +540,19 @@ def inventory_batch_create(request):
                 item.final_unit_cost = 0
                 item.is_active = True
 
-                # make remaining stock same as received qty on create
                 if not item.qty_remaining:
                     item.qty_remaining = item.qty_received
 
                 item.save()
+
+                log_stock_in(
+                    batch_item=item,
+                    qty_before=Decimal("0"),
+                    qty_after=item.qty_remaining,
+                    batch=batch,
+                    user=request.user,
+                    remark=f"Stock in from batch {batch.batch_no}",
+                )
 
             _log_batch_history(
                 batch,
@@ -536,6 +579,7 @@ def inventory_batch_create(request):
         },
     )
 
+
 @login_required
 @permission_required("inventory.change_inventorybatch", raise_exception=True)
 @transaction.atomic
@@ -558,16 +602,59 @@ def inventory_batch_edit(request, pk):
                 if obj.qty_used != 0:
                     messages.error(request, "Cannot delete a row that already has stock used.")
                     return redirect("inventory_batch_edit", pk=batch.pk)
-                obj.delete()
+
+                old_qty = Decimal(obj.qty_remaining or 0)
+
+                log_batch_delete(
+                    batch_item=obj,
+                    qty_before=old_qty,
+                    qty_after=Decimal("0"),
+                    batch=batch,
+                    user=request.user,
+                    remark=f"Batch row removed from active stock in {batch.batch_no}",
+                )
+
+                obj.qty_remaining = Decimal("0")
+                obj.is_active = False
+                obj.save(update_fields=["qty_remaining", "is_active"])
 
             for item in items:
                 if not item.item:
                     continue
+
+                is_new = item.pk is None
+                old_qty = Decimal("0")
+
+                if not is_new:
+                    old_obj = InventoryBatchItem.objects.get(pk=item.pk)
+                    old_qty = Decimal(old_obj.qty_remaining or 0)
+
                 item.batch = batch
                 item.base_unit_cost = 0
                 item.final_unit_cost = 0
                 item.is_active = True
                 item.save()
+
+                new_qty = Decimal(item.qty_remaining or 0)
+
+                if is_new:
+                    log_stock_in(
+                        batch_item=item,
+                        qty_before=Decimal("0"),
+                        qty_after=new_qty,
+                        batch=batch,
+                        user=request.user,
+                        remark=f"New stock row added in batch {batch.batch_no}",
+                    )
+                elif new_qty != old_qty:
+                    log_batch_edit(
+                        batch_item=item,
+                        qty_before=old_qty,
+                        qty_after=new_qty,
+                        batch=batch,
+                        user=request.user,
+                        remark=f"Batch edited: {batch.batch_no}",
+                    )
 
             _log_batch_history(batch, InventoryBatchHistory.ACTION_UPDATE, request.user, "Batch updated")
             messages.success(request, f"Batch {batch.batch_no} updated.")
@@ -593,9 +680,25 @@ def inventory_batch_edit(request, pk):
 @permission_required("inventory.delete_inventorybatch", raise_exception=True)
 @transaction.atomic
 def inventory_batch_delete(request, pk):
-    batch = get_object_or_404(InventoryBatch, pk=pk, is_deleted=False)
+    batch = get_object_or_404(
+        InventoryBatch.objects.prefetch_related("items"),
+        pk=pk,
+        is_deleted=False,
+    )
 
     if request.method == "POST":
+        for row in batch.items.filter(is_active=True):
+            old_qty = Decimal(row.qty_remaining or 0)
+
+            log_batch_delete(
+                batch_item=row,
+                qty_before=old_qty,
+                qty_after=Decimal("0"),
+                batch=batch,
+                user=request.user,
+                remark=f"Batch soft deleted: {batch.batch_no}",
+            )
+
         batch.is_deleted = True
         batch.deleted_at = timezone.now()
         if request.user.is_authenticated:
@@ -660,7 +763,7 @@ def inventory_adjustment_create(request, batch_item_id):
             adjustment.batch_item = batch_item
             adjustment.created_by = request.user if request.user.is_authenticated else None
 
-            old_qty = batch_item.qty_remaining or Decimal("0")
+            old_qty = Decimal(batch_item.qty_remaining or 0)
             adjustment.qty_before = old_qty
 
             adjustment_type = form.cleaned_data["adjustment_type"]
@@ -668,8 +771,8 @@ def inventory_adjustment_create(request, batch_item_id):
             stocktake_final_qty = form.cleaned_data.get("stocktake_final_qty")
 
             if adjustment_type == InventoryAdjustment.TYPE_STOCKTAKE:
-                new_qty = stocktake_final_qty
-                diff = abs((new_qty or Decimal("0")) - old_qty)
+                new_qty = Decimal(stocktake_final_qty or 0)
+                diff = abs(new_qty - old_qty)
                 adjustment.qty = diff
             elif adjustment_type in [InventoryAdjustment.TYPE_ADD, InventoryAdjustment.TYPE_FOUND]:
                 new_qty = old_qty + qty
@@ -691,6 +794,15 @@ def inventory_adjustment_create(request, batch_item_id):
 
             batch_item.qty_remaining = new_qty
             batch_item.save(update_fields=["qty_remaining"])
+
+            log_adjustment(
+                batch_item=batch_item,
+                qty_before=old_qty,
+                qty_after=new_qty,
+                adjustment=adjustment,
+                user=request.user,
+                remark=adjustment.reason or f"Stock adjusted: {adjustment.adjustment_type}",
+            )
 
             _log_batch_history(
                 batch_item.batch,
@@ -801,6 +913,7 @@ def inventory_adjust_stock_select(request):
                 reason = adjust_form.cleaned_data.get("reason") or ""
 
                 if adjustment_type == "STOCKTAKE":
+                    final_qty = Decimal(final_qty or 0)
                     diff = final_qty - total_stock
 
                     if diff == 0:
@@ -814,11 +927,11 @@ def inventory_adjust_stock_select(request):
                             messages.error(request, "No stock row found to add into. Please create stock batch first.")
                             return redirect(request.path + "?" + request.META.get("QUERY_STRING", ""))
 
-                        old_qty = target.qty_remaining
+                        old_qty = Decimal(target.qty_remaining or 0)
                         target.qty_remaining = old_qty + diff
                         target.save(update_fields=["qty_remaining"])
 
-                        InventoryAdjustment.objects.create(
+                        adjustment = InventoryAdjustment.objects.create(
                             batch_item=target,
                             adjustment_type=InventoryAdjustment.TYPE_FOUND,
                             qty=diff,
@@ -828,6 +941,15 @@ def inventory_adjust_stock_select(request):
                             qty_after=target.qty_remaining,
                         )
 
+                        log_adjustment(
+                            batch_item=target,
+                            qty_before=old_qty,
+                            qty_after=target.qty_remaining,
+                            adjustment=adjustment,
+                            user=request.user,
+                            remark=adjustment.reason,
+                        )
+
                     else:
                         remaining_to_reduce = abs(diff)
 
@@ -835,12 +957,12 @@ def inventory_adjust_stock_select(request):
                             if remaining_to_reduce <= 0:
                                 break
 
-                            use_qty = min(row.qty_remaining, remaining_to_reduce)
-                            old_qty = row.qty_remaining
+                            use_qty = min(Decimal(row.qty_remaining or 0), remaining_to_reduce)
+                            old_qty = Decimal(row.qty_remaining or 0)
                             row.qty_remaining = old_qty - use_qty
                             row.save(update_fields=["qty_remaining"])
 
-                            InventoryAdjustment.objects.create(
+                            adjustment = InventoryAdjustment.objects.create(
                                 batch_item=row,
                                 adjustment_type=InventoryAdjustment.TYPE_STOCKTAKE,
                                 qty=use_qty,
@@ -848,6 +970,15 @@ def inventory_adjust_stock_select(request):
                                 created_by=request.user if request.user.is_authenticated else None,
                                 qty_before=old_qty,
                                 qty_after=row.qty_remaining,
+                            )
+
+                            log_adjustment(
+                                batch_item=row,
+                                qty_before=old_qty,
+                                qty_after=row.qty_remaining,
+                                adjustment=adjustment,
+                                user=request.user,
+                                remark=adjustment.reason,
                             )
 
                             remaining_to_reduce -= use_qty
@@ -860,11 +991,11 @@ def inventory_adjust_stock_select(request):
                             messages.error(request, "No stock row found to add into. Please create stock batch first.")
                             return redirect(request.path + "?" + request.META.get("QUERY_STRING", ""))
 
-                        old_qty = target.qty_remaining
+                        old_qty = Decimal(target.qty_remaining or 0)
                         target.qty_remaining = old_qty + qty
                         target.save(update_fields=["qty_remaining"])
 
-                        InventoryAdjustment.objects.create(
+                        adjustment = InventoryAdjustment.objects.create(
                             batch_item=target,
                             adjustment_type=InventoryAdjustment.TYPE_FOUND if adjustment_type == "FOUND" else InventoryAdjustment.TYPE_ADD,
                             qty=qty,
@@ -872,6 +1003,15 @@ def inventory_adjust_stock_select(request):
                             created_by=request.user if request.user.is_authenticated else None,
                             qty_before=old_qty,
                             qty_after=target.qty_remaining,
+                        )
+
+                        log_adjustment(
+                            batch_item=target,
+                            qty_before=old_qty,
+                            qty_after=target.qty_remaining,
+                            adjustment=adjustment,
+                            user=request.user,
+                            remark=adjustment.reason or "Stock added",
                         )
 
                     else:
@@ -891,12 +1031,12 @@ def inventory_adjust_stock_select(request):
                             if remaining_to_reduce <= 0:
                                 break
 
-                            use_qty = min(row.qty_remaining, remaining_to_reduce)
-                            old_qty = row.qty_remaining
+                            use_qty = min(Decimal(row.qty_remaining or 0), remaining_to_reduce)
+                            old_qty = Decimal(row.qty_remaining or 0)
                             row.qty_remaining = old_qty - use_qty
                             row.save(update_fields=["qty_remaining"])
 
-                            InventoryAdjustment.objects.create(
+                            adjustment = InventoryAdjustment.objects.create(
                                 batch_item=row,
                                 adjustment_type=type_map[adjustment_type],
                                 qty=use_qty,
@@ -904,6 +1044,15 @@ def inventory_adjust_stock_select(request):
                                 created_by=request.user if request.user.is_authenticated else None,
                                 qty_before=old_qty,
                                 qty_after=row.qty_remaining,
+                            )
+
+                            log_adjustment(
+                                batch_item=row,
+                                qty_before=old_qty,
+                                qty_after=row.qty_remaining,
+                                adjustment=adjustment,
+                                user=request.user,
+                                remark=adjustment.reason or "Stock reduced",
                             )
 
                             remaining_to_reduce -= use_qty
@@ -1027,12 +1176,12 @@ def material_usage(request):
             if remaining_to_reduce <= 0:
                 break
 
-            use_qty = min(row.qty_remaining, remaining_to_reduce)
-            old_qty = row.qty_remaining
+            use_qty = min(Decimal(row.qty_remaining or 0), remaining_to_reduce)
+            old_qty = Decimal(row.qty_remaining or 0)
             row.qty_remaining = old_qty - use_qty
             row.save(update_fields=["qty_remaining"])
 
-            InventoryAdjustment.objects.create(
+            adjustment = InventoryAdjustment.objects.create(
                 batch_item=row,
                 adjustment_type=InventoryAdjustment.TYPE_REMOVE,
                 qty=use_qty,
@@ -1040,6 +1189,15 @@ def material_usage(request):
                 created_by=request.user if request.user.is_authenticated else None,
                 qty_before=old_qty,
                 qty_after=row.qty_remaining,
+            )
+
+            log_adjustment(
+                batch_item=row,
+                qty_before=old_qty,
+                qty_after=row.qty_remaining,
+                adjustment=adjustment,
+                user=request.user,
+                remark=adjustment.reason or "Material usage",
             )
 
             remaining_to_reduce -= use_qty
@@ -1108,22 +1266,186 @@ def material_usage(request):
         },
     )
 
+
 @login_required
-@permission_required("inventory.delete_inventoryitem", raise_exception=True)
-def inventory_item_delete(request, pk):
-    item = get_object_or_404(InventoryItem, pk=pk)
+@permission_required("inventory.view_stockledger", raise_exception=True)
+def stock_ledger_list(request):
+    keyword = (request.GET.get("q") or "").strip()
+    movement_type = (request.GET.get("movement_type") or "").strip()
+    date_from = (request.GET.get("date_from") or "").strip()
+    date_to = (request.GET.get("date_to") or "").strip()
+    only_correct_forward = request.GET.get("from_correct") == "1"
 
-    # prevent delete if already used
-    used_in_batch = InventoryBatchItem.objects.filter(item=item).exists()
-    used_in_order = OrderItem.objects.filter(shirt_item=item).exists()
+    item_id = (request.GET.get("item") or "").strip()
+    color_id = (request.GET.get("color") or "").strip()
+    size_id = (request.GET.get("size") or "").strip()
 
-    if used_in_batch or used_in_order:
-        messages.error(request, "Cannot delete. Item already used in stock or orders.")
-        return redirect("inventory_item_list")
+    qs = (
+        StockLedger.objects
+        .select_related(
+            "batch_item",
+            "batch_item__batch",
+            "batch_item__item",
+            "batch_item__color",
+            "batch_item__size",
+            "created_by",
+        )
+        .order_by("-created_at", "-id")
+    )
+
+    if keyword:
+        qs = qs.filter(
+            Q(reference_no__icontains=keyword)
+            | Q(order_no__icontains=keyword)
+            | Q(batch_no__icontains=keyword)
+            | Q(remark__icontains=keyword)
+            | Q(correct_remark__icontains=keyword)
+            | Q(batch_item__item__name__icontains=keyword)
+            | Q(batch_item__item__code__icontains=keyword)
+            | Q(batch_item__color__name__icontains=keyword)
+            | Q(batch_item__size__name__icontains=keyword)
+        )
+
+    if movement_type:
+        qs = qs.filter(movement_type=movement_type)
+
+    if date_from:
+        qs = qs.filter(created_at__date__gte=date_from)
+
+    if date_to:
+        qs = qs.filter(created_at__date__lte=date_to)
+
+    if item_id:
+        qs = qs.filter(batch_item__item_id=item_id)
+
+    if color_id:
+        qs = qs.filter(batch_item__color_id=color_id)
+
+    if size_id:
+        qs = qs.filter(batch_item__size_id=size_id)
+
+    last_correct = None
+    if only_correct_forward and item_id:
+        correct_qs = StockLedger.objects.filter(
+            is_correct_checkpoint=True,
+            batch_item__item_id=item_id,
+        )
+
+        if color_id:
+            correct_qs = correct_qs.filter(batch_item__color_id=color_id)
+
+        if size_id:
+            correct_qs = correct_qs.filter(batch_item__size_id=size_id)
+
+        last_correct = correct_qs.order_by("-created_at", "-id").first()
+
+        if last_correct:
+            qs = qs.filter(created_at__gte=last_correct.created_at)
+
+    return render(
+        request,
+        "inventory/stock_ledger_list.html",
+        {
+            "rows": qs[:500],
+            "keyword": keyword,
+            "movement_type": movement_type,
+            "date_from": date_from,
+            "date_to": date_to,
+            "only_correct_forward": only_correct_forward,
+            "last_correct": last_correct,
+            "selected_item_id": item_id,
+            "selected_color_id": color_id,
+            "selected_size_id": size_id,
+            "items": InventoryItem.objects.filter(is_active=True).order_by("item_type", "code", "name"),
+            "colors": Color.objects.filter(is_active=True).order_by("name"),
+            "sizes": Size.objects.filter(is_active=True).order_by("sort_order", "id"),
+            "movement_choices": StockLedger.TYPE_CHOICES,
+        },
+    )
+
+
+@login_required
+@permission_required("inventory.view_stockledger", raise_exception=True)
+def stock_ledger_by_batch_item(request, batch_item_id):
+    batch_item = get_object_or_404(
+        InventoryBatchItem.objects.select_related("batch", "item", "color", "size"),
+        pk=batch_item_id,
+    )
+
+    only_correct_forward = request.GET.get("from_correct") == "1"
+
+    qs = (
+        StockLedger.objects
+        .select_related("created_by", "batch_item", "batch_item__item", "batch_item__color", "batch_item__size")
+        .filter(batch_item=batch_item)
+        .order_by("-created_at", "-id")
+    )
+
+    last_correct = (
+        StockLedger.objects
+        .filter(batch_item=batch_item, is_correct_checkpoint=True)
+        .order_by("-created_at", "-id")
+        .first()
+    )
+
+    if only_correct_forward and last_correct:
+        qs = qs.filter(created_at__gte=last_correct.created_at)
+
+    return render(
+        request,
+        "inventory/stock_ledger_list.html",
+        {
+            "rows": qs[:500],
+            "batch_item": batch_item,
+            "only_correct_forward": only_correct_forward,
+            "last_correct": last_correct,
+            "items": InventoryItem.objects.filter(is_active=True).order_by("item_type", "code", "name"),
+            "colors": Color.objects.filter(is_active=True).order_by("name"),
+            "sizes": Size.objects.filter(is_active=True).order_by("sort_order", "id"),
+            "movement_choices": StockLedger.TYPE_CHOICES,
+        },
+    )
+
+
+@login_required
+@permission_required("inventory.add_stockledger", raise_exception=True)
+@transaction.atomic
+def correct_stock_count_view(request, batch_item_id):
+    batch_item = get_object_or_404(
+        InventoryBatchItem.objects.select_related("batch", "item", "color", "size"),
+        pk=batch_item_id,
+        batch__is_deleted=False,
+    )
 
     if request.method == "POST":
-        item.delete()
-        messages.success(request, "Item deleted successfully.")
-        return redirect("inventory_item_list")
+        correct_qty = Decimal(str(request.POST.get("correct_qty") or "0"))
+        remark = (request.POST.get("remark") or "").strip()
 
-    return render(request, "inventory/inventory_item_delete.html", {"item": item})
+        if correct_qty < 0:
+            messages.error(request, "Correct qty cannot be below 0.")
+            return redirect("correct_stock_count", batch_item_id=batch_item.pk)
+
+        correct_stock_count(
+            batch_item=batch_item,
+            correct_qty=correct_qty,
+            user=request.user,
+            remark=remark or "Correct stock count. Track from this date forward.",
+        )
+
+        _log_batch_history(
+            batch_item.batch,
+            InventoryBatchHistory.ACTION_UPDATE,
+            request.user,
+            f"Correct stock count for row {batch_item.id}: {correct_qty}",
+        )
+
+        messages.success(request, "Stock marked as correct. Next time check from this date forward.")
+        return redirect("stock_ledger_by_batch_item", batch_item_id=batch_item.pk)
+
+    return render(
+        request,
+        "inventory/correct_stock_form.html",
+        {
+            "batch_item": batch_item,
+        },
+    )

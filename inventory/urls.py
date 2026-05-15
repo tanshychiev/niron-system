@@ -13,14 +13,19 @@ from .views import (
     inventory_batch_edit,
     inventory_batch_history,
     inventory_item_create,
+    inventory_item_delete,
     inventory_item_edit,
     inventory_item_list,
-    inventory_item_delete,   # ✅ add this
     inventory_list,
     material_usage,
     size_create,
     size_edit,
     size_list,
+
+    # Stock Ledger
+    stock_ledger_list,
+    stock_ledger_by_batch_item,
+    correct_stock_count_view,
 )
 
 urlpatterns = [
@@ -31,7 +36,7 @@ urlpatterns = [
     path("items/", inventory_item_list, name="inventory_item_list"),
     path("items/new/", inventory_item_create, name="inventory_item_create"),
     path("items/<int:pk>/edit/", inventory_item_edit, name="inventory_item_edit"),
-    path("items/<int:pk>/delete/", inventory_item_delete, name="inventory_item_delete"),  # ✅ FIXED
+    path("items/<int:pk>/delete/", inventory_item_delete, name="inventory_item_delete"),
 
     # Colors
     path("colors/", color_list, name="color_list"),
@@ -43,7 +48,7 @@ urlpatterns = [
     path("sizes/new/", size_create, name="size_create"),
     path("sizes/<int:pk>/edit/", size_edit, name="size_edit"),
 
-    # Stock In (Batch)
+    # Stock In / Batch
     path("batches/new/", inventory_batch_create, name="inventory_batch_create"),
     path("batches/<int:pk>/", inventory_batch_detail, name="inventory_batch_detail"),
     path("batches/<int:pk>/edit/", inventory_batch_edit, name="inventory_batch_edit"),
@@ -57,4 +62,9 @@ urlpatterns = [
 
     # Material usage
     path("material-usage/", material_usage, name="material_usage"),
+
+    # Stock Ledger
+    path("ledger/", stock_ledger_list, name="stock_ledger_list"),
+    path("ledger/batch-item/<int:batch_item_id>/", stock_ledger_by_batch_item, name="stock_ledger_by_batch_item"),
+    path("ledger/batch-item/<int:batch_item_id>/correct/", correct_stock_count_view, name="correct_stock_count"),
 ]
