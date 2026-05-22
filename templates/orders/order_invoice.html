@@ -7,7 +7,10 @@
 <title>Invoice {{ order.order_no }}</title>
 
 <style>
-@page { size: A4; margin: 0; }
+@page {
+    size: A4;
+    margin: 0;
+}
 
 * {
     box-sizing: border-box;
@@ -30,13 +33,15 @@ html, body {
     margin: 0 auto;
 }
 
-/* NIRON THEME */
 :root {
     --brand: #8b451f;
-    --soft: #fbf3ec;
-    --light: #f7eee8;
+    --border: #e5e7eb;
+    --muted: #6b7280;
 }
 
+/* =========================
+   HEADER
+========================= */
 .header {
     display: flex;
     justify-content: space-between;
@@ -55,7 +60,7 @@ html, body {
 .subtitle {
     margin-top: 5px;
     font-size: 12px;
-    color: #6b7280;
+    color: var(--muted);
 }
 
 .invoice-title {
@@ -71,9 +76,12 @@ html, body {
 .invoice-no {
     margin-top: 6px;
     font-size: 12px;
-    color: #6b7280;
+    color: var(--muted);
 }
 
+/* =========================
+   INFO BOX
+========================= */
 .info-grid {
     display: grid;
     grid-template-columns: 1.15fr .85fr;
@@ -82,7 +90,7 @@ html, body {
 }
 
 .info-box {
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--border);
     border-radius: 12px;
     padding: 6mm;
     min-height: 33mm;
@@ -101,9 +109,12 @@ html, body {
     margin-bottom: 7px;
 }
 
+/* =========================
+   DESIGN CARD
+========================= */
 .design-card {
     margin-top: 8mm;
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--border);
     border-radius: 12px;
     padding: 6mm;
     page-break-inside: avoid;
@@ -145,7 +156,7 @@ html, body {
     border-radius: 12px;
     overflow: hidden;
     background: #f3f4f6;
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--border);
 }
 
 .design-img-wrap img {
@@ -160,10 +171,13 @@ html, body {
     align-items: center;
     justify-content: center;
     font-size: 11px;
-    color: #6b7280;
+    color: var(--muted);
     text-align: center;
 }
 
+/* =========================
+   TABLE
+========================= */
 .item-table {
     width: 100%;
     border-collapse: collapse;
@@ -184,17 +198,93 @@ html, body {
     border-bottom: 1px dashed #d1d5db;
 }
 
-.text-right { text-align: right; }
-.text-center { text-align: center; }
+.text-right {
+    text-align: right;
+}
 
+.text-center {
+    text-align: center;
+}
+
+/* =========================
+   BOTTOM
+========================= */
 .bottom-section {
     display: grid;
     grid-template-columns: 1fr 78mm;
     gap: 14mm;
-    margin-top: 12mm;
+    margin-top: 14mm;
     align-items: start;
 }
 
+/* =========================
+   SIGNATURE FIX
+========================= */
+.signature-area {
+    min-height: 52mm;
+}
+
+.signature-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14mm;
+    align-items: start;
+}
+
+.sign-block {
+    width: 100%;
+    height: 48mm;
+    display: flex;
+    flex-direction: column;
+}
+
+.sign-label {
+    font-size: 12px;
+    font-weight: 400;
+    color: #000;
+    margin-bottom: 8mm;
+}
+
+.signature-img-wrap,
+.customer-blank-space {
+    width: 100%;
+    height: 16mm;
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-start;
+    margin-bottom: 2mm;
+}
+
+.signature-img {
+    max-width: 100%;
+    max-height: 16mm;
+    object-fit: contain;
+}
+
+.sign-line {
+    border-bottom: 1px solid #000;
+    width: 100%;
+    height: 1px;
+    margin-bottom: 3mm;
+}
+
+.issue-info {
+    font-size: 12px;
+    color: #000;
+    line-height: 1.5;
+}
+
+.issue-info strong {
+    font-weight: 700;
+}
+
+.blank-info {
+    visibility: hidden;
+}
+
+/* =========================
+   SUMMARY
+========================= */
 .summary {
     width: 78mm;
 }
@@ -204,7 +294,7 @@ html, body {
     justify-content: space-between;
     padding: 9px 0;
     font-size: 13px;
-    border-bottom: 1px solid #e5e7eb;
+    border-bottom: 1px solid var(--border);
 }
 
 .balance-row {
@@ -221,62 +311,15 @@ html, body {
     color: var(--brand);
 }
 
-.signature-area {
-    min-height: 45mm;
-}
+@media print {
+    html, body {
+        width: 210mm;
+        min-height: 297mm;
+    }
 
-.signature-label,
-.issue-label {
-    display: inline-block;
-    color: var(--brand);
-    background: var(--light);
-    padding: 6px 12px;
-    border-radius: 8px;
-    font-size: 11px;
-    font-weight: 900;
-    margin-bottom: 6px;
-}
-
-.signature-space {
-    width: 62mm;
-    height: 25mm;
-    margin-bottom: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #c4a48c;
-    font-size: 11px;
-    border: 1px dashed #e6d6cc;
-    border-radius: 8px;
-    overflow: hidden;
-}
-
-.signature-img {
-    max-width: 100%;
-    max-height: 100%;
-    object-fit: contain;
-}
-
-.signature-line {
-    width: 62mm;
-    border-bottom: 1px solid #111827;
-    margin: 4px 0 10px;
-}
-
-.issue-box {
-    margin-top: 8px;
-}
-
-.issue-name {
-    font-size: 13px;
-    font-weight: 900;
-    margin-top: 2px;
-}
-
-.issue-date {
-    font-size: 11px;
-    color: #6b7280;
-    margin-top: 3px;
+    .invoice-page {
+        margin: 0;
+    }
 }
 </style>
 </head>
@@ -284,9 +327,16 @@ html, body {
 <body>
 <div class="invoice-page">
 
+    <!-- HEADER -->
     <div class="header">
         <div>
-            <div class="brand-logo-text">Niron</div>
+            <div class="brand-logo-text">
+                {% if order.order_type == "KAMPU" %}
+                    Kampu
+                {% else %}
+                    Niron
+                {% endif %}
+            </div>
             <div class="subtitle">Custom Printing Invoice</div>
         </div>
 
@@ -296,6 +346,7 @@ html, body {
         </div>
     </div>
 
+    <!-- CUSTOMER / ORDER INFO -->
     <div class="info-grid">
         <div class="info-box">
             <div class="box-title">Customer</div>
@@ -310,10 +361,11 @@ html, body {
             <div class="info-line"><strong>Order Type:</strong> {{ order.get_order_type_display|default:"-" }}</div>
             <div class="info-line"><strong>Service Type:</strong> {{ order.get_service_type_display|default:"-" }}</div>
             <div class="info-line"><strong>Deadline:</strong> {{ order.deadline|date:"Y-m-d"|default:"-" }}</div>
-            <div class="info-line"><strong>Created:</strong> {{ order.created_at|date:"Y-m-d, g:i a" }}</div>
+            <div class="info-line"><strong>Created:</strong> {{ order.created_at|date:"Y-m-d" }}</div>
         </div>
     </div>
 
+    <!-- DESIGN ITEMS -->
     {% for design in order.designs.all %}
     <div class="design-card">
         <div class="design-top-line">
@@ -325,7 +377,7 @@ html, body {
             <div class="design-img-wrap">
                 {% for file in design.files.all %}
                     {% if forloop.first %}
-                        <img src="{{ file.image.url }}">
+                        <img src="{{ file.image.url }}" alt="Design Image">
                     {% endif %}
                 {% empty %}
                     <div class="no-image">No design image</div>
@@ -447,43 +499,66 @@ html, body {
     </div>
     {% endfor %}
 
+    <!-- BOTTOM SECTION -->
     <div class="bottom-section">
+
+        <!-- SIGNATURE AREA -->
         <div class="signature-area">
-            <div class="signature-label">Signature</div>
+            <div class="signature-grid">
 
-            <div class="signature-space">
-               {% if signature_url %}
-    <img src="{{ signature_url }}" class="signature-img">
-{% else %}
-    No Signature
-{% endif %}
-            </div>
+                <!-- SELLER SIGNATURE -->
+                <div class="sign-block">
+                    <div class="sign-label">Seller Signature:</div>
 
-            <div class="signature-line"></div>
-
-            <div class="issue-box">
-                <span class="issue-label">Issue By</span>
-                <span class="issue-name">
-                    {% if printed_by %}
-                        {% if printed_by.get_full_name %}
-                            {{ printed_by.get_full_name }}
-                        {% else %}
-                            {{ printed_by.username }}
+                    <div class="signature-img-wrap">
+                        {% if signature_url %}
+                            <img src="{{ signature_url }}" class="signature-img" alt="Seller Signature">
                         {% endif %}
-                    {% elif order.created_by %}
-                        {% if order.created_by.get_full_name %}
-                            {{ order.created_by.get_full_name }}
-                        {% else %}
-                            {{ order.created_by.username }}
-                        {% endif %}
-                    {% else %}
-                        -
-                    {% endif %}
-                </span>
-                <div class="issue-date">{% now "Y-m-d, g:i a" %}</div>
+                    </div>
+
+                    <div class="sign-line"></div>
+
+                    <div class="issue-info">
+                        <div>
+                            <strong>Issue by:</strong>
+                            {% if printed_by %}
+                                {% if printed_by.get_full_name %}
+                                    {{ printed_by.get_full_name }}
+                                {% else %}
+                                    {{ printed_by.username }}
+                                {% endif %}
+                            {% elif order.created_by %}
+                                {% if order.created_by.get_full_name %}
+                                    {{ order.created_by.get_full_name }}
+                                {% else %}
+                                    {{ order.created_by.username }}
+                                {% endif %}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </div>
+                        <div><strong>Date:</strong> {% now "Y-m-d" %}</div>
+                    </div>
+                </div>
+
+                <!-- CUSTOMER SIGNATURE -->
+                <div class="sign-block">
+                    <div class="sign-label">Customer Signature:</div>
+
+                    <div class="customer-blank-space"></div>
+
+                    <div class="sign-line"></div>
+
+                    <div class="issue-info blank-info">
+                        <div><strong>Issue by:</strong> -</div>
+                        <div><strong>Date:</strong> -</div>
+                    </div>
+                </div>
+
             </div>
         </div>
 
+        <!-- SUMMARY -->
         <div class="summary">
             <div class="summary-row">
                 <span>Total</span>
@@ -505,6 +580,7 @@ html, body {
                 <span>${{ order.balance_amount|floatformat:2 }}</span>
             </div>
         </div>
+
     </div>
 
 </div>
