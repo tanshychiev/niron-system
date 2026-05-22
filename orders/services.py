@@ -4,8 +4,12 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 
-from inventory.models import InventoryBatch, InventoryBatchItem, InventoryItem
+from inventory.models import InventoryBatch, InventoryBatchItem, StockLedger
 from .models import StockConsumption
+
+
+def _dec(value):
+    return Decimal(str(value or "0"))
 
 
 def _get_fifo_rows(item, color=None, size=None):
@@ -18,9 +22,13 @@ def _get_fifo_rows(item, color=None, size=None):
 
     if color:
         rows = rows.filter(color=color)
+    else:
+        rows = rows.filter(color__isnull=True)
 
     if size:
         rows = rows.filter(size=size)
+    else:
+        rows = rows.filter(size__isnull=True)
 
     return rows.order_by("batch__received_date", "id")
 
@@ -41,7 +49,7 @@ def _available_fifo_qty(item, color=None, size=None):
     total = Decimal("0")
 
     for row in _get_fifo_rows(item, color=color, size=size):
-        total += Decimal(row.qty_remaining or 0)
+        total += _dec(row.qty_remaining)
 
     return total
 
@@ -50,18 +58,71 @@ def _retail_color_size_for_line(order, line):
     if order.service_type != order.SERVICE_RETAIL:
         return line.color, line.size
 
-    # Retail material → no color/size
+    # Retail material has no color / size.
     if line.material_item:
         return None, None
 
     return line.color, line.size
 
 
+def _ledger_user(order, user=None):
+    if user and getattr(user, "is_authenticated", False):
+        return user
+
+    if getattr(order, "created_by", None):
+        return order.created_by
+
+    return None
+
+
+def _log_order_out(order, order_item, batch_item, qty, qty_before, qty_after, user=None):
+    StockLedger.objects.create(
+        batch_item=batch_item,
+        movement_type=StockLedger.TYPE_ORDER_OUT,
+        qty_before=qty_before,
+        qty_in=Decimal("0"),
+        qty_out=qty,
+        qty_after=qty_after,
+        reference_no=order.order_no or "",
+        source_type=StockLedger.SOURCE_ORDER,
+        source_id=order.id,
+        order_id=order.id,
+        order_no=order.order_no or "",
+        batch_no=batch_item.batch.batch_no if batch_item.batch else "",
+        remark=f"Order stock out: {order.order_no}",
+        created_by=_ledger_user(order, user),
+    )
+
+
+def _log_order_restore(order, consume, qty, qty_before, qty_after, user=None):
+    batch_item = consume.batch_item
+
+    StockLedger.objects.create(
+        batch_item=batch_item,
+        movement_type=StockLedger.TYPE_ORDER_RESTORE,
+        qty_before=qty_before,
+        qty_in=qty,
+        qty_out=Decimal("0"),
+        qty_after=qty_after,
+        reference_no=order.order_no or "",
+        source_type=StockLedger.SOURCE_ORDER,
+        source_id=order.id,
+        order_id=order.id,
+        order_no=order.order_no or "",
+        batch_no=batch_item.batch.batch_no if batch_item.batch else "",
+        remark=f"Order stock restored: {order.order_no}",
+        created_by=_ledger_user(order, user),
+    )
+
+
 def get_order_shortages(order):
     shortages = []
 
-    # Film Only and Print & Heat Press do not deduct stock
-    if order.service_type in [order.SERVICE_FILM_ONLY, order.SERVICE_PRINT_HEATPRESS]:
+    # Film Only and Print & Heat Press do not deduct stock.
+    if order.service_type in [
+        order.SERVICE_FILM_ONLY,
+        order.SERVICE_PRINT_HEATPRESS,
+    ]:
         return shortages
 
     lines = order.items.select_related(
@@ -73,18 +134,18 @@ def get_order_shortages(order):
     )
 
     for line in lines:
-        needed = Decimal(line.quantity or 0)
+        needed = _dec(line.quantity)
 
         if needed <= 0:
             continue
 
-        # Retail material stock
+        # Retail material stock.
         if order.service_type == order.SERVICE_RETAIL and line.material_item:
             stock_item = line.material_item
             color = None
             size = None
 
-        # Full order / Retail shirt stock
+        # Full order / Retail shirt stock.
         elif line.shirt_item:
             stock_item = line.shirt_item
             color, size = _retail_color_size_for_line(order, line)
@@ -113,6 +174,7 @@ def get_order_shortages(order):
 
     return shortages
 
+
 def build_shortage_message(shortages):
     if not shortages:
         return ""
@@ -121,7 +183,8 @@ def build_shortage_message(shortages):
 
     for s in shortages:
         lines.append(
-            f"- {s['label']} : need {s['needed']}, available {s['available']}, short {s['shortage']}"
+            f"- {s['label']} : need {s['needed']}, "
+            f"available {s['available']}, short {s['shortage']}"
         )
 
     return "\n".join(lines)
@@ -171,8 +234,17 @@ def _get_or_create_negative_row(item, color=None, size=None):
     )
 
 
-def _consume_fifo(item, qty_needed, order, order_item, color=None, size=None, allow_shortage=False):
-    qty_needed = Decimal(qty_needed or 0)
+def _consume_fifo(
+    item,
+    qty_needed,
+    order,
+    order_item,
+    color=None,
+    size=None,
+    allow_shortage=False,
+    user=None,
+):
+    qty_needed = _dec(qty_needed)
 
     if qty_needed <= 0:
         return Decimal("0")
@@ -184,31 +256,54 @@ def _consume_fifo(item, qty_needed, order, order_item, color=None, size=None, al
         if remaining <= 0:
             break
 
-        available = Decimal(row.qty_remaining or 0)
+        available = _dec(row.qty_remaining)
         take_qty = min(available, remaining)
 
-        if take_qty > 0:
-            row.qty_remaining = available - take_qty
-            row.save(update_fields=["qty_remaining"])
+        if take_qty <= 0:
+            continue
 
-            StockConsumption.objects.create(
-                order=order,
-                order_item=order_item,
-                batch_item=row,
-                consumed_qty=take_qty,
-                unit_cost=row.final_unit_cost or row.base_unit_cost or 0,
-            )
+        before_qty = available
+        after_qty = available - take_qty
 
-            remaining -= take_qty
+        row.qty_remaining = after_qty
+        row.save(update_fields=["qty_remaining"])
+
+        StockConsumption.objects.create(
+            order=order,
+            order_item=order_item,
+            batch_item=row,
+            consumed_qty=take_qty,
+            unit_cost=row.final_unit_cost or row.base_unit_cost or Decimal("0"),
+        )
+
+        _log_order_out(
+            order=order,
+            order_item=order_item,
+            batch_item=row,
+            qty=take_qty,
+            qty_before=before_qty,
+            qty_after=after_qty,
+            user=user,
+        )
+
+        remaining -= take_qty
 
     if remaining > 0:
         if not allow_shortage:
-            raise ValidationError(f"Not enough stock for {_variant_text(item, color, size)}.")
+            raise ValidationError(
+                f"Not enough stock for {_variant_text(item, color, size)}."
+            )
 
-        negative_row = _get_or_create_negative_row(item, color=color, size=size)
+        negative_row = _get_or_create_negative_row(
+            item,
+            color=color,
+            size=size,
+        )
 
-        before_qty = Decimal(negative_row.qty_remaining or 0)
-        negative_row.qty_remaining = before_qty - remaining
+        before_qty = _dec(negative_row.qty_remaining)
+        after_qty = before_qty - remaining
+
+        negative_row.qty_remaining = after_qty
         negative_row.save(update_fields=["qty_remaining"])
 
         StockConsumption.objects.create(
@@ -216,7 +311,17 @@ def _consume_fifo(item, qty_needed, order, order_item, color=None, size=None, al
             order_item=order_item,
             batch_item=negative_row,
             consumed_qty=remaining,
-            unit_cost=negative_row.final_unit_cost or negative_row.base_unit_cost or 0,
+            unit_cost=negative_row.final_unit_cost or negative_row.base_unit_cost or Decimal("0"),
+        )
+
+        _log_order_out(
+            order=order,
+            order_item=order_item,
+            batch_item=negative_row,
+            qty=remaining,
+            qty_before=before_qty,
+            qty_after=after_qty,
+            user=user,
         )
 
         remaining = Decimal("0")
@@ -225,12 +330,15 @@ def _consume_fifo(item, qty_needed, order, order_item, color=None, size=None, al
 
 
 @transaction.atomic
-def deduct_stock_for_order(order, allow_shortage=False):
+def deduct_stock_for_order(order, allow_shortage=False, user=None):
     if order.stock_deducted:
         return []
 
-    # Film Only and Print & Heat Press do not deduct stock
-    if order.service_type in [order.SERVICE_FILM_ONLY, order.SERVICE_PRINT_HEATPRESS]:
+    # Film Only and Print & Heat Press do not deduct stock.
+    if order.service_type in [
+        order.SERVICE_FILM_ONLY,
+        order.SERVICE_PRINT_HEATPRESS,
+    ]:
         return []
 
     shortages = get_order_shortages(order)
@@ -249,7 +357,7 @@ def deduct_stock_for_order(order, allow_shortage=False):
     )
 
     for line in lines:
-        qty_needed = Decimal(line.quantity or 0)
+        qty_needed = _dec(line.quantity)
 
         if qty_needed <= 0:
             continue
@@ -258,9 +366,11 @@ def deduct_stock_for_order(order, allow_shortage=False):
             stock_item = line.material_item
             color = None
             size = None
+
         elif line.shirt_item:
             stock_item = line.shirt_item
             color, size = _retail_color_size_for_line(order, line)
+
         else:
             continue
 
@@ -272,28 +382,55 @@ def deduct_stock_for_order(order, allow_shortage=False):
             color=color,
             size=size,
             allow_shortage=allow_shortage,
+            user=user,
         )
 
         if remaining > 0:
-            unresolved.append({
-                "type": "stock",
-                "label": _variant_text(stock_item, color, size),
-                "shortage": remaining,
-            })
+            unresolved.append(
+                {
+                    "type": "stock",
+                    "label": _variant_text(stock_item, color, size),
+                    "shortage": remaining,
+                }
+            )
 
     order.stock_deducted = True
     order.save(update_fields=["stock_deducted"])
 
     return unresolved
 
+
 @transaction.atomic
-def restore_stock_for_order(order):
-    consumptions = order.stock_consumptions.select_related("batch_item").order_by("-id")
+def restore_stock_for_order(order, user=None):
+    if not order.stock_deducted:
+        return
+
+    consumptions = order.stock_consumptions.select_related(
+        "batch_item",
+        "batch_item__batch",
+        "batch_item__item",
+        "batch_item__color",
+        "batch_item__size",
+    ).order_by("-id")
 
     for consume in consumptions:
         row = consume.batch_item
-        row.qty_remaining = Decimal(row.qty_remaining or 0) + Decimal(consume.consumed_qty or 0)
+
+        before_qty = _dec(row.qty_remaining)
+        restore_qty = _dec(consume.consumed_qty)
+        after_qty = before_qty + restore_qty
+
+        row.qty_remaining = after_qty
         row.save(update_fields=["qty_remaining"])
+
+        _log_order_restore(
+            order=order,
+            consume=consume,
+            qty=restore_qty,
+            qty_before=before_qty,
+            qty_after=after_qty,
+            user=user,
+        )
 
     consumptions.delete()
 

@@ -933,7 +933,7 @@ def order_create(request):
                         Order.SERVICE_FULL,
                         Order.SERVICE_RETAIL,
                     ]:
-                        deduct_stock_for_order(order, allow_shortage=True)
+                        deduct_stock_for_order(order, allow_shortage=True, user=request.user)
 
                     _log_order_history(
                         order=order,
@@ -969,6 +969,8 @@ def order_create(request):
             **_order_form_context_base(),
         },
     )
+
+
 
 @login_required
 @permission_required("orders.view_order", raise_exception=True)
@@ -1038,7 +1040,7 @@ def production_update(request, pk):
 
             # Cancel = restore stock one time
             if order.stock_deducted:
-                restore_stock_for_order(order)
+                restore_stock_for_order(order, user=request.user)
 
             order.status = cancel_status
             order.save(update_fields=["status"])
@@ -1222,7 +1224,7 @@ def order_edit(request, pk):
 
                     # 🔴 STEP 1: restore old stock
                     if order.stock_deducted:
-                        restore_stock_for_order(order)
+                        restore_stock_for_order(order, user=request.user)
 
                     order = form.save(commit=False)
                     order.customer = _get_or_create_customer_from_request(request)
@@ -1279,7 +1281,7 @@ def order_edit(request, pk):
                         Order.SERVICE_FULL,
                         Order.SERVICE_RETAIL,
                     ]:
-                        deduct_stock_for_order(order, allow_shortage=True)
+                        deduct_stock_for_order(order, allow_shortage=True, user=request.user)
 
                     after_order = _snapshot_order(order)
                     _log_order_changes(order, before_order, after_order, request.user)
@@ -1320,7 +1322,7 @@ def order_trash(request, pk):
         # Delete active order = restore stock
         # Delete cancelled order = no restore, because cancel already restored
         if order.status != cancel_status and order.stock_deducted:
-            restore_stock_for_order(order)
+            restore_stock_for_order(order, user=request.user)
 
         order.is_deleted = True
         order.deleted_at = timezone.now()
@@ -1368,7 +1370,7 @@ def order_restore(request, pk):
             Order.SERVICE_FULL,
             Order.SERVICE_RETAIL,
         ]:
-            deduct_stock_for_order(order, allow_shortage=True)
+            deduct_stock_for_order(order, allow_shortage=True, user=request.user)
 
         messages.success(request, f"Order {order.order_no} restored and stock deducted again.")
         return redirect("order_detail", pk=order.pk)
