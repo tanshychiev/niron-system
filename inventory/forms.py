@@ -57,12 +57,16 @@ class ColorForm(forms.ModelForm):
 
     def clean_hex_code(self):
         value = (self.cleaned_data.get("hex_code") or "").strip().upper()
+
         if not value:
             value = "#000000"
+
         if not value.startswith("#"):
             value = f"#{value}"
+
         if len(value) != 7:
             raise forms.ValidationError("Hex code must be in format like #000000")
+
         return value
 
     def save(self, commit=True):
@@ -83,6 +87,7 @@ class ColorForm(forms.ModelForm):
 
         if commit:
             instance.save()
+
         return instance
 
 
@@ -133,21 +138,62 @@ class InventoryBatchForm(forms.ModelForm):
 
         if commit:
             instance.save()
+
         return instance
+
+
+class InventoryItemSelect(forms.Select):
+    """
+    Stock In item dropdown.
+
+    This adds real item data to each <option>, so JavaScript can know:
+    - Is this item a shirt?
+    - What item type is it?
+    - What unit should display?
+
+    This fixes the bug where material items like Cleaning Solution
+    can be shown as Shirt in the Stock In row.
+    """
+
+    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
+        option = super().create_option(name, value, label, selected, index, subindex, attrs)
+
+        item = getattr(value, "instance", None)
+
+        if item:
+            is_shirt = item.item_type == InventoryItem.TYPE_SHIRT
+
+            option["attrs"].update(
+                {
+                    "data-item-type": item.item_type or "",
+                    "data-type-label": item.get_item_type_display(),
+                    "data-unit": item.unit or "",
+                    "data-unit-label": item.get_unit_display(),
+                    "data-is-shirt": "1" if is_shirt else "0",
+                }
+            )
+
+        return option
 
 
 class InventoryBatchItemForm(forms.ModelForm):
     quantity = forms.DecimalField(
         max_digits=12,
         decimal_places=2,
-        widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0"}),
+        widget=forms.NumberInput(
+            attrs={
+                "class": "form-control",
+                "step": "0.01",
+                "min": "0",
+            }
+        ),
     )
 
     class Meta:
         model = InventoryBatchItem
         fields = ["item", "color", "size", "quantity"]
         widgets = {
-            "item": forms.Select(attrs={"class": "form-select item-select"}),
+            "item": InventoryItemSelect(attrs={"class": "form-select item-select"}),
             "color": forms.Select(attrs={"class": "form-select color-select"}),
             "size": forms.Select(attrs={"class": "form-select size-select"}),
         }
@@ -159,33 +205,39 @@ class InventoryBatchItemForm(forms.ModelForm):
             is_active=True,
         ).order_by("item_type", "code", "name")
 
-        self.fields["color"].queryset = Color.objects.filter(is_active=True).order_by("name")
-        self.fields["size"].queryset = Size.objects.filter(is_active=True).order_by("sort_order", "id")
+        self.fields["color"].queryset = Color.objects.filter(
+            is_active=True,
+        ).order_by("name")
+
+        self.fields["size"].queryset = Size.objects.filter(
+            is_active=True,
+        ).order_by("sort_order", "id")
 
         self.fields["color"].required = False
         self.fields["size"].required = False
 
-        item_widget = self.fields["item"].widget
-        item_choices = [("", "---------")]
-
-        for item in self.fields["item"].queryset:
-            label = f"{item.code} - {item.name}"
-            item_choices.append((item.pk, label))
-
-        item_widget.choices = item_choices
+        self.fields["item"].label_from_instance = self.item_label_from_instance
 
         if self.instance and self.instance.pk:
             self.fields["quantity"].initial = self.instance.qty_received
 
+    def item_label_from_instance(self, obj):
+        return f"{obj.code} - {obj.name}"
+
     def clean(self):
         cleaned_data = super().clean()
+
         item = cleaned_data.get("item")
         color = cleaned_data.get("color")
         size = cleaned_data.get("size")
 
-        if item and item.item_type == InventoryItem.TYPE_SHIRT:
+        if not item:
+            return cleaned_data
+
+        if item.item_type == InventoryItem.TYPE_SHIRT:
             if not color:
                 self.add_error("color", "Color is required for shirt stock.")
+
             if not size:
                 self.add_error("size", "Size is required for shirt stock.")
         else:
@@ -196,6 +248,7 @@ class InventoryBatchItemForm(forms.ModelForm):
 
     def save(self, commit=True):
         instance = super().save(commit=False)
+
         qty = self.cleaned_data.get("quantity") or Decimal("0")
 
         if instance.pk and not instance.can_edit_received_qty:
@@ -214,6 +267,7 @@ class InventoryBatchItemForm(forms.ModelForm):
         else:
             old_received = instance.qty_received or Decimal("0")
             diff = qty - old_received
+
             instance.qty_received = qty
             instance.qty_remaining = (instance.qty_remaining or Decimal("0")) + diff
 
@@ -222,6 +276,7 @@ class InventoryBatchItemForm(forms.ModelForm):
 
         if commit:
             instance.save()
+
         return instance
 
 
@@ -262,6 +317,7 @@ class InventoryAdjustmentForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
+
         adjustment_type = cleaned_data.get("adjustment_type")
         qty = cleaned_data.get("qty")
         stocktake_final_qty = cleaned_data.get("stocktake_final_qty")
@@ -269,6 +325,7 @@ class InventoryAdjustmentForm(forms.ModelForm):
         if adjustment_type == InventoryAdjustment.TYPE_STOCKTAKE:
             if stocktake_final_qty is None:
                 raise forms.ValidationError("Please enter the final counted qty for stock take.")
+
             if stocktake_final_qty < 0:
                 raise forms.ValidationError("Final counted qty cannot be below 0.")
         else:
@@ -276,6 +333,7 @@ class InventoryAdjustmentForm(forms.ModelForm):
                 raise forms.ValidationError("Qty must be greater than 0.")
 
             old_qty = self.batch_item.qty_remaining if self.batch_item else Decimal("0")
+
             if adjustment_type in [
                 InventoryAdjustment.TYPE_REMOVE,
                 InventoryAdjustment.TYPE_DAMAGE,
@@ -294,11 +352,13 @@ class InventoryAdjustStockSelectForm(forms.Form):
         ).order_by("code"),
         widget=forms.Select(attrs={"class": "form-select"}),
     )
+
     color = forms.ModelChoiceField(
         queryset=Color.objects.filter(is_active=True).order_by("name"),
         required=False,
         widget=forms.Select(attrs={"class": "form-select"}),
     )
+
     size = forms.ModelChoiceField(
         queryset=Size.objects.filter(is_active=True).order_by("sort_order", "id"),
         required=False,
@@ -318,18 +378,21 @@ class InventoryAdjustVariantForm(forms.Form):
         ],
         widget=forms.Select(attrs={"class": "form-select"}),
     )
+
     qty = forms.DecimalField(
         max_digits=12,
         decimal_places=2,
         required=False,
         widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
     )
+
     final_qty = forms.DecimalField(
         max_digits=12,
         decimal_places=2,
         required=False,
         widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
     )
+
     reason = forms.CharField(
         required=False,
         widget=forms.Textarea(attrs={"class": "form-control", "rows": 3}),
@@ -337,6 +400,7 @@ class InventoryAdjustVariantForm(forms.Form):
 
     def clean(self):
         cleaned_data = super().clean()
+
         adjustment_type = cleaned_data.get("adjustment_type")
         qty = cleaned_data.get("qty")
         final_qty = cleaned_data.get("final_qty")
@@ -344,6 +408,7 @@ class InventoryAdjustVariantForm(forms.Form):
         if adjustment_type == "STOCKTAKE":
             if final_qty is None:
                 raise forms.ValidationError("Please enter final total qty.")
+
             if final_qty < 0:
                 raise forms.ValidationError("Final total qty cannot be below 0.")
         else:
