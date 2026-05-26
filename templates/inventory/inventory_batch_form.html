@@ -112,11 +112,34 @@
 </div>
 
 <style>
-  .section-head { margin-bottom: 18px; }
-  .section-head h2 { margin: 0 0 6px; font-size: 28px; font-weight: 800; color: var(--text); letter-spacing: -0.5px; }
-  .rows-head-flex { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-  .btn-add-row { padding: 10px 14px; }
-  .note-field textarea, .note-field .form-control { min-height: 82px; }
+  .section-head {
+    margin-bottom: 18px;
+  }
+
+  .section-head h2 {
+    margin: 0 0 6px;
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--text);
+    letter-spacing: -0.5px;
+  }
+
+  .rows-head-flex {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .btn-add-row {
+    padding: 10px 14px;
+  }
+
+  .note-field textarea,
+  .note-field .form-control {
+    min-height: 82px;
+  }
 
   .batch-row-grid {
     display: grid;
@@ -125,11 +148,18 @@
     align-items: start;
   }
 
-  .batch-row.is-material .batch-row-grid { grid-template-columns: 2.8fr 1.5fr 78px; }
-  .batch-row.is-material .color-field,
-  .batch-row.is-material .size-field { display: none; }
+  .batch-row.is-material .batch-row-grid {
+    grid-template-columns: 2.8fr 1.5fr 78px;
+  }
 
-  .batch-row .field { margin-bottom: 0; }
+  .batch-row.is-material .color-field,
+  .batch-row.is-material .size-field {
+    display: none;
+  }
+
+  .batch-row .field {
+    margin-bottom: 0;
+  }
 
   .item-kind-pill {
     display: inline-flex;
@@ -150,8 +180,15 @@
     color: #15803d;
   }
 
-  .qty-with-unit { display: flex; align-items: center; gap: 8px; }
-  .qty-with-unit input { flex: 1; }
+  .qty-with-unit {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .qty-with-unit input {
+    flex: 1;
+  }
 
   .unit-label {
     min-width: 54px;
@@ -169,8 +206,16 @@
     text-transform: uppercase;
   }
 
-  .delete-icon-wrap { position: relative; height: 44px; }
-  .delete-icon-wrap input[type="checkbox"] { position: absolute; opacity: 0; pointer-events: none; }
+  .delete-icon-wrap {
+    position: relative;
+    height: 44px;
+  }
+
+  .delete-icon-wrap input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
 
   .trash-btn {
     width: 100%;
@@ -186,10 +231,26 @@
     padding: 0;
   }
 
-  .trash-btn:hover { background: #fee2e2; border-color: #fca5a5; }
-  .trash-btn.is-marked { background: #dc2626; border-color: #dc2626; }
-  .trash-btn.is-marked .trash-icon { color: #fff; opacity: 1; }
-  .trash-icon { font-size: 18px; line-height: 1; opacity: .9; }
+  .trash-btn:hover {
+    background: #fee2e2;
+    border-color: #fca5a5;
+  }
+
+  .trash-btn.is-marked {
+    background: #dc2626;
+    border-color: #dc2626;
+  }
+
+  .trash-btn.is-marked .trash-icon {
+    color: #fff;
+    opacity: 1;
+  }
+
+  .trash-icon {
+    font-size: 18px;
+    line-height: 1;
+    opacity: .9;
+  }
 
   .stock-in-total-box {
     margin-top: 16px;
@@ -221,20 +282,53 @@
 
   @media (max-width: 1100px) {
     .batch-row-grid,
-    .batch-row.is-material .batch-row-grid { grid-template-columns: 1fr 1fr; }
+    .batch-row.is-material .batch-row-grid {
+      grid-template-columns: 1fr 1fr;
+    }
   }
 
   @media (max-width: 680px) {
     .batch-row-grid,
-    .batch-row.is-material .batch-row-grid { grid-template-columns: 1fr; }
+    .batch-row.is-material .batch-row-grid {
+      grid-template-columns: 1fr;
+    }
   }
 </style>
 
 <script>
 document.addEventListener("DOMContentLoaded", function () {
+  /*
+    IMPORTANT FIX:
+    Do not guess item type from code/name.
+    Example bug:
+    IT1 - Cleaning Solution was Maintenance in database,
+    but old JS did not find FILM/INK/DAMPER in the text,
+    so it returned Shirt.
+
+    This version uses real item type from database by item id.
+  */
+
   const ITEM_UNIT_MAP = {
     {% for item in items %}
-      "{{ item.id }}": "{{ item.get_unit_display|default:item.unit }}",
+      "{{ item.id }}": "{{ item.get_unit_display|default:item.unit|escapejs }}",
+    {% endfor %}
+  };
+
+  const ITEM_TYPE_MAP = {
+    {% for item in items %}
+      "{{ item.id }}": "{{ item.item_type|escapejs }}",
+    {% endfor %}
+  };
+
+  const ITEM_TYPE_LABEL_MAP = {
+    {% for item in items %}
+      "{{ item.id }}": "{{ item.get_item_type_display|escapejs }}",
+    {% endfor %}
+  };
+
+  const ITEM_IS_SHIRT_MAP = {
+    {% for item in items %}
+      "{{ item.id }}": {% if item.item_type == "SHIRT" or item.get_item_type_display == "Shirt" %}true{% else %}false{% endif %},
     {% endfor %}
   };
 
@@ -247,8 +341,40 @@ document.addEventListener("DOMContentLoaded", function () {
 
   const prefix = totalFormsInput.name.replace("-TOTAL_FORMS", "");
 
+  function hasOwn(obj, key) {
+    return Object.prototype.hasOwnProperty.call(obj, key);
+  }
+
   function detectUnit(select) {
+    if (!select || !select.value) return "PCS";
     return ITEM_UNIT_MAP[select.value] || "PCS";
+  }
+
+  function isShirtItem(select) {
+    if (!select || !select.value) return false;
+
+    const itemId = select.value;
+
+    if (hasOwn(ITEM_IS_SHIRT_MAP, itemId)) {
+      return ITEM_IS_SHIRT_MAP[itemId] === true;
+    }
+
+    /*
+      Fallback only.
+      Do not check code like IT / IT1.
+      Only check clear shirt words.
+    */
+    const option = select.options[select.selectedIndex];
+    const text = option ? option.textContent.toUpperCase() : "";
+
+    return (
+      text.includes("TSHIRT") ||
+      text.includes("T-SHIRT") ||
+      text.includes("SHIRT") ||
+      text.includes("POLO") ||
+      text.includes("OVERSIZE") ||
+      text.includes("BOXY")
+    );
   }
 
   function updateTotalStockIn() {
@@ -256,36 +382,20 @@ document.addEventListener("DOMContentLoaded", function () {
 
     rowsContainer.querySelectorAll(".batch-row").forEach(function (row) {
       const deleteInput = row.querySelector('input[type="checkbox"][name$="-DELETE"]');
+
       if (deleteInput && deleteInput.checked) return;
 
       const qtyInput = row.querySelector('input[name$="-quantity"]');
       const value = parseFloat(qtyInput ? qtyInput.value || "0" : "0");
 
-      if (!isNaN(value)) total += value;
+      if (!isNaN(value)) {
+        total += value;
+      }
     });
 
     totalStockInEl.textContent = Number.isInteger(total)
       ? String(total)
       : total.toFixed(2);
-  }
-
-  function detectItemType(select) {
-    const option = select.options[select.selectedIndex];
-    const text = option ? option.textContent.toUpperCase() : "";
-
-    if (
-      text.includes("FILM") ||
-      text.includes("INK") ||
-      text.includes("POWDER") ||
-      text.includes("MAINTENANCE") ||
-      text.includes("OTHER") ||
-      text.includes("TUBE") ||
-      text.includes("DAMPER")
-    ) {
-      return "MATERIAL";
-    }
-
-    return "SHIRT";
   }
 
   function updateRowType(row) {
@@ -298,6 +408,7 @@ document.addEventListener("DOMContentLoaded", function () {
     if (!itemSelect) return;
 
     let pill = row.querySelector(".item-kind-pill");
+
     if (!pill && itemField) {
       pill = document.createElement("div");
       itemField.appendChild(pill);
@@ -305,37 +416,73 @@ document.addEventListener("DOMContentLoaded", function () {
 
     if (!itemSelect.value) {
       row.classList.remove("is-material", "is-shirt");
+
+      if (colorSelect) {
+        colorSelect.disabled = false;
+      }
+
+      if (sizeSelect) {
+        sizeSelect.disabled = false;
+      }
+
       if (pill) {
         pill.textContent = "Choose item";
         pill.className = "item-kind-pill";
       }
-      if (unitLabel) unitLabel.textContent = "PCS";
+
+      if (unitLabel) {
+        unitLabel.textContent = "PCS";
+      }
+
       return;
     }
 
-    if (unitLabel) unitLabel.textContent = detectUnit(itemSelect);
+    const isShirt = isShirtItem(itemSelect);
 
-    if (detectItemType(itemSelect) === "MATERIAL") {
-      row.classList.add("is-material");
-      row.classList.remove("is-shirt");
-      if (colorSelect) colorSelect.value = "";
-      if (sizeSelect) sizeSelect.value = "";
-      if (pill) {
-        pill.textContent = "Material";
-        pill.className = "item-kind-pill";
-      }
-    } else {
+    if (unitLabel) {
+      unitLabel.textContent = detectUnit(itemSelect);
+    }
+
+    if (isShirt) {
       row.classList.remove("is-material");
       row.classList.add("is-shirt");
+
+      if (colorSelect) {
+        colorSelect.disabled = false;
+      }
+
+      if (sizeSelect) {
+        sizeSelect.disabled = false;
+      }
+
       if (pill) {
         pill.textContent = "Shirt";
         pill.className = "item-kind-pill shirt";
+      }
+    } else {
+      row.classList.add("is-material");
+      row.classList.remove("is-shirt");
+
+      if (colorSelect) {
+        colorSelect.value = "";
+        colorSelect.disabled = true;
+      }
+
+      if (sizeSelect) {
+        sizeSelect.value = "";
+        sizeSelect.disabled = true;
+      }
+
+      if (pill) {
+        pill.textContent = "Material";
+        pill.className = "item-kind-pill";
       }
     }
   }
 
   function bindRow(row) {
     if (!row || row.dataset.bound === "1") return;
+
     row.dataset.bound = "1";
 
     const itemSelect = row.querySelector('select[name$="-item"]');
@@ -379,9 +526,13 @@ document.addEventListener("DOMContentLoaded", function () {
 
   function replaceIndex(value, index) {
     if (!value) return value;
+
     const re1 = new RegExp(prefix + "-\\d+-", "g");
     const re2 = new RegExp("id_" + prefix + "-\\d+-", "g");
-    return value.replace(re1, prefix + "-" + index + "-").replace(re2, "id_" + prefix + "-" + index + "-");
+
+    return value
+      .replace(re1, prefix + "-" + index + "-")
+      .replace(re2, "id_" + prefix + "-" + index + "-");
   }
 
   function cleanRow(row, index) {
@@ -390,12 +541,21 @@ document.addEventListener("DOMContentLoaded", function () {
     row.style.opacity = "1";
 
     row.querySelectorAll("input, select, textarea, label").forEach(function (el) {
-      if (el.name) el.name = replaceIndex(el.name, index);
-      if (el.id) el.id = replaceIndex(el.id, index);
-      if (el.htmlFor) el.htmlFor = replaceIndex(el.htmlFor, index);
+      if (el.name) {
+        el.name = replaceIndex(el.name, index);
+      }
+
+      if (el.id) {
+        el.id = replaceIndex(el.id, index);
+      }
+
+      if (el.htmlFor) {
+        el.htmlFor = replaceIndex(el.htmlFor, index);
+      }
 
       if (el.tagName === "SELECT") {
         el.selectedIndex = 0;
+        el.disabled = false;
       } else if (el.type === "checkbox") {
         el.checked = false;
       } else {
@@ -408,7 +568,10 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     const trashBtn = row.querySelector(".trash-btn");
-    if (trashBtn) trashBtn.classList.remove("is-marked");
+
+    if (trashBtn) {
+      trashBtn.classList.remove("is-marked");
+    }
   }
 
   function reindexRows() {
@@ -416,9 +579,17 @@ document.addEventListener("DOMContentLoaded", function () {
 
     rows.forEach(function (row, index) {
       row.querySelectorAll("input, select, textarea, label").forEach(function (el) {
-        if (el.name) el.name = replaceIndex(el.name, index);
-        if (el.id) el.id = replaceIndex(el.id, index);
-        if (el.htmlFor) el.htmlFor = replaceIndex(el.htmlFor, index);
+        if (el.name) {
+          el.name = replaceIndex(el.name, index);
+        }
+
+        if (el.id) {
+          el.id = replaceIndex(el.id, index);
+        }
+
+        if (el.htmlFor) {
+          el.htmlFor = replaceIndex(el.htmlFor, index);
+        }
       });
     });
 
@@ -427,6 +598,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   function addNewRow() {
     const firstRow = rowsContainer.querySelector(".batch-row");
+
     if (!firstRow) return;
 
     const index = parseInt(totalFormsInput.value || "0", 10);
