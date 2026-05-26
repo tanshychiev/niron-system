@@ -4,9 +4,9 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models
+from django.utils import timezone
+
 from customers.models import Customer
-
-
 from inventory.models import Color, InventoryBatchItem, InventoryItem, Size
 
 
@@ -71,6 +71,15 @@ class Order(models.Model):
     customer_location = models.CharField(max_length=255, blank=True, default="")
     deadline = models.DateField()
 
+    # This is the date shown on invoice.
+    # Admin can edit this from /admin.
+    invoice_date = models.DateField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Date shown on invoice. Admin can edit this date.",
+    )
+
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -131,8 +140,10 @@ class Order(models.Model):
     def payment_status_display(self):
         if self.balance_amount <= 0:
             return "Paid"
+
         if (self.deposit_amount or Decimal("0")) > 0 or (self.paid_amount or Decimal("0")) > 0:
             return "Partial"
+
         return "Pending"
 
     @property
@@ -151,8 +162,6 @@ class Order(models.Model):
 
         New month will restart from 001.
         """
-        from django.utils import timezone
-
         today = timezone.localdate()
         prefix = f"NR-{today.strftime('%y%m')}-"
 
@@ -174,6 +183,9 @@ class Order(models.Model):
         return f"{prefix}{last_number + 1:03d}"
 
     def save(self, *args, **kwargs):
+        if not self.invoice_date:
+            self.invoice_date = timezone.localdate()
+
         if not self.order_no:
             self.order_no = self.generate_order_no()
 
@@ -185,6 +197,8 @@ class Order(models.Model):
             self.payment_status = self.PAYMENT_PENDING
 
         super().save(*args, **kwargs)
+
+
 class OrderDesign(models.Model):
     order = models.ForeignKey(
         Order,
@@ -232,8 +246,6 @@ class OrderDesign(models.Model):
         return total
 
 
-
-
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="items")
     design = models.ForeignKey(
@@ -253,8 +265,20 @@ class OrderItem(models.Model):
         blank=True,
         null=True,
     )
-    color = models.ForeignKey(Color, on_delete=models.PROTECT, related_name="order_items", blank=True, null=True)
-    size = models.ForeignKey(Size, on_delete=models.PROTECT, related_name="order_items", blank=True, null=True)
+    color = models.ForeignKey(
+        Color,
+        on_delete=models.PROTECT,
+        related_name="order_items",
+        blank=True,
+        null=True,
+    )
+    size = models.ForeignKey(
+        Size,
+        on_delete=models.PROTECT,
+        related_name="order_items",
+        blank=True,
+        null=True,
+    )
 
     film_item = models.ForeignKey(
         InventoryItem,
@@ -407,6 +431,7 @@ class OrderItem(models.Model):
         remaining = Decimal(self.quantity or 0) - Decimal(self.done_qty or 0)
         return remaining if remaining > 0 else Decimal("0")
 
+
 class StockConsumption(models.Model):
     order = models.ForeignKey(
         Order,
@@ -529,7 +554,8 @@ class OrderHistory(models.Model):
 
     def __str__(self):
         return f"{self.order.order_no} - {self.action} - {self.field_name}"
-    
+
+
 class OrderPaymentLog(models.Model):
     ACTION_PAY = "PAY"
     ACTION_UNDO = "UNDO"
@@ -562,7 +588,7 @@ class OrderPaymentLog(models.Model):
     )
 
     created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,   # ✅ BEST PRACTICE (not direct User)
+        settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
