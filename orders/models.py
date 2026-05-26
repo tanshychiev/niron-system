@@ -2,11 +2,9 @@ from decimal import Decimal, ROUND_HALF_UP
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.core.validators import MinValueValidator
 from django.db import models
 from django.utils import timezone
 
-from customers.models import Customer
 from inventory.models import Color, InventoryBatchItem, InventoryItem, Size
 
 
@@ -71,8 +69,7 @@ class Order(models.Model):
     customer_location = models.CharField(max_length=255, blank=True, default="")
     deadline = models.DateField()
 
-    # This is the date shown on invoice.
-    # Admin can edit this from /admin.
+    # Date shown on invoice. Admin can edit this.
     invoice_date = models.DateField(
         null=True,
         blank=True,
@@ -101,7 +98,12 @@ class Order(models.Model):
     # ===== STATUS =====
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
     remark = models.TextField(blank=True, default="")
-    created_at = models.DateTimeField(auto_now_add=True)
+
+    # Editable in /admin.
+    created_at = models.DateTimeField(
+        default=timezone.now,
+        db_index=True,
+    )
 
     # ===== STOCK =====
     stock_deducted = models.BooleanField(default=False)

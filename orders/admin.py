@@ -71,7 +71,6 @@ class OrderAdmin(admin.ModelAdmin):
     readonly_fields = (
         "order_no",
         "payment_status",
-        "created_at",
     )
 
     fields = (
