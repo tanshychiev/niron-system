@@ -12,12 +12,13 @@ from .models import InventoryBatchItem, InventoryItem, StockLedger
 
 
 SHIRT_SIZE_ORDER = {
-    "S": 1,
-    "M": 2,
-    "L": 3,
-    "XL": 4,
-    "XXL": 5,
-    "XXXL": 6,
+    "XS": 1,
+    "S": 2,
+    "M": 3,
+    "L": 4,
+    "XL": 5,
+    "XXL": 6,
+    "XXXL": 7,
 }
 
 
