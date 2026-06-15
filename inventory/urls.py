@@ -1,9 +1,11 @@
 from django.urls import path
 
+from .stock_confirm import stock_confirm, stock_history
 from .views import (
     color_create,
     color_edit,
     color_list,
+    correct_stock_count_view,
     inventory_adjust_stock_select,
     inventory_adjustment_create,
     inventory_adjustment_list,
@@ -21,16 +23,18 @@ from .views import (
     size_create,
     size_edit,
     size_list,
-
-    # Stock Ledger
-    stock_ledger_list,
     stock_ledger_by_batch_item,
-    correct_stock_count_view,
+    stock_ledger_list,
 )
+
 
 urlpatterns = [
     # Dashboard
     path("", inventory_list, name="inventory_list"),
+
+    # Stock Confirm / History
+    path("stock-confirm/", stock_confirm, name="stock_confirm"),
+    path("stock-history/", stock_history, name="stock_history"),
 
     # Items
     path("items/", inventory_item_list, name="inventory_item_list"),
@@ -58,13 +62,25 @@ urlpatterns = [
     # Adjust
     path("adjust-stock/", inventory_adjust_stock_select, name="inventory_adjust_stock_select"),
     path("adjustments/", inventory_adjustment_list, name="inventory_adjustment_list"),
-    path("adjustments/new/<int:batch_item_id>/", inventory_adjustment_create, name="inventory_adjustment_create"),
+    path(
+        "adjustments/new/<int:batch_item_id>/",
+        inventory_adjustment_create,
+        name="inventory_adjustment_create",
+    ),
 
     # Material usage
     path("material-usage/", material_usage, name="material_usage"),
 
     # Stock Ledger
     path("ledger/", stock_ledger_list, name="stock_ledger_list"),
-    path("ledger/batch-item/<int:batch_item_id>/", stock_ledger_by_batch_item, name="stock_ledger_by_batch_item"),
-    path("ledger/batch-item/<int:batch_item_id>/correct/", correct_stock_count_view, name="correct_stock_count"),
+    path(
+        "ledger/batch-item/<int:batch_item_id>/",
+        stock_ledger_by_batch_item,
+        name="stock_ledger_by_batch_item",
+    ),
+    path(
+        "ledger/batch-item/<int:batch_item_id>/correct/",
+        correct_stock_count_view,
+        name="correct_stock_count",
+    ),
 ]

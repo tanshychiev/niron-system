@@ -27,7 +27,8 @@
 
         * { box-sizing: border-box; }
 
-        html, body {
+        html,
+        body {
             margin: 0;
             padding: 0;
             background: var(--bg);
@@ -134,7 +135,7 @@
         }
 
         .nav-submenu.show {
-            max-height: 620px;
+            max-height: 720px;
             opacity: 1;
             padding: 8px 0 4px 10px;
         }
@@ -202,7 +203,7 @@
             justify-content: space-between;
             padding: 14px 34px;
             border-bottom: 1px solid var(--line);
-            background: rgba(255,255,255,.82);
+            background: rgba(255, 255, 255, 0.82);
             backdrop-filter: blur(10px);
             gap: 12px;
         }
@@ -286,8 +287,11 @@
             margin-right: auto;
         }
 
-        .card, .form-card, .info-card, .table-card {
-            background: rgba(255,255,255,.82);
+        .card,
+        .form-card,
+        .info-card,
+        .table-card {
+            background: rgba(255, 255, 255, 0.82);
             border: 1px solid var(--line);
             border-radius: 22px;
             padding: 24px;
@@ -295,7 +299,11 @@
             box-shadow: var(--shadow);
         }
 
-        .btn, .btn-primary, .btn-light, .btn-secondary, .btn-danger {
+        .btn,
+        .btn-primary,
+        .btn-light,
+        .btn-secondary,
+        .btn-danger {
             display: inline-flex;
             align-items: center;
             justify-content: center;
@@ -305,25 +313,29 @@
             cursor: pointer;
             font-size: 13px;
             font-weight: 700;
-            letter-spacing: .3px;
-            transition: .2s ease;
+            letter-spacing: 0.3px;
+            transition: 0.2s ease;
             border: none;
         }
 
-        .btn, .btn-light, .btn-secondary {
+        .btn,
+        .btn-light,
+        .btn-secondary {
             background: white;
             color: var(--text);
             border: 1px solid var(--line);
         }
 
-        .btn:hover, .btn-light:hover, .btn-secondary:hover {
+        .btn:hover,
+        .btn-light:hover,
+        .btn-secondary:hover {
             background: var(--bg-soft);
         }
 
         .btn-primary {
             background: var(--accent);
             color: white;
-            box-shadow: 0 8px 20px rgba(232,155,20,.28);
+            box-shadow: 0 8px 20px rgba(232, 155, 20, 0.28);
         }
 
         .btn-primary:hover { background: var(--accent-dark); }
@@ -333,7 +345,8 @@
             color: white;
         }
 
-        .actions, .top-actions {
+        .actions,
+        .top-actions {
             display: flex;
             gap: 10px;
             flex-wrap: wrap;
@@ -344,7 +357,11 @@
             margin-top: 18px;
         }
 
-        input, select, textarea, .form-control, .form-select {
+        input,
+        select,
+        textarea,
+        .form-control,
+        .form-select {
             width: 100%;
             padding: 13px 14px;
             border: 1px solid var(--line);
@@ -355,25 +372,39 @@
             outline: none;
         }
 
-        input, select, .form-control, .form-select { height: 44px; }
+        input,
+        select,
+        .form-control,
+        .form-select {
+            height: 44px;
+        }
 
-        textarea, textarea.form-control {
+        textarea,
+        textarea.form-control {
             height: auto;
             padding: 12px 14px;
             min-height: 110px;
         }
 
-        input:focus, select:focus, textarea:focus, .form-control:focus, .form-select:focus {
+        input:focus,
+        select:focus,
+        textarea:focus,
+        .form-control:focus,
+        .form-select:focus {
             border-color: var(--accent);
-            box-shadow: 0 0 0 4px rgba(232,155,20,.12);
+            box-shadow: 0 0 0 4px rgba(232, 155, 20, 0.12);
         }
 
-        .app-table, table {
+        .app-table,
+        table {
             width: 100%;
             border-collapse: collapse;
         }
 
-        .app-table th, .app-table td, table th, table td {
+        .app-table th,
+        .app-table td,
+        table th,
+        table td {
             text-align: left;
             vertical-align: top;
             padding: 14px 10px;
@@ -382,7 +413,9 @@
             color: var(--text);
         }
 
-        .app-table thead th, table thead th, table th {
+        .app-table thead th,
+        table thead th,
+        table th {
             font-size: 12px;
             text-transform: uppercase;
             letter-spacing: 1.2px;
@@ -500,6 +533,7 @@
 
     {% block extra_css %}{% endblock %}
 </head>
+
 <body>
     <div class="layout">
         <aside class="sidebar">
@@ -517,20 +551,44 @@
                         <span>Inventory</span>
                         <span class="nav-arrow">▼</span>
                     </button>
+
                     <div class="nav-submenu" id="menu-inventory">
-                        <a class="nav-link" href="/inventory/">Cloth Inventory</a>
+                        <a class="nav-link" href="{% url 'inventory_list' %}">
+                            Cloth Inventory
+                        </a>
 
                         {% if perms.inventory.add_inventorybatch %}
-                        <a class="nav-link" href="/inventory/batches/new/">Stock In</a>
+                        <a class="nav-link" href="{% url 'inventory_batch_create' %}">
+                            Stock In
+                        </a>
                         {% endif %}
 
                         {% if perms.inventory.add_inventoryadjustment %}
-                        <a class="nav-link" href="/inventory/adjust-stock/">Adjust Cloth Stock</a>
-                        <a class="nav-link" href="/inventory/material-usage/">Material Usage</a>
+                        <a class="nav-link" href="{% url 'inventory_adjust_stock_select' %}">
+                            Adjust Cloth Stock
+                        </a>
+
+                        <a class="nav-link" href="{% url 'material_usage' %}">
+                            Material Usage
+                        </a>
+                        {% endif %}
+
+                        {% if perms.inventory.add_stockledger %}
+                        <a class="nav-link" href="{% url 'stock_confirm' %}">
+                            Stock Confirm
+                        </a>
+                        {% endif %}
+
+                        {% if perms.inventory.view_stockledger %}
+                        <a class="nav-link" href="{% url 'stock_history' %}">
+                            Stock History
+                        </a>
                         {% endif %}
 
                         {% if perms.inventory.view_inventoryadjustment %}
-                        <a class="nav-link" href="/inventory/adjustments/">Adjustment History</a>
+                        <a class="nav-link" href="{% url 'inventory_adjustment_list' %}">
+                            Adjustment History
+                        </a>
                         {% endif %}
                     </div>
                 </div>
@@ -543,6 +601,7 @@
                         <span>Orders</span>
                         <span class="nav-arrow">▼</span>
                     </button>
+
                     <div class="nav-submenu" id="menu-orders">
                         {% if perms.orders.view_order %}
                         <a class="nav-link" href="/orders/">Order List</a>
@@ -555,18 +614,22 @@
                         {% if perms.orders.view_order %}
                         <a class="nav-link" href="/orders/production/">Production List</a>
                         {% endif %}
-                        <a class="nav-link" href="/orders/customer-payments/">Customer Payments</a>
+
+                        <a class="nav-link" href="/orders/customer-payments/">
+                            Customer Payments
+                        </a>
                     </div>
                 </div>
                 {% endif %}
 
-                <!-- 🔥 NEW CUSTOMERS -->
+                <!-- CUSTOMERS -->
                 {% if perms.customers.view_customer %}
                 <div class="nav-group">
                     <button class="nav-toggle" type="button" data-target="menu-customers">
                         <span>Customers</span>
                         <span class="nav-arrow">▼</span>
                     </button>
+
                     <div class="nav-submenu" id="menu-customers">
                         <a class="nav-link" href="/customers/">Customer List</a>
                     </div>
@@ -575,21 +638,21 @@
 
                 <!-- FINANCE -->
                 {% if perms.finance.view_expense_summary_nav or perms.finance.view_other_expense_nav or perms.finance.view_batch_expense_nav or perms.finance.view_operating_expense_nav or perms.finance.view_profit_dashboard_nav %}
-<div class="nav-group">
-    <button class="nav-toggle" type="button" data-target="menu-finance">
-        <span>Finance</span>
-        <span class="nav-arrow">▼</span>
-    </button>
+                <div class="nav-group">
+                    <button class="nav-toggle" type="button" data-target="menu-finance">
+                        <span>Finance</span>
+                        <span class="nav-arrow">▼</span>
+                    </button>
 
-    <div class="nav-submenu" id="menu-finance">
-        <a class="nav-link" href="/finance/expenses/">Expense Summary</a>
-        <a class="nav-link" href="/finance/expenses/other/">Other Expense</a>
-        <a class="nav-link" href="/finance/expenses/batch/">Batch Expense</a>
-        <a class="nav-link" href="/finance/expenses/operating/">Operating Expense</a>
-        <a class="nav-link" href="/finance/profit-dashboard/">Profit Dashboard</a>
-    </div>
-</div>
-{% endif %}
+                    <div class="nav-submenu" id="menu-finance">
+                        <a class="nav-link" href="/finance/expenses/">Expense Summary</a>
+                        <a class="nav-link" href="/finance/expenses/other/">Other Expense</a>
+                        <a class="nav-link" href="/finance/expenses/batch/">Batch Expense</a>
+                        <a class="nav-link" href="/finance/expenses/operating/">Operating Expense</a>
+                        <a class="nav-link" href="/finance/profit-dashboard/">Profit Dashboard</a>
+                    </div>
+                </div>
+                {% endif %}
 
                 <!-- SETUP -->
                 {% if perms.inventory.view_inventoryitem or perms.inventory.view_color or perms.inventory.view_size %}
@@ -598,6 +661,7 @@
                         <span>Setup</span>
                         <span class="nav-arrow">▼</span>
                     </button>
+
                     <div class="nav-submenu" id="menu-setup">
                         <a class="nav-link" href="/inventory/items/">Item List</a>
                         <a class="nav-link" href="/inventory/colors/">Color List</a>
@@ -613,6 +677,7 @@
                         <span>Users & Permissions</span>
                         <span class="nav-arrow">▼</span>
                     </button>
+
                     <div class="nav-submenu" id="menu-users">
                         <a class="nav-link" href="/users/">User List</a>
                         <a class="nav-link" href="/users/roles/">Roles</a>
@@ -637,8 +702,15 @@
             <div class="topbar">
                 <div class="topbar-left">
                     <div>
-                        <div class="topbar-title">{% block topbar_title %}Niron System{% endblock %}</div>
-                        <div class="topbar-subtitle">{% block topbar_subtitle %}Custom printing management platform{% endblock %}</div>
+                        <div class="topbar-title">
+                            {% block topbar_title %}Niron System{% endblock %}
+                        </div>
+
+                        <div class="topbar-subtitle">
+                            {% block topbar_subtitle %}
+                            Custom printing management platform
+                            {% endblock %}
+                        </div>
                     </div>
                 </div>
 
@@ -656,15 +728,31 @@
 
             <div class="content-wrap">
                 <div class="hero">
-                    <h1 class="hero-title">{% block page_title %}Niron System{% endblock %}</h1>
-                    <div class="hero-subtitle">{% block page_subtitle %}Clean custom printing management{% endblock %}</div>
+                    <h1 class="hero-title">
+                        {% block page_title %}Niron System{% endblock %}
+                    </h1>
+
+                    <div class="hero-subtitle">
+                        {% block page_subtitle %}
+                        Clean custom printing management
+                        {% endblock %}
+                    </div>
                 </div>
 
                 {% if messages %}
                 <div class="flash-stack">
                     {% for message in messages %}
                     <div class="flash-message flash-{{ message.tags }}">
-                        <div class="flash-icon">✓</div>
+                        <div class="flash-icon">
+                            {% if message.tags == "error" %}
+                                !
+                            {% elif message.tags == "warning" %}
+                                !
+                            {% else %}
+                                ✓
+                            {% endif %}
+                        </div>
+
                         <div class="flash-text">{{ message }}</div>
                     </div>
                     {% endfor %}
@@ -675,53 +763,69 @@
             </div>
         </div>
     </div>
+
+    <script>
+    (function () {
+        const toggles = document.querySelectorAll(".nav-toggle");
+        const currentPath = window.location.pathname;
+
+        function closeAll() {
+            toggles.forEach((button) => {
+                const targetId = button.getAttribute("data-target");
+                const menu = document.getElementById(targetId);
+
+                button.classList.remove("active");
+
+                if (menu) {
+                    menu.classList.remove("show");
+                }
+            });
+        }
+
+        toggles.forEach((toggle) => {
+            toggle.addEventListener("click", function () {
+                const targetId = this.getAttribute("data-target");
+                const currentMenu = document.getElementById(targetId);
+
+                if (!currentMenu) {
+                    return;
+                }
+
+                const isOpen = currentMenu.classList.contains("show");
+                closeAll();
+
+                if (!isOpen) {
+                    currentMenu.classList.add("show");
+                    this.classList.add("active");
+                }
+            });
+        });
+
+        toggles.forEach((toggle) => {
+            const targetId = toggle.getAttribute("data-target");
+            const menu = document.getElementById(targetId);
+
+            if (!menu) {
+                return;
+            }
+
+            menu.querySelectorAll(".nav-link").forEach((link) => {
+                const linkUrl = new URL(link.href, window.location.origin);
+                const linkPath = linkUrl.pathname;
+
+                const exactMatch = linkPath === currentPath;
+                const childMatch =
+                    linkPath !== "/" &&
+                    currentPath.startsWith(linkPath);
+
+                if (exactMatch || childMatch) {
+                    menu.classList.add("show");
+                    toggle.classList.add("active");
+                    link.classList.add("current");
+                }
+            });
+        });
+    })();
+    </script>
 </body>
-<script>
-(function () {
-    const toggles = document.querySelectorAll(".nav-toggle");
-    const currentPath = window.location.pathname;
-
-    function closeAll() {
-        toggles.forEach((btn) => {
-            const id = btn.getAttribute("data-target");
-            const menu = document.getElementById(id);
-            btn.classList.remove("active");
-            if (menu) menu.classList.remove("show");
-        });
-    }
-
-    toggles.forEach((toggle) => {
-        toggle.addEventListener("click", function () {
-            const targetId = this.getAttribute("data-target");
-            const currentMenu = document.getElementById(targetId);
-            if (!currentMenu) return;
-
-            const isOpen = currentMenu.classList.contains("show");
-            closeAll();
-
-            if (!isOpen) {
-                currentMenu.classList.add("show");
-                this.classList.add("active");
-            }
-        });
-    });
-
-    toggles.forEach((toggle) => {
-        const targetId = toggle.getAttribute("data-target");
-        const menu = document.getElementById(targetId);
-        if (!menu) return;
-
-        menu.querySelectorAll(".nav-link").forEach((link) => {
-            const href = link.getAttribute("href");
-            if (!href) return;
-
-            if (href === currentPath || (href !== "/" && currentPath.startsWith(href))) {
-                menu.classList.add("show");
-                toggle.classList.add("active");
-                link.classList.add("current");
-            }
-        });
-    });
-})();
-</script>
 </html>
