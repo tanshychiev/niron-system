@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+
+{% block title %}Stock History | Niron{% endblock %}
+{% block page_title %}Stock History{% endblock %}
+{% block page_subtitle %}
+Cloth and material confirmation records with final quantity, date, note, and staff name.
+{% endblock %}
+
+{% block content %}
+<div class="history-actions">
+  <a href="{% url 'stock_confirm' %}" class="btn-primary">← Stock Confirm</a>
+</div>
+
+<form method="get" class="filter-card">
+  <div>
+    <label>Search</label>
+    <input
+      type="text"
+      name="q"
+      value="{{ keyword }}"
+      placeholder="Item, color, size, staff or note"
+    >
+  </div>
+
+  <div>
+    <label>From</label>
+    <input type="date" name="date_from" value="{{ date_from }}">
+  </div>
+
+  <div>
+    <label>To</label>
+    <input type="date" name="date_to" value="{{ date_to }}">
+  </div>
+
+  <button type="submit" class="btn-primary">Filter</button>
+  <a href="{% url 'stock_history' %}" class="btn-light">Reset</a>
+</form>
+
+<div class="table-card">
+  <div class="table-scroll">
+    <table class="history-table">
+      <thead>
+        <tr>
+          <th>Date & Time</th>
+          <th>Type</th>
+          <th>Item</th>
+          <th>Color</th>
+          <th>Size / Unit</th>
+          <th class="number">Before</th>
+          <th class="number">Final Qty</th>
+          <th class="number">Difference</th>
+          <th>Note</th>
+          <th>Recorded By</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td>
+            <strong>{{ row.created_at|date:"d M Y" }}</strong>
+            <small>{{ row.created_at|date:"H:i" }}</small>
+          </td>
+
+          <td>
+            {% if row.batch_item.item.item_type == "SHIRT" %}
+              <span class="type-pill cloth">Cloth</span>
+            {% else %}
+              <span class="type-pill material">
+                {{ row.batch_item.item.get_item_type_display }}
+              </span>
+            {% endif %}
+          </td>
+
+          <td>
+            <strong>{{ row.batch_item.item.name }}</strong>
+            <small>{{ row.batch_item.item.code }}</small>
+          </td>
+
+          <td>
+            {% if row.batch_item.item.item_type == "SHIRT" %}
+              {{ row.batch_item.color.name|default:"-" }}
+            {% else %}
+              -
+            {% endif %}
+          </td>
+
+          <td>
+            {% if row.batch_item.item.item_type == "SHIRT" %}
+              <span class="size-pill">{{ row.batch_item.size.name|default:"-" }}</span>
+            {% else %}
+              <span class="size-pill">{{ row.batch_item.item.get_unit_display }}</span>
+            {% endif %}
+          </td>
+
+          <td class="number">{{ row.qty_before|floatformat:"-2" }}</td>
+          <td class="number final-number">{{ row.qty_after|floatformat:"-2" }}</td>
+
+          <td class="number">
+            {% if row.qty_in > 0 %}
+              <span class="diff-in">+{{ row.qty_in|floatformat:"-2" }}</span>
+            {% elif row.qty_out > 0 %}
+              <span class="diff-out">-{{ row.qty_out|floatformat:"-2" }}</span>
+            {% else %}
+              <span class="diff-same">Correct</span>
+            {% endif %}
+          </td>
+
+          <td>{{ row.correct_remark|default:row.remark|default:"-" }}</td>
+
+          <td>
+            {% if row.created_by %}
+              {{ row.created_by.get_full_name|default:row.created_by.username }}
+            {% else %}
+              -
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="10" class="empty-row">No stock confirmation history found.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<style>
+  .history-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 14px;
+  }
+
+  .filter-card {
+    display: grid;
+    grid-template-columns: minmax(220px,1fr) 170px 170px auto auto;
+    align-items: end;
+    gap: 12px;
+    padding: 18px;
+    margin-bottom: 20px;
+    background: rgba(255,255,255,.88);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    box-shadow: var(--shadow);
+  }
+
+  .filter-card label {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  .table-scroll { overflow-x: auto; }
+  .history-table { min-width: 1180px; }
+
+  .history-table td strong,
+  .history-table td small {
+    display: block;
+  }
+
+  .history-table td small {
+    color: var(--muted);
+    margin-top: 3px;
+  }
+
+  .number { text-align: right; }
+
+  .final-number {
+    font-weight: 900;
+    color: #0d7b39;
+  }
+
+  .type-pill,
+  .size-pill,
+  .diff-in,
+  .diff-out,
+  .diff-same {
+    display: inline-flex;
+    padding: 6px 9px;
+    border-radius: 10px;
+    font-weight: 900;
+  }
+
+  .type-pill.cloth {
+    background: #eef5ff;
+    color: #1d4ed8;
+  }
+
+  .type-pill.material,
+  .size-pill {
+    background: #fff3d6;
+    color: #9a5d00;
+  }
+
+  .diff-in {
+    background: #eaf9ef;
+    color: #087535;
+  }
+
+  .diff-out {
+    background: #fdecec;
+    color: #b42318;
+  }
+
+  .diff-same {
+    background: #edf7f0;
+    color: #087535;
+  }
+
+  .empty-row {
+    text-align: center;
+    padding: 35px !important;
+    color: var(--muted);
+  }
+
+  @media (max-width: 900px) {
+    .filter-card {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .filter-card > div:first-child {
+      grid-column: 1 / -1;
+    }
+  }
+</style>
+{% endblock %}

@@ -1,0 +1,636 @@
+{% extends "base.html" %}
+
+{% block title %}Stock Confirm | Niron{% endblock %}
+{% block page_title %}Stock Confirm{% endblock %}
+{% block page_subtitle %}
+Confirm cloth by color and size, then confirm material stock on the same page.
+{% endblock %}
+
+{% block content %}
+<div class="confirm-toolbar">
+  <div class="summary-pills">
+    <span><strong>{{ shirt_count }}</strong> cloth sizes</span>
+    <span><strong>{{ material_count }}</strong> materials</span>
+  </div>
+
+  <div class="toolbar-actions">
+    <a href="{% url 'stock_history' %}" class="btn-light">Stock History</a>
+
+    <form
+      method="post"
+      onsubmit="return confirm('Confirm every displayed cloth and material quantity as correct?');"
+    >
+      {% csrf_token %}
+      <input type="hidden" name="action" value="confirm_all">
+      <button type="submit" class="btn-confirm-all">✓ Confirm All Correct</button>
+    </form>
+  </div>
+</div>
+
+<div class="section-heading">
+  <div>
+    <h2>Cloth Stock</h2>
+    <p>Sizes are shown in this order: S, M, L, XL, XXL, XXXL.</p>
+  </div>
+</div>
+
+{% for group in shirt_groups %}
+<section class="stock-group">
+  <div class="group-head">
+    <div class="cloth-visual">
+      <div class="shirt-picture">
+        <svg viewBox="0 0 220 220" aria-hidden="true">
+          <path
+            class="shirt-shape {% if group.style == 'POLO' %}polo-shape{% elif group.style == 'BOXY' %}boxy-shape{% endif %}"
+            fill="{{ group.color_hex|default:'#D1D5DB' }}"
+            d="{% if group.style == 'POLO' %}M65 46 L88 28 L132 28 L155 46 L178 80 L160 92 L150 74 L150 190 L70 190 L70 74 L60 92 L42 80 Z{% elif group.style == 'BOXY' %}M48 58 L75 34 L145 34 L172 58 L188 86 L168 97 L158 80 L158 175 L62 175 L62 80 L52 97 L32 86 Z{% else %}M55 48 L82 30 L138 30 L165 48 L190 83 L170 96 L160 78 L160 190 L60 190 L60 78 L50 96 L30 83 Z{% endif %}">
+          </path>
+
+          {% if group.style == "POLO" %}
+          <path
+            fill="#F3F4F6"
+            d="M92 30 L110 48 L128 30 L118 62 L102 62 Z">
+          </path>
+          {% endif %}
+        </svg>
+
+        {% if group.image_url %}
+        <img
+          src="{{ group.image_url }}"
+          alt="{{ group.item_name }}"
+          class="actual-item-image"
+        >
+        {% endif %}
+      </div>
+
+      <span class="color-name">
+        <span class="color-dot" style="background:{{ group.color_hex }}"></span>
+        {{ group.color_name }}
+      </span>
+    </div>
+
+    <div class="group-title">
+      <h2>{{ group.item_name }}</h2>
+      <p>{{ group.item_code }} · {{ group.style_label }}</p>
+    </div>
+  </div>
+
+  <div class="stock-list">
+    {% for row in group.rows %}
+    <form method="post" class="stock-row">
+      {% csrf_token %}
+      <input type="hidden" name="key" value="{{ row.key }}">
+
+      <div class="size-box">
+        <span>Size</span>
+        <strong>{{ row.size_name }}</strong>
+      </div>
+
+      <div class="qty-box">
+        <span>System Qty</span>
+        <strong>{{ row.current_qty|floatformat:"-2" }}</strong>
+      </div>
+
+      <div class="last-box">
+        <span>Last Confirmed</span>
+        {% if row.last_confirmed_at %}
+          <strong>{{ row.last_confirmed_at|date:"d M Y, H:i" }}</strong>
+          <small>
+            by
+            {% if row.last_confirmed_by %}
+              {{ row.last_confirmed_by.get_full_name|default:row.last_confirmed_by.username }}
+            {% else %}
+              -
+            {% endif %}
+          </small>
+        {% else %}
+          <strong>Not confirmed yet</strong>
+        {% endif %}
+      </div>
+
+      <div class="real-box">
+        <label for="qty-{{ row.key }}">Real Qty</label>
+        <input
+          id="qty-{{ row.key }}"
+          type="number"
+          step="{{ row.input_step }}"
+          name="real_qty"
+          value="{{ row.current_qty|floatformat:'-2' }}"
+          required
+        >
+      </div>
+
+      <div class="note-box">
+        <label for="note-{{ row.key }}">Note</label>
+        <input
+          id="note-{{ row.key }}"
+          type="text"
+          name="note"
+          placeholder="Optional note"
+        >
+      </div>
+
+      <div class="row-actions">
+        <button
+          type="submit"
+          name="action"
+          value="confirm_correct"
+          class="btn-correct"
+        >
+          ✓ Correct
+        </button>
+
+        <button
+          type="submit"
+          name="action"
+          value="update_confirm"
+          class="btn-update"
+        >
+          Update & Confirm
+        </button>
+      </div>
+    </form>
+    {% endfor %}
+  </div>
+</section>
+{% empty %}
+<div class="empty-card">No active cloth stock was found.</div>
+{% endfor %}
+
+<div class="section-heading material-heading">
+  <div>
+    <h2>Material Stock</h2>
+    <p>Film, ink, powder, maintenance items, and other materials.</p>
+  </div>
+</div>
+
+<div class="material-grid">
+  {% for row in material_rows %}
+  <form method="post" class="material-card">
+    {% csrf_token %}
+    <input type="hidden" name="key" value="{{ row.key }}">
+
+    <div class="material-top">
+      <div class="material-picture">
+        {% if row.image_url %}
+          <img src="{{ row.image_url }}" alt="{{ row.item_name }}">
+        {% else %}
+          <div class="material-placeholder">NO IMAGE</div>
+        {% endif %}
+      </div>
+
+      <div class="material-title">
+        <span>{{ row.item_type_label }}</span>
+        <h3>{{ row.item_name }}</h3>
+        <p>{{ row.item_code }} · {{ row.unit }}</p>
+      </div>
+    </div>
+
+    <div class="material-metrics">
+      <div>
+        <span>System Qty</span>
+        <strong>{{ row.current_qty|floatformat:"-2" }}</strong>
+      </div>
+
+      <div>
+        <span>Last Confirmed</span>
+        {% if row.last_confirmed_at %}
+          <strong>{{ row.last_confirmed_at|date:"d M Y, H:i" }}</strong>
+          <small>
+            by
+            {% if row.last_confirmed_by %}
+              {{ row.last_confirmed_by.get_full_name|default:row.last_confirmed_by.username }}
+            {% else %}
+              -
+            {% endif %}
+          </small>
+        {% else %}
+          <strong>Not confirmed yet</strong>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="material-fields">
+      <div>
+        <label for="material-qty-{{ row.key }}">Real Qty</label>
+        <input
+          id="material-qty-{{ row.key }}"
+          type="number"
+          step="{{ row.input_step }}"
+          name="real_qty"
+          value="{{ row.current_qty|floatformat:'-2' }}"
+          required
+        >
+      </div>
+
+      <div>
+        <label for="material-note-{{ row.key }}">Note</label>
+        <input
+          id="material-note-{{ row.key }}"
+          type="text"
+          name="note"
+          placeholder="Optional note"
+        >
+      </div>
+    </div>
+
+    <div class="material-actions">
+      <button
+        type="submit"
+        name="action"
+        value="confirm_correct"
+        class="btn-correct"
+      >
+        ✓ Correct
+      </button>
+
+      <button
+        type="submit"
+        name="action"
+        value="update_confirm"
+        class="btn-update"
+      >
+        Update & Confirm
+      </button>
+    </div>
+  </form>
+  {% empty %}
+  <div class="empty-card">No active material stock was found.</div>
+  {% endfor %}
+</div>
+
+<style>
+  .confirm-toolbar,
+  .stock-group,
+  .material-card,
+  .empty-card {
+    background: rgba(255,255,255,.9);
+    border: 1px solid var(--line);
+    border-radius: 22px;
+    box-shadow: var(--shadow);
+  }
+
+  .confirm-toolbar {
+    padding: 18px 20px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+
+  .summary-pills,
+  .toolbar-actions,
+  .row-actions,
+  .material-actions {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    flex-wrap: wrap;
+  }
+
+  .summary-pills span {
+    display: inline-flex;
+    gap: 5px;
+    padding: 9px 12px;
+    border-radius: 999px;
+    background: #fff8e9;
+    border: 1px solid #f0d7a4;
+    color: #72501d;
+    font-size: 13px;
+  }
+
+  .toolbar-actions form { margin: 0; }
+
+  .section-heading {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 28px 0 14px;
+  }
+
+  .section-heading h2 {
+    margin: 0 0 5px;
+    font-size: 23px;
+  }
+
+  .section-heading p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  .btn-confirm-all,
+  .btn-correct,
+  .btn-update {
+    border-radius: 12px;
+    padding: 11px 15px;
+    font-weight: 800;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .btn-confirm-all,
+  .btn-correct {
+    border: 0;
+    background: #159447;
+    color: white;
+  }
+
+  .btn-confirm-all:hover,
+  .btn-correct:hover {
+    background: #0d7b39;
+  }
+
+  .btn-update {
+    background: #fff7e6;
+    color: #9a5d00;
+    border: 1px solid #f0cf91;
+  }
+
+  .stock-group {
+    margin-bottom: 20px;
+    overflow: hidden;
+  }
+
+  .group-head {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--line);
+    background: #fffaf0;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .cloth-visual {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .shirt-picture {
+    position: relative;
+    width: 92px;
+    height: 92px;
+    border-radius: 19px;
+    background: linear-gradient(180deg,#fff,#f4f1e9);
+    border: 1px solid #e5dfd2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  .shirt-picture svg {
+    width: 72px;
+    height: 72px;
+    filter: drop-shadow(0 6px 8px rgba(15,23,42,.14));
+  }
+
+  .actual-item-image {
+    position: absolute;
+    right: 5px;
+    bottom: 5px;
+    width: 30px;
+    height: 30px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 2px solid white;
+    box-shadow: 0 3px 8px rgba(15,23,42,.18);
+  }
+
+  .color-name {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 10px;
+    border-radius: 999px;
+    background: white;
+    border: 1px solid var(--line);
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  .color-dot {
+    width: 16px;
+    height: 16px;
+    border-radius: 999px;
+    border: 2px solid white;
+    box-shadow: 0 0 0 1px #cfd4dc;
+    flex-shrink: 0;
+  }
+
+  .group-title h2 {
+    margin: 0 0 4px;
+    font-size: 19px;
+  }
+
+  .group-title p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  .stock-list {
+    padding: 10px 16px;
+  }
+
+  .stock-row {
+    display: grid;
+    grid-template-columns: 80px 110px minmax(190px,1.1fr) 120px minmax(170px,1fr) auto;
+    gap: 12px;
+    align-items: end;
+    padding: 14px 4px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .stock-row:last-child { border-bottom: 0; }
+
+  .size-box span,
+  .qty-box span,
+  .last-box span,
+  .real-box label,
+  .note-box label,
+  .material-fields label,
+  .material-metrics span {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+
+  .size-box strong,
+  .qty-box strong {
+    font-size: 22px;
+  }
+
+  .last-box strong,
+  .material-metrics strong {
+    display: block;
+    font-size: 13px;
+  }
+
+  .last-box small,
+  .material-metrics small {
+    display: block;
+    color: var(--muted);
+    font-size: 12px;
+    margin-top: 3px;
+  }
+
+  .real-box input,
+  .note-box input,
+  .material-fields input {
+    height: 42px;
+    padding: 10px 12px;
+    border-radius: 12px;
+  }
+
+  .material-heading {
+    margin-top: 38px;
+  }
+
+  .material-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill,minmax(330px,1fr));
+    gap: 18px;
+  }
+
+  .material-card {
+    padding: 18px;
+  }
+
+  .material-top {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    margin-bottom: 16px;
+  }
+
+  .material-picture {
+    width: 76px;
+    height: 76px;
+    border-radius: 17px;
+    overflow: hidden;
+    background: #f5f4ef;
+    border: 1px solid var(--line);
+    flex-shrink: 0;
+  }
+
+  .material-picture img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .material-placeholder {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #9ca3af;
+    font-size: 10px;
+    font-weight: 800;
+  }
+
+  .material-title > span {
+    display: inline-flex;
+    padding: 5px 8px;
+    border-radius: 999px;
+    background: #fff3d6;
+    color: #9a5d00;
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+  }
+
+  .material-title h3 {
+    margin: 7px 0 4px;
+    font-size: 17px;
+  }
+
+  .material-title p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  .material-metrics {
+    display: grid;
+    grid-template-columns: 110px 1fr;
+    gap: 12px;
+    padding: 13px;
+    border-radius: 15px;
+    background: #faf8f1;
+    border: 1px solid var(--line);
+  }
+
+  .material-metrics > div:first-child strong {
+    font-size: 24px;
+    color: #0f172a;
+  }
+
+  .material-fields {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    gap: 10px;
+    margin-top: 14px;
+  }
+
+  .material-actions {
+    margin-top: 14px;
+    justify-content: flex-end;
+  }
+
+  .empty-card {
+    padding: 35px;
+    text-align: center;
+    color: var(--muted);
+  }
+
+  @media (max-width: 1180px) {
+    .stock-row {
+      grid-template-columns: 80px 110px 1fr 120px;
+    }
+
+    .note-box { grid-column: 1 / 4; }
+    .row-actions { grid-column: 4; }
+  }
+
+  @media (max-width: 760px) {
+    .group-head {
+      align-items: flex-start;
+    }
+
+    .cloth-visual {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+
+    .stock-row {
+      grid-template-columns: 1fr 1fr;
+      align-items: start;
+    }
+
+    .last-box,
+    .note-box,
+    .row-actions {
+      grid-column: 1 / -1;
+    }
+
+    .row-actions button,
+    .material-actions button {
+      flex: 1;
+    }
+
+    .material-fields {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+{% endblock %}

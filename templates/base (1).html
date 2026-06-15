@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}Niron System{% endblock %}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <style>
+        :root {
+            --bg: #F7F3E8;
+            --bg-soft: #FBFAF5;
+            --panel: #FFFDF8;
+            --line: #ECE6D8;
+            --text: #1F2937;
+            --muted: #6B7280;
+            --accent: #E89B14;
+            --accent-dark: #C97D00;
+            --accent-soft: #FFF3D6;
+            --shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+            --danger-bg: #FDECEC;
+            --danger-line: #F5C2C7;
+            --danger-text: #B42318;
+            --success-bg: #ECFDF3;
+            --success-line: #ABEFC6;
+            --success-text: #067647;
+        }
+
+        * { box-sizing: border-box; }
+
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: Inter, "Segoe UI", Arial, sans-serif;
+        }
+
+        body { min-height: 100vh; }
+        a { color: inherit; }
+
+        .layout {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            width: 278px;
+            background: var(--panel);
+            border-right: 1px solid var(--line);
+            padding: 24px 18px 18px;
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            overflow-y: auto;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .logo-wrap { margin-bottom: 18px; }
+
+        .logo {
+            font-size: 28px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 6px;
+            text-decoration: none;
+        }
+
+        .logo::before {
+            content: "";
+            width: 10px;
+            height: 24px;
+            border-radius: 3px;
+            background: var(--accent);
+            box-shadow: 14px 0 0 var(--accent), 28px 0 0 var(--accent);
+            display: inline-block;
+            margin-right: 26px;
+        }
+
+        .logo-sub {
+            font-size: 11px;
+            letter-spacing: 2px;
+            color: var(--muted);
+            text-transform: uppercase;
+            margin-bottom: 0;
+            padding-left: 52px;
+        }
+
+        .sidebar-scroll { flex: 1; }
+        .nav-group { margin-bottom: 10px; }
+
+        .nav-toggle {
+            width: 100%;
+            border: 0;
+            background: transparent;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 14px;
+            border-radius: 14px;
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text);
+            cursor: pointer;
+            transition: 0.2s ease;
+        }
+
+        .nav-toggle:hover,
+        .nav-toggle.active {
+            background: var(--accent-soft);
+            color: var(--accent-dark);
+        }
+
+        .nav-arrow {
+            font-size: 12px;
+            transition: transform 0.2s ease;
+        }
+
+        .nav-toggle.active .nav-arrow {
+            transform: rotate(180deg);
+        }
+
+        .nav-submenu {
+            max-height: 0;
+            overflow: hidden;
+            padding: 0 0 0 10px;
+            opacity: 0;
+            transition: max-height 0.25s ease, opacity 0.2s ease, padding 0.2s ease;
+        }
+
+        .nav-submenu.show {
+            max-height: 720px;
+            opacity: 1;
+            padding: 8px 0 4px 10px;
+        }
+
+        .nav-link {
+            display: block;
+            text-decoration: none;
+            color: var(--muted);
+            padding: 10px 14px;
+            border-radius: 12px;
+            margin-bottom: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            transition: 0.2s ease;
+        }
+
+        .nav-link:hover {
+            background: var(--bg-soft);
+            color: var(--accent-dark);
+        }
+
+        .nav-link.current {
+            background: var(--accent-soft);
+            color: var(--accent-dark);
+            font-weight: 700;
+        }
+
+        .sidebar-footer {
+            border-top: 1px solid var(--line);
+            padding-top: 16px;
+            margin-top: 10px;
+        }
+
+        .logout-link {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            text-decoration: none;
+            border-radius: 14px;
+            padding: 12px 14px;
+            background: #fff;
+            border: 1px solid var(--line);
+            color: #B42318;
+            font-size: 14px;
+            font-weight: 700;
+            transition: 0.2s ease;
+        }
+
+        .logout-link:hover {
+            background: var(--danger-bg);
+            border-color: var(--danger-line);
+        }
+
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .topbar {
+            min-height: 76px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 34px;
+            border-bottom: 1px solid var(--line);
+            background: rgba(255, 255, 255, 0.82);
+            backdrop-filter: blur(10px);
+            gap: 12px;
+        }
+
+        .topbar-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
+        }
+
+        .topbar-title {
+            font-size: 15px;
+            font-weight: 800;
+            color: var(--text);
+        }
+
+        .topbar-subtitle {
+            font-size: 12px;
+            color: var(--muted);
+            margin-top: 3px;
+        }
+
+        .topbar-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .user-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            border-radius: 14px;
+            background: white;
+            border: 1px solid var(--line);
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        .user-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 999px;
+            background: var(--accent);
+            display: inline-block;
+            flex-shrink: 0;
+        }
+
+        .content-wrap { padding: 32px 34px 40px; }
+
+        .hero {
+            background: linear-gradient(180deg, #F8F3E6 0%, #F7F3E8 100%);
+            border: 1px solid var(--line);
+            border-radius: 28px;
+            padding: 42px 40px;
+            margin-bottom: 28px;
+            box-shadow: var(--shadow);
+        }
+
+        .hero-title {
+            text-align: center;
+            font-size: 42px;
+            line-height: 1.08;
+            letter-spacing: -1.2px;
+            color: var(--text);
+            margin: 0;
+            font-weight: 800;
+        }
+
+        .hero-subtitle {
+            text-align: center;
+            margin-top: 12px;
+            color: var(--muted);
+            font-size: 15px;
+            max-width: 720px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .card,
+        .form-card,
+        .info-card,
+        .table-card {
+            background: rgba(255, 255, 255, 0.82);
+            border: 1px solid var(--line);
+            border-radius: 22px;
+            padding: 24px;
+            margin-bottom: 22px;
+            box-shadow: var(--shadow);
+        }
+
+        .btn,
+        .btn-primary,
+        .btn-light,
+        .btn-secondary,
+        .btn-danger {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            border-radius: 12px;
+            padding: 12px 18px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+            transition: 0.2s ease;
+            border: none;
+        }
+
+        .btn,
+        .btn-light,
+        .btn-secondary {
+            background: white;
+            color: var(--text);
+            border: 1px solid var(--line);
+        }
+
+        .btn:hover,
+        .btn-light:hover,
+        .btn-secondary:hover {
+            background: var(--bg-soft);
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+            box-shadow: 0 8px 20px rgba(232, 155, 20, 0.28);
+        }
+
+        .btn-primary:hover { background: var(--accent-dark); }
+
+        .btn-danger {
+            background: #DC2626;
+            color: white;
+        }
+
+        .actions,
+        .top-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .actions {
+            justify-content: flex-end;
+            margin-top: 18px;
+        }
+
+        input,
+        select,
+        textarea,
+        .form-control,
+        .form-select {
+            width: 100%;
+            padding: 13px 14px;
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            background: white;
+            font-size: 14px;
+            color: var(--text);
+            outline: none;
+        }
+
+        input,
+        select,
+        .form-control,
+        .form-select {
+            height: 44px;
+        }
+
+        textarea,
+        textarea.form-control {
+            height: auto;
+            padding: 12px 14px;
+            min-height: 110px;
+        }
+
+        input:focus,
+        select:focus,
+        textarea:focus,
+        .form-control:focus,
+        .form-select:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 4px rgba(232, 155, 20, 0.12);
+        }
+
+        .app-table,
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .app-table th,
+        .app-table td,
+        table th,
+        table td {
+            text-align: left;
+            vertical-align: top;
+            padding: 14px 10px;
+            border-bottom: 1px solid var(--line);
+            font-size: 14px;
+            color: var(--text);
+        }
+
+        .app-table thead th,
+        table thead th,
+        table th {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            color: var(--muted);
+            font-weight: 700;
+        }
+
+        .flash-stack {
+            display: grid;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .flash-message {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            border-radius: 18px;
+            padding: 14px 16px;
+            border: 1px solid transparent;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+        }
+
+        .flash-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 900;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        .flash-text {
+            font-size: 14px;
+            font-weight: 700;
+            line-height: 1.45;
+            white-space: pre-line;
+        }
+
+        .flash-success {
+            background: #ECFDF3;
+            border-color: #ABEFC6;
+            color: #067647;
+        }
+
+        .flash-success .flash-icon {
+            background: #D1FADF;
+            color: #067647;
+        }
+
+        .flash-warning {
+            background: #FFF7E8;
+            border-color: #F7D08A;
+            color: #B54708;
+        }
+
+        .flash-warning .flash-icon {
+            background: #FDE7C2;
+            color: #B54708;
+        }
+
+        .flash-error {
+            background: #FDECEC;
+            border-color: #F5C2C7;
+            color: #B42318;
+        }
+
+        .flash-error .flash-icon {
+            background: #FAD2D6;
+            color: #B42318;
+        }
+
+        .flash-info {
+            background: #F4F7FB;
+            border-color: #D7E3F4;
+            color: #1F4E79;
+        }
+
+        .flash-info .flash-icon {
+            background: #E3EDF9;
+            color: #1F4E79;
+        }
+
+        @media (max-width: 980px) {
+            .layout { flex-direction: column; }
+
+            .sidebar {
+                width: 100%;
+                height: auto;
+                position: relative;
+                border-right: none;
+                border-bottom: 1px solid var(--line);
+            }
+
+            .topbar {
+                padding: 16px 20px;
+                min-height: auto;
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .topbar-right {
+                width: 100%;
+                justify-content: flex-start;
+            }
+
+            .content-wrap { padding: 20px; }
+            .hero-title { font-size: 32px; }
+        }
+    </style>
+
+    {% block extra_css %}{% endblock %}
+</head>
+
+<body>
+    <div class="layout">
+        <aside class="sidebar">
+            <div class="logo-wrap">
+                <a href="/" class="logo">Niron</a>
+                <div class="logo-sub">Custom Printing</div>
+            </div>
+
+            <div class="sidebar-scroll">
+
+                <!-- INVENTORY -->
+                {% if perms.inventory.view_inventorybatch %}
+                <div class="nav-group">
+                    <button class="nav-toggle" type="button" data-target="menu-inventory">
+                        <span>Inventory</span>
+                        <span class="nav-arrow">▼</span>
+                    </button>
+
+                    <div class="nav-submenu" id="menu-inventory">
+                        <a class="nav-link" href="{% url 'inventory_list' %}">
+                            Cloth Inventory
+                        </a>
+
+                        {% if perms.inventory.add_inventorybatch %}
+                        <a class="nav-link" href="{% url 'inventory_batch_create' %}">
+                            Stock In
+                        </a>
+                        {% endif %}
+
+                        {% if perms.inventory.add_inventoryadjustment %}
+                        <a class="nav-link" href="{% url 'inventory_adjust_stock_select' %}">
+                            Adjust Cloth Stock
+                        </a>
+
+                        <a class="nav-link" href="{% url 'material_usage' %}">
+                            Material Usage
+                        </a>
+                        {% endif %}
+
+                        {% if perms.inventory.add_stockledger %}
+                        <a class="nav-link" href="{% url 'stock_confirm' %}">
+                            Stock Confirm
+                        </a>
+                        {% endif %}
+
+                        {% if perms.inventory.view_stockledger %}
+                        <a class="nav-link" href="{% url 'stock_history' %}">
+                            Stock History
+                        </a>
+                        {% endif %}
+
+                        {% if perms.inventory.view_inventoryadjustment %}
+                        <a class="nav-link" href="{% url 'inventory_adjustment_list' %}">
+                            Adjustment History
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- ORDERS -->
+                {% if perms.orders.view_order or perms.orders.add_order %}
+                <div class="nav-group">
+                    <button class="nav-toggle" type="button" data-target="menu-orders">
+                        <span>Orders</span>
+                        <span class="nav-arrow">▼</span>
+                    </button>
+
+                    <div class="nav-submenu" id="menu-orders">
+                        {% if perms.orders.view_order %}
+                        <a class="nav-link" href="/orders/">Order List</a>
+                        {% endif %}
+
+                        {% if perms.orders.add_order %}
+                        <a class="nav-link" href="/orders/new/">Create Order</a>
+                        {% endif %}
+
+                        {% if perms.orders.view_order %}
+                        <a class="nav-link" href="/orders/production/">Production List</a>
+                        {% endif %}
+
+                        <a class="nav-link" href="/orders/customer-payments/">
+                            Customer Payments
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- CUSTOMERS -->
+                {% if perms.customers.view_customer %}
+                <div class="nav-group">
+                    <button class="nav-toggle" type="button" data-target="menu-customers">
+                        <span>Customers</span>
+                        <span class="nav-arrow">▼</span>
+                    </button>
+
+                    <div class="nav-submenu" id="menu-customers">
+                        <a class="nav-link" href="/customers/">Customer List</a>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- FINANCE -->
+                {% if perms.finance.view_expense_summary_nav or perms.finance.view_other_expense_nav or perms.finance.view_batch_expense_nav or perms.finance.view_operating_expense_nav or perms.finance.view_profit_dashboard_nav %}
+                <div class="nav-group">
+                    <button class="nav-toggle" type="button" data-target="menu-finance">
+                        <span>Finance</span>
+                        <span class="nav-arrow">▼</span>
+                    </button>
+
+                    <div class="nav-submenu" id="menu-finance">
+                        <a class="nav-link" href="/finance/expenses/">Expense Summary</a>
+                        <a class="nav-link" href="/finance/expenses/other/">Other Expense</a>
+                        <a class="nav-link" href="/finance/expenses/batch/">Batch Expense</a>
+                        <a class="nav-link" href="/finance/expenses/operating/">Operating Expense</a>
+                        <a class="nav-link" href="/finance/profit-dashboard/">Profit Dashboard</a>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- SETUP -->
+                {% if perms.inventory.view_inventoryitem or perms.inventory.view_color or perms.inventory.view_size %}
+                <div class="nav-group">
+                    <button class="nav-toggle" type="button" data-target="menu-setup">
+                        <span>Setup</span>
+                        <span class="nav-arrow">▼</span>
+                    </button>
+
+                    <div class="nav-submenu" id="menu-setup">
+                        <a class="nav-link" href="/inventory/items/">Item List</a>
+                        <a class="nav-link" href="/inventory/colors/">Color List</a>
+                        <a class="nav-link" href="/inventory/sizes/">Size List</a>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- USERS -->
+                {% if perms.auth.view_user or perms.auth.view_group %}
+                <div class="nav-group">
+                    <button class="nav-toggle" type="button" data-target="menu-users">
+                        <span>Users & Permissions</span>
+                        <span class="nav-arrow">▼</span>
+                    </button>
+
+                    <div class="nav-submenu" id="menu-users">
+                        <a class="nav-link" href="/users/">User List</a>
+                        <a class="nav-link" href="/users/roles/">Roles</a>
+                        <a class="nav-link" href="/users/permissions/">Permissions</a>
+                    </div>
+                </div>
+                {% endif %}
+
+            </div>
+
+            {% if user.is_authenticated %}
+            <div class="sidebar-footer">
+                <a class="logout-link" href="/logout/">
+                    <span>Logout</span>
+                    <span>↗</span>
+                </a>
+            </div>
+            {% endif %}
+        </aside>
+
+        <div class="main">
+            <div class="topbar">
+                <div class="topbar-left">
+                    <div>
+                        <div class="topbar-title">
+                            {% block topbar_title %}Niron System{% endblock %}
+                        </div>
+
+                        <div class="topbar-subtitle">
+                            {% block topbar_subtitle %}
+                            Custom printing management platform
+                            {% endblock %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="topbar-right">
+                    {% if user.is_authenticated %}
+                    <div class="user-chip">
+                        <span class="user-dot"></span>
+                        <span>{{ user.get_full_name|default:user.username }}</span>
+                    </div>
+                    {% endif %}
+
+                    {% block top_actions %}{% endblock %}
+                </div>
+            </div>
+
+            <div class="content-wrap">
+                <div class="hero">
+                    <h1 class="hero-title">
+                        {% block page_title %}Niron System{% endblock %}
+                    </h1>
+
+                    <div class="hero-subtitle">
+                        {% block page_subtitle %}
+                        Clean custom printing management
+                        {% endblock %}
+                    </div>
+                </div>
+
+                {% if messages %}
+                <div class="flash-stack">
+                    {% for message in messages %}
+                    <div class="flash-message flash-{{ message.tags }}">
+                        <div class="flash-icon">
+                            {% if message.tags == "error" %}
+                                !
+                            {% elif message.tags == "warning" %}
+                                !
+                            {% else %}
+                                ✓
+                            {% endif %}
+                        </div>
+
+                        <div class="flash-text">{{ message }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                {% block content %}{% endblock %}
+            </div>
+        </div>
+    </div>
+
+    <script>
+    (function () {
+        const toggles = document.querySelectorAll(".nav-toggle");
+        const currentPath = window.location.pathname;
+
+        function closeAll() {
+            toggles.forEach((button) => {
+                const targetId = button.getAttribute("data-target");
+                const menu = document.getElementById(targetId);
+
+                button.classList.remove("active");
+
+                if (menu) {
+                    menu.classList.remove("show");
+                }
+            });
+        }
+
+        toggles.forEach((toggle) => {
+            toggle.addEventListener("click", function () {
+                const targetId = this.getAttribute("data-target");
+                const currentMenu = document.getElementById(targetId);
+
+                if (!currentMenu) {
+                    return;
+                }
+
+                const isOpen = currentMenu.classList.contains("show");
+                closeAll();
+
+                if (!isOpen) {
+                    currentMenu.classList.add("show");
+                    this.classList.add("active");
+                }
+            });
+        });
+
+        toggles.forEach((toggle) => {
+            const targetId = toggle.getAttribute("data-target");
+            const menu = document.getElementById(targetId);
+
+            if (!menu) {
+                return;
+            }
+
+            menu.querySelectorAll(".nav-link").forEach((link) => {
+                const linkUrl = new URL(link.href, window.location.origin);
+                const linkPath = linkUrl.pathname;
+
+                const exactMatch = linkPath === currentPath;
+                const childMatch =
+                    linkPath !== "/" &&
+                    currentPath.startsWith(linkPath);
+
+                if (exactMatch || childMatch) {
+                    menu.classList.add("show");
+                    toggle.classList.add("active");
+                    link.classList.add("current");
+                }
+            });
+        });
+    })();
+    </script>
+</body>
+</html>
