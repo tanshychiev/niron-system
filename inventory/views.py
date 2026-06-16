@@ -45,6 +45,50 @@ def _to_int(value):
     return int(round(float(value)))
 
 
+# Fixed display order for shirt sizes.
+# The database sort_order is only used for sizes not listed here.
+SHIRT_SIZE_ORDER = {
+    "XS": 1,
+    "S": 2,
+    "M": 3,
+    "L": 4,
+    "XL": 5,
+    "XXL": 6,
+    "XXXL": 7,
+}
+
+
+# These important colors must appear before all other colors.
+PRIORITY_COLOR_ORDER = {
+    "black": 1,
+    "white": 2,
+    "cream": 3,
+    "grey": 4,
+    "gray": 4,
+}
+
+
+def _shirt_size_sort_key(size_data):
+    size_name = str(size_data.get("size_name") or "").strip().upper()
+    database_order = int(size_data.get("size_sort") or 9999)
+
+    return (
+        SHIRT_SIZE_ORDER.get(size_name, 1000 + database_order),
+        size_name,
+    )
+
+
+def _cloth_card_sort_key(card):
+    color_name = str(card.get("color_name") or "").strip().lower()
+
+    return (
+        PRIORITY_COLOR_ORDER.get(color_name, 999),
+        color_name,
+        str(card.get("item_code") or "").lower(),
+        str(card.get("item_name") or "").lower(),
+    )
+
+
 def _batch_snapshot(batch):
     return {
         "batch_no": batch.batch_no,
@@ -219,7 +263,7 @@ def inventory_list(request):
 
         for _, s in sorted(
             data["sizes"].items(),
-            key=lambda x: (x[1]["size_sort"], x[1]["size_name"]),
+            key=lambda x: _shirt_size_sort_key(x[1]),
         ):
             size_available = _to_int(s.get("stock_qty", 0))
             size_in_proc = _to_int(s.get("in_progress_qty", 0))
@@ -247,6 +291,8 @@ def inventory_list(request):
     style_groups = []
 
     for style_key, cards in grouped_styles.items():
+        cards = sorted(cards, key=_cloth_card_sort_key)
+
         style_groups.append(
             {
                 "style_key": style_key,
