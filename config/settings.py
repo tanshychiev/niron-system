@@ -1,18 +1,21 @@
 from pathlib import Path
 
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+
 SECRET_KEY = "django-insecure-change-this"
+
 DEBUG = True
 
 ALLOWED_HOSTS = [
     "127.0.0.1",
     "localhost",
-    "niron-system.com",      # change if needed
-    "www.niron-system.com",  # change if needed
-    "your-server-ip",
-    "5.223.90.183",        # change if needed
+    "niron-system.com",
+    "www.niron-system.com",
+    "5.223.90.183",
 ]
+
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -29,6 +32,7 @@ INSTALLED_APPS = [
     "customers",
 ]
 
+
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -39,12 +43,16 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
+
 ROOT_URLCONF = "config.urls"
+
 
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [BASE_DIR / "templates"],
+        "DIRS": [
+            BASE_DIR / "templates",
+        ],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -57,7 +65,9 @@ TEMPLATES = [
     },
 ]
 
+
 WSGI_APPLICATION = "config.wsgi.application"
+
 
 DATABASES = {
     "default": {
@@ -66,50 +76,70 @@ DATABASES = {
     }
 }
 
+
 AUTH_PASSWORD_VALIDATORS = [
     {
-        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
+        "NAME": (
+            "django.contrib.auth.password_validation."
+            "UserAttributeSimilarityValidator"
+        ),
     },
     {
-        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+        "NAME": (
+            "django.contrib.auth.password_validation."
+            "MinimumLengthValidator"
+        ),
     },
     {
-        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
+        "NAME": (
+            "django.contrib.auth.password_validation."
+            "CommonPasswordValidator"
+        ),
     },
     {
-        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
+        "NAME": (
+            "django.contrib.auth.password_validation."
+            "NumericPasswordValidator"
+        ),
     },
 ]
+
 
 LANGUAGE_CODE = "en-us"
+
 TIME_ZONE = "Asia/Phnom_Penh"
+
 USE_I18N = True
+
 USE_TZ = True
 
-STATIC_URL = "/static/"
-STATIC_ROOT = BASE_DIR / "staticfiles"
 
-MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
+STATIC_URL = "/static/"
+
 STATICFILES_DIRS = [
-    BASE_DIR / "orders" / "static",
+    BASE_DIR / "static",
 ]
 
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
+
+MEDIA_URL = "/media/"
+
+MEDIA_ROOT = BASE_DIR / "media"
+
+
 LOGIN_URL = "/login/"
+
 LOGIN_REDIRECT_URL = "/inventory/"
+
 LOGOUT_REDIRECT_URL = "/login/"
+
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# =========================
-# SESSION SETTINGS
-# =========================
 
-# Session lasts 12 hours
-SESSION_COOKIE_AGE = 60 * 60 * 12  # 43200 seconds
+SESSION_COOKIE_AGE = 60 * 60 * 12
 
-# Refresh session on every request (active user stays logged in)
 SESSION_SAVE_EVERY_REQUEST = True
 
-# Do NOT logout when browser closes
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
