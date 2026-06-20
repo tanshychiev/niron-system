@@ -1228,7 +1228,21 @@
                             <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M5 4h14v16H5zM8 8h8M8 12h8M8 16h5"/></svg></span>
                             <span>Order List</span>
                         </a>
+                        {% endif %}
 
+                        {% if perms.orders.add_order %}
+                        <a class="nav-link" href="/orders/new/">
+                            <span class="nav-mini-icon">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M5 4h14v16H5z"/>
+                                    <path d="M12 8v8M8 12h8"/>
+                                </svg>
+                            </span>
+                            <span>Create Order</span>
+                        </a>
+                        {% endif %}
+
+                        {% if perms.orders.view_order %}
                         <a class="nav-link" href="/orders/production/">
                             <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M4 17h16M6 17V9l4 3V8l4 3V6l4 3v8"/><path d="M8 20h8"/></svg></span>
                             <span>Production List</span>
