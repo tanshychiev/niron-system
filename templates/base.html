@@ -314,6 +314,7 @@
         }
 
         .icon-inventory { background: #DDF4E9; color: #187A57; }
+        .icon-production { background: #FFF0D4; color: #A75A00; }
         .icon-orders { background: #E5EEFF; color: #3267BE; }
         .icon-customers { background: #EEE7FF; color: #7049B0; }
         .icon-finance { background: #FFECCE; color: #B76408; }
@@ -1215,6 +1216,71 @@
                     </div>
                 </div>
                 {% endif %}
+
+
+{% if perms.production.view_production_nav %}
+<div class="nav-group">
+    <button class="nav-toggle" type="button" data-target="menu-production" aria-expanded="false">
+        <span class="nav-main-icon icon-production" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+                <path d="M3 20h18M5 20V10l4 3V8l4 3V6l6 4v10"/>
+                <path d="M8 20v-4h3v4M15 14h3M15 17h3"/>
+            </svg>
+        </span>
+        <span class="nav-label">Production</span>
+        <span class="nav-arrow" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 10 5 5 5-5"/></svg>
+        </span>
+    </button>
+
+    <div class="nav-submenu" id="menu-production">
+        <a class="nav-link" href="{% url 'production_dashboard' %}">
+            <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg></span>
+            <span>Production Dashboard</span>
+        </a>
+        {% if perms.production.view_fabricroll %}
+        <a class="nav-link" href="{% url 'production_material_stock' %}">
+            <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M5 6h14v12H5zM8 3h8v3M8 18v3h8v-3"/></svg></span>
+            <span>Material Stock</span>
+        </a>
+        {% endif %}
+        {% if perms.production.add_fabricreceipt %}
+        <a class="nav-link" href="{% url 'production_fabric_receive' %}">
+            <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span>
+            <span>Receive Fabric</span>
+        </a>
+        {% endif %}
+        {% if perms.production.view_productionproject %}
+        <a class="nav-link" href="{% url 'production_project_list' %}">
+            <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M5 4h14v16H5zM8 8h8M8 12h8M8 16h5"/></svg></span>
+            <span>Production Projects</span>
+        </a>
+        {% endif %}
+        {% if perms.production.view_sewingreturn %}
+        <a class="nav-link" href="{% url 'production_return_list' %}">
+            <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M4 7h16v10H4zM8 11h8M12 7V4M9 4h6"/></svg></span>
+            <span>Sewing Returns</span>
+        </a>
+        {% endif %}
+        {% if perms.production.view_sewingpartner %}
+        <a class="nav-link" href="{% url 'production_partner_list' %}">
+            <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20v-1a6 6 0 0 1 12 0v1M16 7h5M18.5 4.5v5"/></svg></span>
+            <span>Sewing Partners</span>
+        </a>
+        {% endif %}
+        {% if perms.production.manage_production_payments %}
+        <a class="nav-link" href="{% url 'production_payment_list' 'sewer' %}">
+            <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18M7 15h3"/></svg></span>
+            <span>Sewing Payments</span>
+        </a>
+        <a class="nav-link" href="{% url 'production_payment_list' 'staff' %}">
+            <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"/><path d="M3 20v-1a5 5 0 0 1 10 0v1M16 9h5M18 6l3 3-3 3"/></svg></span>
+            <span>Staff Payments</span>
+        </a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
 
                 {% if perms.orders.view_order or perms.orders.add_order %}
                 <div class="nav-group">
