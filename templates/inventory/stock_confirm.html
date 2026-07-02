@@ -12,7 +12,7 @@ Tick only the sizes you checked. Leave unticked sizes for later. Change Real Qty
   <div class="report-title">
     <div>
       <span class="report-kicker">Latest Confirmation Report</span>
-      <h3>{{ last_report.total }} item{{ last_report.total|pluralize }} checked</h3>
+      <h3>{{ last_report.total }} type{{ last_report.total|pluralize }} confirmed</h3>
     </div>
 
     <div class="report-links">
@@ -23,7 +23,7 @@ Tick only the sizes you checked. Leave unticked sizes for later. Change Real Qty
 
   <div class="report-counts">
     <div class="report-count total-count">
-      <span>Total Checked</span>
+      <span>Total Confirmed</span>
       <strong>{{ last_report.total }}</strong>
     </div>
     <div class="report-count correct-count">
@@ -31,14 +31,14 @@ Tick only the sizes you checked. Leave unticked sizes for later. Change Real Qty
       <strong>{{ last_report.correct }}</strong>
     </div>
     <div class="report-count wrong-count">
-      <span>Wrong</span>
+      <span>Updated / Wrong</span>
       <strong>{{ last_report.wrong }}</strong>
     </div>
   </div>
 
   {% if last_report.wrong_rows %}
   <div class="wrong-list">
-    <div class="wrong-list-title">Wrong stock changed</div>
+    <div class="wrong-list-title">Updated quantities</div>
     {% for wrong in last_report.wrong_rows %}
     <div class="wrong-line">
       <strong>{{ wrong.label }}</strong>
@@ -56,6 +56,7 @@ Tick only the sizes you checked. Leave unticked sizes for later. Change Real Qty
 
 <form method="post" id="stock-confirm-form">
   {% csrf_token %}
+  <input type="hidden" name="action" value="confirm_selected">
 
   <div class="confirm-toolbar">
     <div class="summary-pills">
@@ -76,13 +77,11 @@ Tick only the sizes you checked. Leave unticked sizes for later. Change Real Qty
 
       <button
         type="submit"
-        name="action"
-        value="confirm_selected"
         class="btn-confirm-all"
         id="confirm-selected-button"
         disabled
       >
-        ✓ Confirm Ticked Sizes
+        Review & Confirm Selected
       </button>
     </div>
   </div>
@@ -154,6 +153,7 @@ Tick only the sizes you checked. Leave unticked sizes for later. Change Real Qty
             class="row-checkbox"
             data-group="{{ group.group_field_key }}"
             data-field="{{ row.field_key }}"
+            data-label="{{ group.item_name }} / {{ group.color_name }} / {{ row.size_name }}"
           >
           <span class="row-check-box">✓</span>
         </label>
@@ -166,6 +166,7 @@ Tick only the sizes you checked. Leave unticked sizes for later. Change Real Qty
         <div class="qty-box">
           <span>System Qty</span>
           <strong>{{ row.current_qty|floatformat:"-2" }}</strong>
+          <small class="qty-state" data-state-for="{{ row.field_key }}">Not selected</small>
         </div>
 
         <div class="last-box">
@@ -196,8 +197,8 @@ Tick only the sizes you checked. Leave unticked sizes for later. Change Real Qty
             data-system-qty="{{ row.current_qty|floatformat:'-2' }}"
             data-field="{{ row.field_key }}"
             class="real-qty-input"
-            required
           >
+          <small class="qty-difference" data-difference-for="{{ row.field_key }}"></small>
         </div>
 
         <div class="note-box">
@@ -210,25 +211,6 @@ Tick only the sizes you checked. Leave unticked sizes for later. Change Real Qty
           >
         </div>
 
-        <div class="row-actions">
-          <button
-            type="submit"
-            name="single_correct_key"
-            value="{{ row.key }}"
-            class="btn-correct"
-          >
-            ✓ Correct
-          </button>
-
-          <button
-            type="submit"
-            name="single_update_key"
-            value="{{ row.key }}"
-            class="btn-update"
-          >
-            Update & Confirm
-          </button>
-        </div>
       </div>
       {% endfor %}
     </div>
@@ -269,6 +251,7 @@ Tick only the sizes you checked. Leave unticked sizes for later. Change Real Qty
             value="{{ row.key }}"
             class="row-checkbox"
             data-field="{{ row.field_key }}"
+            data-label="{{ row.item_name }} / {{ row.unit }}"
           >
           <span class="row-check-box">✓</span>
           <span class="tick-label">Tick</span>
@@ -276,9 +259,10 @@ Tick only the sizes you checked. Leave unticked sizes for later. Change Real Qty
       </div>
 
       <div class="material-metrics">
-        <div>
+        <div class="material-system-box">
           <span>System Qty</span>
           <strong>{{ row.current_qty|floatformat:"-2" }}</strong>
+          <small class="qty-state" data-state-for="{{ row.field_key }}">Not selected</small>
         </div>
 
         <div>
@@ -311,8 +295,8 @@ Tick only the sizes you checked. Leave unticked sizes for later. Change Real Qty
             data-system-qty="{{ row.current_qty|floatformat:'-2' }}"
             data-field="{{ row.field_key }}"
             class="real-qty-input"
-            required
           >
+          <small class="qty-difference" data-difference-for="{{ row.field_key }}"></small>
         </div>
 
         <div>
@@ -326,25 +310,6 @@ Tick only the sizes you checked. Leave unticked sizes for later. Change Real Qty
         </div>
       </div>
 
-      <div class="material-actions">
-        <button
-          type="submit"
-          name="single_correct_key"
-          value="{{ row.key }}"
-          class="btn-correct"
-        >
-          ✓ Correct
-        </button>
-
-        <button
-          type="submit"
-          name="single_update_key"
-          value="{{ row.key }}"
-          class="btn-update"
-        >
-          Update & Confirm
-        </button>
-      </div>
     </div>
     {% empty %}
     <div class="empty-card">No active material stock was found.</div>
@@ -352,33 +317,177 @@ Tick only the sizes you checked. Leave unticked sizes for later. Change Real Qty
   </div>
 </form>
 
+<div class="review-modal" id="review-modal" aria-hidden="true">
+  <button type="button" class="review-backdrop" data-close-review aria-label="Close review"></button>
+
+  <section
+    class="review-dialog"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="review-title"
+  >
+    <div class="review-head">
+      <div>
+        <span>Final Check</span>
+        <h3 id="review-title">Confirm selected stock types?</h3>
+      </div>
+
+      <button type="button" class="review-close" data-close-review aria-label="Close">×</button>
+    </div>
+
+    <div class="review-counts">
+      <div>
+        <span>Selected</span>
+        <strong id="review-total">0</strong>
+      </div>
+
+      <div class="review-correct">
+        <span>Confirm Correct</span>
+        <strong id="review-correct">0</strong>
+      </div>
+
+      <div class="review-updated">
+        <span>Update / Wrong</span>
+        <strong id="review-updated">0</strong>
+      </div>
+    </div>
+
+    <div class="review-changes" id="review-changes-section">
+      <div class="review-section-title">Quantity changes</div>
+      <div class="review-change-list" id="review-change-list"></div>
+    </div>
+
+    <div class="review-message" id="review-message"></div>
+
+    <div class="review-actions">
+      <button type="button" class="review-back-button" data-close-review>
+        Back & Edit
+      </button>
+
+      <button type="button" class="review-confirm-button" id="review-confirm-button">
+        Confirm Selected
+      </button>
+    </div>
+  </section>
+</div>
+
 <script>
 document.addEventListener("DOMContentLoaded", function () {
   const form = document.getElementById("stock-confirm-form");
-  const button = document.getElementById("confirm-selected-button");
+  const submitButton = document.getElementById("confirm-selected-button");
   const selectAll = document.getElementById("select-all-rows");
   const rowCheckboxes = Array.from(document.querySelectorAll(".row-checkbox"));
   const groupCheckboxes = Array.from(document.querySelectorAll(".group-checkbox"));
   const qtyInputs = Array.from(document.querySelectorAll(".real-qty-input"));
 
+  const reviewModal = document.getElementById("review-modal");
+  const reviewTotal = document.getElementById("review-total");
+  const reviewCorrect = document.getElementById("review-correct");
+  const reviewUpdated = document.getElementById("review-updated");
+  const reviewChangesSection = document.getElementById("review-changes-section");
+  const reviewChangeList = document.getElementById("review-change-list");
+  const reviewMessage = document.getElementById("review-message");
+  const reviewConfirmButton = document.getElementById("review-confirm-button");
+  const closeReviewButtons = Array.from(document.querySelectorAll("[data-close-review]"));
+
+  let confirmedForSubmission = false;
+
+  function parseQty(value) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  function formatQty(value) {
+    if (value === null || !Number.isFinite(value)) return "";
+    return Number.isInteger(value)
+      ? String(value)
+      : String(Number(value.toFixed(2)));
+  }
+
+  function getInputForCheckbox(checkbox) {
+    return qtyInputs.find((input) => input.dataset.field === checkbox.dataset.field);
+  }
+
   function valuesDiffer(input) {
-    const current = Number(input.dataset.systemQty || 0);
-    const entered = Number(input.value || 0);
-    return Number.isFinite(current) && Number.isFinite(entered) && current !== entered;
+    const systemQty = parseQty(input.dataset.systemQty);
+    const realQty = parseQty(input.value);
+
+    return systemQty !== null && realQty !== null && systemQty !== realQty;
+  }
+
+  function updateRowVisual(input) {
+    const field = input.dataset.field;
+    const checkbox = rowCheckboxes.find((item) => item.dataset.field === field);
+    const row = input.closest(".stock-row, .material-card");
+    const state = document.querySelector(`[data-state-for="${field}"]`);
+    const differenceText = document.querySelector(`[data-difference-for="${field}"]`);
+
+    const systemQty = parseQty(input.dataset.systemQty);
+    const realQty = parseQty(input.value);
+    const changed = valuesDiffer(input);
+
+    if (checkbox && changed) {
+      checkbox.checked = true;
+    }
+
+    if (row) {
+      row.classList.toggle("has-wrong-qty", changed);
+      row.classList.toggle("qty-matches", !changed && realQty !== null);
+    }
+
+    if (differenceText) {
+      if (changed) {
+        const difference = realQty - systemQty;
+        const sign = difference > 0 ? "+" : "";
+        differenceText.textContent =
+          `${formatQty(systemQty)} → ${formatQty(realQty)} (${sign}${formatQty(difference)})`;
+      } else if (realQty !== null) {
+        differenceText.textContent = "Same as system";
+      } else {
+        differenceText.textContent = "Enter a valid quantity";
+      }
+
+      differenceText.classList.toggle("is-change", changed);
+    }
+
+    if (state && checkbox) {
+      if (!checkbox.checked) {
+        state.textContent = "Not selected";
+        state.className = "qty-state";
+      } else if (changed) {
+        state.textContent = `Selected · Update ${formatQty(systemQty)} → ${formatQty(realQty)}`;
+        state.className = "qty-state is-update";
+      } else {
+        state.textContent = "Selected · Confirm correct";
+        state.className = "qty-state is-correct";
+      }
+    }
   }
 
   function refreshSelection() {
     const selected = rowCheckboxes.filter((checkbox) => checkbox.checked);
+    const updatedCount = selected.filter((checkbox) => {
+      const input = getInputForCheckbox(checkbox);
+      return input ? valuesDiffer(input) : false;
+    }).length;
 
-    button.disabled = selected.length === 0;
-    button.textContent = selected.length
-      ? `✓ Confirm Ticked Sizes (${selected.length})`
-      : "✓ Confirm Ticked Sizes";
+    submitButton.disabled = selected.length === 0;
+    submitButton.textContent = selected.length
+      ? `Review & Confirm Selected (${selected.length})`
+      : "Review & Confirm Selected";
+
+    submitButton.classList.toggle("has-updates", updatedCount > 0);
 
     rowCheckboxes.forEach((checkbox) => {
       const card = checkbox.closest(".stock-row, .material-card");
+
       if (card) {
         card.classList.toggle("is-selected", checkbox.checked);
+      }
+
+      const input = getInputForCheckbox(checkbox);
+      if (input) {
+        updateRowVisual(input);
       }
     });
 
@@ -400,25 +509,106 @@ document.addEventListener("DOMContentLoaded", function () {
 
     if (rowCheckboxes.length) {
       selectAll.checked = selected.length === rowCheckboxes.length;
-      selectAll.indeterminate = selected.length > 0 && selected.length < rowCheckboxes.length;
+      selectAll.indeterminate =
+        selected.length > 0 && selected.length < rowCheckboxes.length;
     }
+  }
+
+  function closeReview() {
+    reviewModal.classList.remove("is-open");
+    reviewModal.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("review-open");
+  }
+
+  function openReview(selected) {
+    const changes = [];
+    let invalidLabel = "";
+
+    selected.forEach((checkbox) => {
+      const input = getInputForCheckbox(checkbox);
+      const label = checkbox.dataset.label || "Selected stock";
+      const systemQty = input ? parseQty(input.dataset.systemQty) : null;
+      const realQty = input ? parseQty(input.value) : null;
+
+      if (realQty === null) {
+        invalidLabel = label;
+        return;
+      }
+
+      if (systemQty !== realQty) {
+        changes.push({
+          label,
+          systemQty,
+          realQty,
+          difference: realQty - systemQty,
+        });
+      }
+    });
+
+    if (invalidLabel) {
+      alert(`Enter a valid real quantity for ${invalidLabel}.`);
+      return;
+    }
+
+    reviewTotal.textContent = String(selected.length);
+    reviewUpdated.textContent = String(changes.length);
+    reviewCorrect.textContent = String(selected.length - changes.length);
+
+    reviewChangeList.innerHTML = "";
+
+    changes.forEach((change) => {
+      const line = document.createElement("div");
+      line.className = "review-change-line";
+
+      const label = document.createElement("strong");
+      label.textContent = change.label;
+
+      const qty = document.createElement("span");
+      const sign = change.difference > 0 ? "+" : "";
+      qty.textContent =
+        `${formatQty(change.systemQty)} → ${formatQty(change.realQty)} ` +
+        `(${sign}${formatQty(change.difference)})`;
+
+      line.appendChild(label);
+      line.appendChild(qty);
+      reviewChangeList.appendChild(line);
+    });
+
+    reviewChangesSection.hidden = changes.length === 0;
+
+    reviewMessage.textContent = changes.length
+      ? `${changes.length} selected type(s) will update stock quantity. ` +
+        `${selected.length - changes.length} type(s) will be confirmed correct.`
+      : `All ${selected.length} selected type(s) match the system quantity and will be confirmed correct.`;
+
+    reviewConfirmButton.textContent = changes.length
+      ? `Confirm ${selected.length} Types (${changes.length} Updated)`
+      : `Confirm ${selected.length} Types Correct`;
+
+    reviewModal.classList.add("is-open");
+    reviewModal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("review-open");
+    reviewConfirmButton.focus();
   }
 
   selectAll.addEventListener("change", function () {
     rowCheckboxes.forEach((checkbox) => {
       checkbox.checked = selectAll.checked;
     });
+
     refreshSelection();
   });
 
   groupCheckboxes.forEach((groupCheckbox) => {
     groupCheckbox.addEventListener("change", function () {
       const groupName = groupCheckbox.dataset.group;
+
       rowCheckboxes.forEach((checkbox) => {
         if (checkbox.dataset.group === groupName) {
           checkbox.checked = groupCheckbox.checked;
         }
       });
+
       refreshSelection();
     });
   });
@@ -429,57 +619,41 @@ document.addEventListener("DOMContentLoaded", function () {
 
   qtyInputs.forEach((input) => {
     input.addEventListener("input", function () {
-      const field = input.dataset.field;
-      const checkbox = rowCheckboxes.find(
-        (item) => item.dataset.field === field
-      );
-
-      if (checkbox && valuesDiffer(input)) {
-        checkbox.checked = true;
-      }
-
-      const row = input.closest(".stock-row, .material-card");
-      if (row) {
-        row.classList.toggle("has-wrong-qty", valuesDiffer(input));
-      }
-
+      updateRowVisual(input);
       refreshSelection();
     });
   });
 
   form.addEventListener("submit", function (event) {
-    const submitter = event.submitter;
-
-    if (submitter && (
-      submitter.name === "single_correct_key" ||
-      submitter.name === "single_update_key"
-    )) {
+    if (confirmedForSubmission) {
       return;
     }
+
+    event.preventDefault();
 
     const selected = rowCheckboxes.filter((checkbox) => checkbox.checked);
 
     if (!selected.length) {
-      event.preventDefault();
       alert("Tick at least one size or material first.");
       return;
     }
 
-    const wrongCount = selected.filter((checkbox) => {
-      const field = checkbox.dataset.field;
-      const input = qtyInputs.find((item) => item.dataset.field === field);
-      return input ? valuesDiffer(input) : false;
-    }).length;
+    openReview(selected);
+  });
 
-    const correctCount = selected.length - wrongCount;
-    const message = (
-      `Confirm ${selected.length} selected item(s)?\n` +
-      `Correct: ${correctCount}\n` +
-      `Wrong/changed: ${wrongCount}`
-    );
+  reviewConfirmButton.addEventListener("click", function () {
+    confirmedForSubmission = true;
+    closeReview();
+    form.requestSubmit(submitButton);
+  });
 
-    if (!confirm(message)) {
-      event.preventDefault();
+  closeReviewButtons.forEach((button) => {
+    button.addEventListener("click", closeReview);
+  });
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && reviewModal.classList.contains("is-open")) {
+      closeReview();
     }
   });
 
@@ -604,13 +778,21 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   .confirm-toolbar {
-    padding: 18px 20px;
+    position: sticky;
+    top: 88px;
+    z-index: 35;
+    padding: 14px 16px;
     margin-bottom: 12px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 14px;
     flex-wrap: wrap;
+    background: rgba(255,255,255,.97);
+    border-color: #dfd2bd;
+    box-shadow: 0 14px 35px rgba(79,58,26,.17);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
   }
 
   .confirm-help {
@@ -636,9 +818,7 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   .summary-pills,
-  .toolbar-actions,
-  .row-actions,
-  .material-actions {
+  .toolbar-actions {
     display: flex;
     align-items: center;
     gap: 9px;
@@ -748,9 +928,7 @@ document.addEventListener("DOMContentLoaded", function () {
     font-size: 13px;
   }
 
-  .btn-confirm-all,
-  .btn-correct,
-  .btn-update {
+  .btn-confirm-all {
     border-radius: 12px;
     padding: 11px 15px;
     font-weight: 800;
@@ -758,16 +936,20 @@ document.addEventListener("DOMContentLoaded", function () {
     white-space: nowrap;
   }
 
-  .btn-confirm-all,
-  .btn-correct {
+  .btn-confirm-all {
     border: 0;
     background: #159447;
     color: white;
+    box-shadow: 0 8px 18px rgba(21,148,71,.22);
   }
 
-  .btn-confirm-all:hover:not(:disabled),
-  .btn-correct:hover {
-    background: #0d7b39;
+  .btn-confirm-all.has-updates {
+    background: #d97706;
+    box-shadow: 0 8px 18px rgba(217,119,6,.24);
+  }
+
+  .btn-confirm-all:hover:not(:disabled) {
+    filter: brightness(.94);
   }
 
   .btn-confirm-all:disabled {
@@ -775,11 +957,6 @@ document.addEventListener("DOMContentLoaded", function () {
     opacity: .45;
   }
 
-  .btn-update {
-    background: #fff7e6;
-    color: #9a5d00;
-    border: 1px solid #f0cf91;
-  }
 
   .stock-group {
     margin-bottom: 20px;
@@ -874,31 +1051,56 @@ document.addEventListener("DOMContentLoaded", function () {
 
   .stock-row {
     display: grid;
-    grid-template-columns: 38px 70px 100px minmax(175px,1.1fr) 120px minmax(155px,1fr) auto;
-    gap: 11px;
-    align-items: end;
-    padding: 14px 4px;
+    grid-template-columns:
+      42px
+      64px
+      132px
+      minmax(170px, 1fr)
+      150px
+      minmax(190px, 1.15fr);
+    gap: 10px;
+    align-items: stretch;
+    min-height: 88px;
+    padding: 9px 8px;
     border-bottom: 1px solid var(--line);
-    transition: .15s ease;
+    transition: background .15s ease, box-shadow .15s ease, outline-color .15s ease;
+  }
+
+  .stock-row > * {
+    min-width: 0;
   }
 
   .stock-row:last-child { border-bottom: 0; }
 
   .stock-row.is-selected,
   .material-card.is-selected {
-    background: #f5fff8;
-    box-shadow: inset 4px 0 0 #159447;
+    background: #f2fff7;
+    box-shadow: inset 5px 0 0 #159447;
+  }
+
+  .stock-row.is-selected,
+  .stock-row.has-wrong-qty {
+    border-radius: 14px;
   }
 
   .stock-row.has-wrong-qty,
   .material-card.has-wrong-qty {
-    background: #fff9ef;
-    box-shadow: inset 4px 0 0 #f4a62a;
+    background: #fff8ed;
+    box-shadow: inset 5px 0 0 #e67e00;
+  }
+
+  .stock-row.is-selected.has-wrong-qty,
+  .material-card.is-selected.has-wrong-qty {
+    background: #fff4df;
+    outline: 1px solid #edb35a;
+    outline-offset: -1px;
   }
 
   .row-select {
     align-self: center;
     justify-self: center;
+    display: grid;
+    place-items: center;
   }
 
   .size-box span,
@@ -917,9 +1119,73 @@ document.addEventListener("DOMContentLoaded", function () {
     letter-spacing: .5px;
   }
 
-  .size-box strong,
-  .qty-box strong {
+  .size-box,
+  .qty-box,
+  .last-box,
+  .real-box,
+  .note-box {
+    min-height: 70px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    margin: 0;
+    border-radius: 13px;
+  }
+
+  .size-box {
+    align-items: flex-start;
+    padding: 9px 8px;
+    background: #fbfaf7;
+    border: 1px solid #ece5da;
+  }
+
+  .size-box strong {
     font-size: 22px;
+    line-height: 1;
+  }
+
+  .qty-box,
+  .material-system-box {
+    padding: 9px 11px;
+    border-radius: 13px;
+    background: #eef5ff;
+    border: 1px solid #cadcf8;
+  }
+
+  .last-box {
+    padding: 9px 11px;
+    background: #faf9f6;
+    border: 1px solid #ebe4d9;
+  }
+
+  .note-box {
+    padding: 8px 0;
+  }
+
+  .qty-box strong,
+  .material-system-box strong {
+    display: block;
+    color: #1d4ed8;
+    font-size: 25px;
+    line-height: 1;
+  }
+
+  .qty-state {
+    display: block;
+    margin-top: 6px;
+    color: #7b8798;
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
+  .qty-state.is-correct {
+    color: #087535;
+  }
+
+  .qty-state.is-update {
+    color: #b85d00;
   }
 
   .last-box strong,
@@ -936,19 +1202,54 @@ document.addEventListener("DOMContentLoaded", function () {
     margin-top: 3px;
   }
 
+  .real-box {
+    padding: 8px 9px;
+    background: #f5fbf7;
+    border: 1px solid #c9e5d3;
+  }
+
   .real-box input,
-  .note-box input,
   .material-fields input {
-    height: 42px;
+    height: 40px;
     padding: 10px 12px;
     border-radius: 12px;
   }
 
-  .has-wrong-qty .real-qty-input {
-    border-color: #f0a83f;
-    background: #fffaf0;
-    color: #9a5d00;
+  .real-qty-input {
+    font-size: 17px;
     font-weight: 900;
+    color: #087535;
+  }
+
+  .note-box input {
+    height: 40px;
+    margin: 0;
+  }
+
+  .qty-difference {
+    display: block;
+    min-height: 16px;
+    margin-top: 5px;
+    color: #087535;
+    font-size: 10px;
+    font-weight: 850;
+  }
+
+  .qty-difference.is-change {
+    color: #b42318;
+  }
+
+  .has-wrong-qty .real-box,
+  .material-card.has-wrong-qty .material-fields > div:first-child {
+    background: #fff4df;
+    border-color: #edb35a;
+  }
+
+  .has-wrong-qty .real-qty-input {
+    border-color: #e67e00;
+    background: #fffaf0;
+    color: #b42318;
+    box-shadow: 0 0 0 3px rgba(230,126,0,.10);
   }
 
   .material-heading { margin-top: 38px; }
@@ -1048,14 +1349,16 @@ document.addEventListener("DOMContentLoaded", function () {
 
   .material-fields {
     display: grid;
-    grid-template-columns: 120px 1fr;
+    grid-template-columns: 145px 1fr;
     gap: 10px;
     margin-top: 14px;
   }
 
-  .material-actions {
-    margin-top: 14px;
-    justify-content: flex-end;
+  .material-fields > div:first-child {
+    padding: 8px;
+    border-radius: 14px;
+    background: #f5fbf7;
+    border: 1px solid #c9e5d3;
   }
 
   .empty-card {
@@ -1064,13 +1367,261 @@ document.addEventListener("DOMContentLoaded", function () {
     color: var(--muted);
   }
 
-  @media (max-width: 1260px) {
-    .stock-row {
-      grid-template-columns: 38px 70px 100px 1fr 120px;
+
+  body.review-open {
+    overflow: hidden;
+  }
+
+  .review-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+  }
+
+  .review-modal.is-open {
+    display: flex;
+  }
+
+  .review-backdrop {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    background: rgba(20, 24, 31, .52);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    cursor: default;
+  }
+
+  .review-dialog {
+    position: relative;
+    z-index: 1;
+    width: min(620px, 100%);
+    max-height: min(720px, 88vh);
+    overflow-y: auto;
+    padding: 20px;
+    border-radius: 22px;
+    background: #fffdf9;
+    border: 1px solid #e5d7c1;
+    box-shadow: 0 28px 80px rgba(31,35,41,.28);
+  }
+
+  .review-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+  }
+
+  .review-head span,
+  .review-section-title {
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: .65px;
+  }
+
+  .review-head h3 {
+    margin: 5px 0 0;
+    font-size: 23px;
+  }
+
+  .review-close {
+    width: 38px;
+    height: 38px;
+    border: 1px solid var(--line);
+    border-radius: 11px;
+    background: #fff;
+    color: #5f6368;
+    font-size: 24px;
+    cursor: pointer;
+  }
+
+  .review-counts {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  .review-counts > div {
+    padding: 13px;
+    border-radius: 15px;
+    border: 1px solid var(--line);
+    background: #f8f7f4;
+  }
+
+  .review-counts span {
+    display: block;
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+  }
+
+  .review-counts strong {
+    display: block;
+    margin-top: 4px;
+    font-size: 27px;
+  }
+
+  .review-correct {
+    background: #f1fff6 !important;
+    border-color: #afe0c0 !important;
+    color: #087535;
+  }
+
+  .review-updated {
+    background: #fff5e8 !important;
+    border-color: #edc58a !important;
+    color: #b85d00;
+  }
+
+  .review-changes {
+    margin-top: 16px;
+    padding: 13px;
+    border-radius: 16px;
+    background: #fff7e9;
+    border: 1px solid #efd19c;
+  }
+
+  .review-change-list {
+    display: grid;
+    gap: 7px;
+    margin-top: 9px;
+  }
+
+  .review-change-line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 9px 10px;
+    border-radius: 11px;
+    background: #fff;
+    border: 1px solid #f0dcc0;
+  }
+
+  .review-change-line strong {
+    font-size: 12px;
+  }
+
+  .review-change-line span {
+    padding: 5px 8px;
+    border-radius: 8px;
+    background: #fdecec;
+    color: #b42318;
+    font-size: 12px;
+    font-weight: 900;
+    white-space: nowrap;
+  }
+
+  .review-message {
+    margin-top: 14px;
+    padding: 12px 13px;
+    border-radius: 13px;
+    background: #f4f6f8;
+    color: #4b5563;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .review-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  .review-back-button,
+  .review-confirm-button {
+    min-height: 45px;
+    padding: 10px 16px;
+    border-radius: 12px;
+    font-weight: 900;
+    cursor: pointer;
+  }
+
+  .review-back-button {
+    border: 1px solid var(--line);
+    background: #fff;
+    color: var(--text);
+  }
+
+  .review-confirm-button {
+    border: 0;
+    background: #159447;
+    color: #fff;
+  }
+
+  @media (max-width: 620px) {
+    .review-counts {
+      grid-template-columns: 1fr;
     }
 
-    .note-box { grid-column: 2 / 5; }
-    .row-actions { grid-column: 5; }
+    .review-change-line {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+
+    .review-actions {
+      flex-direction: column-reverse;
+    }
+
+    .review-actions button {
+      width: 100%;
+    }
+  }
+
+  @media (max-width: 1260px) {
+    .stock-row {
+      grid-template-columns:
+        40px
+        58px
+        118px
+        minmax(150px, 1fr)
+        138px
+        minmax(165px, 1fr);
+      gap: 8px;
+    }
+
+    .size-box,
+    .qty-box,
+    .last-box,
+    .real-box,
+    .note-box {
+      min-height: 66px;
+    }
+
+    .qty-box strong {
+      font-size: 22px;
+    }
+
+    .last-box strong {
+      font-size: 12px;
+    }
+
+    .last-box small {
+      font-size: 10px;
+    }
+  }
+
+  @media (max-width: 940px) and (min-width: 761px) {
+    .stock-row {
+      grid-template-columns: 40px 62px 118px minmax(160px, 1fr) 142px;
+    }
+
+    .note-box {
+      grid-column: 2 / -1;
+      min-height: auto;
+      padding-top: 0;
+    }
   }
 
   @media (max-width: 760px) {
@@ -1105,17 +1656,24 @@ document.addEventListener("DOMContentLoaded", function () {
 
     .last-box,
     .real-box,
-    .note-box,
-    .row-actions {
+    .note-box {
       grid-column: 2 / -1;
     }
 
-    .row-actions button,
-    .material-actions button {
-      flex: 1;
+    .material-fields { grid-template-columns: 1fr; }
+
+    .confirm-toolbar {
+      top: 72px;
     }
 
-    .material-fields { grid-template-columns: 1fr; }
+    .toolbar-actions {
+      width: 100%;
+    }
+
+    .btn-confirm-all {
+      flex: 1 1 100%;
+      min-height: 48px;
+    }
   }
 </style>
 {% endblock %}

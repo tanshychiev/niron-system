@@ -1,6 +1,6 @@
 from django.urls import path
 
-from .stock_confirm import stock_confirm, stock_history
+from .stock_confirm import stock_confirm, stock_history, stock_history_detail
 from .stock_summary import stock_summary_report
 from .views import (
     color_create,
@@ -37,6 +37,11 @@ urlpatterns = [
     path("stock-confirm/", stock_confirm, name="stock_confirm"),
     path("stock-summary/", stock_summary_report, name="stock_summary_report"),
     path("stock-history/", stock_history, name="stock_history"),
+    path(
+        "stock-history/<int:year>/<int:month>/<int:day>/",
+        stock_history_detail,
+        name="stock_history_detail",
+    ),
 
     # Items
     path("items/", inventory_item_list, name="inventory_item_list"),

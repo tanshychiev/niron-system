@@ -1,0 +1,455 @@
+{% extends "base.html" %}
+
+{% block title %}Stock History Detail | Niron{% endblock %}
+{% block page_title %}Stock History Detail{% endblock %}
+{% block page_subtitle %}
+{{ report_date|date:"d F Y" }} — review correct and wrong stock checks for this date.
+{% endblock %}
+
+{% block content %}
+<div class="detail-actions">
+  <a
+    href="{% url 'stock_history' %}?date_from={{ report_date|date:'Y-m-d' }}&date_to={{ report_date|date:'Y-m-d' }}"
+    class="btn-light"
+  >
+    ← Back to History List
+  </a>
+
+  <a href="{% url 'stock_confirm' %}" class="btn-primary">Stock Confirm</a>
+</div>
+
+<div class="date-banner">
+  <div>
+    <span>Stock Count Date</span>
+    <h2>{{ report_date|date:"d F Y" }}</h2>
+    <p>{{ report_date|date:"l" }}</p>
+  </div>
+
+  <div class="visible-count">
+    Showing <strong>{{ visible_count }}</strong> record{{ visible_count|pluralize }}
+  </div>
+</div>
+
+<div class="detail-summary">
+  <div class="summary-card">
+    <span>Total Types</span>
+    <strong>{{ total_count }}</strong>
+  </div>
+
+  <div class="summary-card cloth-card">
+    <span>Cloth Types</span>
+    <strong>{{ cloth_count }}</strong>
+  </div>
+
+  <div class="summary-card material-card">
+    <span>Material Types</span>
+    <strong>{{ material_count }}</strong>
+  </div>
+
+  <div class="summary-card correct-card">
+    <span>Correct</span>
+    <strong>{{ correct_count }}</strong>
+  </div>
+
+  <div class="summary-card wrong-card">
+    <span>Wrong</span>
+    <strong>{{ wrong_count }}</strong>
+  </div>
+
+  <div class="summary-card added-card">
+    <span>Stock Added</span>
+    <strong>+{{ total_added_text }}</strong>
+  </div>
+
+  <div class="summary-card removed-card">
+    <span>Stock Removed</span>
+    <strong>-{{ total_removed_text }}</strong>
+  </div>
+</div>
+
+<form method="get" class="detail-filter">
+  <div class="search-field">
+    <label>Search Detail</label>
+    <input
+      type="text"
+      name="q"
+      value="{{ keyword }}"
+      placeholder="Item, color, size, staff or note"
+    >
+  </div>
+
+  <div>
+    <label>Result</label>
+    <select name="result">
+      <option value="ALL" {% if result_filter == "ALL" %}selected{% endif %}>All</option>
+      <option value="CORRECT" {% if result_filter == "CORRECT" %}selected{% endif %}>Correct only</option>
+      <option value="WRONG" {% if result_filter == "WRONG" %}selected{% endif %}>Wrong only</option>
+    </select>
+  </div>
+
+  <button type="submit" class="btn-primary">Filter</button>
+  <a
+    href="{% url 'stock_history_detail' report_date.year report_date.month report_date.day %}"
+    class="btn-light"
+  >
+    Reset
+  </a>
+</form>
+
+<div class="detail-table-card">
+  <div class="table-scroll">
+    <table class="detail-table">
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Type</th>
+          <th>Item</th>
+          <th>Color</th>
+          <th>Size / Unit</th>
+          <th>Result</th>
+          <th class="number">System Before</th>
+          <th class="number">Real Count</th>
+          <th class="number">Change</th>
+          <th class="number">Difference</th>
+          <th>Note</th>
+          <th>Recorded By</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {% for row in rows %}
+        <tr class="{% if row.is_wrong_count %}wrong-row{% else %}correct-row{% endif %}">
+          <td><strong>{{ row.created_at|date:"H:i" }}</strong></td>
+
+          <td>
+            {% if row.is_material %}
+              <span class="type-pill material">{{ row.type_label }}</span>
+            {% else %}
+              <span class="type-pill cloth">Cloth</span>
+            {% endif %}
+          </td>
+
+          <td>
+            <strong>{{ row.item_name }}</strong>
+            <small>{{ row.item_code }}</small>
+          </td>
+
+          <td>{{ row.color_name }}</td>
+          <td><span class="size-pill">{{ row.size_name }}</span></td>
+
+          <td>
+            {% if row.is_wrong_count %}
+              <span class="result-pill wrong-result">Wrong</span>
+            {% else %}
+              <span class="result-pill correct-result">Correct</span>
+            {% endif %}
+          </td>
+
+          <td class="number">{{ row.before_text }}</td>
+          <td class="number">{{ row.after_text }}</td>
+
+          <td class="number">
+            {% if row.is_wrong_count %}
+              <span class="change-pill wrong-change">
+                {{ row.before_text }} → {{ row.after_text }}
+              </span>
+            {% else %}
+              <span class="change-pill same-change">No change</span>
+            {% endif %}
+          </td>
+
+          <td class="number">
+            {% if row.difference > 0 %}
+              <span class="diff-in">+{{ row.difference_text }}</span>
+            {% elif row.difference < 0 %}
+              <span class="diff-out">{{ row.difference_text }}</span>
+            {% else %}
+              <span class="diff-same">0</span>
+            {% endif %}
+          </td>
+
+          <td>{{ row.note|default:"-" }}</td>
+
+          <td>
+            {% if row.created_by %}
+              {{ row.created_by.get_full_name|default:row.created_by.username }}
+            {% else %}
+              -
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="12" class="empty-row">No records match this filter.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="result-rule">
+  <strong>Correct:</strong> system quantity equals real count.
+  <strong>Wrong:</strong> quantity changed, and the report shows before → real count.
+</div>
+
+<style>
+  .detail-actions {
+    display: flex;
+    justify-content: space-between;
+    gap: 9px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+
+  .date-banner,
+  .summary-card,
+  .detail-filter,
+  .detail-table-card,
+  .result-rule {
+    background: rgba(255,255,255,.92);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow);
+  }
+
+  .date-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 18px 20px;
+    border-radius: 19px;
+    margin-bottom: 14px;
+    background: linear-gradient(135deg,#fffaf0,#fff);
+  }
+
+  .date-banner span {
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+  }
+
+  .date-banner h2 {
+    margin: 4px 0;
+    font-size: 24px;
+  }
+
+  .date-banner p {
+    margin: 0;
+    color: var(--muted);
+  }
+
+  .visible-count {
+    padding: 10px 13px;
+    border-radius: 12px;
+    background: #fff3d6;
+    border: 1px solid #efd39b;
+    color: #825000;
+  }
+
+  .detail-summary {
+    display: grid;
+    grid-template-columns: repeat(7,minmax(0,1fr));
+    gap: 11px;
+    margin-bottom: 14px;
+  }
+
+  .summary-card {
+    padding: 15px;
+    border-radius: 17px;
+  }
+
+  .summary-card span {
+    display: block;
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+  }
+
+  .summary-card strong {
+    display: block;
+    margin-top: 5px;
+    font-size: 27px;
+  }
+
+  .cloth-card {
+    background: #f3f7ff;
+    border-color: #c8d8f4;
+  }
+
+  .cloth-card strong {
+    color: #2455a4;
+  }
+
+  .material-card {
+    background: #fff9ec;
+    border-color: #eed8a9;
+  }
+
+  .material-card strong {
+    color: #9a5d00;
+  }
+
+  .correct-card {
+    background: #f3fff7;
+    border-color: #a9dfbd;
+  }
+
+  .correct-card strong,
+  .added-card strong {
+    color: #087535;
+  }
+
+  .wrong-card,
+  .removed-card {
+    background: #fff8f5;
+    border-color: #efc1b4;
+  }
+
+  .wrong-card strong,
+  .removed-card strong {
+    color: #b42318;
+  }
+
+  .detail-filter {
+    display: grid;
+    grid-template-columns: minmax(260px,1fr) 180px auto auto;
+    align-items: end;
+    gap: 11px;
+    padding: 16px;
+    border-radius: 18px;
+    margin-bottom: 14px;
+  }
+
+  .detail-filter label {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+  }
+
+  .detail-table-card {
+    overflow: hidden;
+    border-radius: 20px;
+  }
+
+  .table-scroll {
+    overflow-x: auto;
+  }
+
+  .detail-table {
+    min-width: 1380px;
+  }
+
+  .detail-table td strong,
+  .detail-table td small {
+    display: block;
+  }
+
+  .detail-table td small {
+    margin-top: 3px;
+    color: var(--muted);
+  }
+
+  .wrong-row {
+    background: #fff9f5;
+  }
+
+  .number {
+    text-align: right;
+  }
+
+  .type-pill,
+  .size-pill,
+  .result-pill,
+  .change-pill,
+  .diff-in,
+  .diff-out,
+  .diff-same {
+    display: inline-flex;
+    padding: 6px 9px;
+    border-radius: 10px;
+    font-weight: 900;
+    white-space: nowrap;
+  }
+
+  .type-pill.cloth {
+    background: #eef5ff;
+    color: #1d4ed8;
+  }
+
+  .type-pill.material,
+  .size-pill {
+    background: #fff3d6;
+    color: #9a5d00;
+  }
+
+  .correct-result,
+  .same-change,
+  .diff-same {
+    background: #edf7f0;
+    color: #087535;
+  }
+
+  .wrong-result,
+  .wrong-change,
+  .diff-out {
+    background: #fdecec;
+    color: #b42318;
+  }
+
+  .diff-in {
+    background: #fff1df;
+    color: #b85d00;
+  }
+
+  .result-rule {
+    margin-top: 14px;
+    padding: 15px 17px;
+    border-radius: 16px;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.55;
+  }
+
+  .empty-row {
+    padding: 35px !important;
+    text-align: center;
+    color: var(--muted);
+  }
+
+  @media (max-width: 1000px) {
+    .detail-summary {
+      grid-template-columns: repeat(3,minmax(0,1fr));
+    }
+
+    .detail-filter {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  @media (max-width: 720px) {
+    .date-banner {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+
+    .detail-summary {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .detail-filter {
+      grid-template-columns: 1fr;
+    }
+
+    .detail-filter button,
+    .detail-filter a {
+      width: 100%;
+    }
+  }
+</style>
+{% endblock %}

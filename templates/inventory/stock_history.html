@@ -3,7 +3,7 @@
 {% block title %}Stock History | Niron{% endblock %}
 {% block page_title %}Stock History{% endblock %}
 {% block page_subtitle %}
-See how many checked items were correct or wrong, including every wrong quantity change.
+Daily stock-count list. Every count represents a product variety or material type, not the number of pieces.
 {% endblock %}
 
 {% block content %}
@@ -12,153 +12,179 @@ See how many checked items were correct or wrong, including every wrong quantity
   <a href="{% url 'stock_summary_report' %}" class="btn-light">Daily Summary Report</a>
 </div>
 
-<form method="get" class="filter-card">
+<form method="get" class="date-filter-card">
   <div>
-    <label>Search</label>
-    <input
-      type="text"
-      name="q"
-      value="{{ keyword }}"
-      placeholder="Item, color, size, staff or note"
-    >
+    <label>From Date</label>
+    <input type="date" name="date_from" value="{{ date_from|date:'Y-m-d' }}">
   </div>
 
   <div>
-    <label>From</label>
-    <input type="date" name="date_from" value="{{ date_from }}">
+    <label>To Date</label>
+    <input type="date" name="date_to" value="{{ date_to|date:'Y-m-d' }}">
   </div>
 
-  <div>
-    <label>To</label>
-    <input type="date" name="date_to" value="{{ date_to }}">
-  </div>
-
-  <button type="submit" class="btn-primary">Filter</button>
+  <button type="submit" class="btn-primary">Search Date</button>
   <a href="{% url 'stock_history' %}" class="btn-light">Reset</a>
 </form>
 
-<div class="history-summary">
-  <div class="summary-card total-summary">
-    <span>Total Checked</span>
-    <strong>{{ total_count }}</strong>
+<div class="period-heading">
+  <div>
+    <span>Selected Period</span>
+    <h2>{{ date_from|date:"d M Y" }} – {{ date_to|date:"d M Y" }}</h2>
+  </div>
+  <p>{{ day_count }} stock-count day{{ day_count|pluralize }}</p>
+</div>
+
+<div class="range-summary">
+  <div class="summary-card">
+    <span>Total Types Checked</span>
+    <strong>{{ range_total }}</strong>
   </div>
 
-  <div class="summary-card correct-summary">
-    <span>Correct Items</span>
-    <strong>{{ correct_count }}</strong>
+  <div class="summary-card cloth-card">
+    <span>Cloth Types</span>
+    <strong>{{ range_cloth }}</strong>
   </div>
 
-  <div class="summary-card wrong-summary">
-    <span>Wrong Items</span>
-    <strong>{{ wrong_count }}</strong>
+  <div class="summary-card material-card">
+    <span>Material Types</span>
+    <strong>{{ range_material }}</strong>
+  </div>
+
+  <div class="summary-card correct-card">
+    <span>Correct Types</span>
+    <strong>{{ range_correct }}</strong>
+  </div>
+
+  <div class="summary-card wrong-card">
+    <span>Wrong Types</span>
+    <strong>{{ range_wrong }}</strong>
   </div>
 </div>
 
-<div class="table-card">
-  <div class="table-scroll">
-    <table class="history-table">
+<div class="history-list-card">
+  <div class="list-title">
+    <div>
+      <span>Daily Reports</span>
+      <h2>Stock Count List</h2>
+    </div>
+    <p>One type = product + color + size, or one material item.</p>
+  </div>
+
+  <div class="desktop-list">
+    <table class="history-list-table">
       <thead>
         <tr>
-          <th>Date & Time</th>
-          <th>Type</th>
-          <th>Item</th>
-          <th>Color</th>
-          <th>Size / Unit</th>
-          <th>Result</th>
-          <th class="number">Quantity Change</th>
-          <th class="number">Difference</th>
-          <th>Note</th>
-          <th>Recorded By</th>
+          <th>Date</th>
+          <th class="number">Total Types</th>
+          <th class="number">Cloth Types</th>
+          <th class="number">Material Types</th>
+          <th class="number">Correct</th>
+          <th class="number">Wrong</th>
+          <th></th>
         </tr>
       </thead>
 
       <tbody>
-        {% for row in rows %}
-        <tr class="{% if row.is_wrong_count %}wrong-history-row{% endif %}">
+        {% for report in daily_reports %}
+        <tr>
           <td>
-            <strong>{{ row.created_at|date:"d M Y" }}</strong>
-            <small>{{ row.created_at|date:"H:i" }}</small>
-          </td>
-
-          <td>
-            {% if row.batch_item.item.item_type == "SHIRT" %}
-              <span class="type-pill cloth">Cloth</span>
-            {% else %}
-              <span class="type-pill material">
-                {{ row.batch_item.item.get_item_type_display }}
-              </span>
-            {% endif %}
-          </td>
-
-          <td>
-            <strong>{{ row.batch_item.item.name }}</strong>
-            <small>{{ row.batch_item.item.code }}</small>
-          </td>
-
-          <td>
-            {% if row.batch_item.item.item_type == "SHIRT" %}
-              {{ row.batch_item.color.name|default:"-" }}
-            {% else %}
-              -
-            {% endif %}
-          </td>
-
-          <td>
-            {% if row.batch_item.item.item_type == "SHIRT" %}
-              <span class="size-pill">{{ row.batch_item.size.name|default:"-" }}</span>
-            {% else %}
-              <span class="size-pill">{{ row.batch_item.item.get_unit_display }}</span>
-            {% endif %}
-          </td>
-
-          <td>
-            {% if row.is_wrong_count %}
-              <span class="result-pill wrong-result">Wrong</span>
-            {% else %}
-              <span class="result-pill correct-result">Correct</span>
-            {% endif %}
+            <strong>{{ report.date|date:"d M Y" }}</strong>
+            <small>{{ report.date|date:"l" }}</small>
           </td>
 
           <td class="number">
-            {% if row.is_wrong_count %}
-              <span class="change-pill wrong-change">
-                {{ row.before_text }} → {{ row.after_text }}
-              </span>
-            {% else %}
-              <span class="change-pill same-change">
-                {{ row.before_text }}
-              </span>
-            {% endif %}
+            <span class="metric-pill total-pill">{{ report.total }}</span>
           </td>
 
           <td class="number">
-            {% if row.qty_in > 0 %}
-              <span class="diff-in">+{{ row.qty_in|floatformat:"-2" }}</span>
-            {% elif row.qty_out > 0 %}
-              <span class="diff-out">-{{ row.qty_out|floatformat:"-2" }}</span>
-            {% else %}
-              <span class="diff-same">0</span>
-            {% endif %}
+            <span class="metric-pill cloth-pill">{{ report.cloth_count }}</span>
           </td>
 
-          <td>{{ row.correct_remark|default:row.remark|default:"-" }}</td>
+          <td class="number">
+            <span class="metric-pill material-pill">{{ report.material_count }}</span>
+          </td>
 
-          <td>
-            {% if row.created_by %}
-              {{ row.created_by.get_full_name|default:row.created_by.username }}
-            {% else %}
-              -
-            {% endif %}
+          <td class="number">
+            <span class="metric-pill correct-pill">{{ report.correct }}</span>
+          </td>
+
+          <td class="number">
+            <span class="metric-pill wrong-pill">{{ report.wrong }}</span>
+          </td>
+
+          <td class="detail-cell">
+            <a
+              class="detail-button"
+              href="{% url 'stock_history_detail' report.date.year report.date.month report.date.day %}"
+            >
+              View Detail →
+            </a>
           </td>
         </tr>
         {% empty %}
         <tr>
-          <td colspan="10" class="empty-row">No stock confirmation history found.</td>
+          <td colspan="7" class="empty-row">No stock checks were found in this date range.</td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
+
+  <div class="mobile-list">
+    {% for report in daily_reports %}
+    <article class="mobile-day-card">
+      <div class="mobile-day-head">
+        <div>
+          <strong>{{ report.date|date:"d M Y" }}</strong>
+          <small>{{ report.date|date:"l" }}</small>
+        </div>
+
+        <a
+          href="{% url 'stock_history_detail' report.date.year report.date.month report.date.day %}"
+          class="mobile-detail-button"
+        >
+          Detail
+        </a>
+      </div>
+
+      <div class="mobile-metrics">
+        <div>
+          <span>Total Types</span>
+          <strong>{{ report.total }}</strong>
+        </div>
+
+        <div class="cloth-mobile">
+          <span>Cloth</span>
+          <strong>{{ report.cloth_count }}</strong>
+        </div>
+
+        <div class="material-mobile">
+          <span>Material</span>
+          <strong>{{ report.material_count }}</strong>
+        </div>
+
+        <div class="correct-mobile">
+          <span>Correct</span>
+          <strong>{{ report.correct }}</strong>
+        </div>
+
+        <div class="wrong-mobile">
+          <span>Wrong</span>
+          <strong>{{ report.wrong }}</strong>
+        </div>
+      </div>
+    </article>
+    {% empty %}
+    <div class="empty-mobile">No stock checks were found in this date range.</div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="report-rule">
+  <strong>Counting rule:</strong>
+  Cloth type means one product + color + size. Material type means one material item.
+  These numbers are not the quantity of pieces.
 </div>
 
 <style>
@@ -170,155 +196,346 @@ See how many checked items were correct or wrong, including every wrong quantity
     margin-bottom: 14px;
   }
 
-  .filter-card {
-    display: grid;
-    grid-template-columns: minmax(220px,1fr) 170px 170px auto auto;
-    align-items: end;
-    gap: 12px;
-    padding: 18px;
-    margin-bottom: 15px;
-    background: rgba(255,255,255,.88);
+  .date-filter-card,
+  .summary-card,
+  .history-list-card,
+  .report-rule {
+    background: rgba(255,255,255,.92);
     border: 1px solid var(--line);
-    border-radius: 18px;
     box-shadow: var(--shadow);
   }
 
-  .filter-card label {
+  .date-filter-card {
+    display: grid;
+    grid-template-columns: minmax(180px,1fr) minmax(180px,1fr) auto auto;
+    gap: 11px;
+    align-items: end;
+    padding: 17px;
+    border-radius: 19px;
+    margin-bottom: 19px;
+  }
+
+  .date-filter-card label {
     display: block;
     margin-bottom: 6px;
     color: var(--muted);
-    font-size: 12px;
-    font-weight: 800;
+    font-size: 11px;
+    font-weight: 900;
+    text-transform: uppercase;
   }
 
-  .history-summary {
-    display: grid;
-    grid-template-columns: repeat(3,minmax(0,1fr));
+  .period-heading {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
     gap: 12px;
+    margin: 4px 2px 13px;
+  }
+
+  .period-heading span,
+  .list-title span {
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+
+  .period-heading h2,
+  .list-title h2 {
+    margin: 4px 0 0;
+  }
+
+  .period-heading p,
+  .list-title p {
+    margin: 0;
+    color: var(--muted);
+  }
+
+  .range-summary {
+    display: grid;
+    grid-template-columns: repeat(5,minmax(0,1fr));
+    gap: 11px;
     margin-bottom: 20px;
   }
 
   .summary-card {
-    padding: 16px 18px;
-    border-radius: 18px;
-    background: #fff;
-    border: 1px solid var(--line);
-    box-shadow: var(--shadow);
+    padding: 16px;
+    border-radius: 17px;
   }
 
   .summary-card span {
     display: block;
     color: var(--muted);
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 900;
     text-transform: uppercase;
-    letter-spacing: .6px;
   }
 
   .summary-card strong {
     display: block;
     margin-top: 5px;
-    font-size: 29px;
+    font-size: 28px;
   }
 
-  .correct-summary {
+  .cloth-card {
+    background: #f3f7ff;
+    border-color: #c8d8f4;
+  }
+
+  .cloth-card strong {
+    color: #2455a4;
+  }
+
+  .material-card {
+    background: #fff9ec;
+    border-color: #eed8a9;
+  }
+
+  .material-card strong {
+    color: #9a5d00;
+  }
+
+  .correct-card {
+    background: #f3fff7;
     border-color: #a9dfbd;
-    background: linear-gradient(135deg,#f4fff7,#fff);
   }
 
-  .correct-summary strong { color: #087535; }
-
-  .wrong-summary {
-    border-color: #efc29a;
-    background: linear-gradient(135deg,#fff8ef,#fff);
+  .correct-card strong {
+    color: #087535;
   }
 
-  .wrong-summary strong { color: #b42318; }
+  .wrong-card {
+    background: #fff8f5;
+    border-color: #efc1b4;
+  }
 
-  .table-scroll { overflow-x: auto; }
-  .history-table { min-width: 1240px; }
+  .wrong-card strong {
+    color: #b42318;
+  }
 
-  .history-table td strong,
-  .history-table td small {
+  .history-list-card {
+    overflow: hidden;
+    border-radius: 20px;
+  }
+
+  .list-title {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--line);
+    background: #fffaf0;
+  }
+
+  .desktop-list {
+    overflow-x: auto;
+  }
+
+  .history-list-table {
+    min-width: 900px;
+  }
+
+  .history-list-table td strong,
+  .history-list-table td small {
     display: block;
   }
 
-  .history-table td small {
-    color: var(--muted);
+  .history-list-table td small {
     margin-top: 3px;
+    color: var(--muted);
   }
 
-  .wrong-history-row {
-    background: #fffaf2;
+  .number {
+    text-align: right;
   }
 
-  .number { text-align: right; }
-
-  .type-pill,
-  .size-pill,
-  .result-pill,
-  .change-pill,
-  .diff-in,
-  .diff-out,
-  .diff-same {
+  .metric-pill {
     display: inline-flex;
-    padding: 6px 9px;
+    min-width: 48px;
+    justify-content: center;
+    padding: 7px 10px;
     border-radius: 10px;
     font-weight: 900;
-    white-space: nowrap;
   }
 
-  .type-pill.cloth {
-    background: #eef5ff;
-    color: #1d4ed8;
+  .total-pill {
+    background: #f3f4f6;
   }
 
-  .type-pill.material,
-  .size-pill {
+  .cloth-pill {
+    background: #eef4ff;
+    color: #2455a4;
+  }
+
+  .material-pill {
     background: #fff3d6;
     color: #9a5d00;
   }
 
-  .correct-result,
-  .same-change,
-  .diff-same {
-    background: #edf7f0;
+  .correct-pill {
+    background: #edf8f0;
     color: #087535;
   }
 
-  .wrong-result,
-  .wrong-change,
-  .diff-out {
+  .wrong-pill {
     background: #fdecec;
     color: #b42318;
   }
 
-  .diff-in {
-    background: #eaf9ef;
-    color: #087535;
+  .detail-cell {
+    text-align: right;
   }
 
-  .wrong-change {
-    border: 1px solid #efb6b1;
+  .detail-button,
+  .mobile-detail-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 11px;
+    background: #f5a800;
+    color: #2c1d00;
+    text-decoration: none;
+    font-weight: 900;
+  }
+
+  .detail-button {
+    min-height: 40px;
+    padding: 8px 13px;
+  }
+
+  .mobile-list {
+    display: none;
+  }
+
+  .report-rule {
+    margin-top: 15px;
+    padding: 15px 17px;
+    border-radius: 16px;
+    color: var(--muted);
+    font-size: 13px;
   }
 
   .empty-row {
-    text-align: center;
     padding: 35px !important;
+    text-align: center;
     color: var(--muted);
   }
 
-  @media (max-width: 900px) {
-    .filter-card {
+  @media (max-width: 1000px) {
+    .range-summary {
+      grid-template-columns: repeat(3,minmax(0,1fr));
+    }
+  }
+
+  @media (max-width: 720px) {
+    .date-filter-card {
       grid-template-columns: 1fr 1fr;
     }
 
-    .filter-card > div:first-child {
-      grid-column: 1 / -1;
+    .date-filter-card button,
+    .date-filter-card a {
+      width: 100%;
     }
 
-    .history-summary {
-      grid-template-columns: 1fr;
+    .range-summary {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .desktop-list {
+      display: none;
+    }
+
+    .mobile-list {
+      display: grid;
+      gap: 11px;
+      padding: 13px;
+    }
+
+    .mobile-day-card {
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: white;
+    }
+
+    .mobile-day-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .mobile-day-head strong,
+    .mobile-day-head small {
+      display: block;
+    }
+
+    .mobile-day-head small {
+      margin-top: 3px;
+      color: var(--muted);
+    }
+
+    .mobile-detail-button {
+      min-height: 39px;
+      padding: 8px 12px;
+    }
+
+    .mobile-metrics {
+      display: grid;
+      grid-template-columns: repeat(2,1fr);
+      gap: 8px;
+      margin-top: 13px;
+    }
+
+    .mobile-metrics > div {
+      padding: 10px;
+      border-radius: 12px;
+      background: #f7f6f2;
+    }
+
+    .mobile-metrics span,
+    .mobile-metrics strong {
+      display: block;
+    }
+
+    .mobile-metrics span {
+      color: var(--muted);
+      font-size: 9px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .mobile-metrics strong {
+      margin-top: 3px;
+      font-size: 19px;
+    }
+
+    .cloth-mobile {
+      background: #eef4ff !important;
+      color: #2455a4;
+    }
+
+    .material-mobile {
+      background: #fff3d6 !important;
+      color: #9a5d00;
+    }
+
+    .correct-mobile {
+      background: #edf8f0 !important;
+      color: #087535;
+    }
+
+    .wrong-mobile {
+      background: #fdecec !important;
+      color: #b42318;
+    }
+
+    .empty-mobile {
+      padding: 28px;
+      text-align: center;
+      color: var(--muted);
     }
   }
 </style>
