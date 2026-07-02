@@ -1190,6 +1190,16 @@
                         {% endif %}
 
                         {% if perms.inventory.view_stockledger %}
+                        <a class="nav-link" href="{% url 'stock_summary_report' %}">
+                            <span class="nav-mini-icon">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M4 19V10M10 19V5M16 19v-7M3 19h18"/>
+                                    <path d="m5 8 4-3 4 4 6-5"/>
+                                </svg>
+                            </span>
+                            <span>Stock Summary</span>
+                        </a>
+
                         <a class="nav-link" href="{% url 'stock_history' %}">
                             <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg></span>
                             <span>Stock History</span>

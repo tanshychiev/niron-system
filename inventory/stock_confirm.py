@@ -33,6 +33,13 @@ def _variant_key(item_id, color_id=None, size_id=None, is_material=False):
     return f"S:{item_id}:{color_id or 0}:{size_id or 0}"
 
 
+def _product_group_key(item_id, color_id=None, is_material=False):
+    """One checkbox key for one displayed product card."""
+    if is_material:
+        return f"P:M:{item_id}"
+    return f"P:S:{item_id}:{color_id or 0}"
+
+
 def _stock_queryset(item_id, color_id=None, size_id=None, is_material=False):
     qs = (
         InventoryBatchItem.objects
@@ -108,6 +115,11 @@ def _collect_stock_data():
 
             variants[key] = {
                 "key": key,
+                "group_key": _product_group_key(
+                    row.item_id,
+                    row.color_id,
+                    is_material=is_material,
+                ),
                 "is_material": is_material,
                 "item_id": row.item_id,
                 "item_code": row.item.code,
@@ -216,6 +228,7 @@ def _collect_stock_data():
 
         shirt_groups.append(
             {
+                "group_key": first["group_key"],
                 "style": style,
                 "style_label": first["style_label"],
                 "style_sort": style_order.get(style, 999),
@@ -351,24 +364,59 @@ def stock_confirm(request):
         action = (request.POST.get("action") or "").strip()
 
         try:
-            if action == "confirm_all":
-                confirmed = 0
+            if action in {"confirm_selected", "confirm_all"}:
+                if action == "confirm_all":
+                    # Kept for backward compatibility with an older template.
+                    selected_group_keys = {
+                        variant["group_key"] for variant in variants.values()
+                    }
+                else:
+                    selected_group_keys = {
+                        value.strip()
+                        for value in request.POST.getlist("selected_groups")
+                        if value.strip()
+                    }
 
-                for variant in variants.values():
-                    _confirm_variant(
-                        item_id=variant["item_id"],
-                        color_id=variant["color_id"],
-                        size_id=variant["size_id"],
-                        is_material=variant["is_material"],
-                        real_qty=variant["current_qty"],
-                        user=request.user,
-                        note="All listed stock checked and confirmed correct.",
-                    )
-                    confirmed += 1
+                if not selected_group_keys:
+                    messages.error(request, "Tick at least one product first.")
+                    return redirect("stock_confirm")
+
+                selected_variants = [
+                    variant
+                    for variant in variants.values()
+                    if variant["group_key"] in selected_group_keys
+                ]
+
+                valid_group_keys = {
+                    variant["group_key"] for variant in selected_variants
+                }
+
+                if not selected_variants:
+                    messages.error(request, "The ticked products were not found.")
+                    return redirect("stock_confirm")
+
+                confirmed_rows = 0
+
+                # If any selected row fails, roll back the whole bulk confirmation.
+                with transaction.atomic():
+                    for variant in selected_variants:
+                        _confirm_variant(
+                            item_id=variant["item_id"],
+                            color_id=variant["color_id"],
+                            size_id=variant["size_id"],
+                            is_material=variant["is_material"],
+                            real_qty=variant["current_qty"],
+                            user=request.user,
+                            note="Ticked product checked and confirmed correct.",
+                        )
+                        confirmed_rows += 1
 
                 messages.success(
                     request,
-                    f"{confirmed} stock rows confirmed correct. Date and staff were recorded.",
+                    (
+                        f"{len(valid_group_keys)} product(s) confirmed correct "
+                        f"across {confirmed_rows} stock row(s)."
+                    ),
                 )
                 return redirect("stock_confirm")
 
@@ -439,6 +487,7 @@ def stock_confirm(request):
             "shirt_groups": shirt_groups,
             "material_rows": material_rows,
             "variant_count": len(variants),
+            "product_count": len(shirt_groups) + len(material_rows),
             "shirt_count": sum(len(group["rows"]) for group in shirt_groups),
             "material_count": len(material_rows),
         },

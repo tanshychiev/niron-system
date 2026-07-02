@@ -1,0 +1,619 @@
+{% extends "base.html" %}
+
+{% block title %}Stock Summary Report | Niron{% endblock %}
+{% block page_title %}Stock Summary Report{% endblock %}
+{% block page_subtitle %}
+Daily stock-count results. Each Product + Color + Size is counted once per day using its latest check.
+{% endblock %}
+
+{% block content %}
+<div class="report-actions">
+  <a href="{% url 'stock_confirm' %}" class="btn-primary">← Stock Confirm</a>
+  <a href="{% url 'stock_history' %}" class="btn-light">Full Stock History</a>
+</div>
+
+<form method="get" class="filter-card">
+  <div class="search-field">
+    <label>Search</label>
+    <input
+      type="text"
+      name="q"
+      value="{{ keyword }}"
+      placeholder="Product, color, size, staff or note"
+    >
+  </div>
+
+  <div>
+    <label>From</label>
+    <input type="date" name="date_from" value="{{ date_from|date:'Y-m-d' }}">
+  </div>
+
+  <div>
+    <label>To</label>
+    <input type="date" name="date_to" value="{{ date_to|date:'Y-m-d' }}">
+  </div>
+
+  <div>
+    <label>Result</label>
+    <select name="result">
+      <option value="ALL" {% if result_filter == "ALL" %}selected{% endif %}>All results</option>
+      <option value="CORRECT" {% if result_filter == "CORRECT" %}selected{% endif %}>Correct only</option>
+      <option value="WRONG" {% if result_filter == "WRONG" %}selected{% endif %}>Wrong only</option>
+    </select>
+  </div>
+
+  <button type="submit" class="btn-primary">Show Report</button>
+  <a href="{% url 'stock_summary_report' %}" class="btn-light">Reset</a>
+</form>
+
+<div class="range-title">
+  <div>
+    <span>Report Period</span>
+    <h2>{{ date_from|date:"d M Y" }} – {{ date_to|date:"d M Y" }}</h2>
+  </div>
+  <p>{{ day_count }} stock-count day{{ day_count|pluralize }}</p>
+</div>
+
+<div class="summary-grid">
+  <div class="summary-card total-card">
+    <span>Total Checked</span>
+    <strong>{{ total_checked }}</strong>
+    <small>Daily varieties</small>
+  </div>
+
+  <div class="summary-card correct-card">
+    <span>Correct</span>
+    <strong>{{ total_correct }}</strong>
+    <small>No quantity change</small>
+  </div>
+
+  <div class="summary-card wrong-card">
+    <span>Wrong</span>
+    <strong>{{ total_wrong }}</strong>
+    <small>Quantity corrected</small>
+  </div>
+
+  <div class="summary-card added-card">
+    <span>Stock Added</span>
+    <strong>+{{ total_added_text }}</strong>
+    <small>Found during checks</small>
+  </div>
+
+  <div class="summary-card removed-card">
+    <span>Stock Removed</span>
+    <strong>-{{ total_removed_text }}</strong>
+    <small>Missing during checks</small>
+  </div>
+</div>
+
+<div class="daily-list">
+  {% for report in daily_reports %}
+  <details class="daily-card" {% if forloop.first %}open{% endif %}>
+    <summary>
+      <div class="day-title">
+        <span class="day-label">Stock Count</span>
+        <h2>{{ report.date|date:"d M Y" }}</h2>
+        {% if report.rechecked %}
+          <small>{{ report.rechecked }} variet{{ report.rechecked|pluralize:"y,ies" }} rechecked; latest result shown</small>
+        {% endif %}
+      </div>
+
+      <div class="day-counts">
+        <span class="day-pill total-pill">
+          <small>Checked</small>
+          <strong>{{ report.total }}</strong>
+        </span>
+        <span class="day-pill correct-pill">
+          <small>Correct</small>
+          <strong>{{ report.correct }}</strong>
+        </span>
+        <span class="day-pill wrong-pill">
+          <small>Wrong</small>
+          <strong>{{ report.wrong }}</strong>
+        </span>
+      </div>
+
+      <span class="expand-icon">⌄</span>
+    </summary>
+
+    <div class="day-body">
+      <div class="movement-strip">
+        <span>Added <strong>+{{ report.added_qty_text }}</strong></span>
+        <span>Removed <strong>-{{ report.removed_qty_text }}</strong></span>
+      </div>
+
+      <div class="table-scroll">
+        <table class="report-table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Product</th>
+              <th>Color</th>
+              <th>Size / Unit</th>
+              <th>Result</th>
+              <th class="number">Quantity Change</th>
+              <th class="number">Difference</th>
+              <th>Checked By</th>
+              <th>Note</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {% for row in report.rows %}
+            <tr class="{% if row.is_wrong %}wrong-row{% else %}correct-row{% endif %}">
+              <td>
+                <strong>{{ row.created_at|date:"H:i" }}</strong>
+                {% if row.recheck_count > 1 %}
+                  <span class="recheck-badge">Checked {{ row.recheck_count }}×</span>
+                {% endif %}
+              </td>
+
+              <td>
+                <strong>{{ row.item_name }}</strong>
+                <small>{{ row.item_code }} · {{ row.type_label }}</small>
+              </td>
+
+              <td>{{ row.color_name }}</td>
+              <td><span class="size-pill">{{ row.size_name }}</span></td>
+
+              <td>
+                {% if row.is_wrong %}
+                  <span class="result-pill wrong-result">Wrong</span>
+                {% else %}
+                  <span class="result-pill correct-result">Correct</span>
+                {% endif %}
+              </td>
+
+              <td class="number">
+                {% if row.is_wrong %}
+                  <span class="quantity-change wrong-change">{{ row.before_text }} → {{ row.after_text }}</span>
+                {% else %}
+                  <span class="quantity-change same-change">{{ row.before_text }}</span>
+                {% endif %}
+              </td>
+
+              <td class="number">
+                {% if row.difference > 0 %}
+                  <span class="difference added">+{{ row.difference_text }}</span>
+                {% elif row.difference < 0 %}
+                  <span class="difference removed">{{ row.difference_text }}</span>
+                {% else %}
+                  <span class="difference same">0</span>
+                {% endif %}
+              </td>
+
+              <td>
+                {% if row.checked_by %}
+                  {{ row.checked_by.get_full_name|default:row.checked_by.username }}
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+
+              <td>{{ row.note|default:"-" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </details>
+  {% empty %}
+  <div class="empty-card">
+    <strong>No stock count found.</strong>
+    <p>Change the date range or complete a stock confirmation first.</p>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="report-note">
+  <strong>How this report counts:</strong>
+  If the same product, color and size is checked more than once on the same day,
+  this summary uses only the latest result. Full Stock History still keeps every check.
+</div>
+
+<style>
+  .report-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 9px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+
+  .filter-card,
+  .summary-card,
+  .daily-card,
+  .empty-card,
+  .report-note {
+    background: rgba(255,255,255,.92);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow);
+  }
+
+  .filter-card {
+    display: grid;
+    grid-template-columns: minmax(230px,1fr) 165px 165px 165px auto auto;
+    align-items: end;
+    gap: 11px;
+    padding: 17px;
+    border-radius: 19px;
+    margin-bottom: 20px;
+  }
+
+  .filter-card label {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: .45px;
+  }
+
+  .filter-card input,
+  .filter-card select {
+    width: 100%;
+    height: 43px;
+    border-radius: 11px;
+  }
+
+  .range-title {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 4px 2px 13px;
+  }
+
+  .range-title span {
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: .55px;
+  }
+
+  .range-title h2 {
+    margin: 3px 0 0;
+    font-size: 22px;
+  }
+
+  .range-title p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(5,minmax(0,1fr));
+    gap: 11px;
+    margin-bottom: 24px;
+  }
+
+  .summary-card {
+    padding: 16px;
+    border-radius: 18px;
+  }
+
+  .summary-card > span,
+  .summary-card small {
+    display: block;
+  }
+
+  .summary-card > span {
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: .6px;
+    text-transform: uppercase;
+  }
+
+  .summary-card strong {
+    display: block;
+    margin: 4px 0 2px;
+    font-size: 29px;
+    line-height: 1;
+  }
+
+  .summary-card small {
+    color: var(--muted);
+    font-size: 11px;
+  }
+
+  .correct-card {
+    background: linear-gradient(135deg,#f1fff5,#fff);
+    border-color: #a9dfbd;
+  }
+
+  .correct-card strong { color: #087535; }
+
+  .wrong-card,
+  .removed-card {
+    background: linear-gradient(135deg,#fff5f2,#fff);
+    border-color: #efc0b9;
+  }
+
+  .wrong-card strong,
+  .removed-card strong { color: #b42318; }
+
+  .added-card {
+    background: linear-gradient(135deg,#f2fbff,#fff);
+    border-color: #acd7e7;
+  }
+
+  .added-card strong { color: #036786; }
+
+  .daily-list {
+    display: grid;
+    gap: 15px;
+  }
+
+  .daily-card {
+    border-radius: 20px;
+    overflow: hidden;
+  }
+
+  .daily-card summary {
+    list-style: none;
+    cursor: pointer;
+    display: grid;
+    grid-template-columns: minmax(210px,1fr) auto 28px;
+    align-items: center;
+    gap: 16px;
+    padding: 17px 19px;
+    background: #fffaf0;
+  }
+
+  .daily-card summary::-webkit-details-marker { display: none; }
+
+  .day-label {
+    display: block;
+    color: #9a5d00;
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: .65px;
+    text-transform: uppercase;
+  }
+
+  .day-title h2 {
+    margin: 3px 0 0;
+    font-size: 20px;
+  }
+
+  .day-title small {
+    display: block;
+    margin-top: 4px;
+    color: var(--muted);
+    font-size: 11px;
+  }
+
+  .day-counts {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .day-pill {
+    min-width: 76px;
+    padding: 8px 11px;
+    border-radius: 12px;
+    text-align: center;
+    border: 1px solid var(--line);
+    background: #fff;
+  }
+
+  .day-pill small,
+  .day-pill strong {
+    display: block;
+  }
+
+  .day-pill small {
+    color: var(--muted);
+    font-size: 9px;
+    font-weight: 900;
+    text-transform: uppercase;
+  }
+
+  .day-pill strong {
+    margin-top: 2px;
+    font-size: 20px;
+  }
+
+  .correct-pill {
+    background: #f1fff5;
+    border-color: #a9dfbd;
+    color: #087535;
+  }
+
+  .wrong-pill {
+    background: #fff3f1;
+    border-color: #efc0b9;
+    color: #b42318;
+  }
+
+  .expand-icon {
+    font-size: 22px;
+    transition: transform .2s ease;
+  }
+
+  .daily-card[open] .expand-icon { transform: rotate(180deg); }
+
+  .day-body {
+    padding: 14px 16px 16px;
+    border-top: 1px solid var(--line);
+  }
+
+  .movement-strip {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-bottom: 11px;
+  }
+
+  .movement-strip span {
+    padding: 7px 10px;
+    border-radius: 10px;
+    background: #f8f7f2;
+    border: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 11px;
+  }
+
+  .movement-strip strong { color: #111827; }
+
+  .table-scroll { overflow-x: auto; }
+
+  .report-table {
+    min-width: 1180px;
+    width: 100%;
+  }
+
+  .report-table td strong,
+  .report-table td small {
+    display: block;
+  }
+
+  .report-table td small {
+    color: var(--muted);
+    margin-top: 3px;
+  }
+
+  .wrong-row { background: #fff8f5; }
+  .correct-row { background: #fff; }
+  .number { text-align: right; }
+
+  .size-pill,
+  .result-pill,
+  .quantity-change,
+  .difference,
+  .recheck-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 9px;
+    border-radius: 10px;
+    font-weight: 900;
+    white-space: nowrap;
+  }
+
+  .size-pill {
+    background: #fff3d6;
+    color: #9a5d00;
+  }
+
+  .correct-result,
+  .same-change,
+  .difference.same {
+    background: #edf8f0;
+    color: #087535;
+  }
+
+  .wrong-result,
+  .wrong-change,
+  .difference.removed {
+    background: #fdecec;
+    color: #b42318;
+  }
+
+  .difference.added {
+    background: #e9f8fd;
+    color: #036786;
+  }
+
+  .recheck-badge {
+    margin-top: 5px;
+    padding: 4px 7px;
+    background: #f0ecff;
+    color: #6040a8;
+    font-size: 9px;
+  }
+
+  .empty-card {
+    padding: 42px 20px;
+    border-radius: 20px;
+    text-align: center;
+  }
+
+  .empty-card p {
+    margin: 6px 0 0;
+    color: var(--muted);
+  }
+
+  .report-note {
+    padding: 14px 16px;
+    margin-top: 17px;
+    border-radius: 15px;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.6;
+  }
+
+  .report-note strong { color: #111827; }
+
+  @media (max-width: 1120px) {
+    .filter-card {
+      grid-template-columns: 1fr 1fr 1fr;
+    }
+
+    .search-field { grid-column: 1 / -1; }
+
+    .summary-grid {
+      grid-template-columns: repeat(3,minmax(0,1fr));
+    }
+  }
+
+  @media (max-width: 760px) {
+    .filter-card {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .search-field,
+    .filter-card > div:nth-child(4) {
+      grid-column: 1 / -1;
+    }
+
+    .filter-card button,
+    .filter-card > a {
+      width: 100%;
+      text-align: center;
+    }
+
+    .summary-grid {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .total-card { grid-column: 1 / -1; }
+
+    .daily-card summary {
+      grid-template-columns: 1fr 22px;
+      gap: 10px;
+      padding: 15px;
+    }
+
+    .day-counts {
+      grid-column: 1 / -1;
+      grid-row: 2;
+    }
+
+    .day-pill {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .expand-icon {
+      grid-column: 2;
+      grid-row: 1;
+    }
+
+    .movement-strip {
+      justify-content: stretch;
+    }
+
+    .movement-strip span {
+      flex: 1;
+      text-align: center;
+    }
+  }
+</style>
+{% endblock %}
