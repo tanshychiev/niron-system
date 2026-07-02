@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     "orders.apps.OrdersConfig",
     "finance",
     "customers",
+    "production.apps.ProductionConfig",
 ]
 
 

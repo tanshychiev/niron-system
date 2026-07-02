@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+    {% block page_title %}Production{% endblock %}
+    {% block page_subtitle %}Fabric rolls, cutting, sewing returns, finished stock and payments{% endblock %}
+    {% block content %}
+
+<style>
+.prod-wrap{max-width:1450px;margin:0 auto}.prod-actions{display:flex;gap:9px;flex-wrap:wrap;justify-content:flex-end;margin-bottom:14px}.prod-card{background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:17px}.prod-grid{display:grid;gap:13px}.prod-summary{grid-template-columns:repeat(5,minmax(0,1fr));margin-bottom:16px}.prod-metric span{display:block;color:var(--muted);font-size:10px;font-weight:900;text-transform:uppercase}.prod-metric strong{display:block;margin-top:5px;font-size:27px}.prod-table-wrap{overflow-x:auto}.prod-table{width:100%;border-collapse:collapse;min-width:850px}.prod-table th,.prod-table td{padding:12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}.prod-table th{font-size:10px;color:var(--muted);text-transform:uppercase}.num{text-align:right!important}.pill{display:inline-flex;padding:6px 9px;border-radius:999px;background:#f3f4f6;font-weight:850;font-size:11px}.pill.good{background:#eaf8ef;color:#087535}.pill.warn{background:#fff1df;color:#a95500}.pill.bad{background:#fdecec;color:#b42318}.section-head{display:flex;align-items:end;justify-content:space-between;gap:12px;margin-bottom:12px}.section-head h2{margin:0}.section-head p{margin:4px 0 0;color:var(--muted)}.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.field label{display:block;margin-bottom:6px;font-size:11px;font-weight:900;text-transform:uppercase;color:var(--muted)}.field input,.field select,.field textarea{width:100%}.full{grid-column:1/-1}.inline-form{display:grid;grid-template-columns:2fr 1fr 1fr 2fr auto;gap:10px;align-items:end}.empty{padding:28px;text-align:center;color:var(--muted)}.cost-box{background:#fff8e8;border-color:#efd49b}.selected-bar{position:sticky;top:88px;z-index:30;background:rgba(255,255,255,.96);backdrop-filter:blur(12px);padding:12px;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}.modal{display:none;position:fixed;inset:0;z-index:200;align-items:center;justify-content:center;padding:18px;background:rgba(20,24,31,.5)}.modal.open{display:flex}.modal-card{width:min(600px,100%);max-height:88vh;overflow:auto;background:#fff;border-radius:20px;padding:20px}.modal-actions{display:flex;gap:9px;justify-content:flex-end;margin-top:15px}@media(max-width:950px){.prod-summary{grid-template-columns:repeat(3,1fr)}.inline-form{grid-template-columns:1fr 1fr}.inline-form>*:last-child{grid-column:1/-1}.form-grid{grid-template-columns:1fr}}@media(max-width:650px){.prod-summary{grid-template-columns:1fr 1fr}.prod-actions>*{flex:1}.selected-bar{top:72px;align-items:stretch;flex-direction:column}}
+</style>
+
+    <div class="prod-wrap">
+      <div class="prod-actions">
+        {% if perms.production.add_fabricreceipt %}<a class="btn-light" href="{% url 'production_fabric_receive' %}">+ Receive Fabric</a>{% endif %}
+        {% if perms.production.add_productionproject %}<a class="btn-primary" href="{% url 'production_project_create' %}">+ New Project</a>{% endif %}
+      </div>
+      <div class="prod-grid prod-summary">
+        <div class="prod-card prod-metric"><span>Projects</span><strong>{{ project_count }}</strong></div>
+        <div class="prod-card prod-metric"><span>Active Projects</span><strong>{{ active_project_count }}</strong></div>
+        <div class="prod-card prod-metric"><span>Physical Rolls</span><strong>{{ available_roll_count }}</strong></div>
+        <div class="prod-card prod-metric"><span>Equivalent Rolls</span><strong>{{ equivalent_rolls|floatformat:"-3" }}</strong></div>
+        <div class="prod-card prod-metric"><span>Unpaid Records</span><strong>{{ unpaid_count }}</strong>{% if can_view_cost %}<small>${{ unpaid_total|floatformat:2 }}</small>{% endif %}</div>
+      </div>
+      <div class="prod-card">
+        <div class="section-head"><div><h2>Recent Projects</h2><p>Open a project to control its full production flow.</p></div><a class="btn-light" href="{% url 'production_project_list' %}">All Projects</a></div>
+        <div class="prod-table-wrap"><table class="prod-table"><thead><tr><th>Project</th><th>Product</th><th>Color</th><th class="num">Expected</th><th class="num">Sent</th><th class="num">Returned</th><th class="num">Pending</th><th>Status</th></tr></thead><tbody>
+          {% for project in projects %}<tr><td><a href="{% url 'production_project_detail' project.id %}"><strong>{{ project.project_no }}</strong></a></td><td>{{ project.finished_item.name }}</td><td>{{ project.color.name }}</td><td class="num">{{ project.expected_qty }}</td><td class="num">{{ project.sent_total }}</td><td class="num">{{ project.returned_good_total }}</td><td class="num">{{ project.still_with_sewer }}</td><td><span class="pill">{{ project.get_status_display }}</span></td></tr>
+          {% empty %}<tr><td colspan="8" class="empty">No production projects yet.</td></tr>{% endfor %}
+        </tbody></table></div>
+      </div>
+    </div>
+    {% endblock %}
