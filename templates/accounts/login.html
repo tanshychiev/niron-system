@@ -1,831 +1,1026 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Niron Login</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#141311">
+    <title>Niron System Login</title>
 
     <style>
-        :root{
-            --bg-1:#fff9ea;
-            --bg-2:#f9edd2;
-            --bg-3:#efd9b3;
-            --bg-4:#ddb88c;
-            --bg-5:#bf9166;
-
-            --text:#382a20;
-            --muted:#7d6a58;
-            --white:#ffffff;
-
-            --card-bg:rgba(255,255,255,.28);
-            --card-border:rgba(255,255,255,.48);
-            --card-shadow:0 30px 80px rgba(105,74,41,.16);
-
-            --input-bg:rgba(255,255,255,.58);
-            --input-border:rgba(185,146,107,.22);
-
-            --brand:#9e7957;
-            --brand-dark:#7f6147;
-            --brand-soft:#f5e4ca;
-
-            --btn:#f0b31b;
-            --btn-hover:#dd9f12;
-
-            --danger-bg:rgba(190,72,59,.14);
-            --danger-text:#9c352b;
+        :root {
+            --black: #151412;
+            --black-soft: #1d1b18;
+            --cream: #f6ecdc;
+            --cream-light: #fffaf2;
+            --cream-deep: #ead6b8;
+            --gold: #c99b5e;
+            --gold-light: #e8c58e;
+            --text: #201d19;
+            --muted: #776d61;
+            --line: rgba(95, 73, 48, .17);
+            --danger: #a23a32;
+            --danger-bg: rgba(162, 58, 50, .10);
         }
 
-        *{
-            box-sizing:border-box;
+        * {
+            box-sizing: border-box;
         }
 
-        html,body{
-            margin:0;
-            min-height:100%;
-            font-family:Inter, "Segoe UI", Arial, sans-serif;
+        html,
+        body {
+            width: 100%;
+            min-height: 100%;
+            margin: 0;
         }
 
-        body{
-            overflow:hidden;
+        body {
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+                "Segoe UI", Arial, sans-serif;
+            color: var(--text);
+            background-color: #171512;
+            background-image:
+                linear-gradient(rgba(9, 8, 7, .24), rgba(9, 8, 7, .42)),
+                url("{% static 'img/niron-login-bg.png' %}");
+            background-position: center;
+            background-repeat: no-repeat;
+            background-size: cover;
+            background-attachment: fixed;
+        }
+
+        button,
+        input {
+            font: inherit;
+        }
+
+        .login-page {
+            position: relative;
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            padding: 34px;
+            overflow: hidden;
+            isolation: isolate;
+        }
+
+        .login-page::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            z-index: -2;
             background:
-                radial-gradient(circle at 10% 18%, rgba(255,255,255,.72), transparent 22%),
-                radial-gradient(circle at 88% 12%, rgba(255,255,255,.38), transparent 18%),
-                radial-gradient(circle at 16% 86%, rgba(255,240,213,.72), transparent 22%),
-                radial-gradient(circle at 88% 82%, rgba(214,171,120,.22), transparent 18%),
-                linear-gradient(135deg, var(--bg-1) 0%, var(--bg-2) 32%, var(--bg-3) 67%, var(--bg-4) 100%);
-            position:relative;
+                radial-gradient(circle at 50% 48%, rgba(228, 184, 120, .16), transparent 28%),
+                linear-gradient(90deg, rgba(7, 7, 6, .24), transparent 28%, transparent 72%, rgba(7, 7, 6, .24));
         }
 
-        .scene{
-            position:relative;
-            min-height:100vh;
-            display:grid;
-            place-items:center;
-            padding:28px;
-            overflow:hidden;
-            isolation:isolate;
+        .login-page::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            z-index: -1;
+            pointer-events: none;
+            box-shadow: inset 0 0 180px rgba(0, 0, 0, .55);
         }
 
-        .back-circle{
-            position:absolute;
-            border-radius:50%;
-            border:1px solid rgba(255,255,255,.18);
-            z-index:0;
-            animation:spinSlow 18s linear infinite;
-        }
-
-        .back-circle.one{
-            width:420px;
-            height:420px;
-            left:-120px;
-            top:-60px;
-        }
-
-        .back-circle.two{
-            width:320px;
-            height:320px;
-            right:70px;
-            bottom:-60px;
-            animation-direction:reverse;
-        }
-
-        .back-circle::before{
-            content:"";
-            position:absolute;
-            inset:24px;
-            border-radius:50%;
-            border:1px solid rgba(255,255,255,.12);
-        }
-
-        .stripe-ball{
-            position:absolute;
-            width:118px;
-            height:118px;
-            border-radius:50%;
-            opacity:.18;
-            background:
-                repeating-linear-gradient(
-                    180deg,
-                    rgba(255,255,255,.92) 0 3px,
-                    transparent 3px 9px
-                );
-            z-index:0;
-            animation:floatMini 8s ease-in-out infinite alternate;
-        }
-
-        .stripe-ball.left{
-            left:72px;
-            top:88px;
-        }
-
-        .stripe-ball.right{
-            right:88px;
-            top:74px;
-            animation-delay:1s;
-        }
-
-        .stripe-ball.bottom{
-            right:112px;
-            bottom:76px;
-            animation-delay:1.5s;
-        }
-
-        .blob{
-            position:absolute;
-            filter:blur(1px);
-            z-index:0;
-            animation-timing-function:ease-in-out;
-            animation-iteration-count:infinite;
-            animation-direction:alternate;
-        }
-
-        .blob-a{
-            width:430px;
-            height:300px;
-            left:8%;
-            top:14%;
-            border-radius:52% 48% 60% 40% / 44% 44% 56% 56%;
-            background:linear-gradient(135deg, #b8e6ff 0%, #9fd4ff 40%, #f8d9a9 100%);
-            opacity:.95;
-            animation:floatA 8s infinite;
-        }
-
-        .blob-b{
-            width:260px;
-            height:200px;
-            right:18%;
-            top:20%;
-            border-radius:46% 54% 43% 57% / 62% 41% 59% 38%;
-            background:linear-gradient(135deg, rgba(255,255,255,.78), rgba(255,255,255,.22));
-            opacity:.85;
-            backdrop-filter:blur(8px);
-            animation:floatB 9s infinite;
-        }
-
-        .blob-c{
-            width:300px;
-            height:220px;
-            left:12%;
-            bottom:10%;
-            border-radius:60% 40% 54% 46% / 45% 57% 43% 55%;
-            background:linear-gradient(135deg, #fffdf6 0%, #f3e2c0 55%, #dcb17b 100%);
-            opacity:.78;
-            animation:floatC 7s infinite;
-        }
-
-        .blob-d{
-            width:280px;
-            height:220px;
-            right:10%;
-            bottom:16%;
-            border-radius:42% 58% 62% 38% / 52% 42% 58% 48%;
-            background:linear-gradient(135deg, #f7dfba 0%, #d9af7f 48%, #a97a56 100%);
-            opacity:.72;
-            animation:floatD 10s infinite;
-        }
-
-        .orb{
-            position:absolute;
-            border-radius:50%;
-            z-index:0;
+        .login-shell {
+            position: relative;
+            width: min(930px, 100%);
+            min-height: 650px;
+            display: grid;
+            grid-template-columns: 46% 54%;
+            border: 1px solid rgba(255, 255, 255, .22);
+            border-radius: 36px;
+            overflow: hidden;
+            background: var(--cream);
             box-shadow:
-                inset -8px -12px 20px rgba(0,0,0,.12),
-                inset 10px 10px 18px rgba(255,255,255,.26),
-                0 14px 24px rgba(0,0,0,.12);
-            animation:orbFloat 6s ease-in-out infinite alternate;
+                0 35px 90px rgba(0, 0, 0, .46),
+                0 10px 30px rgba(0, 0, 0, .24);
+            animation: cardEnter .65s cubic-bezier(.2, .75, .2, 1) both;
         }
 
-        .orb-1{
-            width:84px;height:84px;left:38%;top:14%;
-            background:radial-gradient(circle at 30% 30%, #d9f1ff, #6bc5ee 58%, #9e7957 100%);
+        .login-shell::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 8;
+            border-radius: inherit;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, .55);
         }
 
-        .orb-2{
-            width:46px;height:46px;left:56%;top:15%;
-            background:radial-gradient(circle at 30% 30%, #fff8dd, #f0c97e 58%, #9e7957 100%);
-            animation-delay:.9s;
-        }
-
-        .orb-3{
-            width:72px;height:72px;right:26%;top:26%;
-            background:radial-gradient(circle at 30% 30%, #d9f1ff, #8cbcff 56%, #9e7957 100%);
-            animation-delay:1.3s;
-        }
-
-        .orb-4{
-            width:90px;height:90px;right:8%;bottom:24%;
-            background:radial-gradient(circle at 30% 30%, #ffe3bc, #d69d68 56%, #8f6447 100%);
-            animation-delay:.3s;
-        }
-
-        .orb-5{
-            width:54px;height:54px;left:9%;bottom:26%;
-            background:radial-gradient(circle at 30% 30%, #d8f2ff, #67c6ee 56%, #9e7957 100%);
-            animation-delay:1.8s;
-        }
-
-        .orb-6{
-            width:36px;height:36px;left:34%;bottom:10%;
-            background:radial-gradient(circle at 30% 30%, #fff6db, #efc77c 55%, #9e7957 100%);
-            animation-delay:2.4s;
-        }
-
-        .login-card{
-            position:relative;
-            z-index:2;
-            width:100%;
-            max-width:760px;
-            min-height:520px;
-            border-radius:34px;
-            background:var(--card-bg);
-            border:1px solid var(--card-border);
-            backdrop-filter:blur(18px);
-            -webkit-backdrop-filter:blur(18px);
-            box-shadow:var(--card-shadow);
-            overflow:hidden;
-        }
-
-        .login-card::before{
-            content:"";
-            position:absolute;
-            inset:0;
+        .dark-pane {
+            position: relative;
+            z-index: 2;
+            min-height: 650px;
+            padding: 44px 42px 40px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            color: #fff8ec;
             background:
-                linear-gradient(135deg, rgba(255,255,255,.22), transparent 28%, transparent 72%, rgba(255,255,255,.08));
-            pointer-events:none;
+                radial-gradient(circle at 20% 15%, rgba(255, 255, 255, .07), transparent 32%),
+                linear-gradient(150deg, #201e1b 0%, #11100f 72%);
+            border-radius: 35px 124px 124px 35px;
         }
 
-        .shine{
-            content:"";
-            position:absolute;
-            inset:-40% auto auto -20%;
-            width:220px;
-            height:180%;
-            transform:rotate(18deg);
-            background:linear-gradient(90deg, transparent, rgba(255,255,255,.22), transparent);
-            animation:shineMove 7s linear infinite;
-            pointer-events:none;
-            z-index:1;
+        .dark-pane::before {
+            content: "";
+            position: absolute;
+            width: 330px;
+            height: 330px;
+            right: -150px;
+            bottom: -180px;
+            border-radius: 50%;
+            border: 1px solid rgba(226, 190, 137, .20);
+            box-shadow:
+                0 0 0 34px rgba(226, 190, 137, .025),
+                0 0 0 68px rgba(226, 190, 137, .02);
         }
 
-        .card-grid{
-            position:relative;
-            z-index:2;
-            display:grid;
-            grid-template-columns: 1.05fr .95fr;
-            min-height:520px;
+        .dark-pane::after {
+            content: "";
+            position: absolute;
+            left: -54px;
+            bottom: -94px;
+            width: 290px;
+            height: 215px;
+            border-radius: 56% 44% 46% 54% / 58% 48% 52% 42%;
+            background:
+                linear-gradient(135deg, rgba(201, 155, 94, .20), rgba(255, 255, 255, .025)),
+                repeating-linear-gradient(28deg, transparent 0 10px, rgba(255, 255, 255, .025) 10px 11px);
+            transform: rotate(-8deg);
         }
 
-        .left-pane{
-            padding:38px 34px 34px;
-            display:flex;
-            flex-direction:column;
-            justify-content:space-between;
-            border-right:1px solid rgba(255,255,255,.14);
+        .brand {
+            position: relative;
+            z-index: 2;
+            display: flex;
+            align-items: center;
+            gap: 14px;
         }
 
-        .right-pane{
-            padding:40px 34px 34px;
-            display:flex;
-            align-items:center;
-            justify-content:center;
+        .brand-logo-wrap {
+            width: 86px;
+            height: 86px;
+            flex: 0 0 86px;
+            display: block;
+            padding: 0;
+            overflow: hidden;
+            border-radius: 20px;
+            background: linear-gradient(145deg, rgba(255, 255, 255, .11), rgba(255, 255, 255, .025));
+            border: 1px solid rgba(255, 255, 255, .09);
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, .10),
+                0 8px 20px rgba(0, 0, 0, .22);
         }
 
-        .brand-top{
-            display:flex;
-            align-items:center;
-            gap:12px;
+        .brand-logo {
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center;
+            border-radius: inherit;
+            transform: scale(1.08);
+            transform-origin: center;
         }
 
-        .logo-box{
-            width:48px;
-            height:48px;
-            border-radius:14px;
-            background:linear-gradient(135deg, #c79f74, #9e7957);
-            display:flex;
-            align-items:center;
-            justify-content:center;
-            color:#fff;
-            font-size:20px;
-            font-weight:900;
-            box-shadow:0 10px 18px rgba(158,121,87,.22);
+        .brand-name {
+            margin: 0;
+            font-size: 25px;
+            line-height: 1;
+            font-weight: 900;
+            letter-spacing: .23em;
         }
 
-        .brand-name{
-            font-size:18px;
-            font-weight:900;
-            color:var(--text);
-            line-height:1.1;
+        .brand-subtitle {
+            margin-top: 7px;
+            color: var(--gold-light);
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: .32em;
+            text-transform: uppercase;
         }
 
-        .brand-sub{
-            font-size:11px;
-            letter-spacing:.18em;
-            text-transform:uppercase;
-            color:var(--brand);
-            margin-top:4px;
+        .welcome-block {
+            position: relative;
+            z-index: 2;
+            margin-top: 72px;
         }
 
-        .tag{
-            display:inline-flex;
-            align-items:center;
-            gap:8px;
-            padding:8px 14px;
-            border-radius:999px;
-            background:rgba(255,255,255,.44);
-            border:1px solid rgba(158,121,87,.14);
-            color:var(--brand-dark);
-            font-size:12px;
-            font-weight:800;
-            margin-top:22px;
-            text-transform:uppercase;
-            letter-spacing:.06em;
+        .welcome-title {
+            margin: 0;
+            max-width: 320px;
+            font-size: clamp(42px, 4vw, 58px);
+            line-height: .98;
+            letter-spacing: -.055em;
+            font-weight: 800;
         }
 
-        .tag-dot{
-            width:8px;
-            height:8px;
-            border-radius:50%;
-            background:#5f9b6f;
-            box-shadow:0 0 0 5px rgba(95,155,111,.12);
+        .welcome-title em {
+            color: var(--gold-light);
+            font-family: Georgia, "Times New Roman", serif;
+            font-weight: 500;
         }
 
-        .headline{
-            margin:22px 0 0;
-            font-size:52px;
-            line-height:1.02;
-            letter-spacing:-.05em;
-            font-weight:900;
-            color:var(--text);
-            max-width:360px;
+        .welcome-copy {
+            max-width: 300px;
+            margin: 22px 0 0;
+            color: rgba(255, 248, 236, .72);
+            font-size: 15px;
+            line-height: 1.7;
         }
 
-        .headline .accent{
-            color:var(--brand);
+        .gold-line {
+            width: 42px;
+            height: 2px;
+            margin: 25px 0 0;
+            border-radius: 999px;
+            background: linear-gradient(90deg, var(--gold-light), rgba(232, 197, 142, .12));
         }
 
-        .desc{
-            margin-top:18px;
-            max-width:380px;
-            color:var(--muted);
-            font-size:15px;
-            line-height:1.75;
+        .feature-list {
+            position: relative;
+            z-index: 2;
+            display: grid;
+            gap: 16px;
+            margin: 34px 0 0;
         }
 
-        .feature-list{
-            display:grid;
-            gap:12px;
-            margin-top:28px;
+        .feature-item {
+            display: grid;
+            grid-template-columns: 48px 1fr;
+            align-items: center;
+            gap: 15px;
         }
 
-        .feature{
-            background:rgba(255,255,255,.42);
-            border:1px solid rgba(158,121,87,.10);
-            border-radius:20px;
-            padding:15px 16px;
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            display: grid;
+            place-items: center;
+            border-radius: 15px;
+            color: var(--gold-light);
+            background: linear-gradient(145deg, rgba(255, 255, 255, .07), rgba(255, 255, 255, .025));
+            border: 1px solid rgba(255, 255, 255, .08);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06);
         }
 
-        .feature-title{
-            margin:0 0 6px;
-            font-size:15px;
-            font-weight:800;
-            color:var(--text);
+        .feature-icon svg {
+            width: 23px;
+            height: 23px;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 1.8;
+            stroke-linecap: round;
+            stroke-linejoin: round;
         }
 
-        .feature-text{
-            margin:0;
-            color:var(--muted);
-            font-size:13px;
-            line-height:1.6;
+        .feature-title {
+            margin: 0;
+            color: #fff9ef;
+            font-size: 14px;
+            font-weight: 800;
         }
 
-        .login-panel{
-            width:100%;
-            max-width:320px;
+        .feature-copy {
+            margin: 5px 0 0;
+            color: rgba(255, 248, 236, .56);
+            font-size: 12px;
+            line-height: 1.45;
         }
 
-        .panel-top{
-            display:flex;
-            align-items:center;
-            justify-content:space-between;
-            gap:12px;
-            margin-bottom:12px;
+        .left-footer {
+            position: relative;
+            z-index: 2;
+            margin-top: auto;
+            padding-top: 26px;
+            color: rgba(255, 248, 236, .38);
+            font-size: 11px;
+            letter-spacing: .05em;
         }
 
-        .panel-mini{
-            display:flex;
-            align-items:center;
-            gap:10px;
+        .cream-pane {
+            position: relative;
+            min-width: 0;
+            padding: 50px 55px 42px 70px;
+            display: flex;
+            align-items: center;
+            background:
+                radial-gradient(circle at 98% 0%, rgba(255, 255, 255, .76), transparent 34%),
+                linear-gradient(140deg, var(--cream-light), var(--cream));
         }
 
-        .panel-logo{
-            width:40px;
-            height:40px;
-            border-radius:12px;
-            background:linear-gradient(135deg, #d2aa81, #9e7957);
-            display:flex;
-            align-items:center;
-            justify-content:center;
-            color:#fff;
-            font-size:17px;
-            font-weight:900;
+        .cream-pane::before {
+            content: "";
+            position: absolute;
+            top: 28px;
+            right: 32px;
+            width: 88px;
+            height: 88px;
+            border-radius: 50%;
+            border: 1px solid rgba(132, 96, 53, .08);
+            box-shadow:
+                0 0 0 15px rgba(132, 96, 53, .018),
+                0 0 0 30px rgba(132, 96, 53, .012);
         }
 
-        .panel-mini-title{
-            font-size:15px;
-            font-weight:900;
-            color:var(--text);
-            line-height:1.1;
+        .login-panel {
+            position: relative;
+            z-index: 2;
+            width: 100%;
+            max-width: 410px;
+            margin-inline: auto;
         }
 
-        .panel-mini-sub{
-            font-size:12px;
-            color:var(--muted);
-            margin-top:3px;
+        .hello-row {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 48px;
         }
 
-        .secure-pill{
-            padding:7px 12px;
-            border-radius:999px;
-            background:rgba(255,255,255,.45);
-            border:1px solid rgba(158,121,87,.14);
-            color:var(--brand-dark);
-            font-size:11px;
-            font-weight:800;
+        .user-badge {
+            width: 48px;
+            height: 48px;
+            display: grid;
+            place-items: center;
+            flex: 0 0 48px;
+            border-radius: 50%;
+            color: #342c23;
+            background: rgba(255, 255, 255, .50);
+            border: 1px solid rgba(102, 75, 44, .12);
+            box-shadow: 0 10px 24px rgba(92, 65, 37, .08);
         }
 
-        .title{
-            margin:12px 0 8px;
-            font-size:42px;
-            line-height:1.04;
-            letter-spacing:-.04em;
-            color:var(--text);
-            font-weight:900;
+        .user-badge svg {
+            width: 23px;
+            height: 23px;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 1.8;
+            stroke-linecap: round;
+            stroke-linejoin: round;
         }
 
-        .text{
-            margin:0 0 18px;
-            color:var(--muted);
-            font-size:14px;
-            line-height:1.7;
+        .hello-title {
+            margin: 0;
+            color: var(--text);
+            font-size: 18px;
+            line-height: 1.15;
+            font-weight: 850;
         }
 
-        .field{
-            margin-bottom:14px;
+        .hello-copy {
+            margin: 5px 0 0;
+            color: var(--muted);
+            font-size: 13px;
         }
 
-        .field label{
-            display:block;
-            margin-bottom:7px;
-            color:var(--muted);
-            font-size:12px;
-            font-weight:800;
-            text-transform:uppercase;
-            letter-spacing:.07em;
+        .alert {
+            margin-bottom: 18px;
+            padding: 12px 14px;
+            border: 1px solid rgba(162, 58, 50, .15);
+            border-radius: 14px;
+            color: var(--danger);
+            background: var(--danger-bg);
+            font-size: 13px;
+            line-height: 1.5;
         }
 
-        .field input{
-            width:100%;
-            height:52px;
-            border-radius:16px;
-            border:1px solid var(--input-border);
-            background:var(--input-bg);
-            color:var(--text);
-            padding:0 16px;
-            font-size:15px;
-            outline:none;
-            transition:.22s ease;
+        .field {
+            margin-bottom: 21px;
         }
 
-        .field input::placeholder{
-            color:#a69280;
+        .field-label {
+            display: block;
+            margin-bottom: 9px;
+            color: #28231e;
+            font-size: 12px;
+            font-weight: 800;
         }
 
-        .field input:focus{
-            border-color:rgba(158,121,87,.34);
-            box-shadow:0 0 0 4px rgba(158,121,87,.08);
-            transform:translateY(-1px);
+        .input-wrap {
+            position: relative;
         }
 
-        .meta{
-            display:flex;
-            align-items:center;
-            justify-content:space-between;
-            gap:10px;
-            font-size:12px;
-            color:var(--muted);
-            margin:2px 0 16px;
+        .input-icon {
+            position: absolute;
+            top: 50%;
+            left: 16px;
+            width: 19px;
+            height: 19px;
+            transform: translateY(-50%);
+            color: #8c7d6a;
+            pointer-events: none;
         }
 
-        .remember{
-            display:flex;
-            align-items:center;
-            gap:8px;
+        .input-icon svg {
+            width: 100%;
+            height: 100%;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 1.8;
+            stroke-linecap: round;
+            stroke-linejoin: round;
         }
 
-        .remember input{
-            width:15px;
-            height:15px;
-            accent-color:var(--brand);
+        .field input {
+            width: 100%;
+            height: 54px;
+            padding: 0 48px 0 48px;
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            outline: none;
+            color: var(--text);
+            background: rgba(255, 255, 255, .36);
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, .45),
+                0 8px 20px rgba(109, 76, 39, .045);
+            transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease, background .18s ease;
         }
 
-        .forgot{
-            text-decoration:none;
-            color:var(--brand-dark);
-            font-weight:800;
+        .field input::placeholder {
+            color: #a49684;
         }
 
-        .forgot:hover{
-            text-decoration:underline;
+        .field input:focus {
+            border-color: rgba(172, 126, 70, .52);
+            background: rgba(255, 255, 255, .57);
+            box-shadow: 0 0 0 4px rgba(172, 126, 70, .09), 0 10px 24px rgba(109, 76, 39, .07);
+            transform: translateY(-1px);
         }
 
-        .login-btn{
-            width:100%;
-            height:56px;
-            border:none;
-            border-radius:18px;
-            background:linear-gradient(180deg, #f4bf26, #f0b31b);
-            color:#fff;
-            font-size:18px;
-            font-weight:900;
-            cursor:pointer;
-            box-shadow:0 16px 28px rgba(240,179,27,.18);
-            transition:.22s ease;
+        .password-toggle {
+            position: absolute;
+            top: 50%;
+            right: 12px;
+            width: 34px;
+            height: 34px;
+            display: grid;
+            place-items: center;
+            transform: translateY(-50%);
+            padding: 0;
+            border: 0;
+            border-radius: 10px;
+            color: #897965;
+            background: transparent;
+            cursor: pointer;
         }
 
-        .login-btn:hover{
-            transform:translateY(-1px);
-            background:linear-gradient(180deg, #f6c839, #e4a313);
+        .password-toggle:hover {
+            color: #3b332b;
+            background: rgba(113, 82, 48, .06);
         }
 
-        .footer-note{
-            margin-top:16px;
-            padding-top:16px;
-            border-top:1px solid rgba(158,121,87,.12);
-            display:flex;
-            align-items:center;
-            justify-content:space-between;
-            gap:10px;
-            color:var(--muted);
-            font-size:12px;
-            font-weight:700;
+        .password-toggle svg {
+            width: 19px;
+            height: 19px;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 1.8;
+            stroke-linecap: round;
+            stroke-linejoin: round;
         }
 
-        .alert{
-            border-radius:14px;
-            padding:12px 14px;
-            margin-bottom:14px;
-            font-size:13px;
-            line-height:1.55;
+        .field-error {
+            margin-top: 7px;
+            color: var(--danger);
+            font-size: 12px;
+            font-weight: 700;
         }
 
-        .alert-danger{
-            background:var(--danger-bg);
-            color:var(--danger-text);
-            border:1px solid rgba(156,53,43,.12);
+        .form-meta {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            margin: 2px 0 23px;
+            color: var(--muted);
+            font-size: 12px;
         }
 
-        .field-error{
-            margin-top:6px;
-            color:var(--danger-text);
-            font-size:12px;
-            font-weight:700;
+        .remember {
+            display: inline-flex;
+            align-items: center;
+            gap: 9px;
+            cursor: pointer;
+            user-select: none;
         }
 
-        @keyframes floatA{
-            0%{transform:translate(0,0) rotate(0deg)}
-            100%{transform:translate(22px,-14px) rotate(8deg)}
+        .remember input {
+            width: 16px;
+            height: 16px;
+            margin: 0;
+            accent-color: var(--black);
         }
 
-        @keyframes floatB{
-            0%{transform:translate(0,0)}
-            100%{transform:translate(-20px,14px)}
+        .forgot {
+            color: #9b6e3a;
+            font-weight: 750;
+            text-decoration: none;
         }
 
-        @keyframes floatC{
-            0%{transform:translate(0,0)}
-            100%{transform:translate(18px,-16px)}
+        .forgot:hover {
+            text-decoration: underline;
         }
 
-        @keyframes floatD{
-            0%{transform:translate(0,0)}
-            100%{transform:translate(-24px,18px)}
+        .login-button {
+            width: 100%;
+            min-height: 58px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            padding: 0 20px;
+            border: 0;
+            border-radius: 14px;
+            color: #fffaf1;
+            background: linear-gradient(135deg, #24211d, #11100f);
+            box-shadow: 0 14px 28px rgba(20, 18, 15, .20), inset 0 1px 0 rgba(255, 255, 255, .10);
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 850;
+            transition: transform .18s ease, box-shadow .18s ease, background .18s ease;
         }
 
-        @keyframes orbFloat{
-            0%{transform:translateY(0) scale(1)}
-            100%{transform:translateY(-14px) scale(1.05)}
+        .login-button:hover {
+            transform: translateY(-2px);
+            background: linear-gradient(135deg, #302b25, #151311);
+            box-shadow: 0 18px 34px rgba(20, 18, 15, .25), inset 0 1px 0 rgba(255, 255, 255, .12);
         }
 
-        @keyframes spinSlow{
-            0%{transform:rotate(0deg)}
-            100%{transform:rotate(360deg)}
+        .login-button:active {
+            transform: translateY(0);
         }
 
-        @keyframes floatMini{
-            0%{transform:translateY(0)}
-            100%{transform:translateY(-10px)}
+        .login-button svg {
+            width: 20px;
+            height: 20px;
+            margin-left: auto;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
         }
 
-        @keyframes shineMove{
-            0%{transform:translateX(-180%) rotate(18deg)}
-            100%{transform:translateX(520%) rotate(18deg)}
+        .secure-divider {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            align-items: center;
+            gap: 13px;
+            margin: 38px 0 24px;
+            color: #978977;
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: .13em;
+            text-transform: uppercase;
         }
 
-        @media (max-width: 980px){
-            body{
-                overflow:auto;
+        .secure-divider::before,
+        .secure-divider::after {
+            content: "";
+            height: 1px;
+            background: rgba(105, 78, 49, .13);
+        }
+
+        .security-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 11px;
+            color: #796e61;
+            font-size: 12px;
+        }
+
+        .security-icon {
+            width: 34px;
+            height: 34px;
+            display: grid;
+            place-items: center;
+            border-radius: 12px;
+            color: #9e7444;
+            background: rgba(255, 255, 255, .30);
+            border: 1px solid rgba(102, 75, 44, .10);
+        }
+
+        .security-icon svg {
+            width: 17px;
+            height: 17px;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 1.8;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .panel-footer {
+            margin-top: 54px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            color: #7e7264;
+            font-size: 11px;
+        }
+
+        .panel-footer strong {
+            color: #9e6f39;
+            font-weight: 800;
+        }
+
+        @keyframes cardEnter {
+            from {
+                opacity: 0;
+                transform: translateY(18px) scale(.985);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        @media (max-width: 920px) {
+            .login-page {
+                padding: 22px;
+                align-items: center;
             }
 
-            .scene{
-                padding:18px;
+            .login-shell {
+                width: min(560px, 100%);
+                grid-template-columns: 1fr;
+                min-height: auto;
             }
 
-            .login-card{
-                max-width:560px;
-                min-height:auto;
+            .dark-pane {
+                min-height: auto;
+                padding: 30px 30px 28px;
+                border-radius: 35px 35px 82px 35px;
             }
 
-            .card-grid{
-                grid-template-columns:1fr;
+            .welcome-block {
+                margin-top: 34px;
             }
 
-            .left-pane{
-                border-right:none;
-                border-bottom:1px solid rgba(255,255,255,.14);
+            .welcome-title {
+                max-width: none;
+                font-size: 40px;
             }
 
-            .headline{
-                font-size:40px;
-                max-width:none;
+            .welcome-copy {
+                max-width: 430px;
             }
 
-            .right-pane{
-                padding-top:28px;
+            .feature-list {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 10px;
+                margin-top: 28px;
+            }
+
+            .feature-item {
+                grid-template-columns: 1fr;
+                align-items: start;
+                gap: 9px;
+            }
+
+            .feature-icon {
+                width: 42px;
+                height: 42px;
+                border-radius: 13px;
+            }
+
+            .feature-copy {
+                display: none;
+            }
+
+            .left-footer {
+                display: none;
+            }
+
+            .cream-pane {
+                padding: 42px 34px 36px;
+            }
+
+            .hello-row {
+                margin-bottom: 34px;
+            }
+
+            .panel-footer {
+                margin-top: 36px;
             }
         }
 
-        @media (max-width: 640px){
-            .blob,.orb,.back-circle,.stripe-ball{
-                display:none;
+        @media (max-width: 560px) {
+            body {
+                background-attachment: scroll;
             }
 
-            .login-card{
-                border-radius:24px;
+            .login-page {
+                min-height: 100svh;
+                padding: 12px;
+                overflow: visible;
             }
 
-            .left-pane,
-            .right-pane{
-                padding:24px 20px;
+            .login-shell {
+                border-radius: 25px;
             }
 
-            .title{
-                font-size:34px;
+            .dark-pane {
+                padding: 24px 22px 23px;
+                border-radius: 24px 24px 58px 24px;
             }
 
-            .headline{
-                font-size:34px;
+            .brand-logo-wrap {
+                width: 52px;
+                height: 52px;
+                flex-basis: 52px;
+                border-radius: 16px;
             }
 
-            .footer-note,
-            .meta,
-            .panel-top{
-                flex-direction:column;
-                align-items:flex-start;
+            .brand-logo {
+                width: 250%;
+                height: 250%;
+            }
+
+            .brand-name {
+                font-size: 21px;
+            }
+
+            .welcome-block {
+                margin-top: 27px;
+            }
+
+            .welcome-title {
+                font-size: 34px;
+            }
+
+            .welcome-copy {
+                margin-top: 15px;
+                font-size: 13px;
+                line-height: 1.55;
+            }
+
+            .gold-line {
+                margin-top: 18px;
+            }
+
+            .feature-list {
+                margin-top: 22px;
+            }
+
+            .feature-title {
+                font-size: 11px;
+            }
+
+            .cream-pane {
+                padding: 34px 20px 29px;
+            }
+
+            .hello-row {
+                margin-bottom: 29px;
+            }
+
+            .form-meta {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .secure-divider {
+                margin-top: 31px;
+            }
+
+            .panel-footer {
+                flex-wrap: wrap;
+                margin-top: 31px;
+                text-align: center;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                scroll-behavior: auto !important;
+                animation-duration: .01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: .01ms !important;
             }
         }
     </style>
 </head>
 <body>
-    <div class="scene">
-        <div class="back-circle one"></div>
-        <div class="back-circle two"></div>
-
-        <div class="stripe-ball left"></div>
-        <div class="stripe-ball right"></div>
-        <div class="stripe-ball bottom"></div>
-
-        <div class="blob blob-a"></div>
-        <div class="blob blob-b"></div>
-        <div class="blob blob-c"></div>
-        <div class="blob blob-d"></div>
-
-        <div class="orb orb-1"></div>
-        <div class="orb orb-2"></div>
-        <div class="orb orb-3"></div>
-        <div class="orb orb-4"></div>
-        <div class="orb orb-5"></div>
-        <div class="orb orb-6"></div>
-
-        <div class="login-card">
-            <div class="shine"></div>
-
-            <div class="card-grid">
-                <div class="left-pane">
+    <main class="login-page">
+        <section class="login-shell" aria-label="Niron system login">
+            <aside class="dark-pane">
+                <div class="brand">
+                    <div class="brand-logo-wrap">
+                        <img
+                            class="brand-logo"
+                            src="{% static 'img/niron-logo.png' %}"
+                            alt="Niron"
+                        >
+                    </div>
                     <div>
-                        <div class="brand-top">
-                            <div class="logo-box">N</div>
-                            <div>
-                                <div class="brand-name">Niron</div>
-                                <div class="brand-sub">Custom Printing</div>
-                            </div>
+                        <h1 class="brand-name">NIRON</h1>
+                        <div class="brand-subtitle">System</div>
+                    </div>
+                </div>
+
+                <div class="welcome-block">
+                    <h2 class="welcome-title">Welcome <em>back!</em></h2>
+                    <p class="welcome-copy">
+                        Sign in to continue to your Niron management system.
+                    </p>
+                    <div class="gold-line"></div>
+                </div>
+
+                <div class="feature-list">
+                    <div class="feature-item">
+                        <div class="feature-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M12 3 3.8 7.3 12 11.6l8.2-4.3L12 3Z"></path>
+                                <path d="M3.8 7.3V16.7L12 21l8.2-4.3V7.3"></path>
+                                <path d="M12 11.6V21"></path>
+                            </svg>
                         </div>
-
-                        <div class="tag">
-                            <span class="tag-dot"></span>
-                            Internal Staff Access
-                        </div>
-
-                        <h1 class="headline">
-                            Smarter access for <span class="accent">inventory, production, expense,</span> and daily workflow.
-                        </h1>
-
-                        <div class="desc">
-                            Secure login for Niron staff. Manage tshirt inventory, film materials, cutting, print jobs, expenses, and reports in one clean system.
+                        <div>
+                            <h3 class="feature-title">Inventory Control</h3>
+                            <p class="feature-copy">Track stock, sizes and materials in real time.</p>
                         </div>
                     </div>
 
-                    <div class="feature-list">
-                        <div class="feature">
-                            <h3 class="feature-title">Inventory Control</h3>
-                            <p class="feature-text">Track finished tshirts, stock in, and inventory adjustment in one place.</p>
+                    <div class="feature-item">
+                        <div class="feature-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M7 4 3.5 7.2 6.5 10l1.3-1.2V20h8.4V8.8l1.3 1.2 3-2.8L17 4c-1.1 1.2-2.7 1.8-5 1.8S8.1 5.2 7 4Z"></path>
+                            </svg>
                         </div>
-
-                        <div class="feature">
+                        <div>
                             <h3 class="feature-title">Production Flow</h3>
-                            <p class="feature-text">Manage tshirt production and print job workflow more clearly.</p>
+                            <p class="feature-copy">Manage printing, cutting and daily jobs clearly.</p>
                         </div>
+                    </div>
 
-                        <div class="feature">
-                            <h3 class="feature-title">Expense & Dashboard</h3>
-                            <p class="feature-text">Keep batch cost, salary, and operational expense organized with reports.</p>
+                    <div class="feature-item">
+                        <div class="feature-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M4 20V13h4v7H4Z"></path>
+                                <path d="M10 20V9h4v11h-4Z"></path>
+                                <path d="M16 20V5h4v15h-4Z"></path>
+                                <path d="m4 9 5-4 4 2 6-5"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="feature-title">Smart Reports</h3>
+                            <p class="feature-copy">Monitor expense, productivity and performance.</p>
                         </div>
                     </div>
                 </div>
 
-                <div class="right-pane">
-                    <div class="login-panel">
-                        <div class="panel-top">
-                            <div class="panel-mini">
-                                <div class="panel-logo">N</div>
-                                <div>
-                                    <div class="panel-mini-title">Niron</div>
-                                    <div class="panel-mini-sub">Staff Login</div>
-                                </div>
-                            </div>
+                <div class="left-footer">Secure internal staff access</div>
+            </aside>
 
-                            <div class="secure-pill">Secure Login</div>
+            <div class="cream-pane">
+                <div class="login-panel">
+                    <div class="hello-row">
+                        <div class="user-badge" aria-hidden="true">
+                            <svg viewBox="0 0 24 24">
+                                <circle cx="12" cy="8" r="3.5"></circle>
+                                <path d="M5 20v-2.2A5.8 5.8 0 0 1 10.8 12h2.4a5.8 5.8 0 0 1 5.8 5.8V20"></path>
+                            </svg>
                         </div>
+                        <div>
+                            <h2 class="hello-title">Hello again!</h2>
+                            <p class="hello-copy">Let’s get things done.</p>
+                        </div>
+                    </div>
 
-                        <h2 class="title">Welcome back</h2>
-                        <p class="text">
-                            Sign in to continue to the internal Niron management system.
-                        </p>
+                    <form method="post" novalidate>
+                        {% csrf_token %}
 
-                        <form method="post">
-                            {% csrf_token %}
+                        {% if form.non_field_errors %}
+                            <div class="alert" role="alert">
+                                {{ form.non_field_errors }}
+                            </div>
+                        {% endif %}
 
-                            {% if form.non_field_errors %}
-                                <div class="alert alert-danger">
-                                    {{ form.non_field_errors }}
-                                </div>
-                            {% endif %}
-
-                            <div class="field">
-                                <label for="{{ form.username.id_for_label }}">Username</label>
+                        <div class="field">
+                            <label class="field-label" for="{{ form.username.id_for_label }}">Username</label>
+                            <div class="input-wrap">
+                                <span class="input-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24">
+                                        <circle cx="12" cy="8" r="3.5"></circle>
+                                        <path d="M5 20v-2.2A5.8 5.8 0 0 1 10.8 12h2.4a5.8 5.8 0 0 1 5.8 5.8V20"></path>
+                                    </svg>
+                                </span>
                                 {{ form.username }}
-                                {% for e in form.username.errors %}
-                                    <div class="field-error">{{ e }}</div>
-                                {% endfor %}
                             </div>
-
-                            <div class="field">
-                                <label for="{{ form.password.id_for_label }}">Password</label>
-                                {{ form.password }}
-                                {% for e in form.password.errors %}
-                                    <div class="field-error">{{ e }}</div>
-                                {% endfor %}
-                            </div>
-
-                            <div class="meta">
-                                <label class="remember">
-                                    <input type="checkbox" name="remember_me">
-                                    <span>Remember me</span>
-                                </label>
-
-                                <a href="#" class="forgot">Forgot password?</a>
-                            </div>
-
-                            <button type="submit" class="login-btn">Login to System</button>
-                        </form>
-
-                        <div class="footer-note">
-                            <span>Module: Internal System</span>
-                            <span>Status: Active</span>
+                            {% for error in form.username.errors %}
+                                <div class="field-error">{{ error }}</div>
+                            {% endfor %}
                         </div>
+
+                        <div class="field">
+                            <label class="field-label" for="{{ form.password.id_for_label }}">Password</label>
+                            <div class="input-wrap">
+                                <span class="input-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24">
+                                        <rect x="5" y="10" width="14" height="10" rx="2"></rect>
+                                        <path d="M8 10V7a4 4 0 0 1 8 0v3"></path>
+                                    </svg>
+                                </span>
+                                {{ form.password }}
+                                <button
+                                    class="password-toggle"
+                                    id="passwordToggle"
+                                    type="button"
+                                    aria-label="Show password"
+                                    aria-pressed="false"
+                                >
+                                    <svg id="eyeIcon" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"></path>
+                                        <circle cx="12" cy="12" r="2.5"></circle>
+                                    </svg>
+                                </button>
+                            </div>
+                            {% for error in form.password.errors %}
+                                <div class="field-error">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="form-meta">
+                            <label class="remember">
+                                <input type="checkbox" name="remember_me" {% if request.POST.remember_me %}checked{% endif %}>
+                                <span>Remember me</span>
+                            </label>
+                            <a class="forgot" href="#" onclick="return false;">Forgot password?</a>
+                        </div>
+
+                        <button class="login-button" type="submit">
+                            <span>Sign In</span>
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M5 12h14"></path>
+                                <path d="m14 7 5 5-5 5"></path>
+                            </svg>
+                        </button>
+                    </form>
+
+                    <div class="secure-divider">Secure internal login</div>
+
+                    <div class="security-row">
+                        <span class="security-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M12 3 5 6v5c0 4.8 2.9 8.1 7 10 4.1-1.9 7-5.2 7-10V6l-7-3Z"></path>
+                                <path d="m9 12 2 2 4-4"></path>
+                            </svg>
+                        </span>
+                        <span>Protected access for Niron staff</span>
+                    </div>
+
+                    <div class="panel-footer">
+                        <span>Niron System</span>
+                        <span>•</span>
+                        <strong>Smarter Printing Workflow</strong>
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
+        </section>
+    </main>
+
+    <script>
+        (function () {
+            const passwordInput = document.getElementById("{{ form.password.id_for_label }}");
+            const toggle = document.getElementById("passwordToggle");
+            const eyeIcon = document.getElementById("eyeIcon");
+
+            if (!passwordInput || !toggle || !eyeIcon) return;
+
+            toggle.addEventListener("click", function () {
+                const showing = passwordInput.type === "text";
+                passwordInput.type = showing ? "password" : "text";
+                toggle.setAttribute("aria-pressed", String(!showing));
+                toggle.setAttribute("aria-label", showing ? "Show password" : "Hide password");
+
+                eyeIcon.innerHTML = showing
+                    ? '<path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"></path><circle cx="12" cy="12" r="2.5"></circle>'
+                    : '<path d="M3 3l18 18"></path><path d="M10.6 6.2A10.8 10.8 0 0 1 12 6c6 0 9.5 6 9.5 6a17.5 17.5 0 0 1-3.1 3.8"></path><path d="M6.2 6.2C3.8 8 2.5 12 2.5 12s3.5 6 9.5 6a9.8 9.8 0 0 0 3.1-.5"></path><path d="M10.2 10.2a2.5 2.5 0 0 0 3.6 3.6"></path>';
+            });
+
+            if (!passwordInput.getAttribute("placeholder")) {
+                passwordInput.setAttribute("placeholder", "Enter your password");
+            }
+
+            const usernameInput = document.getElementById("{{ form.username.id_for_label }}");
+            if (usernameInput && !usernameInput.getAttribute("placeholder")) {
+                usernameInput.setAttribute("placeholder", "Enter your username");
+            }
+
+            if (usernameInput) {
+                usernameInput.setAttribute("autocomplete", "username");
+            }
+            passwordInput.setAttribute("autocomplete", "current-password");
+        })();
+    </script>
 </body>
 </html>
