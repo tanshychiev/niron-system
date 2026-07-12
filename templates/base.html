@@ -1,13 +1,27 @@
 {% load static %}
 {% static 'img/niron-logo.png' as niron_logo_url %}
+{% static 'img/niron-app-icon-180.png' as niron_icon_180_url %}
+{% static 'img/niron-app-icon-192.png' as niron_icon_192_url %}
+{% static 'img/niron-app-icon-512.png' as niron_icon_512_url %}
+{% static 'niron/manifest.webmanifest' as niron_manifest_url %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#F8F1E4">
-    <link rel="icon" type="image/png" href="{{ niron_logo_url }}?v=20260620-4">
-    <link rel="preload" as="image" href="{{ niron_logo_url }}?v=20260620-4">
+    <meta name="application-name" content="Niron">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Niron">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+
+    <link rel="icon" type="image/png" href="{{ niron_logo_url }}?v=20260712-1">
+    <link rel="icon" type="image/png" sizes="192x192" href="{{ niron_icon_192_url }}?v=20260712-1">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ niron_icon_180_url }}?v=20260712-1">
+    <link rel="manifest" href="{{ niron_manifest_url }}?v=20260712-1">
+    <link rel="preload" as="image" href="{{ niron_logo_url }}?v=20260712-1">
+
     <title>{% block title %}Niron System{% endblock %}</title>
 
     <style>
@@ -75,6 +89,128 @@
         .layout {
             display: flex;
             min-height: 100vh;
+        }
+
+        /* =========================
+           NIRON PAGE LOADER
+        ========================== */
+        .niron-page-loader {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            display: grid;
+            place-items: center;
+            padding: 24px;
+            background:
+                radial-gradient(circle at 50% 35%, rgba(245, 168, 0, .17), transparent 34%),
+                linear-gradient(145deg, #FFFDF8 0%, #F7EFE1 100%);
+            opacity: 1;
+            visibility: visible;
+            transition: opacity .28s ease, visibility .28s ease;
+        }
+
+        .niron-page-loader.is-hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .niron-loader-card {
+            width: min(88vw, 300px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 30px 26px 27px;
+            border: 1px solid rgba(222, 203, 172, .9);
+            border-radius: 28px;
+            background: rgba(255, 255, 255, .84);
+            box-shadow: 0 24px 70px rgba(79, 58, 26, .14);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+        }
+
+        .niron-loader-logo-wrap {
+            position: relative;
+            width: 94px;
+            height: 94px;
+            display: grid;
+            place-items: center;
+        }
+
+        .niron-loader-ring {
+            position: absolute;
+            inset: 0;
+            border: 3px solid rgba(245, 168, 0, .18);
+            border-top-color: var(--accent);
+            border-right-color: #D88700;
+            border-radius: 50%;
+            animation: nironLoaderSpin .9s linear infinite;
+        }
+
+        .niron-loader-logo {
+            width: 72px;
+            height: 72px;
+            display: block;
+            object-fit: contain;
+            border: 1px solid #E7D7BC;
+            border-radius: 22px;
+            background: #FFFDF8;
+            box-shadow: 0 10px 26px rgba(174, 111, 0, .15);
+        }
+
+        .niron-loader-fallback {
+            width: 72px;
+            height: 72px;
+            display: none;
+            place-items: center;
+            border-radius: 22px;
+            color: #5F3C00;
+            background: linear-gradient(145deg, #FFD66F, #F1A71A);
+            font-size: 30px;
+            font-weight: 950;
+        }
+
+        .niron-loader-title {
+            margin-top: 18px;
+            color: var(--text);
+            font-size: 22px;
+            line-height: 1;
+            font-weight: 950;
+            letter-spacing: -.5px;
+        }
+
+        .niron-loader-text {
+            margin-top: 8px;
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.4;
+            font-weight: 700;
+        }
+
+        .niron-loader-dots {
+            display: inline-flex;
+            gap: 5px;
+            margin-top: 16px;
+        }
+
+        .niron-loader-dots span {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--accent);
+            animation: nironLoaderBounce 1s ease-in-out infinite;
+        }
+
+        .niron-loader-dots span:nth-child(2) { animation-delay: .14s; }
+        .niron-loader-dots span:nth-child(3) { animation-delay: .28s; }
+
+        @keyframes nironLoaderSpin {
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes nironLoaderBounce {
+            0%, 60%, 100% { transform: translateY(0); opacity: .45; }
+            30% { transform: translateY(-6px); opacity: 1; }
         }
 
         /* =========================
@@ -1097,6 +1233,26 @@
             }
         }
 
+        @media (max-width: 480px) {
+            .niron-loader-card {
+                width: min(90vw, 270px);
+                padding: 26px 22px 24px;
+                border-radius: 24px;
+            }
+
+            .niron-loader-logo-wrap {
+                width: 86px;
+                height: 86px;
+            }
+
+            .niron-loader-logo,
+            .niron-loader-fallback {
+                width: 66px;
+                height: 66px;
+                border-radius: 20px;
+            }
+        }
+
         @media (prefers-reduced-motion: reduce) {
             *,
             *::before,
@@ -1111,6 +1267,31 @@
     {% block extra_css %}{% endblock %}
 </head>
 <body>
+    <div class="niron-page-loader" id="nironPageLoader" role="status" aria-live="polite" aria-label="Loading Niron System">
+        <div class="niron-loader-card">
+            <div class="niron-loader-logo-wrap">
+                <span class="niron-loader-ring" aria-hidden="true"></span>
+                <img
+                    class="niron-loader-logo"
+                    src="{{ niron_logo_url }}?v=20260712-1"
+                    alt="Niron"
+                    width="72"
+                    height="72"
+                    loading="eager"
+                    decoding="async"
+                    onerror="this.onerror=null;this.style.display='none';this.nextElementSibling.style.display='grid';"
+                >
+                <span class="niron-loader-fallback" aria-hidden="true">N</span>
+            </div>
+            <div class="niron-loader-title">NIRON</div>
+            <div class="niron-loader-text">Loading your workspace</div>
+            <div class="niron-loader-dots" aria-hidden="true">
+                <span></span><span></span><span></span>
+            </div>
+        </div>
+    </div>
+    <noscript><style>.niron-page-loader{display:none!important;}</style></noscript>
+
     <div class="layout">
         <aside class="sidebar" id="appSidebar" aria-label="Main navigation">
             <div class="sidebar-head">
@@ -1598,6 +1779,7 @@
         "use strict";
 
         const body = document.body;
+        const pageLoader = document.getElementById("nironPageLoader");
         const sidebar = document.getElementById("appSidebar");
         const openButton = document.getElementById("mobileMenuButton");
         const moreButton = document.getElementById("mobileMoreButton");
@@ -1605,6 +1787,25 @@
         const overlay = document.getElementById("sidebarOverlay");
         const toggles = Array.from(document.querySelectorAll(".nav-toggle"));
         const currentPath = normalizePath(window.location.pathname);
+        let loaderFallbackTimer = null;
+
+        function showPageLoader() {
+            if (!pageLoader) return;
+            window.clearTimeout(loaderFallbackTimer);
+            pageLoader.classList.remove("is-hidden");
+            pageLoader.setAttribute("aria-hidden", "false");
+        }
+
+        function hidePageLoader() {
+            if (!pageLoader) return;
+            pageLoader.classList.add("is-hidden");
+            pageLoader.setAttribute("aria-hidden", "true");
+        }
+
+        function scheduleLoaderSafetyHide() {
+            window.clearTimeout(loaderFallbackTimer);
+            loaderFallbackTimer = window.setTimeout(hidePageLoader, 8000);
+        }
 
         function normalizePath(path) {
             if (!path) return "/";
@@ -1628,6 +1829,40 @@
                 if (menu) menu.classList.remove("show");
             });
         }
+
+        window.addEventListener("load", hidePageLoader, { once: true });
+        window.addEventListener("pageshow", hidePageLoader);
+        scheduleLoaderSafetyHide();
+
+        document.addEventListener("submit", function (event) {
+            if (!event.defaultPrevented) {
+                showPageLoader();
+                scheduleLoaderSafetyHide();
+            }
+        });
+
+        document.addEventListener("click", function (event) {
+            const link = event.target.closest("a[href]");
+            if (!link || event.defaultPrevented) return;
+            if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+            if (link.target === "_blank" || link.hasAttribute("download")) return;
+
+            const rawHref = link.getAttribute("href") || "";
+            if (!rawHref || rawHref.startsWith("#") || rawHref.startsWith("mailto:") || rawHref.startsWith("tel:") || rawHref.startsWith("javascript:")) return;
+
+            const destination = new URL(link.href, window.location.href);
+            if (destination.origin !== window.location.origin) return;
+
+            const sameDocumentHash =
+                destination.pathname === window.location.pathname &&
+                destination.search === window.location.search &&
+                destination.hash;
+
+            if (sameDocumentHash) return;
+
+            showPageLoader();
+            scheduleLoaderSafetyHide();
+        });
 
         toggles.forEach(function (toggle) {
             toggle.addEventListener("click", function () {
