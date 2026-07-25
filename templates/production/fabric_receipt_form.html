@@ -1,16 +1,114 @@
 {% extends "base.html" %}
-    {% block page_title %}{{ page_title_text }}{% endblock %}
-    {% block page_subtitle %}Staff can receive rolls without seeing purchase cost{% endblock %}
-    {% block content %}
-
+{% block page_title %}{{ page_title_text }}{% endblock %}
+{% block page_subtitle %}Receive several fabric types in one save while keeping every physical roll separate{% endblock %}
+{% block content %}
 <style>
-.prod-wrap{max-width:1450px;margin:0 auto}.prod-actions{display:flex;gap:9px;flex-wrap:wrap;justify-content:flex-end;margin-bottom:14px}.prod-card{background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:17px}.prod-grid{display:grid;gap:13px}.prod-summary{grid-template-columns:repeat(5,minmax(0,1fr));margin-bottom:16px}.prod-metric span{display:block;color:var(--muted);font-size:10px;font-weight:900;text-transform:uppercase}.prod-metric strong{display:block;margin-top:5px;font-size:27px}.prod-table-wrap{overflow-x:auto}.prod-table{width:100%;border-collapse:collapse;min-width:850px}.prod-table th,.prod-table td{padding:12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}.prod-table th{font-size:10px;color:var(--muted);text-transform:uppercase}.num{text-align:right!important}.pill{display:inline-flex;padding:6px 9px;border-radius:999px;background:#f3f4f6;font-weight:850;font-size:11px}.pill.good{background:#eaf8ef;color:#087535}.pill.warn{background:#fff1df;color:#a95500}.pill.bad{background:#fdecec;color:#b42318}.section-head{display:flex;align-items:end;justify-content:space-between;gap:12px;margin-bottom:12px}.section-head h2{margin:0}.section-head p{margin:4px 0 0;color:var(--muted)}.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.field label{display:block;margin-bottom:6px;font-size:11px;font-weight:900;text-transform:uppercase;color:var(--muted)}.field input,.field select,.field textarea{width:100%}.full{grid-column:1/-1}.inline-form{display:grid;grid-template-columns:2fr 1fr 1fr 2fr auto;gap:10px;align-items:end}.empty{padding:28px;text-align:center;color:var(--muted)}.cost-box{background:#fff8e8;border-color:#efd49b}.selected-bar{position:sticky;top:88px;z-index:30;background:rgba(255,255,255,.96);backdrop-filter:blur(12px);padding:12px;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}.modal{display:none;position:fixed;inset:0;z-index:200;align-items:center;justify-content:center;padding:18px;background:rgba(20,24,31,.5)}.modal.open{display:flex}.modal-card{width:min(600px,100%);max-height:88vh;overflow:auto;background:#fff;border-radius:20px;padding:20px}.modal-actions{display:flex;gap:9px;justify-content:flex-end;margin-top:15px}@media(max-width:950px){.prod-summary{grid-template-columns:repeat(3,1fr)}.inline-form{grid-template-columns:1fr 1fr}.inline-form>*:last-child{grid-column:1/-1}.form-grid{grid-template-columns:1fr}}@media(max-width:650px){.prod-summary{grid-template-columns:1fr 1fr}.prod-actions>*{flex:1}.selected-bar{top:72px;align-items:stretch;flex-direction:column}}
+.prod-wrap{max-width:1450px;margin:0 auto}.prod-actions{display:flex;gap:9px;flex-wrap:wrap;justify-content:flex-end;margin-bottom:14px}.prod-card{background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:17px}.field label{display:block;margin-bottom:6px;font-size:11px;font-weight:900;text-transform:uppercase;color:var(--muted)}.field input,.field select,.field textarea{width:100%}.header-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.line-card{border:1px solid var(--line);border-radius:16px;padding:14px;margin-top:12px;background:#fffdf9}.line-grid{display:grid;grid-template-columns:1.5fr 1fr .65fr repeat(3,.8fr) 1.2fr auto;gap:10px;align-items:end}.line-title{display:flex;align-items:center;justify-content:space-between;gap:12px}.line-number{display:inline-flex;width:28px;height:28px;align-items:center;justify-content:center;border-radius:999px;background:var(--accent-soft);font-weight:900}.remove-row{border:1px solid #f1b5b5;background:#fff5f5;color:#b42318;border-radius:10px;padding:10px 12px;cursor:pointer}.error-box{padding:12px;border-radius:12px;background:#fdecec;color:#b42318;margin-bottom:12px}.cost-protected{margin-top:12px;background:#f1fff6}.color-preview{width:22px;height:22px;border-radius:50%;border:1px solid rgba(0,0,0,.18);display:inline-block;vertical-align:middle;margin-right:7px}@media(max-width:1200px){.line-grid{grid-template-columns:repeat(3,1fr)}.line-grid .wide{grid-column:span 2}}@media(max-width:700px){.header-grid,.line-grid{grid-template-columns:1fr}.line-grid .wide{grid-column:auto}.prod-actions>*{flex:1}}
 </style>
+<div class="prod-wrap" style="max-width:1280px">
+  <div class="prod-actions"><a class="btn-light" href="{% url 'production_material_stock' %}">← Material Stock</a></div>
 
-    <div class="prod-wrap" style="max-width:950px"><div class="prod-actions"><a class="btn-light" href="{% url 'production_material_stock' %}">← Material Stock</a></div>
-      <div class="prod-card"><form method="post">{% csrf_token %}{% if form.errors %}<div class="pill bad" style="margin-bottom:12px">{{ form.errors }}</div>{% endif %}<div class="form-grid">
-        {% for field in form %}<div class="field {% if field.name == 'note' %}full{% endif %}"><label>{{ field.label }}</label>{{ field }}{% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}</div>{% endfor %}
-      </div><div class="prod-actions" style="margin-top:18px"><button class="btn-primary">Save Fabric Receipt</button></div></form></div>
-      {% if not can_view_cost %}<div class="prod-card" style="margin-top:12px;background:#f1fff6"><strong>Cost is protected.</strong><p style="margin:5px 0 0;color:var(--muted)">You can record the physical rolls, fabric and color. Purchase cost is only available to authorized managers/accounting.</p></div>{% endif %}
+  {% if is_multi_create %}
+  <form method="post" id="multi-receipt-form">
+    {% csrf_token %}
+    <div class="prod-card">
+      {% if header_form.errors %}<div class="error-box">{{ header_form.errors }}</div>{% endif %}
+      <div class="header-grid">
+        <div class="field"><label>{{ header_form.received_date.label }}</label>{{ header_form.received_date }}</div>
+        <div class="field"><label>{{ header_form.supplier.label }}</label>{{ header_form.supplier }}</div>
+      </div>
     </div>
-    {% endblock %}
+
+    <div class="prod-card" style="margin-top:14px">
+      <div class="line-title">
+        <div><h2 style="margin:0">Fabric Types</h2><p style="margin:4px 0 0;color:var(--muted)">Add each fabric and colour received from this supplier.</p></div>
+        <button type="button" class="btn-light" id="add-row">+ Add More</button>
+      </div>
+      {{ line_formset.management_form }}
+      {% if line_formset.non_form_errors %}<div class="error-box">{{ line_formset.non_form_errors }}</div>{% endif %}
+      <div id="line-container">
+        {% for line_form in line_formset %}
+        <div class="line-card receipt-line">
+          <div class="line-title"><span class="line-number">{{ forloop.counter }}</span><button type="button" class="remove-row">Remove</button></div>
+          {% if line_form.errors %}<div class="error-box" style="margin-top:10px">{{ line_form.errors }}</div>{% endif %}
+          <div class="line-grid">
+            <div class="field wide"><label>Fabric Name</label>{{ line_form.fabric_name }}</div>
+            <div class="field"><label>Colour</label>{{ line_form.color }}</div>
+            <div class="field"><label>Roll Count</label>{{ line_form.roll_count }}</div>
+            {% if can_view_cost %}
+            <div class="field"><label>Goods Cost</label>{{ line_form.total_goods_cost }}</div>
+            <div class="field"><label>Shipping</label>{{ line_form.shipping_cost }}</div>
+            <div class="field"><label>Extra Cost</label>{{ line_form.extra_cost }}</div>
+            {% endif %}
+            <div class="field wide"><label>Note</label>{{ line_form.note }}</div>
+            <div style="display:none">{{ line_form.DELETE }}</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      <template id="empty-row-template">
+        <div class="line-card receipt-line">
+          <div class="line-title"><span class="line-number"></span><button type="button" class="remove-row">Remove</button></div>
+          <div class="line-grid">
+            <div class="field wide"><label>Fabric Name</label>{{ line_formset.empty_form.fabric_name }}</div>
+            <div class="field"><label>Colour</label>{{ line_formset.empty_form.color }}</div>
+            <div class="field"><label>Roll Count</label>{{ line_formset.empty_form.roll_count }}</div>
+            {% if can_view_cost %}
+            <div class="field"><label>Goods Cost</label>{{ line_formset.empty_form.total_goods_cost }}</div>
+            <div class="field"><label>Shipping</label>{{ line_formset.empty_form.shipping_cost }}</div>
+            <div class="field"><label>Extra Cost</label>{{ line_formset.empty_form.extra_cost }}</div>
+            {% endif %}
+            <div class="field wide"><label>Note</label>{{ line_formset.empty_form.note }}</div>
+            <div style="display:none">{{ line_formset.empty_form.DELETE }}</div>
+          </div>
+        </div>
+      </template>
+      <div class="prod-actions" style="margin-top:18px"><button class="btn-primary">Save All Fabric Receipts</button></div>
+    </div>
+  </form>
+  {% else %}
+  <div class="prod-card"><form method="post">{% csrf_token %}{% if form.errors %}<div class="error-box">{{ form.errors }}</div>{% endif %}<div class="header-grid">{% for field in form %}<div class="field {% if field.name == 'note' %}full{% endif %}"><label>{{ field.label }}</label>{{ field }}{% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}</div>{% endfor %}</div><div class="prod-actions" style="margin-top:18px"><button class="btn-primary">Save Fabric Receipt</button></div></form></div>
+  {% endif %}
+
+  {% if not can_view_cost %}<div class="prod-card cost-protected"><strong>Cost is protected.</strong><p style="margin:5px 0 0;color:var(--muted)">You can record physical rolls, fabric and colour. Purchase cost is only available to authorised managers/accounting.</p></div>{% endif %}
+</div>
+{% if is_multi_create %}
+<script>
+(function(){
+  const container=document.getElementById('line-container');
+  const total=document.getElementById('id_items-TOTAL_FORMS');
+  const template=document.getElementById('empty-row-template');
+  function renumber(){
+    [...container.querySelectorAll('.receipt-line')].forEach((row,index)=>{
+      row.querySelector('.line-number').textContent=index+1;
+    });
+  }
+  function bindRemove(row){
+    row.querySelector('.remove-row').addEventListener('click',()=>{
+      const rows=container.querySelectorAll('.receipt-line');
+      if(rows.length===1){
+        row.querySelectorAll('input:not([type=hidden]),select,textarea').forEach(el=>{if(el.tagName==='SELECT')el.selectedIndex=0;else if(el.name.includes('roll_count'))el.value=1;else if(el.type==='number')el.value=0;else el.value='';});
+        return;
+      }
+      const del=row.querySelector('input[name$="-DELETE"]');
+      if(del && row.dataset.existing==='1'){del.checked=true;row.style.display='none';}else{row.remove();}
+      renumber();
+    });
+  }
+  container.querySelectorAll('.receipt-line').forEach(bindRemove);
+  document.getElementById('add-row').addEventListener('click',()=>{
+    const index=parseInt(total.value,10);
+    const wrapper=document.createElement('div');
+    wrapper.innerHTML=template.innerHTML.replaceAll('__prefix__',index).trim();
+    const row=wrapper.firstElementChild;
+    container.appendChild(row);
+    total.value=index+1;
+    bindRemove(row);
+    renumber();
+    row.querySelector('input,select')?.focus();
+  });
+  renumber();
+})();
+</script>
+{% endif %}
+{% endblock %}

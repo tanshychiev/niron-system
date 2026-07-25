@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django import forms
+from django.forms import formset_factory
 
 from inventory.models import Color, InventoryItem
 
@@ -54,6 +55,74 @@ class FabricReceiptForm(forms.ModelForm):
         if self.instance and self.instance.pk:
             self.fields["roll_count"].disabled = True
             self.fields["roll_count"].help_text = "Create another receipt to add more physical rolls."
+
+
+class FabricReceiptHeaderForm(forms.Form):
+    received_date = forms.DateField(
+        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"})
+    )
+    supplier = forms.CharField(
+        max_length=150,
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Supplier"}),
+    )
+
+
+class FabricReceiptLineForm(forms.Form):
+    fabric_name = forms.CharField(
+        max_length=150,
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "e.g. Cotton 220 GSM"}),
+    )
+    color = forms.ModelChoiceField(
+        queryset=Color.objects.none(),
+        widget=forms.Select(attrs={"class": "form-select color-select"}),
+    )
+    roll_count = forms.IntegerField(
+        min_value=1,
+        initial=1,
+        widget=forms.NumberInput(attrs={"class": "form-control", "min": 1}),
+    )
+    total_goods_cost = forms.DecimalField(
+        min_value=Decimal("0"),
+        decimal_places=2,
+        max_digits=14,
+        initial=Decimal("0"),
+        required=False,
+        widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": 0}),
+    )
+    shipping_cost = forms.DecimalField(
+        min_value=Decimal("0"),
+        decimal_places=2,
+        max_digits=14,
+        initial=Decimal("0"),
+        required=False,
+        widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": 0}),
+    )
+    extra_cost = forms.DecimalField(
+        min_value=Decimal("0"),
+        decimal_places=2,
+        max_digits=14,
+        initial=Decimal("0"),
+        required=False,
+        widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": 0}),
+    )
+    note = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Optional note"}),
+    )
+
+    def __init__(self, *args, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["color"].queryset = Color.objects.filter(is_active=True).order_by("name")
+        can_view_cost = bool(user and user.has_perm("production.view_production_cost"))
+        if not can_view_cost:
+            for field_name in ["total_goods_cost", "shipping_cost", "extra_cost"]:
+                self.fields.pop(field_name, None)
+
+
+def fabric_receipt_line_formset(*, data=None, user=None, prefix="items"):
+    FormSet = formset_factory(FabricReceiptLineForm, extra=1, can_delete=True, min_num=1, validate_min=True)
+    formset = FormSet(data=data, prefix=prefix, form_kwargs={"user": user})
+    return formset
 
 
 class ProductionProjectForm(forms.ModelForm):

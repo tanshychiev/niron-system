@@ -1,3 +1,4 @@
+from collections import OrderedDict
 from decimal import Decimal, InvalidOperation
 
 from django.contrib import messages
@@ -13,6 +14,8 @@ from inventory.models import Size
 from .forms import (
     CuttingRollUsageForm,
     FabricReceiptForm,
+    FabricReceiptHeaderForm,
+    fabric_receipt_line_formset,
     PaymentBatchForm,
     ProductionProjectForm,
     SewingJobForm,
@@ -86,9 +89,35 @@ def material_stock(request):
             | Q(receipt__color__name__icontains=q)
             | Q(receipt__supplier__icontains=q)
         )
+
     available = rolls.filter(remaining_qty__gt=0)
+    grouped = OrderedDict()
+    for roll in rolls.order_by("receipt__fabric_name", "receipt__color__name", "roll_code"):
+        key = (roll.receipt.fabric_name.strip().lower(), roll.receipt.color_id)
+        if key not in grouped:
+            grouped[key] = {
+                "fabric_name": roll.receipt.fabric_name,
+                "color": roll.receipt.color,
+                "rolls": [],
+                "physical_count": 0,
+                "full_count": 0,
+                "partial_count": 0,
+                "equivalent_total": Decimal("0"),
+                "remaining_value": Decimal("0"),
+            }
+        group = grouped[key]
+        group["rolls"].append(roll)
+        if Decimal(roll.remaining_qty or 0) > 0:
+            group["physical_count"] += 1
+            group["equivalent_total"] += Decimal(roll.remaining_qty or 0)
+            group["remaining_value"] += Decimal(roll.remaining_value or 0)
+            if roll.status == FabricRoll.STATUS_FULL:
+                group["full_count"] += 1
+            elif roll.status == FabricRoll.STATUS_PARTIAL:
+                group["partial_count"] += 1
+
     return render(request, "production/material_stock.html", {
-        "rolls": rolls,
+        "roll_groups": list(grouped.values()),
         "q": q,
         "full_count": available.filter(status=FabricRoll.STATUS_FULL).count(),
         "partial_count": available.filter(status=FabricRoll.STATUS_PARTIAL).count(),
@@ -102,23 +131,50 @@ def material_stock(request):
 @login_required
 @permission_required("production.add_fabricreceipt", raise_exception=True)
 def fabric_receipt_create(request):
+    can_view_cost = request.user.has_perm("production.view_production_cost")
     if request.method == "POST":
-        form = FabricReceiptForm(request.POST, user=request.user)
-        if form.is_valid():
+        header_form = FabricReceiptHeaderForm(request.POST)
+        line_formset = fabric_receipt_line_formset(data=request.POST, user=request.user)
+        if header_form.is_valid() and line_formset.is_valid():
+            total_rolls = 0
+            saved_lines = 0
             with transaction.atomic():
-                receipt = form.save(commit=False)
-                receipt.created_by = request.user
-                receipt.updated_by = request.user
-                receipt.save()
-                create_fabric_rolls(receipt)
-            messages.success(request, f"{receipt.roll_count} fabric rolls received successfully.")
+                for line_form in line_formset:
+                    if not line_form.cleaned_data or line_form.cleaned_data.get("DELETE"):
+                        continue
+                    data = line_form.cleaned_data
+                    receipt = FabricReceipt(
+                        received_date=header_form.cleaned_data["received_date"],
+                        supplier=header_form.cleaned_data["supplier"],
+                        fabric_name=data["fabric_name"],
+                        color=data["color"],
+                        roll_count=data["roll_count"],
+                        total_goods_cost=data.get("total_goods_cost") or Decimal("0"),
+                        shipping_cost=data.get("shipping_cost") or Decimal("0"),
+                        extra_cost=data.get("extra_cost") or Decimal("0"),
+                        note=data.get("note") or "",
+                        created_by=request.user,
+                        updated_by=request.user,
+                    )
+                    receipt.save()
+                    create_fabric_rolls(receipt)
+                    total_rolls += receipt.roll_count
+                    saved_lines += 1
+            messages.success(
+                request,
+                f"{total_rolls} fabric rolls across {saved_lines} fabric types received successfully.",
+            )
             return redirect("production_material_stock")
     else:
-        form = FabricReceiptForm(user=request.user)
+        header_form = FabricReceiptHeaderForm(initial={"received_date": timezone.localdate()})
+        line_formset = fabric_receipt_line_formset(user=request.user)
+
     return render(request, "production/fabric_receipt_form.html", {
-        "form": form,
+        "header_form": header_form,
+        "line_formset": line_formset,
         "page_title_text": "Receive Fabric Rolls",
-        "can_view_cost": request.user.has_perm("production.view_production_cost"),
+        "can_view_cost": can_view_cost,
+        "is_multi_create": True,
     })
 
 
@@ -141,6 +197,7 @@ def fabric_receipt_edit(request, pk):
         "receipt": receipt,
         "page_title_text": f"Edit {receipt.receipt_no}",
         "can_view_cost": request.user.has_perm("production.view_production_cost"),
+        "is_multi_create": False,
     })
 
 
