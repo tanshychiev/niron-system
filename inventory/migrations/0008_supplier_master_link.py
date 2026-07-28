@@ -19,7 +19,7 @@ def link_existing_suppliers(apps, schema_editor):
 class Migration(migrations.Migration):
     dependencies = [
         ("production", "0003_suppliers_partner_expenses"),
-        ("inventory", "0001_initial"),
+        ("inventory", "0007_stockledger"),
     ]
 
     operations = [
