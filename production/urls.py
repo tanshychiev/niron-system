@@ -14,6 +14,7 @@ urlpatterns = [
     path("projects/<int:pk>/", views.project_detail, name="production_project_detail"),
     path("projects/<int:pk>/rolls/add/", views.project_add_roll, name="production_project_add_roll"),
     path("projects/<int:pk>/rolls/<int:usage_id>/remove/", views.project_remove_roll, name="production_project_remove_roll"),
+    path("projects/<int:pk>/plan-sizes/save/", views.project_save_plan_sizes, name="production_project_save_plan_sizes"),
     path("projects/<int:pk>/cut-sizes/save/", views.project_save_cut_sizes, name="production_project_save_cut_sizes"),
     path("projects/<int:pk>/confirm-cutting/", views.project_confirm_cutting, name="production_project_confirm_cutting"),
     path("projects/<int:project_id>/staff-payable/add/", views.staff_payable_create, name="production_staff_payable_create"),

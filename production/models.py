@@ -163,6 +163,27 @@ class FabricRoll(models.Model):
         super().save(*args, **kwargs)
 
     @property
+    def reserved_qty(self):
+        return (
+            self.cutting_usages.filter(applied=False)
+            .aggregate(total=Sum("issued_qty"))["total"]
+            or ZERO
+        )
+
+    @property
+    def available_qty(self):
+        value = Decimal(self.remaining_qty or 0) - Decimal(self.reserved_qty or 0)
+        return max(value, ZERO)
+
+    @property
+    def reservation_status(self):
+        if self.available_qty <= 0 and self.reserved_qty > 0:
+            return "RESERVED"
+        if self.reserved_qty > 0:
+            return "PARTIAL_RESERVED"
+        return "AVAILABLE"
+
+    @property
     def fabric_name(self):
         return self.receipt.fabric_name
 
@@ -249,6 +270,10 @@ class ProductionProject(models.Model):
         super().save(*args, **kwargs)
 
     @property
+    def plan_total(self):
+        return self.plan_sizes.aggregate(total=Sum("planned_qty"))["total"] or 0
+
+    @property
     def fabric_issued_qty(self):
         return self.roll_usages.aggregate(total=Sum("issued_qty"))["total"] or ZERO
 
@@ -322,6 +347,29 @@ class ProductionProject(models.Model):
         return self.total_production_cost / good if good > 0 else ZERO
 
 
+class ProductionPlanSize(models.Model):
+    project = models.ForeignKey(
+        ProductionProject,
+        on_delete=models.CASCADE,
+        related_name="plan_sizes",
+    )
+    size = models.ForeignKey(
+        "inventory.Size",
+        on_delete=models.PROTECT,
+        related_name="production_plan_lines",
+    )
+    planned_qty = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["size__sort_order", "size__id"]
+        constraints = [
+            models.UniqueConstraint(fields=["project", "size"], name="uniq_project_plan_size"),
+        ]
+
+    def __str__(self):
+        return f"{self.project.project_no} / {self.size.name}: {self.planned_qty}"
+
+
 class CuttingRollUsage(models.Model):
     project = models.ForeignKey(
         ProductionProject,
@@ -357,8 +405,16 @@ class CuttingRollUsage(models.Model):
             raise ValidationError("Returned roll quantity cannot exceed issued quantity.")
         if self.roll_id and self.project_id and self.roll.receipt.color_id != self.project.color_id:
             raise ValidationError("Fabric roll color must match the production project color.")
-        if self.roll_id and not self.applied and issued > Decimal(self.roll.remaining_qty or 0):
-            raise ValidationError("Issued quantity exceeds the roll's available quantity.")
+        if self.roll_id and not self.applied:
+            reserved_elsewhere = (
+                self.roll.cutting_usages.filter(applied=False)
+                .exclude(pk=self.pk)
+                .aggregate(total=Sum("issued_qty"))["total"]
+                or ZERO
+            )
+            available = Decimal(self.roll.remaining_qty or 0) - Decimal(reserved_elsewhere or 0)
+            if issued > available:
+                raise ValidationError("Issued quantity exceeds the roll's available quantity after reservations.")
 
     @property
     def consumed_qty(self):

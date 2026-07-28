@@ -128,11 +128,10 @@ def fabric_receipt_line_formset(*, data=None, user=None, prefix="items"):
 class ProductionProjectForm(forms.ModelForm):
     class Meta:
         model = ProductionProject
-        fields = ["finished_item", "color", "expected_qty", "note"]
+        fields = ["finished_item", "color", "note"]
         widgets = {
             "finished_item": forms.Select(attrs={"class": "form-select"}),
             "color": forms.Select(attrs={"class": "form-select"}),
-            "expected_qty": forms.NumberInput(attrs={"class": "form-control", "min": 0}),
             "note": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
         }
 
@@ -159,12 +158,16 @@ class CuttingRollUsageForm(forms.ModelForm):
     def __init__(self, *args, project=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.project = project
-        qs = FabricRoll.objects.select_related("receipt", "receipt__color").filter(remaining_qty__gt=0)
+        qs = (
+            FabricRoll.objects.select_related("receipt", "receipt__color")
+            .filter(remaining_qty__gt=0)
+            .exclude(cutting_usages__applied=False)
+        )
         if project:
             qs = qs.filter(receipt__color=project.color).exclude(cutting_usages__project=project)
         self.fields["roll"].queryset = qs.order_by("status", "remaining_qty", "roll_code")
         self.fields["roll"].label_from_instance = lambda roll: (
-            f"{roll.roll_code} — {roll.receipt.fabric_name} / {roll.receipt.color.name} — Remaining {roll.remaining_qty}"
+            f"{roll.roll_code} — {roll.receipt.fabric_name} / {roll.receipt.color.name} — Available {roll.available_qty}"
         )
 
     def clean(self):
@@ -172,8 +175,8 @@ class CuttingRollUsageForm(forms.ModelForm):
         roll = data.get("roll")
         issued = Decimal(data.get("issued_qty") or 0)
         returned = Decimal(data.get("returned_qty") or 0)
-        if roll and issued > Decimal(roll.remaining_qty or 0):
-            self.add_error("issued_qty", "Issued quantity exceeds this roll's remaining quantity.")
+        if roll and issued > Decimal(roll.available_qty or 0):
+            self.add_error("issued_qty", "Issued quantity exceeds this roll's available quantity after reservations.")
         if returned > issued:
             self.add_error("returned_qty", "Returned quantity cannot exceed issued quantity.")
         if roll and self.project and roll.receipt.color_id != self.project.color_id:
@@ -197,20 +200,17 @@ class SewingPartnerForm(forms.ModelForm):
 class SewingJobForm(forms.ModelForm):
     class Meta:
         model = SewingJob
-        fields = ["partner", "sent_date", "expected_return_date", "price_per_piece", "note"]
+        fields = ["partner", "sent_date", "expected_return_date", "note"]
         widgets = {
             "partner": forms.Select(attrs={"class": "form-select"}),
             "sent_date": forms.DateInput(attrs={"type": "date", "class": "form-control"}),
             "expected_return_date": forms.DateInput(attrs={"type": "date", "class": "form-control"}),
-            "price_per_piece": forms.NumberInput(attrs={"class": "form-control", "step": "0.0001", "min": 0}),
             "note": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
         }
 
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["partner"].queryset = SewingPartner.objects.filter(is_active=True).order_by("name")
-        if not (user and user.has_perm("production.view_production_cost")):
-            self.fields.pop("price_per_piece", None)
 
 
 class SewingReturnForm(forms.ModelForm):

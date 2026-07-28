@@ -30,6 +30,7 @@ from .models import (
     FabricRoll,
     ProductionPayable,
     ProductionPaymentBatch,
+    ProductionPlanSize,
     ProductionProject,
     SewingJob,
     SewingJobLine,
@@ -227,18 +228,38 @@ def project_list(request):
 @login_required
 @permission_required("production.add_productionproject", raise_exception=True)
 def project_create(request):
+    sizes = list(_active_sizes())
+    entered_plan = {}
     if request.method == "POST":
         form = ProductionProjectForm(request.POST)
-        if form.is_valid():
-            project = form.save(commit=False)
-            project.created_by = request.user
-            project.status = ProductionProject.STATUS_CUTTING
-            project.save()
-            messages.success(request, "Production project created.")
+        for size in sizes:
+            try:
+                entered_plan[size.id] = max(int(request.POST.get(f"plan_{size.id}") or 0), 0)
+            except ValueError:
+                entered_plan[size.id] = 0
+        plan_total = sum(entered_plan.values())
+        if form.is_valid() and plan_total > 0:
+            with transaction.atomic():
+                project = form.save(commit=False)
+                project.created_by = request.user
+                project.status = ProductionProject.STATUS_CUTTING
+                project.expected_qty = plan_total  # compatibility with existing reports
+                project.save()
+                for size_id, qty in entered_plan.items():
+                    if qty > 0:
+                        ProductionPlanSize.objects.create(
+                            project=project, size_id=size_id, planned_qty=qty
+                        )
+            messages.success(request, "Production project and size plan created.")
             return redirect("production_project_detail", pk=project.pk)
+        if plan_total <= 0:
+            messages.error(request, "Enter at least one planned quantity by size.")
     else:
         form = ProductionProjectForm()
-    return render(request, "production/project_form.html", {"form": form})
+    return render(request, "production/project_form.html", {
+        "form": form,
+        "plan_rows": [{"size": size, "value": entered_plan.get(size.id, 0)} for size in sizes],
+    })
 
 
 @login_required
@@ -249,10 +270,28 @@ def project_detail(request, pk):
         pk=pk,
     )
     sizes = list(_active_sizes())
+    plan_map = {line.size_id: line.planned_qty for line in project.plan_sizes.all()}
     cut_map = {line.size_id: line.cut_qty for line in project.cut_sizes.all()}
-    size_rows = [{"size": size, "cut_qty": cut_map.get(size.id, 0)} for size in sizes]
+    done_map = {
+        row["size_id"]: int(row["total"] or 0)
+        for row in SewingReturnLine.objects.filter(
+            sewing_return__job__project=project,
+            sewing_return__status=SewingReturn.STATUS_STOCKED,
+        ).values("size_id").annotate(total=Sum("good_qty"))
+    }
+    size_rows = []
+    for size in sizes:
+        planned = int(plan_map.get(size.id, 0) or 0)
+        cut = int(cut_map.get(size.id, 0) or 0)
+        done = int(done_map.get(size.id, 0) or 0)
+        size_rows.append({
+            "size": size,
+            "planned_qty": planned,
+            "cut_qty": cut,
+            "done_qty": done,
+            "pending_qty": max(planned - done, 0),
+        })
     roll_form = CuttingRollUsageForm(project=project)
-    staff_form = StaffPayableForm()
     jobs = project.sewing_jobs.select_related("partner").prefetch_related("lines", "returns__lines")
     job_rows = []
     for job in jobs:
@@ -262,10 +301,6 @@ def project_detail(request, pk):
         "roll_form": roll_form,
         "size_rows": size_rows,
         "job_rows": job_rows,
-        "staff_form": staff_form,
-        "staff_payables": project.payables.filter(payable_type=ProductionPayable.TYPE_STAFF),
-        "can_view_cost": request.user.has_perm("production.view_production_cost"),
-        "can_manage_payments": request.user.has_perm("production.manage_production_payments"),
     })
 
 
@@ -278,12 +313,29 @@ def project_add_roll(request, pk):
         return redirect("production_project_detail", pk=pk)
     form = CuttingRollUsageForm(request.POST or None, project=project)
     if request.method == "POST" and form.is_valid():
-        usage = form.save(commit=False)
-        usage.project = project
-        usage.save()
-        project.status = ProductionProject.STATUS_CUTTING
-        project.save(update_fields=["status", "updated_at"])
-        messages.success(request, "Fabric roll added to the cutting project.")
+        try:
+            with transaction.atomic():
+                roll = FabricRoll.objects.select_for_update().get(pk=form.cleaned_data["roll"].pk)
+                reserved = (
+                    roll.cutting_usages.filter(applied=False)
+                    .aggregate(total=Sum("issued_qty"))["total"]
+                    or Decimal("0")
+                )
+                issued = Decimal(form.cleaned_data["issued_qty"] or 0)
+                available = Decimal(roll.remaining_qty or 0) - Decimal(reserved or 0)
+                if issued > available:
+                    raise ValidationError(
+                        f"Only {available} of {roll.roll_code} remains available after reservations."
+                    )
+                usage = form.save(commit=False)
+                usage.project = project
+                usage.roll = roll
+                usage.save()
+                project.status = ProductionProject.STATUS_CUTTING
+                project.save(update_fields=["status", "updated_at"])
+            messages.success(request, "Fabric roll reserved for this project.")
+        except ValidationError as exc:
+            messages.error(request, " ".join(exc.messages))
     else:
         for error in form.errors.values():
             messages.error(request, " ".join(error))
@@ -298,6 +350,33 @@ def project_remove_roll(request, pk, usage_id):
     if request.method == "POST" and not usage.applied:
         usage.delete()
         messages.success(request, "Fabric roll removed.")
+    return redirect("production_project_detail", pk=pk)
+
+
+@login_required
+@permission_required("production.change_productionproject", raise_exception=True)
+def project_save_plan_sizes(request, pk):
+    project = get_object_or_404(ProductionProject, pk=pk)
+    if request.method != "POST":
+        return redirect("production_project_detail", pk=pk)
+    values = {}
+    for size in _active_sizes():
+        try:
+            values[size.id] = max(int(request.POST.get(f"plan_{size.id}") or 0), 0)
+        except ValueError:
+            values[size.id] = 0
+    total = sum(values.values())
+    if total <= 0:
+        messages.error(request, "Production plan must contain at least one piece.")
+        return redirect("production_project_detail", pk=pk)
+    with transaction.atomic():
+        for size_id, qty in values.items():
+            ProductionPlanSize.objects.update_or_create(
+                project=project, size_id=size_id, defaults={"planned_qty": qty}
+            )
+        project.expected_qty = total
+        project.save(update_fields=["expected_qty", "updated_at"])
+    messages.success(request, "Production plan updated.")
     return redirect("production_project_detail", pk=pk)
 
 
