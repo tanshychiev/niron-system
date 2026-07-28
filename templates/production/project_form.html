@@ -1,14 +1,14 @@
 {% extends "base.html" %}
 {% block page_title %}New Production Project{% endblock %}
-{% block page_subtitle %}Create the work plan by product, colour and size{% endblock %}
+{% block page_subtitle %}Create the work plan by product, colour and selected sizes{% endblock %}
 {% block content %}
 <style>
-.prod-wrap{max-width:920px;margin:0 auto}.prod-card{background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:18px}.prod-actions{display:flex;gap:9px;justify-content:flex-end;flex-wrap:wrap;margin-bottom:14px}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.field label{display:block;margin-bottom:6px;font-size:11px;font-weight:900;text-transform:uppercase;color:var(--muted)}.field input,.field select,.field textarea{width:100%}.full{grid-column:1/-1}.size-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.size-box{border:1px solid var(--line);border-radius:14px;padding:12px}.size-box label{display:block;font-weight:900;margin-bottom:7px}.size-box input{width:100%}.section-title{margin:22px 0 10px}.helper{color:var(--muted);margin-top:4px}@media(max-width:700px){.form-grid{grid-template-columns:1fr}.full{grid-column:auto}.size-grid{grid-template-columns:repeat(2,1fr)}.prod-actions>*{flex:1}}
+.prod-wrap{max-width:920px;margin:0 auto}.prod-card{background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:18px}.prod-actions{display:flex;gap:9px;justify-content:flex-end;flex-wrap:wrap;margin-bottom:14px}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.field label{display:block;margin-bottom:6px;font-size:11px;font-weight:900;text-transform:uppercase;color:var(--muted)}.field input,.field select,.field textarea{width:100%}.full{grid-column:1/-1}.section-title{margin:22px 0 6px}.helper{color:var(--muted);margin:0 0 12px}.size-list{display:grid;gap:10px}.size-row{display:grid;grid-template-columns:minmax(180px,1fr) minmax(120px,.55fr) 44px;gap:10px;align-items:end;padding:12px;border:1px solid var(--line);border-radius:14px;background:#fff}.size-row .field{min-width:0}.trash-btn{height:44px;border:1px solid #fecdca;border-radius:12px;background:#fef3f2;color:#b42318;font-size:18px;font-weight:950;cursor:pointer}.add-size{margin-top:12px}.total-box{display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding:13px;border-radius:14px;background:#f7f7f8}.empty-size{padding:18px;border:1px dashed var(--line);border-radius:14px;text-align:center;color:var(--muted)}@media(max-width:700px){.form-grid{grid-template-columns:1fr}.full{grid-column:auto}.size-row{grid-template-columns:1fr 1fr 44px}.prod-actions>*{flex:1}}@media(max-width:520px){.size-row{grid-template-columns:1fr 90px 42px}}
 </style>
 <div class="prod-wrap">
   <div class="prod-actions"><a class="btn-light" href="{% url 'production_project_list' %}">← Projects</a></div>
   <div class="prod-card">
-    <form method="post">{% csrf_token %}
+    <form method="post" id="projectForm">{% csrf_token %}
       <div class="form-grid">
         {% for field in form %}
           <div class="field {% if field.name == 'note' %}full{% endif %}">
@@ -18,29 +18,131 @@
         {% endfor %}
       </div>
 
-      <h2 class="section-title">Production Plan by Size</h2>
-      <p class="helper">Enter only the sizes you plan to produce. The total is calculated automatically.</p>
-      <div class="size-grid">
-        {% for row in plan_rows %}
-          <div class="size-box">
-            <label>{{ row.size.name }}</label>
-            <input class="form-control plan-input" type="number" min="0" name="plan_{{ row.size.id }}" value="{{ row.value }}">
-          </div>
-        {% endfor %}
+      <div style="display:flex;align-items:end;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div>
+          <h2 class="section-title">Production Plan by Size</h2>
+          <p class="helper">Add only the sizes needed for this project. Use the trash button to remove a wrong size.</p>
+        </div>
+        <button type="button" class="btn-light add-size" id="addSizeBtn">+ Add Size</button>
       </div>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding:13px;border-radius:14px;background:#f7f7f8">
+
+      <div id="sizeList" class="size-list"></div>
+      <div id="emptySize" class="empty-size">No size added yet. Click <strong>+ Add Size</strong>.</div>
+
+      <div class="total-box">
         <strong>Total Planned</strong><strong id="planTotal" style="font-size:24px">0</strong>
       </div>
       <div class="prod-actions" style="margin-top:18px"><button class="btn-primary">Create Project</button></div>
     </form>
   </div>
 </div>
+
+<template id="sizeRowTemplate">
+  <div class="size-row">
+    <div class="field">
+      <label>Size</label>
+      <select class="form-select size-select">
+        <option value="">Select size</option>
+        {% for row in plan_rows %}<option value="{{ row.size.id }}" data-name="{{ row.size.name|escape }}">{{ row.size.name }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label>Plan Quantity</label>
+      <input class="form-control plan-input" type="number" min="1" step="1" value="1">
+    </div>
+    <button type="button" class="trash-btn" title="Remove size">×</button>
+  </div>
+</template>
+
 <script>
 (function(){
-  const inputs=[...document.querySelectorAll('.plan-input')];
+  const list=document.getElementById('sizeList');
+  const empty=document.getElementById('emptySize');
+  const addBtn=document.getElementById('addSizeBtn');
+  const template=document.getElementById('sizeRowTemplate');
   const total=document.getElementById('planTotal');
-  function update(){total.textContent=inputs.reduce((sum,input)=>sum+(parseInt(input.value||'0',10)||0),0)}
-  inputs.forEach(input=>input.addEventListener('input',update)); update();
+
+  const initialRows=[
+    {% for row in plan_rows %}{% if row.value > 0 %}{id:"{{ row.size.id }}",qty:{{ row.value }}},{% endif %}{% endfor %}
+  ];
+
+  function selectedIds(){
+    return [...list.querySelectorAll('.size-select')].map(x=>x.value).filter(Boolean);
+  }
+
+  function refreshOptions(){
+    const used=selectedIds();
+    list.querySelectorAll('.size-select').forEach(select=>{
+      [...select.options].forEach(option=>{
+        if(!option.value) return;
+        option.disabled=used.includes(option.value) && option.value!==select.value;
+      });
+    });
+  }
+
+  function updateTotal(){
+    total.textContent=[...list.querySelectorAll('.plan-input')]
+      .reduce((sum,input)=>sum+(parseInt(input.value||'0',10)||0),0);
+    empty.style.display=list.children.length?'none':'block';
+  }
+
+  function addRow(sizeId='', qty=1){
+    const node=template.content.firstElementChild.cloneNode(true);
+    const select=node.querySelector('.size-select');
+    const input=node.querySelector('.plan-input');
+    const trash=node.querySelector('.trash-btn');
+
+    if(sizeId) select.value=String(sizeId);
+    input.value=qty || 1;
+
+    function syncName(){
+      if(select.value){
+        input.name='plan_'+select.value;
+      }else{
+        input.removeAttribute('name');
+      }
+      refreshOptions();
+      updateTotal();
+    }
+
+    select.addEventListener('change', syncName);
+    input.addEventListener('input', updateTotal);
+    trash.addEventListener('click', ()=>{
+      node.remove();
+      refreshOptions();
+      updateTotal();
+    });
+
+    list.appendChild(node);
+    syncName();
+  }
+
+  addBtn.addEventListener('click', ()=>{
+    const available=[...template.content.querySelectorAll('option[value]')]
+      .map(x=>x.value).filter(Boolean).find(id=>!selectedIds().includes(id));
+    if(!available){
+      alert('All available sizes are already added.');
+      return;
+    }
+    addRow(available,1);
+  });
+
+  if(initialRows.length){
+    initialRows.forEach(row=>addRow(row.id,row.qty));
+  }else{
+    addRow('',1);
+  }
+
+  document.getElementById('projectForm').addEventListener('submit',event=>{
+    const valid=[...list.querySelectorAll('.size-select')].some(select=>{
+      const input=select.closest('.size-row').querySelector('.plan-input');
+      return select.value && (parseInt(input.value||'0',10)||0)>0;
+    });
+    if(!valid){
+      event.preventDefault();
+      alert('Add at least one size with a planned quantity.');
+    }
+  });
 })();
 </script>
 {% endblock %}

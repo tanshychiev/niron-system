@@ -275,9 +275,15 @@ def project_detail(request, pk):
         ProductionProject.objects.select_related("finished_item", "color", "created_by"),
         pk=pk,
     )
-    sizes = list(_active_sizes())
-    plan_map = {line.size_id: line.planned_qty for line in project.plan_sizes.all()}
-    cut_map = {line.size_id: line.cut_qty for line in project.cut_sizes.all()}
+    active_sizes = {size.id: size for size in _active_sizes()}
+    plan_map = {
+        line.size_id: int(line.planned_qty or 0)
+        for line in project.plan_sizes.select_related("size").filter(planned_qty__gt=0)
+    }
+    cut_map = {
+        line.size_id: int(line.cut_qty or 0)
+        for line in project.cut_sizes.select_related("size").filter(cut_qty__gt=0)
+    }
     done_map = {
         row["size_id"]: int(row["total"] or 0)
         for row in SewingReturnLine.objects.filter(
@@ -285,11 +291,23 @@ def project_detail(request, pk):
             sewing_return__status=SewingReturn.STATUS_STOCKED,
         ).values("size_id").annotate(total=Sum("good_qty"))
     }
+
+    # Show only sizes that were actually added to this project.
+    used_size_ids = set(plan_map) | set(cut_map) | set(done_map)
     size_rows = []
-    for size in sizes:
-        planned = int(plan_map.get(size.id, 0) or 0)
-        cut = int(cut_map.get(size.id, 0) or 0)
-        done = int(done_map.get(size.id, 0) or 0)
+    for size_id in sorted(
+        used_size_ids,
+        key=lambda pk: (
+            getattr(active_sizes.get(pk), "sort_order", 999999),
+            pk,
+        ),
+    ):
+        size = active_sizes.get(size_id)
+        if not size:
+            continue
+        planned = plan_map.get(size_id, 0)
+        cut = cut_map.get(size_id, 0)
+        done = done_map.get(size_id, 0)
         size_rows.append({
             "size": size,
             "planned_qty": planned,
@@ -367,19 +385,39 @@ def project_save_plan_sizes(request, pk):
         return redirect("production_project_detail", pk=pk)
     values = {}
     for size in _active_sizes():
+        field_name = f"plan_{size.id}"
+        if field_name not in request.POST:
+            continue
         try:
-            values[size.id] = max(int(request.POST.get(f"plan_{size.id}") or 0), 0)
+            qty = max(int(request.POST.get(field_name) or 0), 0)
         except ValueError:
-            values[size.id] = 0
+            qty = 0
+        if qty > 0:
+            values[size.id] = qty
+
     total = sum(values.values())
     if total <= 0:
-        messages.error(request, "Production plan must contain at least one piece.")
+        messages.error(request, "Production plan must contain at least one size and quantity.")
         return redirect("production_project_detail", pk=pk)
+
     with transaction.atomic():
+        # Remove rows deleted from the dynamic size list, but never remove a size
+        # that already has cutting activity.
+        protected_size_ids = set(
+            project.cut_sizes.filter(cut_qty__gt=0).values_list("size_id", flat=True)
+        )
+        removable = project.plan_sizes.exclude(size_id__in=values.keys()).exclude(
+            size_id__in=protected_size_ids
+        )
+        removable.delete()
+
         for size_id, qty in values.items():
             ProductionPlanSize.objects.update_or_create(
-                project=project, size_id=size_id, defaults={"planned_qty": qty}
+                project=project,
+                size_id=size_id,
+                defaults={"planned_qty": qty},
             )
+
         project.expected_qty = total
         project.save(update_fields=["expected_qty", "updated_at"])
     messages.success(request, "Production plan updated.")
