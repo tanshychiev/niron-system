@@ -68,7 +68,8 @@
         letter-spacing: .5px;
     }
 
-    .filter-group input {
+    .filter-group input,
+    .filter-group select {
         height: 44px;
         min-width: 190px;
         border: 1px solid var(--line);
@@ -81,7 +82,8 @@
         outline: none;
     }
 
-    .filter-group input:focus {
+    .filter-group input:focus,
+    .filter-group select:focus {
         border-color: #d99a00;
         box-shadow: 0 0 0 4px rgba(217,154,0,.12);
     }
@@ -312,6 +314,145 @@
         font-weight: 800;
     }
 
+    .growth-section {
+        margin-bottom: 20px;
+    }
+
+    .growth-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+    }
+
+    .growth-subtitle {
+        margin: -8px 0 0;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 750;
+    }
+
+    .table-scroll {
+        overflow-x: auto;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+    }
+
+    .growth-table {
+        width: 100%;
+        min-width: 1850px;
+        border-collapse: collapse;
+        background: #fff;
+    }
+
+    .growth-table th,
+    .growth-table td {
+        padding: 13px 12px;
+        border-bottom: 1px solid var(--line);
+        border-right: 1px solid var(--line);
+        text-align: right;
+        vertical-align: middle;
+        white-space: nowrap;
+    }
+
+    .growth-table th:last-child,
+    .growth-table td:last-child {
+        border-right: none;
+    }
+
+    .growth-table tbody tr:last-child td {
+        border-bottom: none;
+    }
+
+    .growth-table th {
+        position: sticky;
+        top: 0;
+        z-index: 3;
+        background: #fff8e8;
+        color: #704b00;
+        font-size: 11px;
+        font-weight: 950;
+        text-transform: uppercase;
+        letter-spacing: .35px;
+    }
+
+    .growth-table th:first-child,
+    .growth-table td:first-child {
+        position: sticky;
+        left: 0;
+        z-index: 2;
+        text-align: left;
+        background: #fff;
+        box-shadow: 8px 0 14px rgba(17,24,39,.04);
+    }
+
+    .growth-table th:first-child {
+        z-index: 4;
+        background: #fff8e8;
+    }
+
+    .month-name {
+        font-weight: 950;
+        color: var(--text);
+    }
+
+    .metric-main {
+        font-size: 13px;
+        font-weight: 950;
+        color: var(--text);
+    }
+
+    .growth-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin-top: 5px;
+        padding: 4px 8px;
+        border-radius: 999px;
+        font-size: 10px;
+        font-weight: 950;
+    }
+
+    .growth-badge.up {
+        color: #067647;
+        background: #ecfdf3;
+        border: 1px solid #abefc6;
+    }
+
+    .growth-badge.down {
+        color: #b42318;
+        background: #fef3f2;
+        border: 1px solid #fecdca;
+    }
+
+    .growth-badge.same {
+        color: #475467;
+        background: #f2f4f7;
+        border: 1px solid #d0d5dd;
+    }
+
+    .growth-chart-grid {
+        display: grid;
+        grid-template-columns: 1.35fr 1fr;
+        gap: 18px;
+        margin-top: 18px;
+    }
+
+    .growth-note {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 9px 12px;
+        border-radius: 999px;
+        background: #f8f6ef;
+        border: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 850;
+    }
+
     @media (max-width: 1200px) {
         .summary-grid,
         .section-grid,
@@ -341,6 +482,7 @@
         }
 
         .filter-group input,
+        .filter-group select,
         .filter-btn,
         .reset-btn,
         .date-note {
@@ -379,6 +521,15 @@
         <div class="filter-group">
             <label>Date To</label>
             <input type="date" name="date_to" value="{{ date_to|date:'Y-m-d' }}">
+        </div>
+
+        <div class="filter-group">
+            <label>Compare Year</label>
+            <select name="compare_year">
+                {% for year in compare_year_choices %}
+                <option value="{{ year }}" {% if year == compare_year %}selected{% endif %}>{{ year }}</option>
+                {% endfor %}
+            </select>
         </div>
 
         <button type="submit" class="filter-btn">Filter</button>
@@ -565,6 +716,123 @@
     </div>
 </div>
 
+<div class="dash-card growth-section">
+    <div class="growth-header">
+        <div>
+            <h3 class="dash-title">Monthly Business Growth Analysis — {{ compare_year }}</h3>
+            <p class="growth-subtitle">Every month compared with the previous month. The percentage below each value is month-over-month growth.</p>
+        </div>
+        <div class="growth-note">Percent = current month compared with previous month</div>
+    </div>
+
+    <div class="table-scroll">
+        <table class="growth-table">
+            <thead>
+                <tr>
+                    <th>Month</th>
+                    <th>Revenue</th>
+                    <th>Expense</th>
+                    <th>Profit</th>
+                    <th>Margin</th>
+                    <th>Projects</th>
+                    <th>Niron Revenue</th>
+                    <th>Kampu Revenue</th>
+                    <th>Cloth Sold</th>
+                    <th>Cloth Revenue</th>
+                    <th>Film Sold</th>
+                    <th>Film Revenue</th>
+                    <th>Paid</th>
+                    <th>Receivable</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in monthly_rows %}
+                <tr>
+                    <td><span class="month-name">{{ row.month_full_name }}</span></td>
+
+                    <td>
+                        <div class="metric-main">${{ row.revenue|floatformat:2 }}</div>
+                        <span class="growth-badge {{ row.growth.revenue.css }}">{{ row.growth.revenue.display }}</span>
+                    </td>
+                    <td>
+                        <div class="metric-main">${{ row.expense|floatformat:2 }}</div>
+                        <span class="growth-badge {{ row.growth.expense.css }}">{{ row.growth.expense.display }}</span>
+                    </td>
+                    <td>
+                        <div class="metric-main {% if row.profit < 0 %}red{% else %}green{% endif %}">${{ row.profit|floatformat:2 }}</div>
+                        <span class="growth-badge {{ row.growth.profit.css }}">{{ row.growth.profit.display }}</span>
+                    </td>
+                    <td>
+                        <div class="metric-main">{{ row.margin|floatformat:2 }}%</div>
+                    </td>
+                    <td>
+                        <div class="metric-main">{{ row.orders }}</div>
+                        <span class="growth-badge {{ row.growth.orders.css }}">{{ row.growth.orders.display }}</span>
+                    </td>
+                    <td>
+                        <div class="metric-main">${{ row.niron_revenue|floatformat:2 }}</div>
+                        <span class="growth-badge {{ row.growth.niron_revenue.css }}">{{ row.growth.niron_revenue.display }}</span>
+                    </td>
+                    <td>
+                        <div class="metric-main">${{ row.kampu_revenue|floatformat:2 }}</div>
+                        <span class="growth-badge {{ row.growth.kampu_revenue.css }}">{{ row.growth.kampu_revenue.display }}</span>
+                    </td>
+                    <td>
+                        <div class="metric-main">{{ row.cloth_sold|floatformat:0 }}</div>
+                        <span class="growth-badge {{ row.growth.cloth_sold.css }}">{{ row.growth.cloth_sold.display }}</span>
+                    </td>
+                    <td>
+                        <div class="metric-main">${{ row.cloth_revenue|floatformat:2 }}</div>
+                        <span class="growth-badge {{ row.growth.cloth_revenue.css }}">{{ row.growth.cloth_revenue.display }}</span>
+                    </td>
+                    <td>
+                        <div class="metric-main">{{ row.film_sold|floatformat:2 }}</div>
+                        <span class="growth-badge {{ row.growth.film_sold.css }}">{{ row.growth.film_sold.display }}</span>
+                    </td>
+                    <td>
+                        <div class="metric-main">${{ row.film_revenue|floatformat:2 }}</div>
+                        <span class="growth-badge {{ row.growth.film_revenue.css }}">{{ row.growth.film_revenue.display }}</span>
+                    </td>
+                    <td>
+                        <div class="metric-main">${{ row.paid|floatformat:2 }}</div>
+                        <span class="growth-badge {{ row.growth.paid.css }}">{{ row.growth.paid.display }}</span>
+                    </td>
+                    <td>
+                        <div class="metric-main">${{ row.receivable|floatformat:2 }}</div>
+                        <span class="growth-badge {{ row.growth.receivable.css }}">{{ row.growth.receivable.display }}</span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="growth-chart-grid">
+        <div class="dash-card">
+            <h3 class="dash-title">Monthly Revenue, Expense & Profit</h3>
+            <div class="chart-box"><canvas id="monthlyMoneyChart"></canvas></div>
+        </div>
+        <div class="dash-card">
+            <h3 class="dash-title">Monthly Growth Rate %</h3>
+            <div class="chart-box"><canvas id="monthlyGrowthChart"></canvas></div>
+        </div>
+    </div>
+
+    <div class="growth-chart-grid">
+        <div class="dash-card">
+            <h3 class="dash-title">Niron vs Kampu Monthly Revenue</h3>
+            <div class="chart-box"><canvas id="monthlyBusinessChart"></canvas></div>
+        </div>
+        <div class="dash-card">
+            <h3 class="dash-title">Growth Reading</h3>
+            <div class="breakdown-row"><span>Positive percentage</span><strong class="green">Growth</strong></div>
+            <div class="breakdown-row"><span>Negative percentage</span><strong class="red">Decrease</strong></div>
+            <div class="breakdown-row"><span>New</span><strong>Previous month was zero</strong></div>
+            <div class="breakdown-row"><span>—</span><strong>First month has no comparison</strong></div>
+        </div>
+    </div>
+</div>
+
 <div class="dash-grid">
     <div class="dash-card">
         <h3 class="dash-title">Revenue Trend</h3>
@@ -643,6 +911,15 @@
     const totalValues = {{ total_values|safe }};
     const expenseLabels = {{ expense_labels|safe }};
     const expenseValues = {{ expense_values|safe }};
+
+    const monthlyLabels = {{ monthly_chart_labels|safe }};
+    const monthlyRevenueValues = {{ monthly_revenue_values|safe }};
+    const monthlyExpenseValues = {{ monthly_expense_values|safe }};
+    const monthlyProfitValues = {{ monthly_profit_values|safe }};
+    const monthlyNironValues = {{ monthly_niron_values|safe }};
+    const monthlyKampuValues = {{ monthly_kampu_values|safe }};
+    const monthlyRevenueGrowthValues = {{ monthly_revenue_growth_values|safe }};
+    const monthlyProfitGrowthValues = {{ monthly_profit_growth_values|safe }};
 
     const moneyFormat = new Intl.NumberFormat("en-US", {
         style: "currency",
@@ -730,6 +1007,135 @@
                                 return "$" + value;
                             }
                         }
+                    }
+                }
+            }
+        });
+    }
+
+    const monthlyMoneyCanvas = document.getElementById("monthlyMoneyChart");
+    if (monthlyMoneyCanvas) {
+        new Chart(monthlyMoneyCanvas, {
+            type: "bar",
+            data: {
+                labels: monthlyLabels,
+                datasets: [
+                    { label: "Revenue", data: monthlyRevenueValues, borderWidth: 1, borderRadius: 7 },
+                    { label: "Expense", data: monthlyExpenseValues, borderWidth: 1, borderRadius: 7 },
+                    { label: "Profit", data: monthlyProfitValues, borderWidth: 1, borderRadius: 7 }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: "index", intersect: false },
+                plugins: {
+                    legend: { position: "top" },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return context.dataset.label + ": " + moneyFormat.format(context.parsed.y || 0);
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { callback: value => "$" + value }
+                    }
+                }
+            }
+        });
+    }
+
+    const monthlyGrowthCanvas = document.getElementById("monthlyGrowthChart");
+    if (monthlyGrowthCanvas) {
+        new Chart(monthlyGrowthCanvas, {
+            type: "line",
+            data: {
+                labels: monthlyLabels,
+                datasets: [
+                    {
+                        label: "Revenue Growth %",
+                        data: monthlyRevenueGrowthValues,
+                        tension: .3,
+                        borderWidth: 3,
+                        pointRadius: 4
+                    },
+                    {
+                        label: "Profit Growth %",
+                        data: monthlyProfitGrowthValues,
+                        tension: .3,
+                        borderWidth: 3,
+                        pointRadius: 4
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: "index", intersect: false },
+                plugins: {
+                    legend: { position: "top" },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return context.dataset.label + ": " + Number(context.parsed.y || 0).toFixed(2) + "%";
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        ticks: { callback: value => value + "%" }
+                    }
+                }
+            }
+        });
+    }
+
+    const monthlyBusinessCanvas = document.getElementById("monthlyBusinessChart");
+    if (monthlyBusinessCanvas) {
+        new Chart(monthlyBusinessCanvas, {
+            type: "line",
+            data: {
+                labels: monthlyLabels,
+                datasets: [
+                    {
+                        label: "Niron",
+                        data: monthlyNironValues,
+                        tension: .3,
+                        borderWidth: 3,
+                        pointRadius: 4
+                    },
+                    {
+                        label: "Kampu",
+                        data: monthlyKampuValues,
+                        tension: .3,
+                        borderWidth: 3,
+                        pointRadius: 4
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: "index", intersect: false },
+                plugins: {
+                    legend: { position: "top" },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return context.dataset.label + ": " + moneyFormat.format(context.parsed.y || 0);
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { callback: value => "$" + value }
                     }
                 }
             }

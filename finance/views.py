@@ -1,10 +1,10 @@
-from datetime import timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
 from django.db.models import Q, Sum
-from django.db.models.functions import TruncDate
+from django.db.models.functions import TruncDate, TruncMonth
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
@@ -533,6 +533,164 @@ def profit_dashboard(request):
 
         current += timedelta(days=1)
 
+    # ==========================================================
+    # MONTHLY BUSINESS GROWTH ANALYSIS
+    # ==========================================================
+    compare_year_raw = (request.GET.get("compare_year") or "").strip()
+    try:
+        compare_year = int(compare_year_raw) if compare_year_raw else date_to.year
+    except (TypeError, ValueError):
+        compare_year = date_to.year
+
+    if compare_year < 2000 or compare_year > 2100:
+        compare_year = date_to.year
+
+    def growth_info(current_value, previous_value):
+        current_value = _to_decimal(current_value)
+        previous_value = _to_decimal(previous_value)
+
+        if previous_value == 0:
+            if current_value == 0:
+                return {"display": "0.00%", "value": 0.0, "css": "same", "direction": "same"}
+            return {"display": "New", "value": None, "css": "up", "direction": "up"}
+
+        percent = ((current_value - previous_value) / abs(previous_value)) * Decimal("100")
+        percent = percent.quantize(Decimal("0.01"))
+
+        if percent > 0:
+            css = "up"
+            direction = "up"
+            display = f"+{percent:.2f}%"
+        elif percent < 0:
+            css = "down"
+            direction = "down"
+            display = f"{percent:.2f}%"
+        else:
+            css = "same"
+            direction = "same"
+            display = "0.00%"
+
+        return {
+            "display": display,
+            "value": float(percent),
+            "css": css,
+            "direction": direction,
+        }
+
+    monthly_rows = []
+    previous_row = None
+
+    for month_number in range(1, 13):
+        month_start = date(compare_year, month_number, 1)
+        if month_number == 12:
+            next_month = date(compare_year + 1, 1, 1)
+        else:
+            next_month = date(compare_year, month_number + 1, 1)
+        month_end = next_month - timedelta(days=1)
+
+        month_orders = Order.objects.filter(
+            created_at__date__gte=month_start,
+            created_at__date__lte=month_end,
+        ).exclude(status__in=excluded_statuses)
+
+        month_items = OrderItem.objects.filter(
+            order__created_at__date__gte=month_start,
+            order__created_at__date__lte=month_end,
+        ).exclude(order__status__in=excluded_statuses)
+
+        month_expenses = Expense.objects.filter(
+            created_at__date__gte=month_start,
+            created_at__date__lte=month_end,
+        )
+
+        revenue = month_orders.aggregate(total=Sum("total_amount"))["total"] or Decimal("0.00")
+        expense = month_expenses.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+        profit = revenue - expense
+        margin = (profit / revenue * Decimal("100")) if revenue else Decimal("0.00")
+
+        niron_revenue = (
+            month_orders.filter(order_type="NIRON").aggregate(total=Sum("total_amount"))["total"]
+            or Decimal("0.00")
+        )
+        kampu_revenue = (
+            month_orders.filter(order_type="KAMPU").aggregate(total=Sum("total_amount"))["total"]
+            or Decimal("0.00")
+        )
+
+        cloth_items = month_items.filter(shirt_item__isnull=False)
+        film_items = month_items.filter(film_item__isnull=False)
+
+        cloth_sold = cloth_items.aggregate(total=Sum("quantity"))["total"] or Decimal("0")
+        cloth_revenue = cloth_items.aggregate(total=Sum("line_total"))["total"] or Decimal("0.00")
+        film_sold = film_items.aggregate(total=Sum("film_meter"))["total"] or Decimal("0")
+        film_revenue = film_items.aggregate(total=Sum("line_total"))["total"] or Decimal("0.00")
+
+        deposit = month_orders.aggregate(total=Sum("deposit_amount"))["total"] or Decimal("0.00")
+        paid = month_orders.aggregate(total=Sum("paid_amount"))["total"] or Decimal("0.00")
+        receivable = revenue - deposit - paid
+        order_count = month_orders.count()
+
+        row = {
+            "month_number": month_number,
+            "month_name": month_start.strftime("%b"),
+            "month_full_name": month_start.strftime("%B"),
+            "revenue": revenue,
+            "expense": expense,
+            "profit": profit,
+            "margin": margin,
+            "orders": order_count,
+            "niron_revenue": niron_revenue,
+            "kampu_revenue": kampu_revenue,
+            "cloth_sold": cloth_sold,
+            "cloth_revenue": cloth_revenue,
+            "film_sold": film_sold,
+            "film_revenue": film_revenue,
+            "paid": paid,
+            "receivable": receivable,
+        }
+
+        growth_metrics = [
+            "revenue", "expense", "profit", "orders",
+            "niron_revenue", "kampu_revenue",
+            "cloth_sold", "cloth_revenue",
+            "film_sold", "film_revenue",
+            "paid", "receivable",
+        ]
+
+        row["growth"] = {}
+        if previous_row is None:
+            for metric in growth_metrics:
+                row["growth"][metric] = {
+                    "display": "—",
+                    "value": None,
+                    "css": "same",
+                    "direction": "same",
+                }
+        else:
+            for metric in growth_metrics:
+                row["growth"][metric] = growth_info(row[metric], previous_row[metric])
+
+        monthly_rows.append(row)
+        previous_row = row
+
+    monthly_chart_labels = [row["month_name"] for row in monthly_rows]
+    monthly_revenue_values = [float(row["revenue"]) for row in monthly_rows]
+    monthly_expense_values = [float(row["expense"]) for row in monthly_rows]
+    monthly_profit_values = [float(row["profit"]) for row in monthly_rows]
+    monthly_niron_values = [float(row["niron_revenue"]) for row in monthly_rows]
+    monthly_kampu_values = [float(row["kampu_revenue"]) for row in monthly_rows]
+    monthly_revenue_growth_values = [
+        row["growth"]["revenue"]["value"] if row["growth"]["revenue"]["value"] is not None else 0
+        for row in monthly_rows
+    ]
+    monthly_profit_growth_values = [
+        row["growth"]["profit"]["value"] if row["growth"]["profit"]["value"] is not None else 0
+        for row in monthly_rows
+    ]
+
+    current_year = timezone.localdate().year
+    compare_year_choices = list(range(current_year + 1, current_year - 5, -1))
+
     return render(
         request,
         "finance/profit_dashboard.html",
@@ -555,6 +713,18 @@ def profit_dashboard(request):
 
             "date_from": date_from,
             "date_to": date_to,
+
+            "compare_year": compare_year,
+            "compare_year_choices": compare_year_choices,
+            "monthly_rows": monthly_rows,
+            "monthly_chart_labels": monthly_chart_labels,
+            "monthly_revenue_values": monthly_revenue_values,
+            "monthly_expense_values": monthly_expense_values,
+            "monthly_profit_values": monthly_profit_values,
+            "monthly_niron_values": monthly_niron_values,
+            "monthly_kampu_values": monthly_kampu_values,
+            "monthly_revenue_growth_values": monthly_revenue_growth_values,
+            "monthly_profit_growth_values": monthly_profit_growth_values,
         },
     )
 @login_required
