@@ -450,12 +450,80 @@ def project_save_cut_sizes(request, pk):
 @permission_required("production.change_productionproject", raise_exception=True)
 def project_confirm_cutting(request, pk):
     project = get_object_or_404(ProductionProject, pk=pk)
-    if request.method == "POST":
-        try:
+    if request.method != "POST":
+        return redirect("production_project_detail", pk=pk)
+
+    try:
+        with transaction.atomic():
+            # Save actual cut quantities in the same action so the user does not
+            # need to press a separate Save button before Confirm Cutting.
+            cut_total = 0
+            plan_lines = list(project.plan_sizes.select_related("size").all())
+            for plan_line in plan_lines:
+                raw = request.POST.get(f"cut_{plan_line.size_id}", "0")
+                try:
+                    qty = max(int(raw or 0), 0)
+                except (TypeError, ValueError):
+                    raise ValidationError(f"Enter a valid cut quantity for {plan_line.size.name}.")
+
+                if qty > int(plan_line.planned_qty or 0):
+                    raise ValidationError(
+                        f"{plan_line.size.name}: cut quantity cannot exceed planned quantity {plan_line.planned_qty}."
+                    )
+
+                CuttingSizeLine.objects.update_or_create(
+                    project=project,
+                    size=plan_line.size,
+                    defaults={"cut_qty": qty},
+                )
+                cut_total += qty
+
+            if cut_total <= 0:
+                raise ValidationError("Enter the actual cut quantity by size first.")
+
+            # For every reserved roll, record whether fabric remains after cutting.
+            usages = list(project.roll_usages.select_related("roll").filter(applied=False))
+            if not usages:
+                raise ValidationError("Reserve at least one fabric roll first.")
+
+            for usage in usages:
+                remain_choice = request.POST.get(f"remain_choice_{usage.id}", "")
+                if remain_choice not in {"NO", "YES"}:
+                    raise ValidationError(
+                        f"Choose whether fabric remains for roll {usage.roll.roll_code}."
+                    )
+
+                if remain_choice == "NO":
+                    returned_qty = Decimal("0")
+                else:
+                    raw_remaining = request.POST.get(f"remaining_qty_{usage.id}", "")
+                    try:
+                        returned_qty = Decimal(str(raw_remaining))
+                    except (InvalidOperation, TypeError, ValueError):
+                        raise ValidationError(
+                            f"Enter a valid remaining quantity for roll {usage.roll.roll_code}."
+                        )
+                    if returned_qty <= 0:
+                        raise ValidationError(
+                            f"Remaining quantity for roll {usage.roll.roll_code} must be greater than zero."
+                        )
+                    if returned_qty >= Decimal(usage.issued_qty or 0):
+                        raise ValidationError(
+                            f"Remaining quantity for roll {usage.roll.roll_code} must be less than the reserved quantity."
+                        )
+
+                usage.returned_qty = returned_qty
+                usage.save(update_fields=["returned_qty"])
+
             confirm_cutting(project, request.user)
-            messages.success(request, "Cutting confirmed. Remaining partial rolls returned to material stock.")
-        except ValidationError as exc:
-            messages.error(request, " ".join(exc.messages))
+
+        messages.success(
+            request,
+            "Cutting confirmed. Used fabric was consumed and remaining fabric was returned to material stock.",
+        )
+    except ValidationError as exc:
+        messages.error(request, " ".join(exc.messages))
+
     return redirect("production_project_detail", pk=pk)
 
 

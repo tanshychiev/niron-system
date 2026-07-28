@@ -153,14 +153,16 @@ class CuttingRollUsageForm(forms.ModelForm):
         fields = ["roll", "issued_qty", "returned_qty", "note"]
         widgets = {
             "roll": forms.Select(attrs={"class": "form-select"}),
-            "issued_qty": forms.NumberInput(attrs={"class": "form-control", "step": "0.001", "min": "0.001"}),
-            "returned_qty": forms.NumberInput(attrs={"class": "form-control", "step": "0.001", "min": "0"}),
+            "issued_qty": forms.HiddenInput(),
+            "returned_qty": forms.HiddenInput(),
             "note": forms.TextInput(attrs={"class": "form-control", "placeholder": "Optional note"}),
         }
 
     def __init__(self, *args, project=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.project = project
+        self.fields["issued_qty"].required = False
+        self.fields["returned_qty"].required = False
         qs = (
             FabricRoll.objects.select_related("receipt", "receipt__color")
             .filter(remaining_qty__gt=0)
@@ -176,14 +178,13 @@ class CuttingRollUsageForm(forms.ModelForm):
     def clean(self):
         data = super().clean()
         roll = data.get("roll")
-        issued = Decimal(data.get("issued_qty") or 0)
-        returned = Decimal(data.get("returned_qty") or 0)
-        if roll and issued > Decimal(roll.available_qty or 0):
-            self.add_error("issued_qty", "Issued quantity exceeds this roll's available quantity after reservations.")
-        if returned > issued:
-            self.add_error("returned_qty", "Returned quantity cannot exceed issued quantity.")
+        if roll:
+            # Reserving a roll holds all of its currently available quantity.
+            # The unused quantity is entered later when cutting is confirmed.
+            data["issued_qty"] = Decimal(roll.available_qty or 0)
+            data["returned_qty"] = Decimal("0")
         if roll and self.project and roll.receipt.color_id != self.project.color_id:
-            self.add_error("roll", "This roll color does not match the project color.")
+            self.add_error("roll", "This fabric roll has a different colour from the project.")
         return data
 
 

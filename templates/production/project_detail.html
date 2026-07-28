@@ -1,5 +1,16 @@
 {% extends "base.html" %}
 {% block page_title %}{{ project.project_no }}<script>
+document.querySelectorAll('.remain-choice').forEach(select=>{
+  const target=document.getElementById(select.dataset.target);
+  const input=target ? target.querySelector('input') : null;
+  function refresh(){
+    const show=select.value==='YES';
+    if(target) target.hidden=!show;
+    if(input){ input.required=show; if(!show) input.value=''; }
+  }
+  select.addEventListener('change',refresh); refresh();
+});
+
 document.querySelectorAll('.remove-plan-row').forEach(button=>{
   button.addEventListener('click',()=>{
     const row=button.closest('tr');
@@ -13,6 +24,17 @@ document.querySelectorAll('.remove-plan-row').forEach(button=>{
 </script>
 {% endblock %}
 {% block page_subtitle %}{{ project.finished_item.name }} / {{ project.color.name }}<script>
+document.querySelectorAll('.remain-choice').forEach(select=>{
+  const target=document.getElementById(select.dataset.target);
+  const input=target ? target.querySelector('input') : null;
+  function refresh(){
+    const show=select.value==='YES';
+    if(target) target.hidden=!show;
+    if(input){ input.required=show; if(!show) input.value=''; }
+  }
+  select.addEventListener('change',refresh); refresh();
+});
+
 document.querySelectorAll('.remove-plan-row').forEach(button=>{
   button.addEventListener('click',()=>{
     const row=button.closest('tr');
@@ -71,19 +93,44 @@ document.querySelectorAll('.remove-plan-row').forEach(button=>{
   </section>
 
   <section class="prod-card step">
-    <div class="section-head"><div><h2>2. Reserve Fabric</h2><p>Once selected, a roll is reserved and cannot be selected by another project.</p></div></div>
+    <div class="section-head"><div><h2>2. Choose Fabric Roll</h2><p>Select one roll. The system reserves its full available quantity. Use “Add Another Fabric Roll” when cutting needs more than one roll.</p></div></div>
     {% if project.status == 'DRAFT' or project.status == 'CUTTING' or project.status == 'CUT_COMPLETE' %}
-    <form method="post" action="{% url 'production_project_add_roll' project.id %}" class="inline-form">{% csrf_token %}{% for field in roll_form %}<div class="field"><label>{{ field.label }}</label>{{ field }}</div>{% endfor %}<button class="btn-primary">Reserve Roll</button></form>
+    <form method="post" action="{% url 'production_project_add_roll' project.id %}" class="inline-form" style="grid-template-columns:2fr 2fr auto">{% csrf_token %}
+      <div class="field"><label>Fabric Roll</label>{{ roll_form.roll }}</div>
+      <div class="field"><label>Note</label>{{ roll_form.note }}</div>
+      {{ roll_form.issued_qty }}{{ roll_form.returned_qty }}
+      <button class="btn-primary">{% if project.roll_usages.all %}+ Add Another Fabric Roll{% else %}Reserve Fabric Roll{% endif %}</button>
+    </form>
     {% endif %}
-    <div class="prod-table-wrap" style="margin-top:13px"><table class="prod-table"><thead><tr><th>Roll</th><th class="num">Reserved</th><th class="num">Returned</th><th class="num">Consumed</th><th>Status</th><th></th></tr></thead><tbody>
-    {% for usage in project.roll_usages.all %}<tr><td><strong>{{ usage.roll.roll_code }}</strong><small style="display:block">{{ usage.roll.receipt.fabric_name }}</small></td><td class="num">{{ usage.issued_qty|floatformat:"-3" }}</td><td class="num">{{ usage.returned_qty|floatformat:"-3" }}</td><td class="num">{{ usage.consumed_qty|floatformat:"-3" }}</td><td>{% if usage.applied %}<span class="pill good">Consumed</span>{% else %}<span class="pill reserved">Reserved</span>{% endif %}</td><td>{% if not usage.applied %}<form method="post" action="{% url 'production_project_remove_roll' project.id usage.id %}">{% csrf_token %}<button class="btn-light">Release</button></form>{% endif %}</td></tr>{% empty %}<tr><td colspan="6" class="empty">No fabric reserved.</td></tr>{% endfor %}
+    <div class="prod-table-wrap" style="margin-top:13px"><table class="prod-table"><thead><tr><th>Selected Roll</th><th class="num">Reserved Qty</th><th class="num">Remaining After Cut</th><th class="num">Consumed</th><th>Status</th><th></th></tr></thead><tbody>
+    {% for usage in project.roll_usages.all %}<tr><td><strong>{{ usage.roll.roll_code }}</strong><small style="display:block">{{ usage.roll.receipt.fabric_name }} / {{ usage.roll.receipt.color.name }}</small></td><td class="num">{{ usage.issued_qty|floatformat:"-3" }}</td><td class="num">{% if usage.applied %}{{ usage.returned_qty|floatformat:"-3" }}{% else %}Not confirmed{% endif %}</td><td class="num">{% if usage.applied %}{{ usage.consumed_qty|floatformat:"-3" }}{% else %}-{% endif %}</td><td>{% if usage.applied %}<span class="pill good">Confirmed</span>{% else %}<span class="pill reserved">Reserved</span>{% endif %}</td><td>{% if not usage.applied %}<form method="post" action="{% url 'production_project_remove_roll' project.id usage.id %}">{% csrf_token %}<button class="btn-light">Release</button></form>{% endif %}</td></tr>{% empty %}<tr><td colspan="6" class="empty">No fabric roll selected yet.</td></tr>{% endfor %}
     </tbody></table></div>
   </section>
 
   <section class="prod-card step">
-    <div class="section-head"><div><h2>3. Confirm Cutting</h2><p>Enter the actual quantity cut by size, then confirm fabric consumption.</p></div></div>
-    <form method="post" action="{% url 'production_project_save_cut_sizes' project.id %}">{% csrf_token %}<div class="form-grid">{% for row in size_rows %}<div class="field"><label>{{ row.size.name }}</label><input type="number" min="0" name="cut_{{ row.size.id }}" value="{{ row.cut_qty }}"></div>{% endfor %}</div><div class="prod-actions" style="margin-top:12px"><button class="btn-light">Save Cut Quantity</button></div></form>
-    {% if project.status == 'DRAFT' or project.status == 'CUTTING' or project.status == 'CUT_COMPLETE' %}<form method="post" action="{% url 'production_project_confirm_cutting' project.id %}" onsubmit="return confirm('Confirm cutting and consume the reserved fabric?')">{% csrf_token %}<button class="btn-primary" style="width:100%">Confirm Cutting</button></form>{% endif %}
+    <div class="section-head"><div><h2>3. Confirm Cutting & Fabric Remaining</h2><p>Enter the actual cut quantity, then confirm whether each reserved roll still has fabric remaining.</p></div></div>
+    {% if project.status == 'DRAFT' or project.status == 'CUTTING' or project.status == 'CUT_COMPLETE' %}
+    <form method="post" action="{% url 'production_project_confirm_cutting' project.id %}" id="confirm-cutting-form">{% csrf_token %}
+      <h3 style="margin:0 0 10px">Actual Cut by Size</h3>
+      <div class="form-grid">{% for row in size_rows %}<div class="field"><label>{{ row.size.name }}</label><input type="number" min="0" max="{{ row.planned_qty }}" name="cut_{{ row.size.id }}" value="{{ row.cut_qty }}"></div>{% endfor %}</div>
+
+      <h3 style="margin:20px 0 10px">Fabric Remaining After Cutting</h3>
+      <div class="prod-grid" style="gap:10px">
+      {% for usage in project.roll_usages.all %}
+        {% if not usage.applied %}
+        <div class="prod-card" style="box-shadow:none;padding:14px">
+          <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px;align-items:end">
+            <div><strong>{{ usage.roll.roll_code }}</strong><small style="display:block;color:var(--muted)">{{ usage.roll.receipt.fabric_name }} · Reserved {{ usage.issued_qty|floatformat:"-3" }}</small></div>
+            <div class="field"><label>Fabric still remains?</label><select class="form-select remain-choice" name="remain_choice_{{ usage.id }}" data-target="remaining-{{ usage.id }}" required><option value="">Choose</option><option value="NO">No — fully used</option><option value="YES">Yes — has remaining</option></select></div>
+            <div class="field remaining-field" id="remaining-{{ usage.id }}" hidden><label>Remaining Qty</label><input class="form-control" type="number" min="0.001" step="0.001" max="{{ usage.issued_qty }}" name="remaining_qty_{{ usage.id }}" placeholder="e.g. 0.250"></div>
+          </div>
+        </div>
+        {% endif %}
+      {% empty %}<div class="empty">Reserve a fabric roll first.</div>{% endfor %}
+      </div>
+      <button class="btn-primary" style="width:100%;margin-top:16px">Confirm Cutting</button>
+    </form>
+    {% endif %}
   </section>
 
   <section class="prod-card step">
@@ -92,6 +139,17 @@ document.querySelectorAll('.remove-plan-row').forEach(button=>{
   </section>
 </div>
 <script>
+document.querySelectorAll('.remain-choice').forEach(select=>{
+  const target=document.getElementById(select.dataset.target);
+  const input=target ? target.querySelector('input') : null;
+  function refresh(){
+    const show=select.value==='YES';
+    if(target) target.hidden=!show;
+    if(input){ input.required=show; if(!show) input.value=''; }
+  }
+  select.addEventListener('change',refresh); refresh();
+});
+
 document.querySelectorAll('.remove-plan-row').forEach(button=>{
   button.addEventListener('click',()=>{
     const row=button.closest('tr');
