@@ -7,6 +7,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Q, Sum
 from django.shortcuts import get_object_or_404, redirect, render
+from django.http import JsonResponse
 from django.utils import timezone
 
 from inventory.models import Size
@@ -22,6 +23,8 @@ from .forms import (
     SewingPartnerForm,
     SewingReturnForm,
     StaffPayableForm,
+    ProductionSupplierForm,
+    ProductionExpenseForm,
 )
 from .models import (
     CuttingRollUsage,
@@ -37,6 +40,8 @@ from .models import (
     SewingPartner,
     SewingReturn,
     SewingReturnLine,
+    ProductionSupplier,
+    ProductionExpense,
 )
 from .services import (
     confirm_cutting,
@@ -146,7 +151,8 @@ def fabric_receipt_create(request):
                     data = line_form.cleaned_data
                     receipt = FabricReceipt(
                         received_date=header_form.cleaned_data["received_date"],
-                        supplier=header_form.cleaned_data["supplier"],
+                        supplier_ref=header_form.cleaned_data["supplier"],
+                        supplier=header_form.cleaned_data["supplier"].name,
                         fabric_name=data["fabric_name"],
                         color=data["color"],
                         roll_count=data["roll_count"],
@@ -418,21 +424,110 @@ def project_confirm_cutting(request, pk):
 @login_required
 @permission_required("production.view_sewingpartner", raise_exception=True)
 def partner_list(request):
-    return render(request, "production/partner_list.html", {"partners": SewingPartner.objects.all()})
+    partners = SewingPartner.objects.prefetch_related("sewing_jobs", "expenses").all()
+    rows = []
+    for partner in partners:
+        sent = partner.sewing_jobs.aggregate(total=Sum("lines__sent_qty"))["total"] or 0
+        returned = SewingReturnLine.objects.filter(sewing_return__job__partner=partner).aggregate(total=Sum("good_qty"))["total"] or 0
+        expense_total = partner.expenses.aggregate(total=Sum("amount"))["total"] or Decimal("0")
+        rows.append({"partner": partner, "sent": sent, "returned": returned, "pending": max(sent-returned, 0), "expense_total": expense_total})
+    return render(request, "production/partner_list.html", {"rows": rows, "form": SewingPartnerForm()})
 
 
 @login_required
 @permission_required("production.add_sewingpartner", raise_exception=True)
 def partner_create(request):
-    if request.method == "POST":
-        form = SewingPartnerForm(request.POST)
-        if form.is_valid():
-            form.save()
-            messages.success(request, "Sewing partner created.")
-            return redirect("production_partner_list")
-    else:
-        form = SewingPartnerForm()
+    form = SewingPartnerForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        obj = form.save()
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({"ok": True, "message": "Sewing partner saved successfully.", "partner": {"id": obj.id, "name": obj.name, "phone": obj.phone, "location": obj.location}})
+        messages.success(request, "Sewing partner created.")
+        return redirect("production_partner_list")
+    if request.method == "POST" and request.headers.get("x-requested-with") == "XMLHttpRequest":
+        return JsonResponse({"ok": False, "message": "Failed to save sewing partner.", "errors": form.errors.get_json_data()}, status=400)
     return render(request, "production/partner_form.html", {"form": form})
+
+
+@login_required
+@permission_required("production.view_sewingpartner", raise_exception=True)
+def partner_detail(request, pk):
+    partner = get_object_or_404(SewingPartner, pk=pk)
+    jobs = partner.sewing_jobs.select_related("project").prefetch_related("lines", "returns__lines")
+    expenses = partner.expenses.select_related("project")
+    sent = jobs.aggregate(total=Sum("lines__sent_qty"))["total"] or 0
+    returned = SewingReturnLine.objects.filter(sewing_return__job__partner=partner).aggregate(total=Sum("good_qty"))["total"] or 0
+    return render(request, "production/partner_detail.html", {"partner": partner, "jobs": jobs, "expenses": expenses, "sent": sent, "returned": returned, "pending": max(sent-returned,0), "expense_total": expenses.aggregate(total=Sum("amount"))["total"] or 0})
+
+
+@login_required
+@permission_required("production.view_productionsupplier", raise_exception=True)
+def supplier_list(request):
+    suppliers = ProductionSupplier.objects.prefetch_related("fabric_receipts", "expenses").all()
+    rows=[]
+    for supplier in suppliers:
+        receipts=supplier.fabric_receipts.all()
+        rows.append({"supplier": supplier, "receipts": receipts.count(), "rolls": receipts.aggregate(total=Sum("roll_count"))["total"] or 0, "purchase_total": sum((r.total_cost for r in receipts), Decimal("0")), "expense_total": supplier.expenses.aggregate(total=Sum("amount"))["total"] or 0})
+    return render(request, "production/supplier_list.html", {"rows": rows, "form": ProductionSupplierForm()})
+
+
+@login_required
+@permission_required("production.add_productionsupplier", raise_exception=True)
+def supplier_create(request):
+    form=ProductionSupplierForm(request.POST or None)
+    if request.method=="POST" and form.is_valid():
+        obj=form.save()
+        if request.headers.get("x-requested-with")=="XMLHttpRequest":
+            return JsonResponse({"ok":True,"message":"Supplier saved successfully.","supplier":{"id":obj.id,"name":obj.name,"phone":obj.phone,"location":obj.location}})
+        return redirect("production_supplier_list")
+    if request.method=="POST" and request.headers.get("x-requested-with")=="XMLHttpRequest":
+        return JsonResponse({"ok":False,"message":"Failed to save supplier.","errors":form.errors.get_json_data()},status=400)
+    return render(request,"production/supplier_form.html",{"form":form})
+
+
+@login_required
+@permission_required("production.view_productionsupplier", raise_exception=True)
+def supplier_detail(request, pk):
+    supplier=get_object_or_404(ProductionSupplier,pk=pk)
+    receipts=supplier.fabric_receipts.prefetch_related("rolls").all()
+    expenses=supplier.expenses.select_related("project")
+    return render(request,"production/supplier_detail.html",{"supplier":supplier,"receipts":receipts,"expenses":expenses,"roll_count":receipts.aggregate(total=Sum("roll_count"))["total"] or 0,"purchase_total":sum((r.total_cost for r in receipts),Decimal("0")),"expense_total":expenses.aggregate(total=Sum("amount"))["total"] or 0})
+
+
+def _sync_finance_expense(production_expense, user):
+    from finance.models import Expense
+    category = Expense.OPERATING_COMMISSION if production_expense.category == ProductionExpense.CATEGORY_STAFF_COMMISSION else Expense.OPERATING_OTHER
+    title = production_expense.get_category_display()
+    if production_expense.supplier_id: title += f" - {production_expense.supplier.name}"
+    if production_expense.sewing_partner_id: title += f" - {production_expense.sewing_partner.name}"
+    finance = Expense.objects.create(expense_type=Expense.TYPE_OPERATING, category=category, amount=production_expense.amount, note=f"{title}. {production_expense.note}".strip(), created_by=user)
+    production_expense.finance_expense_id=finance.id
+    production_expense.save(update_fields=["finance_expense_id"] )
+
+
+@login_required
+@permission_required("production.view_production_expense", raise_exception=True)
+def production_expense_list(request):
+    expenses=ProductionExpense.objects.select_related("supplier","sewing_partner","project","created_by")
+    return render(request,"production/expense_list.html",{"expenses":expenses,"total":expenses.aggregate(total=Sum("amount"))["total"] or 0,"form":ProductionExpenseForm()})
+
+
+@login_required
+@permission_required("production.add_productionexpense", raise_exception=True)
+def production_expense_create(request):
+    form=ProductionExpenseForm(request.POST or None)
+    if request.method=="POST" and form.is_valid():
+        try:
+            with transaction.atomic():
+                obj=form.save(commit=False); obj.created_by=request.user; obj.full_clean(); obj.save(); _sync_finance_expense(obj,request.user)
+            if request.headers.get("x-requested-with")=="XMLHttpRequest":
+                return JsonResponse({"ok":True,"message":"Expense saved successfully.","expense":{"id":obj.id,"date":obj.expense_date.strftime("%Y-%m-%d"),"category":obj.get_category_display(),"amount":f"{obj.amount:.2f}"}})
+            return redirect("production_expense_list")
+        except ValidationError as exc:
+            if request.headers.get("x-requested-with")=="XMLHttpRequest": return JsonResponse({"ok":False,"message":"Failed to save expense.","errors":getattr(exc,"message_dict",{"__all__":exc.messages})},status=400)
+    if request.method=="POST" and request.headers.get("x-requested-with")=="XMLHttpRequest":
+        return JsonResponse({"ok":False,"message":"Failed to save expense.","errors":form.errors.get_json_data()},status=400)
+    return render(request,"production/expense_form.html",{"form":form})
 
 
 @login_required

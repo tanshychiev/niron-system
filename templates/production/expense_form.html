@@ -1,0 +1,1 @@
+{% extends "base.html" %}{% block page_title %}Record Production Expense{% endblock %}{% block content %}<form method="post" data-ajax-form action="{% url 'production_expense_create' %}">{% csrf_token %}<div data-form-alert hidden></div>{{ form.as_p }}<button class="btn-primary">Save</button></form>{% include "production/_ajax_form_script.html" %}{% endblock %}

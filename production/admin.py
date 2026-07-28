@@ -14,6 +14,8 @@ from .models import (
     SewingPartner,
     SewingReturn,
     SewingReturnLine,
+    ProductionSupplier,
+    ProductionExpense,
 )
 
 
@@ -105,3 +107,15 @@ class ProductionPaymentBatchAdmin(admin.ModelAdmin):
     list_filter = ("payable_type", "payment_method", "payment_date")
     search_fields = ("payment_no", "payee_name", "reference")
     inlines = [PaymentAllocationInline]
+
+
+@admin.register(ProductionSupplier)
+class ProductionSupplierAdmin(admin.ModelAdmin):
+    list_display=("name","phone","location","is_active")
+    search_fields=("name","phone","location")
+
+@admin.register(ProductionExpense)
+class ProductionExpenseAdmin(admin.ModelAdmin):
+    list_display=("expense_date","category","supplier","sewing_partner","project","amount","finance_expense_id")
+    list_filter=("category","expense_date")
+    search_fields=("supplier__name","sewing_partner__name","project__project_no","note")

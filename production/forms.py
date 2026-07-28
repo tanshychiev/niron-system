@@ -12,6 +12,8 @@ from .models import (
     ProductionPaymentBatch,
     ProductionPayable,
     ProductionProject,
+    ProductionSupplier,
+    ProductionExpense,
     SewingJob,
     SewingPartner,
     SewingReturn,
@@ -23,7 +25,7 @@ class FabricReceiptForm(forms.ModelForm):
         model = FabricReceipt
         fields = [
             "received_date",
-            "supplier",
+            "supplier_ref",
             "fabric_name",
             "color",
             "roll_count",
@@ -34,7 +36,7 @@ class FabricReceiptForm(forms.ModelForm):
         ]
         widgets = {
             "received_date": forms.DateInput(attrs={"type": "date", "class": "form-control"}),
-            "supplier": forms.TextInput(attrs={"class": "form-control", "placeholder": "Supplier"}),
+            "supplier_ref": forms.Select(attrs={"class": "form-select"}),
             "fabric_name": forms.TextInput(attrs={"class": "form-control", "placeholder": "e.g. Cotton 220 GSM"}),
             "color": forms.Select(attrs={"class": "form-select"}),
             "roll_count": forms.NumberInput(attrs={"class": "form-control", "min": 1}),
@@ -48,6 +50,7 @@ class FabricReceiptForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.user = user
         self.fields["color"].queryset = Color.objects.filter(is_active=True).order_by("name")
+        self.fields["supplier_ref"].queryset = ProductionSupplier.objects.filter(is_active=True).order_by("name")
         can_view_cost = bool(user and user.has_perm("production.view_production_cost"))
         if not can_view_cost:
             for field in ["total_goods_cost", "shipping_cost", "extra_cost"]:
@@ -61,9 +64,9 @@ class FabricReceiptHeaderForm(forms.Form):
     received_date = forms.DateField(
         widget=forms.DateInput(attrs={"type": "date", "class": "form-control"})
     )
-    supplier = forms.CharField(
-        max_length=150,
-        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Supplier"}),
+    supplier = forms.ModelChoiceField(
+        queryset=ProductionSupplier.objects.filter(is_active=True).order_by("name"),
+        widget=forms.Select(attrs={"class": "form-select"}),
     )
 
 
@@ -245,3 +248,39 @@ class PaymentBatchForm(forms.ModelForm):
             "reference": forms.TextInput(attrs={"class": "form-control", "placeholder": "ABA / bank reference"}),
             "note": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
         }
+
+
+class ProductionSupplierForm(forms.ModelForm):
+    class Meta:
+        model = ProductionSupplier
+        fields = ["name", "phone", "location", "is_active", "note"]
+        widgets = {
+            "name": forms.TextInput(attrs={"class": "form-control", "autofocus": True}),
+            "phone": forms.TextInput(attrs={"class": "form-control"}),
+            "location": forms.TextInput(attrs={"class": "form-control"}),
+            "is_active": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "note": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+        }
+
+
+class ProductionExpenseForm(forms.ModelForm):
+    class Meta:
+        model = ProductionExpense
+        fields = ["expense_date", "category", "supplier", "sewing_partner", "project", "amount", "payment_method", "reference", "note"]
+        widgets = {
+            "expense_date": forms.DateInput(attrs={"type": "date", "class": "form-control"}),
+            "category": forms.Select(attrs={"class": "form-select"}),
+            "supplier": forms.Select(attrs={"class": "form-select"}),
+            "sewing_partner": forms.Select(attrs={"class": "form-select"}),
+            "project": forms.Select(attrs={"class": "form-select"}),
+            "amount": forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0.01"}),
+            "payment_method": forms.TextInput(attrs={"class": "form-control", "placeholder": "Cash / ABA / Bank"}),
+            "reference": forms.TextInput(attrs={"class": "form-control"}),
+            "note": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["supplier"].queryset = ProductionSupplier.objects.filter(is_active=True).order_by("name")
+        self.fields["sewing_partner"].queryset = SewingPartner.objects.filter(is_active=True).order_by("name")
+        self.fields["project"].queryset = ProductionProject.objects.order_by("-created_at")

@@ -33,9 +33,32 @@ def _next_number(model, field_name, prefix, date_value=None):
     return candidate
 
 
+class ProductionSupplier(models.Model):
+    name = models.CharField(max_length=150, unique=True)
+    phone = models.CharField(max_length=50, blank=True, default="")
+    location = models.CharField(max_length=255, blank=True, default="")
+    is_active = models.BooleanField(default=True)
+    note = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
 class FabricReceipt(models.Model):
     receipt_no = models.CharField(max_length=50, unique=True, blank=True)
     supplier = models.CharField(max_length=150)
+    supplier_ref = models.ForeignKey(
+        "ProductionSupplier",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="fabric_receipts",
+    )
     received_date = models.DateField(default=timezone.localdate)
     fabric_name = models.CharField(max_length=150)
     color = models.ForeignKey(
@@ -77,6 +100,8 @@ class FabricReceipt(models.Model):
         return self.receipt_no or f"Fabric receipt {self.pk or ''}"
 
     def save(self, *args, **kwargs):
+        if self.supplier_ref_id:
+            self.supplier = self.supplier_ref.name
         if not self.receipt_no:
             self.receipt_no = _next_number(
                 FabricReceipt,
@@ -724,3 +749,51 @@ class ProductionPaymentAllocation(models.Model):
 
     def __str__(self):
         return f"{self.payment_batch.payment_no} / {self.payable_id} / {self.amount}"
+
+
+class ProductionExpense(models.Model):
+    CATEGORY_SUPPLIER = "SUPPLIER"
+    CATEGORY_SEWING = "SEWING"
+    CATEGORY_STAFF_COMMISSION = "STAFF_COMMISSION"
+    CATEGORY_OTHER = "OTHER"
+    CATEGORY_CHOICES = [
+        (CATEGORY_SUPPLIER, "Supplier Purchase"),
+        (CATEGORY_SEWING, "Sewing Partner Expense"),
+        (CATEGORY_STAFF_COMMISSION, "Staff Commission"),
+        (CATEGORY_OTHER, "Other Production Expense"),
+    ]
+
+    expense_date = models.DateField(default=timezone.localdate)
+    category = models.CharField(max_length=30, choices=CATEGORY_CHOICES)
+    supplier = models.ForeignKey(
+        ProductionSupplier, on_delete=models.PROTECT, null=True, blank=True, related_name="expenses"
+    )
+    sewing_partner = models.ForeignKey(
+        SewingPartner, on_delete=models.PROTECT, null=True, blank=True, related_name="expenses"
+    )
+    project = models.ForeignKey(
+        ProductionProject, on_delete=models.SET_NULL, null=True, blank=True, related_name="expense_records"
+    )
+    amount = models.DecimalField(max_digits=14, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))])
+    payment_method = models.CharField(max_length=50, blank=True, default="")
+    reference = models.CharField(max_length=120, blank=True, default="")
+    note = models.TextField(blank=True, default="")
+    finance_expense_id = models.PositiveIntegerField(null=True, blank=True, editable=False)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="production_expenses_created"
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-expense_date", "-id"]
+        permissions = [("view_production_expense", "Can view production expenses")]
+
+    def clean(self):
+        super().clean()
+        if self.category == self.CATEGORY_SUPPLIER and not self.supplier_id:
+            raise ValidationError({"supplier": "Select a supplier."})
+        if self.category == self.CATEGORY_SEWING and not self.sewing_partner_id:
+            raise ValidationError({"sewing_partner": "Select a sewing partner."})
+
+    def __str__(self):
+        return f"{self.get_category_display()} - {self.amount}"

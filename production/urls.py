@@ -21,6 +21,12 @@ urlpatterns = [
 
     path("partners/", views.partner_list, name="production_partner_list"),
     path("partners/new/", views.partner_create, name="production_partner_create"),
+    path("partners/<int:pk>/", views.partner_detail, name="production_partner_detail"),
+    path("suppliers/", views.supplier_list, name="production_supplier_list"),
+    path("suppliers/new/", views.supplier_create, name="production_supplier_create"),
+    path("suppliers/<int:pk>/", views.supplier_detail, name="production_supplier_detail"),
+    path("expenses/", views.production_expense_list, name="production_expense_list"),
+    path("expenses/new/", views.production_expense_create, name="production_expense_create"),
 
     path("projects/<int:project_id>/sewing/new/", views.sewing_job_create, name="production_sewing_job_create"),
     path("sewing/<int:pk>/edit/", views.sewing_job_edit, name="production_sewing_job_edit"),
