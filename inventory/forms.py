@@ -153,6 +153,28 @@ class InventoryBatchForm(forms.ModelForm):
         return instance
 
 
+class InventoryItemSelect(forms.Select):
+    """Add item metadata to Stock In dropdown options for the existing JavaScript UI."""
+
+    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
+        option = super().create_option(name, value, label, selected, index, subindex, attrs)
+        item = getattr(value, "instance", None)
+
+        if item:
+            is_shirt = item.item_type == InventoryItem.TYPE_SHIRT
+            option["attrs"].update(
+                {
+                    "data-item-type": item.item_type or "",
+                    "data-type-label": item.get_item_type_display(),
+                    "data-unit": item.unit or "",
+                    "data-unit-label": item.get_unit_display(),
+                    "data-is-shirt": "1" if is_shirt else "0",
+                }
+            )
+
+        return option
+
+
 class InventoryBatchItemForm(forms.ModelForm):
     quantity = forms.DecimalField(
         max_digits=12,
