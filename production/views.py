@@ -5,7 +5,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import Q, Sum
+from django.db.models import Count, Q, Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.http import JsonResponse
 from django.utils import timezone
@@ -292,7 +292,7 @@ def project_detail(request, pk):
         ).values("size_id").annotate(total=Sum("good_qty"))
     }
 
-    # Show only sizes that were actually added to this project.
+    # Show only sizes that belong to this project.
     used_size_ids = set(plan_map) | set(cut_map) | set(done_map)
     size_rows = []
     for size_id in sorted(
@@ -315,15 +315,73 @@ def project_detail(request, pk):
             "done_qty": done,
             "pending_qty": max(planned - done, 0),
         })
-    roll_form = CuttingRollUsageForm(project=project)
+
+    # Group selectable physical rolls by fabric + colour + remaining quantity.
+    # The roll records and codes remain separate in the database.
+    available_rolls = (
+        FabricRoll.objects.select_related("receipt", "receipt__color")
+        .filter(
+            receipt__color=project.color,
+            remaining_qty__gt=0,
+        )
+        .exclude(cutting_usages__applied=False)
+        .order_by("receipt__fabric_name", "-remaining_qty", "created_at", "id")
+    )
+
+    grouped_map = OrderedDict()
+    for roll in available_rolls:
+        remaining = Decimal(roll.remaining_qty or 0)
+        key = (roll.receipt.fabric_name.strip().lower(), remaining)
+        if key not in grouped_map:
+            grouped_map[key] = {
+                "fabric_name": roll.receipt.fabric_name,
+                "color": roll.receipt.color,
+                "remaining_qty": remaining,
+                "is_full": remaining == Decimal(roll.original_qty or 0),
+                "available_count": 0,
+                "roll_codes": [],
+            }
+        grouped_map[key]["available_count"] += 1
+        grouped_map[key]["roll_codes"].append(roll.roll_code)
+
+    fabric_groups = list(grouped_map.values())
+
+    # Compact grouped summary for rolls already selected by this project.
+    selected_usages = list(
+        project.roll_usages.select_related("roll__receipt", "roll__receipt__color")
+        .order_by("roll__receipt__fabric_name", "-issued_qty", "roll__roll_code")
+    )
+    selected_map = OrderedDict()
+    for usage in selected_usages:
+        roll = usage.roll
+        key = (
+            roll.receipt.fabric_name.strip().lower(),
+            Decimal(usage.issued_qty or 0),
+            bool(usage.applied),
+        )
+        if key not in selected_map:
+            selected_map[key] = {
+                "fabric_name": roll.receipt.fabric_name,
+                "color": roll.receipt.color,
+                "reserved_qty": Decimal(usage.issued_qty or 0),
+                "count": 0,
+                "applied": usage.applied,
+                "usages": [],
+            }
+        selected_map[key]["count"] += 1
+        selected_map[key]["usages"].append(usage)
+
+    selected_groups = list(selected_map.values())
+
     jobs = project.sewing_jobs.select_related("partner").prefetch_related("lines", "returns__lines")
-    job_rows = []
-    for job in jobs:
-        job_rows.append({"job": job, "sizes": job_size_summary(job)})
+    job_rows = [{"job": job, "sizes": job_size_summary(job)} for job in jobs]
+
     return render(request, "production/project_detail.html", {
         "project": project,
-        "roll_form": roll_form,
         "size_rows": size_rows,
+        "fabric_groups": fabric_groups,
+        "selected_groups": selected_groups,
+        "selected_usages": selected_usages,
         "job_rows": job_rows,
     })
 
@@ -332,37 +390,71 @@ def project_detail(request, pk):
 @permission_required("production.add_cuttingrollusage", raise_exception=True)
 def project_add_roll(request, pk):
     project = get_object_or_404(ProductionProject, pk=pk)
-    if project.status not in [ProductionProject.STATUS_DRAFT, ProductionProject.STATUS_CUTTING, ProductionProject.STATUS_CUT_COMPLETE]:
+    if project.status not in [
+        ProductionProject.STATUS_DRAFT,
+        ProductionProject.STATUS_CUTTING,
+        ProductionProject.STATUS_CUT_COMPLETE,
+    ]:
         messages.error(request, "Fabric rolls cannot be changed after sending to sewing.")
         return redirect("production_project_detail", pk=pk)
-    form = CuttingRollUsageForm(request.POST or None, project=project)
-    if request.method == "POST" and form.is_valid():
-        try:
-            with transaction.atomic():
-                roll = FabricRoll.objects.select_for_update().get(pk=form.cleaned_data["roll"].pk)
-                reserved = (
-                    roll.cutting_usages.filter(applied=False)
-                    .aggregate(total=Sum("issued_qty"))["total"]
-                    or Decimal("0")
+
+    if request.method != "POST":
+        return redirect("production_project_detail", pk=pk)
+
+    fabric_name = (request.POST.get("fabric_name") or "").strip()
+    remaining_raw = (request.POST.get("remaining_qty") or "").strip()
+    count_raw = (request.POST.get("reserve_count") or "").strip()
+    note = (request.POST.get("note") or "").strip()
+
+    try:
+        remaining_qty = Decimal(remaining_raw)
+        reserve_count = int(count_raw)
+    except (InvalidOperation, TypeError, ValueError):
+        messages.error(request, "Choose a valid fabric group and quantity.")
+        return redirect("production_project_detail", pk=pk)
+
+    if not fabric_name or remaining_qty <= 0 or reserve_count <= 0:
+        messages.error(request, "Choose at least one available fabric roll.")
+        return redirect("production_project_detail", pk=pk)
+
+    try:
+        with transaction.atomic():
+            candidates = list(
+                FabricRoll.objects.select_for_update()
+                .select_related("receipt", "receipt__color")
+                .filter(
+                    receipt__color=project.color,
+                    receipt__fabric_name__iexact=fabric_name,
+                    remaining_qty=remaining_qty,
+                    remaining_qty__gt=0,
                 )
-                issued = Decimal(form.cleaned_data["issued_qty"] or 0)
-                available = Decimal(roll.remaining_qty or 0) - Decimal(reserved or 0)
-                if issued > available:
-                    raise ValidationError(
-                        f"Only {available} of {roll.roll_code} remains available after reservations."
-                    )
-                usage = form.save(commit=False)
-                usage.project = project
-                usage.roll = roll
-                usage.save()
-                project.status = ProductionProject.STATUS_CUTTING
-                project.save(update_fields=["status", "updated_at"])
-            messages.success(request, "Fabric roll reserved for this project.")
-        except ValidationError as exc:
-            messages.error(request, " ".join(exc.messages))
-    else:
-        for error in form.errors.values():
-            messages.error(request, " ".join(error))
+                .exclude(cutting_usages__applied=False)
+                .order_by("created_at", "id")[:reserve_count]
+            )
+
+            if len(candidates) < reserve_count:
+                raise ValidationError(
+                    f"Only {len(candidates)} roll(s) remain available for "
+                    f"{fabric_name} at {remaining_qty.normalize()} each."
+                )
+
+            for roll in candidates:
+                CuttingRollUsage.objects.create(
+                    project=project,
+                    roll=roll,
+                    issued_qty=Decimal(roll.remaining_qty or 0),
+                    returned_qty=Decimal("0"),
+                    note=note,
+                )
+
+        messages.success(
+            request,
+            f"{reserve_count} roll(s) reserved from {fabric_name}. "
+            "Individual roll codes were selected automatically.",
+        )
+    except ValidationError as exc:
+        messages.error(request, " ".join(exc.messages))
+
     return redirect("production_project_detail", pk=pk)
 
 

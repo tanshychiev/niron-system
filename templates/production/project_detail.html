@@ -1,60 +1,17 @@
 {% extends "base.html" %}
-{% block page_title %}{{ project.project_no }}<script>
-document.querySelectorAll('.remain-choice').forEach(select=>{
-  const target=document.getElementById(select.dataset.target);
-  const input=target ? target.querySelector('input') : null;
-  function refresh(){
-    const show=select.value==='YES';
-    if(target) target.hidden=!show;
-    if(input){ input.required=show; if(!show) input.value=''; }
-  }
-  select.addEventListener('change',refresh); refresh();
-});
-
-document.querySelectorAll('.remove-plan-row').forEach(button=>{
-  button.addEventListener('click',()=>{
-    const row=button.closest('tr');
-    const input=row.querySelector('input[name^="plan_"]');
-    if(!confirm('Remove this size from the production plan?')) return;
-    input.value='0';
-    row.style.opacity='.45';
-    row.style.pointerEvents='none';
-  });
-});
-</script>
-{% endblock %}
-{% block page_subtitle %}{{ project.finished_item.name }} / {{ project.color.name }}<script>
-document.querySelectorAll('.remain-choice').forEach(select=>{
-  const target=document.getElementById(select.dataset.target);
-  const input=target ? target.querySelector('input') : null;
-  function refresh(){
-    const show=select.value==='YES';
-    if(target) target.hidden=!show;
-    if(input){ input.required=show; if(!show) input.value=''; }
-  }
-  select.addEventListener('change',refresh); refresh();
-});
-
-document.querySelectorAll('.remove-plan-row').forEach(button=>{
-  button.addEventListener('click',()=>{
-    const row=button.closest('tr');
-    const input=row.querySelector('input[name^="plan_"]');
-    if(!confirm('Remove this size from the production plan?')) return;
-    input.value='0';
-    row.style.opacity='.45';
-    row.style.pointerEvents='none';
-  });
-});
-</script>
-{% endblock %}
+{% block page_title %}{{ project.project_no }}{% endblock %}
+{% block page_subtitle %}{{ project.finished_item.name }} / {{ project.color.name }}{% endblock %}
 {% block content %}
 <style>
-.prod-wrap{max-width:1450px;margin:0 auto}.prod-actions{display:flex;gap:9px;flex-wrap:wrap;justify-content:flex-end;margin-bottom:14px}.prod-card{background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:17px}.prod-grid{display:grid;gap:13px}.prod-summary{grid-template-columns:repeat(5,minmax(0,1fr));margin-bottom:16px}.prod-metric span{display:block;color:var(--muted);font-size:10px;font-weight:900;text-transform:uppercase}.prod-metric strong{display:block;margin-top:5px;font-size:27px}.prod-table-wrap{overflow-x:auto}.prod-table{width:100%;border-collapse:collapse;min-width:760px}.prod-table th,.prod-table td{padding:12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}.prod-table th{font-size:10px;color:var(--muted);text-transform:uppercase}.num{text-align:right!important}.pill{display:inline-flex;padding:6px 9px;border-radius:999px;background:#f3f4f6;font-weight:850;font-size:11px}.pill.good{background:#eaf8ef;color:#087535}.pill.warn{background:#fff1df;color:#a95500}.section-head{display:flex;align-items:end;justify-content:space-between;gap:12px;margin-bottom:12px}.section-head h2,.section-head h3{margin:0}.section-head p{margin:4px 0 0;color:var(--muted)}.form-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.field label{display:block;margin-bottom:6px;font-size:11px;font-weight:900;text-transform:uppercase;color:var(--muted)}.field input,.field select,.field textarea{width:100%}.inline-form{display:grid;grid-template-columns:2fr 1fr 1fr 2fr auto;gap:10px;align-items:end}.empty{padding:28px;text-align:center;color:var(--muted)}.step{margin-top:14px}.reserved{background:#fff8e8;color:#9a5600}.progress-track{height:9px;background:#eceef1;border-radius:999px;overflow:hidden}.progress-fill{height:100%;background:currentColor}.plan-size-head{display:flex;align-items:end;justify-content:space-between;gap:12px;flex-wrap:wrap}.plan-size-note{font-size:12px;color:var(--muted)}@media(max-width:950px){.prod-summary{grid-template-columns:repeat(3,1fr)}.inline-form{grid-template-columns:1fr 1fr}.inline-form>*:last-child{grid-column:1/-1}.form-grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:650px){.prod-summary{grid-template-columns:1fr 1fr}.prod-actions>*{flex:1}.form-grid{grid-template-columns:1fr}}
+.prod-wrap{max-width:1450px;margin:0 auto}.prod-actions{display:flex;gap:9px;flex-wrap:wrap;justify-content:flex-end;margin-bottom:14px}.prod-card{background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:17px}.prod-grid{display:grid;gap:13px}.prod-summary{grid-template-columns:repeat(5,minmax(0,1fr));margin-bottom:16px}.prod-metric span{display:block;color:var(--muted);font-size:10px;font-weight:900;text-transform:uppercase}.prod-metric strong{display:block;margin-top:5px;font-size:27px}.prod-table-wrap{overflow-x:auto}.prod-table{width:100%;border-collapse:collapse;min-width:760px}.prod-table th,.prod-table td{padding:12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}.prod-table th{font-size:10px;color:var(--muted);text-transform:uppercase}.num{text-align:right!important}.pill{display:inline-flex;padding:6px 9px;border-radius:999px;background:#f3f4f6;font-weight:850;font-size:11px}.pill.good{background:#eaf8ef;color:#087535}.pill.warn,.reserved{background:#fff1df;color:#a95500}.pill.bad{background:#fdecec;color:#b42318}.section-head{display:flex;align-items:end;justify-content:space-between;gap:12px;margin-bottom:12px}.section-head h2,.section-head h3{margin:0}.section-head p{margin:4px 0 0;color:var(--muted)}.form-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.field label{display:block;margin-bottom:6px;font-size:11px;font-weight:900;text-transform:uppercase;color:var(--muted)}.field input,.field select,.field textarea{width:100%}.empty{padding:28px;text-align:center;color:var(--muted)}.step{margin-top:14px}.fabric-groups{display:grid;gap:10px}.fabric-row{display:grid;grid-template-columns:minmax(240px,1.5fr) .7fr .7fr .7fr 1fr auto;gap:10px;align-items:end;border:1px solid var(--line);border-radius:15px;padding:13px;background:#fffdf9}.fabric-name strong{display:block}.fabric-name small{color:var(--muted)}.selected-group{border:1px solid var(--line);border-radius:15px;margin-top:10px;overflow:hidden}.selected-head{display:grid;grid-template-columns:1.5fr .7fr .7fr .7fr;gap:10px;padding:13px;background:#fafafa}.code-list{padding:10px 13px;border-top:1px solid var(--line);display:flex;gap:8px;flex-wrap:wrap}.roll-confirm{display:grid;grid-template-columns:minmax(220px,1fr) .9fr .8fr;gap:12px;align-items:end;padding:12px;border:1px solid var(--line);border-radius:14px;margin-top:9px}.remaining-wrap{display:none}.roll-confirm.has-remaining .remaining-wrap{display:block}@media(max-width:950px){.prod-summary{grid-template-columns:repeat(3,1fr)}.form-grid{grid-template-columns:repeat(2,1fr)}.fabric-row{grid-template-columns:1fr 1fr 1fr}.fabric-row .fabric-name{grid-column:1/-1}.selected-head{grid-template-columns:1fr 1fr}.roll-confirm{grid-template-columns:1fr 1fr}}@media(max-width:650px){.prod-summary{grid-template-columns:1fr 1fr}.prod-actions>*{flex:1}.form-grid,.fabric-row,.selected-head,.roll-confirm{grid-template-columns:1fr}.fabric-row .fabric-name{grid-column:auto}}
 </style>
+
 <div class="prod-wrap">
   <div class="prod-actions">
     <a class="btn-light" href="{% url 'production_project_list' %}">← Projects</a>
-    {% if project.status == 'CUT_COMPLETE' or project.status == 'SENT' or project.status == 'PARTIAL_RETURN' %}<a class="btn-primary" href="{% url 'production_sewing_job_create' project.id %}">Send to Sewing</a>{% endif %}
+    {% if project.status == 'CUT_COMPLETE' or project.status == 'SENT' or project.status == 'PARTIAL_RETURN' %}
+      <a class="btn-primary" href="{% url 'production_sewing_job_create' project.id %}">Send to Sewing</a>
+    {% endif %}
   </div>
 
   <div class="prod-grid prod-summary">
@@ -66,26 +23,15 @@ document.querySelectorAll('.remove-plan-row').forEach(button=>{
   </div>
 
   <section class="prod-card">
-    <div class="section-head"><div><h2>1. Production Plan</h2><p>Only sizes added to this project are shown.</p></div><span class="pill">{{ project.get_status_display }}</span></div>
-    <form method="post" action="{% url 'production_project_save_plan_sizes' project.id %}">{% csrf_token %}
-      <div class="prod-table-wrap"><table class="prod-table"><thead><tr><th>Size</th><th class="num">Plan</th><th class="num">Cut</th><th class="num">Done</th><th class="num">Pending</th><th></th></tr></thead><tbody>
+    <div class="section-head">
+      <div><h2>1. Production Plan</h2><p>Only sizes added to this project are shown.</p></div>
+      <span class="pill">{{ project.get_status_display }}</span>
+    </div>
+    <form method="post" action="{% url 'production_project_save_plan_sizes' project.id %}">
+      {% csrf_token %}
+      <div class="prod-table-wrap"><table class="prod-table"><thead><tr><th>Size</th><th class="num">Plan</th><th class="num">Cut</th><th class="num">Done</th><th class="num">Pending</th></tr></thead><tbody>
       {% for row in size_rows %}
-      <tr>
-        <td><strong>{{ row.size.name }}</strong></td>
-        <td class="num"><input style="max-width:95px;text-align:right" type="number" min="0" name="plan_{{ row.size.id }}" value="{{ row.planned_qty }}"></td>
-        <td class="num">{{ row.cut_qty }}</td>
-        <td class="num">{{ row.done_qty }}</td>
-        <td class="num"><span class="pill {% if row.pending_qty %}warn{% else %}good{% endif %}">{{ row.pending_qty }}</span></td>
-        <td class="num">
-          {% if row.cut_qty == 0 and row.done_qty == 0 %}
-          <button type="button" class="btn-light remove-plan-row" style="color:#b42318" data-size="{{ row.size.id }}">Trash</button>
-          {% else %}
-          <span class="plan-size-note">In use</span>
-          {% endif %}
-        </td>
-      </tr>
-      {% empty %}
-      <tr><td colspan="6" class="empty">No planned sizes.</td></tr>
+        <tr><td><strong>{{ row.size.name }}</strong></td><td class="num"><input style="max-width:95px;text-align:right" type="number" min="0" name="plan_{{ row.size.id }}" value="{{ row.planned_qty }}"></td><td class="num">{{ row.cut_qty }}</td><td class="num">{{ row.done_qty }}</td><td class="num"><span class="pill {% if row.pending_qty %}warn{% else %}good{% endif %}">{{ row.pending_qty }}</span></td></tr>
       {% endfor %}
       </tbody></table></div>
       <div class="prod-actions" style="margin-top:12px"><button class="btn-light">Save Plan</button></div>
@@ -93,72 +39,117 @@ document.querySelectorAll('.remove-plan-row').forEach(button=>{
   </section>
 
   <section class="prod-card step">
-    <div class="section-head"><div><h2>2. Choose Fabric Roll</h2><p>Select one roll. The system reserves its full available quantity. Use “Add Another Fabric Roll” when cutting needs more than one roll.</p></div></div>
+    <div class="section-head">
+      <div><h2>2. Choose Fabric</h2><p>Same fabric, colour and remaining amount are grouped. Choose how many physical rolls to reserve.</p></div>
+    </div>
+
     {% if project.status == 'DRAFT' or project.status == 'CUTTING' or project.status == 'CUT_COMPLETE' %}
-    <form method="post" action="{% url 'production_project_add_roll' project.id %}" class="inline-form" style="grid-template-columns:2fr 2fr auto">{% csrf_token %}
-      <div class="field"><label>Fabric Roll</label>{{ roll_form.roll }}</div>
-      <div class="field"><label>Note</label>{{ roll_form.note }}</div>
-      {{ roll_form.issued_qty }}{{ roll_form.returned_qty }}
-      <button class="btn-primary">{% if project.roll_usages.all %}+ Add Another Fabric Roll{% else %}Reserve Fabric Roll{% endif %}</button>
-    </form>
+      <div class="fabric-groups">
+        {% for group in fabric_groups %}
+          <form method="post" action="{% url 'production_project_add_roll' project.id %}" class="fabric-row">
+            {% csrf_token %}
+            <input type="hidden" name="fabric_name" value="{{ group.fabric_name }}">
+            <input type="hidden" name="remaining_qty" value="{{ group.remaining_qty }}">
+            <div class="fabric-name">
+              <strong>{{ group.fabric_name }}</strong>
+              <small>{{ group.color.name }} · {% if group.is_full %}Full roll{% else %}Partial roll{% endif %}</small>
+            </div>
+            <div class="field"><label>Each Roll</label><strong>{{ group.remaining_qty|floatformat:"-3" }}</strong></div>
+            <div class="field"><label>Available</label><strong>{{ group.available_count }}</strong></div>
+            <div class="field"><label>Reserve</label><input class="form-control" type="number" name="reserve_count" min="1" max="{{ group.available_count }}" value="1"></div>
+            <div class="field"><label>Note</label><input class="form-control" name="note" placeholder="Optional"></div>
+            <button class="btn-primary">Reserve</button>
+          </form>
+        {% empty %}
+          <div class="empty">No matching fabric is available for {{ project.color.name }}.</div>
+        {% endfor %}
+      </div>
     {% endif %}
-    <div class="prod-table-wrap" style="margin-top:13px"><table class="prod-table"><thead><tr><th>Selected Roll</th><th class="num">Reserved Qty</th><th class="num">Remaining After Cut</th><th class="num">Consumed</th><th>Status</th><th></th></tr></thead><tbody>
-    {% for usage in project.roll_usages.all %}<tr><td><strong>{{ usage.roll.roll_code }}</strong><small style="display:block">{{ usage.roll.receipt.fabric_name }} / {{ usage.roll.receipt.color.name }}</small></td><td class="num">{{ usage.issued_qty|floatformat:"-3" }}</td><td class="num">{% if usage.applied %}{{ usage.returned_qty|floatformat:"-3" }}{% else %}Not confirmed{% endif %}</td><td class="num">{% if usage.applied %}{{ usage.consumed_qty|floatformat:"-3" }}{% else %}-{% endif %}</td><td>{% if usage.applied %}<span class="pill good">Confirmed</span>{% else %}<span class="pill reserved">Reserved</span>{% endif %}</td><td>{% if not usage.applied %}<form method="post" action="{% url 'production_project_remove_roll' project.id usage.id %}">{% csrf_token %}<button class="btn-light">Release</button></form>{% endif %}</td></tr>{% empty %}<tr><td colspan="6" class="empty">No fabric roll selected yet.</td></tr>{% endfor %}
-    </tbody></table></div>
+
+    <div style="margin-top:17px"><strong>Selected Fabric</strong></div>
+    {% for group in selected_groups %}
+      <div class="selected-group">
+        <div class="selected-head">
+          <div><strong>{{ group.fabric_name }}</strong><small style="display:block;color:var(--muted)">{{ group.color.name }}</small></div>
+          <div><small>Each roll</small><strong style="display:block">{{ group.reserved_qty|floatformat:"-3" }}</strong></div>
+          <div><small>Rolls</small><strong style="display:block">{{ group.count }}</strong></div>
+          <div><small>Status</small><span class="pill {% if group.applied %}good{% else %}warn{% endif %}">{% if group.applied %}Cut confirmed{% else %}Reserved{% endif %}</span></div>
+        </div>
+        <div class="code-list">
+          {% for usage in group.usages %}
+            <span class="pill">{{ usage.roll.roll_code }}</span>
+            {% if not usage.applied %}
+              <form method="post" action="{% url 'production_project_remove_roll' project.id usage.id %}" style="display:inline">
+                {% csrf_token %}<button class="btn-light" title="Release {{ usage.roll.roll_code }}">Release</button>
+              </form>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+    {% empty %}
+      <div class="empty">No fabric reserved.</div>
+    {% endfor %}
   </section>
 
   <section class="prod-card step">
-    <div class="section-head"><div><h2>3. Confirm Cutting & Fabric Remaining</h2><p>Enter the actual cut quantity, then confirm whether each reserved roll still has fabric remaining.</p></div></div>
-    {% if project.status == 'DRAFT' or project.status == 'CUTTING' or project.status == 'CUT_COMPLETE' %}
-    <form method="post" action="{% url 'production_project_confirm_cutting' project.id %}" id="confirm-cutting-form">{% csrf_token %}
-      <h3 style="margin:0 0 10px">Actual Cut by Size</h3>
-      <div class="form-grid">{% for row in size_rows %}<div class="field"><label>{{ row.size.name }}</label><input type="number" min="0" max="{{ row.planned_qty }}" name="cut_{{ row.size.id }}" value="{{ row.cut_qty }}"></div>{% endfor %}</div>
+    <div class="section-head"><div><h2>3. Confirm Cutting</h2><p>Enter cut quantities and the actual fabric remaining on each selected physical roll.</p></div></div>
 
-      <h3 style="margin:20px 0 10px">Fabric Remaining After Cutting</h3>
-      <div class="prod-grid" style="gap:10px">
-      {% for usage in project.roll_usages.all %}
-        {% if not usage.applied %}
-        <div class="prod-card" style="box-shadow:none;padding:14px">
-          <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px;align-items:end">
-            <div><strong>{{ usage.roll.roll_code }}</strong><small style="display:block;color:var(--muted)">{{ usage.roll.receipt.fabric_name }} · Reserved {{ usage.issued_qty|floatformat:"-3" }}</small></div>
-            <div class="field"><label>Fabric still remains?</label><select class="form-select remain-choice" name="remain_choice_{{ usage.id }}" data-target="remaining-{{ usage.id }}" required><option value="">Choose</option><option value="NO">No — fully used</option><option value="YES">Yes — has remaining</option></select></div>
-            <div class="field remaining-field" id="remaining-{{ usage.id }}" hidden><label>Remaining Qty</label><input class="form-control" type="number" min="0.001" step="0.001" max="{{ usage.issued_qty }}" name="remaining_qty_{{ usage.id }}" placeholder="e.g. 0.250"></div>
-          </div>
+    {% if project.status == 'DRAFT' or project.status == 'CUTTING' or project.status == 'CUT_COMPLETE' %}
+      <form method="post" action="{% url 'production_project_confirm_cutting' project.id %}" onsubmit="return confirm('Confirm cutting and update the selected fabric rolls?')">
+        {% csrf_token %}
+        <div class="form-grid">
+          {% for row in size_rows %}
+            <div class="field"><label>{{ row.size.name }} · Planned {{ row.planned_qty }}</label><input type="number" min="0" max="{{ row.planned_qty }}" name="cut_{{ row.size.id }}" value="{{ row.cut_qty }}"></div>
+          {% endfor %}
         </div>
-        {% endif %}
-      {% empty %}<div class="empty">Reserve a fabric roll first.</div>{% endfor %}
-      </div>
-      <button class="btn-primary" style="width:100%;margin-top:16px">Confirm Cutting</button>
-    </form>
+
+        <h3 style="margin:20px 0 8px">Fabric Remaining</h3>
+        {% for usage in selected_usages %}
+          {% if not usage.applied %}
+            <div class="roll-confirm" data-roll-confirm>
+              <div><strong>{{ usage.roll.roll_code }}</strong><small style="display:block;color:var(--muted)">{{ usage.roll.receipt.fabric_name }} · Reserved {{ usage.issued_qty|floatformat:"-3" }}</small></div>
+              <div class="field"><label>After Cutting</label><select class="form-select remain-choice" name="remain_choice_{{ usage.id }}" required><option value="">Choose</option><option value="NO">Fully used</option><option value="YES">Still remains</option></select></div>
+              <div class="field remaining-wrap"><label>Remaining Qty</label><input class="form-control remaining-input" type="number" min="0.001" max="{{ usage.issued_qty }}" step="0.001" name="remaining_qty_{{ usage.id }}" placeholder="e.g. 0.300"></div>
+            </div>
+          {% endif %}
+        {% empty %}
+          <div class="empty">Reserve fabric before confirming cutting.</div>
+        {% endfor %}
+
+        <div class="prod-actions" style="margin-top:14px"><button class="btn-primary" style="width:100%">Confirm Cutting</button></div>
+      </form>
+    {% else %}
+      <div class="empty">Cutting is already confirmed.</div>
     {% endif %}
   </section>
 
   <section class="prod-card step">
     <div class="section-head"><div><h2>4. Sewing & Partial Returns</h2><p>Receive completed pieces in several returns while pending quantities stay visible.</p></div></div>
-    {% for row in job_rows %}<div class="prod-card" style="box-shadow:none;margin-bottom:12px"><div class="section-head"><div><h3>{{ row.job.job_no }} — {{ row.job.partner.name }}</h3><p>Sent {{ row.job.sent_date|date:'d M Y' }}</p></div><div class="prod-actions"><a class="btn-light" href="{% url 'production_sewing_job_edit' row.job.id %}">Edit</a><a class="btn-primary" href="{% url 'production_return_create' row.job.id %}">Receive Return</a></div></div><div class="prod-table-wrap"><table class="prod-table"><thead><tr><th>Size</th><th class="num">Sent</th><th class="num">Done</th><th class="num">Damaged</th><th class="num">Missing</th><th class="num">Pending</th></tr></thead><tbody>{% for size in row.sizes %}<tr><td><strong>{{ size.size.name }}</strong></td><td class="num">{{ size.sent }}</td><td class="num">{{ size.good }}</td><td class="num">{{ size.damaged }}</td><td class="num">{{ size.missing }}</td><td class="num"><span class="pill {% if size.pending %}warn{% else %}good{% endif %}">{{ size.pending }}</span></td></tr>{% endfor %}</tbody></table></div></div>{% empty %}<div class="empty">No sewing job yet. Confirm cutting first.</div>{% endfor %}
+    {% for row in job_rows %}
+      <div class="prod-card" style="box-shadow:none;margin-bottom:12px">
+        <div class="section-head"><div><h3>{{ row.job.job_no }} — {{ row.job.partner.name }}</h3><p>Sent {{ row.job.sent_date|date:'d M Y' }}</p></div><div class="prod-actions"><a class="btn-light" href="{% url 'production_sewing_job_edit' row.job.id %}">Edit</a><a class="btn-primary" href="{% url 'production_return_create' row.job.id %}">Receive Return</a></div></div>
+        <div class="prod-table-wrap"><table class="prod-table"><thead><tr><th>Size</th><th class="num">Sent</th><th class="num">Done</th><th class="num">Damaged</th><th class="num">Missing</th><th class="num">Pending</th></tr></thead><tbody>
+        {% for size in row.sizes %}<tr><td><strong>{{ size.size.name }}</strong></td><td class="num">{{ size.sent }}</td><td class="num">{{ size.good }}</td><td class="num">{{ size.damaged }}</td><td class="num">{{ size.missing }}</td><td class="num"><span class="pill {% if size.pending %}warn{% else %}good{% endif %}">{{ size.pending }}</span></td></tr>{% endfor %}
+        </tbody></table></div>
+      </div>
+    {% empty %}
+      <div class="empty">No sewing job yet. Confirm cutting first.</div>
+    {% endfor %}
   </section>
 </div>
-<script>
-document.querySelectorAll('.remain-choice').forEach(select=>{
-  const target=document.getElementById(select.dataset.target);
-  const input=target ? target.querySelector('input') : null;
-  function refresh(){
-    const show=select.value==='YES';
-    if(target) target.hidden=!show;
-    if(input){ input.required=show; if(!show) input.value=''; }
-  }
-  select.addEventListener('change',refresh); refresh();
-});
 
-document.querySelectorAll('.remove-plan-row').forEach(button=>{
-  button.addEventListener('click',()=>{
-    const row=button.closest('tr');
-    const input=row.querySelector('input[name^="plan_"]');
-    if(!confirm('Remove this size from the production plan?')) return;
-    input.value='0';
-    row.style.opacity='.45';
-    row.style.pointerEvents='none';
-  });
+<script>
+document.querySelectorAll('[data-roll-confirm]').forEach(row=>{
+  const choice=row.querySelector('.remain-choice');
+  const input=row.querySelector('.remaining-input');
+  function refresh(){
+    const remains=choice.value==='YES';
+    row.classList.toggle('has-remaining',remains);
+    input.required=remains;
+    if(!remains) input.value='';
+  }
+  choice.addEventListener('change',refresh);
+  refresh();
 });
 </script>
 {% endblock %}
