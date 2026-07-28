@@ -15,6 +15,7 @@ from .views import (
     inventory_batch_detail,
     inventory_batch_edit,
     inventory_batch_history,
+    inventory_supplier_ajax_create,
     inventory_item_create,
     inventory_item_delete,
     inventory_item_edit,
@@ -61,6 +62,7 @@ urlpatterns = [
 
     # Stock In / Batch
     path("batches/new/", inventory_batch_create, name="inventory_batch_create"),
+    path("suppliers/ajax-create/", inventory_supplier_ajax_create, name="inventory_supplier_ajax_create"),
     path("batches/<int:pk>/", inventory_batch_detail, name="inventory_batch_detail"),
     path("batches/<int:pk>/edit/", inventory_batch_edit, name="inventory_batch_edit"),
     path("batches/<int:pk>/delete/", inventory_batch_delete, name="inventory_batch_delete"),

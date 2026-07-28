@@ -9,6 +9,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from orders.models import Order, OrderItem
+from production.models import ProductionSupplier
 
 from .forms import (
     ColorForm,
@@ -92,7 +93,8 @@ def _cloth_card_sort_key(card):
 def _batch_snapshot(batch):
     return {
         "batch_no": batch.batch_no,
-        "supplier": batch.supplier,
+        "supplier": batch.supplier_name,
+        "supplier_id": batch.supplier_ref_id,
         "received_date": str(batch.received_date),
         "status": batch.status,
         "note": batch.note,
@@ -347,7 +349,7 @@ def inventory_list(request):
             {
                 "id": batch.id,
                 "batch_no": batch.batch_no,
-                "supplier": batch.supplier or "-",
+                "supplier": batch.supplier_name or "-",
                 "created_by": batch.created_by.username if batch.created_by else "-",
                 "received_date": batch.received_date,
                 "total_cloth": total_cloth,
@@ -554,6 +556,36 @@ def size_edit(request, pk):
     )
 
 
+def _form_error_payload(form, formset):
+    field_errors = {}
+    for name, errors in form.errors.items():
+        field_errors[f"id_{name}"] = [str(error) for error in errors]
+    row_errors = {}
+    for index, row_form in enumerate(formset.forms):
+        for name, errors in row_form.errors.items():
+            row_errors[f"id_{formset.prefix}-{index}-{name}"] = [str(error) for error in errors]
+    first = next(iter(field_errors.values()), None) or next(iter(row_errors.values()), None)
+    message = first[0] if first else "Please check the highlighted fields."
+    return {"ok": False, "message": f"Failed: {message}", "field_errors": field_errors, "row_errors": row_errors}
+
+
+@login_required
+@permission_required("production.add_productionsupplier", raise_exception=True)
+def inventory_supplier_ajax_create(request):
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "message": "Failed: POST request required."}, status=405)
+    name = (request.POST.get("name") or "").strip()
+    phone = (request.POST.get("phone") or "").strip()
+    location = (request.POST.get("location") or "").strip()
+    if not name:
+        return JsonResponse({"ok": False, "message": "Failed: Supplier name is required.", "field": "supplier-modal-name"}, status=400)
+    existing = ProductionSupplier.objects.filter(name__iexact=name).first()
+    if existing:
+        return JsonResponse({"ok": True, "supplier": {"id": existing.pk, "name": existing.name}, "message": "Supplier already exists and was selected."})
+    supplier = ProductionSupplier.objects.create(name=name, phone=phone, location=location)
+    return JsonResponse({"ok": True, "supplier": {"id": supplier.pk, "name": supplier.name}, "message": "Supplier created successfully."})
+
+
 @login_required
 @permission_required("inventory.add_inventorybatch", raise_exception=True)
 @transaction.atomic
@@ -607,8 +639,13 @@ def inventory_batch_create(request):
                 "Batch created",
             )
 
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse({"ok": True, "message": f"Inventory batch {batch.batch_no} created successfully.", "redirect_url": f"/inventory/batches/{batch.pk}/"})
             messages.success(request, f"Inventory batch {batch.batch_no} created.")
             return redirect("inventory_batch_detail", pk=batch.pk)
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            transaction.set_rollback(True)
+            return JsonResponse(_form_error_payload(form, formset), status=400)
     else:
         form = InventoryBatchForm(initial={"received_date": timezone.localdate()})
         formset = InventoryBatchItemFormSet()
@@ -703,8 +740,13 @@ def inventory_batch_edit(request, pk):
                     )
 
             _log_batch_history(batch, InventoryBatchHistory.ACTION_UPDATE, request.user, "Batch updated")
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse({"ok": True, "message": f"Batch {batch.batch_no} updated successfully.", "redirect_url": f"/inventory/batches/{batch.pk}/"})
             messages.success(request, f"Batch {batch.batch_no} updated.")
             return redirect("inventory_batch_detail", pk=batch.pk)
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            transaction.set_rollback(True)
+            return JsonResponse(_form_error_payload(form, formset), status=400)
     else:
         form = InventoryBatchForm(instance=batch)
         formset = InventoryBatchItemFormSet(instance=batch)
@@ -763,7 +805,7 @@ def inventory_batch_delete(request, pk):
 @permission_required("inventory.view_inventorybatch", raise_exception=True)
 def inventory_batch_detail(request, pk):
     batch = get_object_or_404(
-        InventoryBatch.objects.prefetch_related(
+        InventoryBatch.objects.select_related("supplier_ref").prefetch_related(
             "items__item",
             "items__color",
             "items__size",

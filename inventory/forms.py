@@ -3,6 +3,8 @@ from decimal import Decimal
 from django import forms
 from django.forms import inlineformset_factory
 
+from production.models import ProductionSupplier
+
 from .models import (
     Color,
     InventoryAdjustment,
@@ -107,73 +109,48 @@ class InventoryBatchForm(forms.ModelForm):
     received_date = forms.DateField(
         widget=forms.DateInput(attrs={"type": "date", "class": "form-control"})
     )
+    supplier_ref = forms.ModelChoiceField(
+        queryset=ProductionSupplier.objects.none(),
+        required=True,
+        empty_label="Choose supplier",
+        widget=forms.Select(attrs={"class": "form-select supplier-select"}),
+        label="Supplier",
+    )
 
     class Meta:
         model = InventoryBatch
-        fields = [
-            "received_date",
-            "supplier",
-            "note",
-        ]
+        fields = ["received_date", "supplier_ref", "note"]
         widgets = {
-            "supplier": forms.TextInput(attrs={"class": "form-control", "placeholder": "Supplier"}),
             "note": forms.Textarea(attrs={"class": "form-control", "rows": 3, "placeholder": "Note"}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["supplier_ref"].queryset = ProductionSupplier.objects.filter(
+            is_active=True
+        ).order_by("name")
+        if self.instance and self.instance.pk and not self.instance.supplier_ref_id and self.instance.supplier:
+            existing = ProductionSupplier.objects.filter(name__iexact=self.instance.supplier.strip()).first()
+            if existing:
+                self.initial["supplier_ref"] = existing.pk
 
     def save(self, commit=True):
         instance = super().save(commit=False)
         instance.status = InventoryBatch.STATUS_FINAL
-
+        if instance.supplier_ref_id:
+            instance.supplier = instance.supplier_ref.name
         if not instance.batch_no:
             date_part = instance.received_date.strftime("%Y%m%d") if instance.received_date else "BATCH"
             base = f"STK-{date_part}"
-            batch_no = base
-            i = 1
-
-            while InventoryBatch.objects.filter(batch_no=batch_no).exclude(pk=instance.pk).exists():
-                batch_no = f"{base}-{i}"
-                i += 1
-
-            instance.batch_no = batch_no
-
+            index = InventoryBatch.objects.filter(batch_no__startswith=base).count() + 1
+            candidate = f"{base}-{index:03d}"
+            while InventoryBatch.objects.filter(batch_no=candidate).exists():
+                index += 1
+                candidate = f"{base}-{index:03d}"
+            instance.batch_no = candidate
         if commit:
             instance.save()
-
         return instance
-
-
-class InventoryItemSelect(forms.Select):
-    """
-    Stock In item dropdown.
-
-    This adds real item data to each <option>, so JavaScript can know:
-    - Is this item a shirt?
-    - What item type is it?
-    - What unit should display?
-
-    This fixes the bug where material items like Cleaning Solution
-    can be shown as Shirt in the Stock In row.
-    """
-
-    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
-        option = super().create_option(name, value, label, selected, index, subindex, attrs)
-
-        item = getattr(value, "instance", None)
-
-        if item:
-            is_shirt = item.item_type == InventoryItem.TYPE_SHIRT
-
-            option["attrs"].update(
-                {
-                    "data-item-type": item.item_type or "",
-                    "data-type-label": item.get_item_type_display(),
-                    "data-unit": item.unit or "",
-                    "data-unit-label": item.get_unit_display(),
-                    "data-is-shirt": "1" if is_shirt else "0",
-                }
-            )
-
-        return option
 
 
 class InventoryBatchItemForm(forms.ModelForm):

@@ -191,7 +191,15 @@ class InventoryBatch(models.Model):
     ]
 
     batch_no = models.CharField(max_length=50, unique=True)
+    # Keep the old text for compatibility and history. The master record is supplier_ref.
     supplier = models.CharField(max_length=120, blank=True)
+    supplier_ref = models.ForeignKey(
+        "production.ProductionSupplier",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="inventory_batches",
+    )
     received_date = models.DateField()
     total_goods_cost = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     shipping_cost = models.DecimalField(max_digits=12, decimal_places=2, default=0)
@@ -232,6 +240,15 @@ class InventoryBatch(models.Model):
 
     def __str__(self):
         return self.batch_no
+
+    def save(self, *args, **kwargs):
+        if self.supplier_ref_id:
+            self.supplier = self.supplier_ref.name
+        super().save(*args, **kwargs)
+
+    @property
+    def supplier_name(self):
+        return self.supplier_ref.name if self.supplier_ref_id else (self.supplier or "")
 
     @property
     def total_expense(self):

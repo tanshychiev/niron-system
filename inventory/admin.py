@@ -24,5 +24,5 @@ class InventoryItemAdmin(admin.ModelAdmin):
 
 @admin.register(InventoryBatch)
 class InventoryBatchAdmin(admin.ModelAdmin):
-    list_display = ["batch_no", "supplier", "received_date", "status", "total_expense"]
+    list_display = ["batch_no", "supplier_ref", "supplier", "received_date", "status", "total_expense"]
     inlines = [InventoryBatchItemInline]

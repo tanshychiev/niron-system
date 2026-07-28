@@ -15,7 +15,7 @@
   <div class="info-card">
     <h3 class="card-title">Batch Info</h3>
     <p><strong>Batch No:</strong> {{ batch.batch_no }}</p>
-    <p><strong>Supplier:</strong> {{ batch.supplier|default:"-" }}</p>
+    <p><strong>Supplier:</strong> {% if batch.supplier_ref %}<a href="{% url 'production_supplier_detail' batch.supplier_ref.id %}">{{ batch.supplier_ref.name }}</a>{% else %}{{ batch.supplier|default:"-" }}{% endif %}</p>
     <p><strong>Received Date:</strong> {{ batch.received_date|date:"d/m/Y" }}</p>
     <p><strong>Status:</strong> {{ batch.get_status_display }}</p>
     <p><strong>Created By:</strong> {% if batch.created_by %}{{ batch.created_by.username }}{% else %}-{% endif %}</p>
