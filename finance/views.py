@@ -536,14 +536,38 @@ def profit_dashboard(request):
     # ==========================================================
     # MONTHLY BUSINESS GROWTH ANALYSIS
     # ==========================================================
-    compare_year_raw = (request.GET.get("compare_year") or "").strip()
-    try:
-        compare_year = int(compare_year_raw) if compare_year_raw else date_to.year
-    except (TypeError, ValueError):
-        compare_year = date_to.year
+    # Month inputs use YYYY-MM and can cross years. By default, show
+    # the previous 3 months plus the current month.
+    def month_start_from_raw(raw_value, fallback):
+        try:
+            return timezone.datetime.strptime(raw_value, "%Y-%m").date().replace(day=1)
+        except (TypeError, ValueError):
+            return fallback
 
-    if compare_year < 2000 or compare_year > 2100:
-        compare_year = date_to.year
+    def add_months(value, months):
+        month_index = (value.year * 12 + value.month - 1) + months
+        return date(month_index // 12, month_index % 12 + 1, 1)
+
+    current_month_start = today.replace(day=1)
+    default_growth_from = add_months(current_month_start, -3)
+    default_growth_to = current_month_start
+
+    growth_from = month_start_from_raw(
+        (request.GET.get("growth_from") or "").strip(),
+        default_growth_from,
+    )
+    growth_to = month_start_from_raw(
+        (request.GET.get("growth_to") or "").strip(),
+        default_growth_to,
+    )
+
+    if growth_from > growth_to:
+        growth_from, growth_to = growth_to, growth_from
+
+    # Keep the dashboard responsive even if a very large range is entered.
+    max_growth_months = 36
+    if ((growth_to.year - growth_from.year) * 12 + growth_to.month - growth_from.month) >= max_growth_months:
+        growth_from = add_months(growth_to, -(max_growth_months - 1))
 
     def growth_info(current_value, previous_value):
         current_value = _to_decimal(current_value)
@@ -577,15 +601,15 @@ def profit_dashboard(request):
             "direction": direction,
         }
 
-    monthly_rows = []
-    previous_row = None
+    service_definitions = [
+        ("full", Order.SERVICE_FULL, "Full Order"),
+        ("print_heatpress", Order.SERVICE_PRINT_HEATPRESS, "Print & Heat Press"),
+        ("film_only", Order.SERVICE_FILM_ONLY, "Film Only"),
+        ("retail", Order.SERVICE_RETAIL, "Retail Sale"),
+    ]
 
-    for month_number in range(1, 13):
-        month_start = date(compare_year, month_number, 1)
-        if month_number == 12:
-            next_month = date(compare_year + 1, 1, 1)
-        else:
-            next_month = date(compare_year, month_number + 1, 1)
+    def build_month_snapshot(month_start):
+        next_month = add_months(month_start, 1)
         month_end = next_month - timedelta(days=1)
 
         month_orders = Order.objects.filter(
@@ -608,18 +632,13 @@ def profit_dashboard(request):
         profit = revenue - expense
         margin = (profit / revenue * Decimal("100")) if revenue else Decimal("0.00")
 
-        niron_revenue = (
-            month_orders.filter(order_type="NIRON").aggregate(total=Sum("total_amount"))["total"]
-            or Decimal("0.00")
-        )
-        kampu_revenue = (
-            month_orders.filter(order_type="KAMPU").aggregate(total=Sum("total_amount"))["total"]
-            or Decimal("0.00")
-        )
+        niron_orders = month_orders.filter(order_type=Order.TYPE_NIRON)
+        kampu_orders = month_orders.filter(order_type=Order.TYPE_KAMPU)
+        niron_revenue = niron_orders.aggregate(total=Sum("total_amount"))["total"] or Decimal("0.00")
+        kampu_revenue = kampu_orders.aggregate(total=Sum("total_amount"))["total"] or Decimal("0.00")
 
         cloth_items = month_items.filter(shirt_item__isnull=False)
         film_items = month_items.filter(film_item__isnull=False)
-
         cloth_sold = cloth_items.aggregate(total=Sum("quantity"))["total"] or Decimal("0")
         cloth_revenue = cloth_items.aggregate(total=Sum("line_total"))["total"] or Decimal("0.00")
         film_sold = film_items.aggregate(total=Sum("film_meter"))["total"] or Decimal("0")
@@ -628,50 +647,117 @@ def profit_dashboard(request):
         deposit = month_orders.aggregate(total=Sum("deposit_amount"))["total"] or Decimal("0.00")
         paid = month_orders.aggregate(total=Sum("paid_amount"))["total"] or Decimal("0.00")
         receivable = revenue - deposit - paid
-        order_count = month_orders.count()
 
-        row = {
-            "month_number": month_number,
-            "month_name": month_start.strftime("%b"),
-            "month_full_name": month_start.strftime("%B"),
+        def service_breakdown(shop_orders):
+            result = {}
+            shop_total = shop_orders.aggregate(total=Sum("total_amount"))["total"] or Decimal("0.00")
+            for key, service_code, label in service_definitions:
+                service_qs = shop_orders.filter(service_type=service_code)
+                service_revenue = service_qs.aggregate(total=Sum("total_amount"))["total"] or Decimal("0.00")
+                service_count = service_qs.count()
+                result[key] = {
+                    "key": key,
+                    "label": label,
+                    "projects": service_count,
+                    "revenue": service_revenue,
+                    "average": (service_revenue / service_count) if service_count else Decimal("0.00"),
+                    "share": (service_revenue / shop_total * Decimal("100")) if shop_total else Decimal("0.00"),
+                }
+            return result
+
+        return {
+            "month_date": month_start,
+            "month_name": month_start.strftime("%b %Y"),
+            "month_full_name": month_start.strftime("%B %Y"),
             "revenue": revenue,
             "expense": expense,
             "profit": profit,
             "margin": margin,
-            "orders": order_count,
+            "orders": month_orders.count(),
+            "niron_projects": niron_orders.count(),
+            "kampu_projects": kampu_orders.count(),
             "niron_revenue": niron_revenue,
             "kampu_revenue": kampu_revenue,
+            "niron_average": (niron_revenue / niron_orders.count()) if niron_orders.exists() else Decimal("0.00"),
+            "kampu_average": (kampu_revenue / kampu_orders.count()) if kampu_orders.exists() else Decimal("0.00"),
             "cloth_sold": cloth_sold,
             "cloth_revenue": cloth_revenue,
             "film_sold": film_sold,
             "film_revenue": film_revenue,
             "paid": paid,
             "receivable": receivable,
+            "niron_services": service_breakdown(niron_orders),
+            "kampu_services": service_breakdown(kampu_orders),
         }
 
-        growth_metrics = [
-            "revenue", "expense", "profit", "orders",
-            "niron_revenue", "kampu_revenue",
-            "cloth_sold", "cloth_revenue",
-            "film_sold", "film_revenue",
-            "paid", "receivable",
-        ]
+    # Load one month before the selected range so the first visible month has
+    # a real comparison percentage.
+    previous_snapshot = build_month_snapshot(add_months(growth_from, -1))
+    monthly_rows = []
+    cursor = growth_from
 
-        row["growth"] = {}
-        if previous_row is None:
-            for metric in growth_metrics:
-                row["growth"][metric] = {
-                    "display": "—",
-                    "value": None,
-                    "css": "same",
-                    "direction": "same",
-                }
-        else:
-            for metric in growth_metrics:
-                row["growth"][metric] = growth_info(row[metric], previous_row[metric])
+    growth_metrics = [
+        "revenue", "expense", "profit", "orders",
+        "niron_projects", "kampu_projects",
+        "niron_revenue", "kampu_revenue",
+        "cloth_sold", "cloth_revenue",
+        "film_sold", "film_revenue", "paid", "receivable",
+    ]
+
+    while cursor <= growth_to:
+        row = build_month_snapshot(cursor)
+        row["growth"] = {
+            metric: growth_info(row[metric], previous_snapshot[metric])
+            for metric in growth_metrics
+        }
+
+        for shop_key in ("niron_services", "kampu_services"):
+            for service_key, _, _ in service_definitions:
+                current_service = row[shop_key][service_key]
+                previous_service = previous_snapshot[shop_key][service_key]
+                current_service["revenue_growth"] = growth_info(
+                    current_service["revenue"], previous_service["revenue"]
+                )
+                current_service["project_growth"] = growth_info(
+                    current_service["projects"], previous_service["projects"]
+                )
 
         monthly_rows.append(row)
-        previous_row = row
+        previous_snapshot = row
+        cursor = add_months(cursor, 1)
+
+    # Totals for an easy shop/service overview across the selected range.
+    selected_end_exclusive = add_months(growth_to, 1)
+    selected_orders = Order.objects.filter(
+        created_at__date__gte=growth_from,
+        created_at__date__lt=selected_end_exclusive,
+    ).exclude(status__in=excluded_statuses)
+
+    def build_service_summary(order_type):
+        shop_orders = selected_orders.filter(order_type=order_type)
+        shop_revenue = shop_orders.aggregate(total=Sum("total_amount"))["total"] or Decimal("0.00")
+        rows = []
+        for key, service_code, label in service_definitions:
+            service_qs = shop_orders.filter(service_type=service_code)
+            service_revenue = service_qs.aggregate(total=Sum("total_amount"))["total"] or Decimal("0.00")
+            project_count = service_qs.count()
+            rows.append({
+                "key": key,
+                "label": label,
+                "projects": project_count,
+                "revenue": service_revenue,
+                "average": (service_revenue / project_count) if project_count else Decimal("0.00"),
+                "share": (service_revenue / shop_revenue * Decimal("100")) if shop_revenue else Decimal("0.00"),
+            })
+        return {
+            "projects": shop_orders.count(),
+            "revenue": shop_revenue,
+            "average": (shop_revenue / shop_orders.count()) if shop_orders.exists() else Decimal("0.00"),
+            "services": rows,
+        }
+
+    niron_service_summary = build_service_summary(Order.TYPE_NIRON)
+    kampu_service_summary = build_service_summary(Order.TYPE_KAMPU)
 
     monthly_chart_labels = [row["month_name"] for row in monthly_rows]
     monthly_revenue_values = [float(row["revenue"]) for row in monthly_rows]
@@ -679,6 +765,8 @@ def profit_dashboard(request):
     monthly_profit_values = [float(row["profit"]) for row in monthly_rows]
     monthly_niron_values = [float(row["niron_revenue"]) for row in monthly_rows]
     monthly_kampu_values = [float(row["kampu_revenue"]) for row in monthly_rows]
+    monthly_niron_project_values = [row["niron_projects"] for row in monthly_rows]
+    monthly_kampu_project_values = [row["kampu_projects"] for row in monthly_rows]
     monthly_revenue_growth_values = [
         row["growth"]["revenue"]["value"] if row["growth"]["revenue"]["value"] is not None else 0
         for row in monthly_rows
@@ -688,8 +776,20 @@ def profit_dashboard(request):
         for row in monthly_rows
     ]
 
-    current_year = timezone.localdate().year
-    compare_year_choices = list(range(current_year + 1, current_year - 5, -1))
+    niron_service_chart = {
+        key: [float(row["niron_services"][key]["revenue"]) for row in monthly_rows]
+        for key, _, _ in service_definitions
+    }
+    kampu_service_chart = {
+        key: [float(row["kampu_services"][key]["revenue"]) for row in monthly_rows]
+        for key, _, _ in service_definitions
+    }
+
+    growth_range_label = (
+        growth_from.strftime("%b %Y")
+        if growth_from == growth_to
+        else f"{growth_from.strftime('%b %Y')} – {growth_to.strftime('%b %Y')}"
+    )
 
     return render(
         request,
@@ -714,17 +814,24 @@ def profit_dashboard(request):
             "date_from": date_from,
             "date_to": date_to,
 
-            "compare_year": compare_year,
-            "compare_year_choices": compare_year_choices,
+            "growth_from": growth_from,
+            "growth_to": growth_to,
+            "growth_range_label": growth_range_label,
             "monthly_rows": monthly_rows,
+            "niron_service_summary": niron_service_summary,
+            "kampu_service_summary": kampu_service_summary,
             "monthly_chart_labels": monthly_chart_labels,
             "monthly_revenue_values": monthly_revenue_values,
             "monthly_expense_values": monthly_expense_values,
             "monthly_profit_values": monthly_profit_values,
             "monthly_niron_values": monthly_niron_values,
             "monthly_kampu_values": monthly_kampu_values,
+            "monthly_niron_project_values": monthly_niron_project_values,
+            "monthly_kampu_project_values": monthly_kampu_project_values,
             "monthly_revenue_growth_values": monthly_revenue_growth_values,
             "monthly_profit_growth_values": monthly_profit_growth_values,
+            "niron_service_chart": niron_service_chart,
+            "kampu_service_chart": kampu_service_chart,
         },
     )
 @login_required

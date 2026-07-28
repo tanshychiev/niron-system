@@ -453,6 +453,96 @@
         font-weight: 850;
     }
 
+    .analysis-title-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 14px;
+    }
+
+    .shop-compare-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px;
+        margin: 18px 0;
+    }
+
+    .shop-card {
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        padding: 18px;
+        background: #fff;
+    }
+
+    .shop-card-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 14px;
+    }
+
+    .shop-card-head h4 {
+        margin: 0;
+        font-size: 20px;
+        font-weight: 950;
+    }
+
+    .shop-kpis {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        margin-bottom: 14px;
+    }
+
+    .shop-kpi {
+        padding: 12px;
+        border-radius: 14px;
+        background: #f8f6ef;
+        border: 1px solid var(--line);
+    }
+
+    .shop-kpi span {
+        display: block;
+        color: var(--muted);
+        font-size: 10px;
+        font-weight: 900;
+        text-transform: uppercase;
+        margin-bottom: 4px;
+    }
+
+    .shop-kpi strong { font-size: 16px; font-weight: 950; }
+
+    .service-summary-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .service-summary-table th,
+    .service-summary-table td {
+        border-bottom: 1px solid var(--line);
+        padding: 10px 8px;
+        text-align: right;
+        font-size: 12px;
+    }
+
+    .service-summary-table th:first-child,
+    .service-summary-table td:first-child { text-align: left; }
+    .service-summary-table th { color: var(--muted); font-size: 10px; text-transform: uppercase; }
+    .service-summary-table tr:last-child td { border-bottom: none; }
+
+    .service-month-table { min-width: 1450px; }
+    .service-cell .service-count { font-size: 11px; color: var(--muted); font-weight: 800; }
+    .service-cell .service-money { font-size: 13px; font-weight: 950; margin-top: 2px; }
+
+    .section-divider {
+        height: 1px;
+        background: var(--line);
+        margin: 22px 0;
+    }
+
     @media (max-width: 1200px) {
         .summary-grid,
         .section-grid,
@@ -460,7 +550,8 @@
             grid-template-columns: repeat(2, 1fr);
         }
 
-        .dash-grid {
+        .dash-grid,
+        .shop-compare-grid {
             grid-template-columns: 1fr;
         }
     }
@@ -492,7 +583,8 @@
 
         .summary-grid,
         .section-grid,
-        .mini-grid {
+        .mini-grid,
+        .shop-kpis {
             grid-template-columns: 1fr;
         }
 
@@ -524,17 +616,18 @@
         </div>
 
         <div class="filter-group">
-            <label>Compare Year</label>
-            <select name="compare_year">
-                {% for year in compare_year_choices %}
-                <option value="{{ year }}" {% if year == compare_year %}selected{% endif %}>{{ year }}</option>
-                {% endfor %}
-            </select>
+            <label>Growth From Month</label>
+            <input type="month" name="growth_from" value="{{ growth_from|date:'Y-m' }}">
         </div>
 
-        <button type="submit" class="filter-btn">Filter</button>
+        <div class="filter-group">
+            <label>Growth To Month</label>
+            <input type="month" name="growth_to" value="{{ growth_to|date:'Y-m' }}">
+        </div>
 
-        <a href="{% url 'profit_dashboard' %}" class="reset-btn">This Month</a>
+        <button type="submit" class="filter-btn">Search</button>
+
+        <a href="{% url 'profit_dashboard' %}" class="reset-btn">Default 4 Months</a>
     </div>
 
     <div class="date-note">
@@ -719,88 +812,127 @@
 <div class="dash-card growth-section">
     <div class="growth-header">
         <div>
-            <h3 class="dash-title">Monthly Business Growth Analysis — {{ compare_year }}</h3>
-            <p class="growth-subtitle">Every month compared with the previous month. The percentage below each value is month-over-month growth.</p>
+            <h3 class="dash-title">Business Growth Analysis</h3>
+            <p class="growth-subtitle">Showing {{ growth_range_label }}. Each percentage compares with the immediately previous calendar month.</p>
         </div>
-        <div class="growth-note">Percent = current month compared with previous month</div>
+        <div class="growth-note">{{ monthly_rows|length }} month{{ monthly_rows|length|pluralize }} selected</div>
+    </div>
+
+    <div class="analysis-title-row">
+        <div>
+            <h3 class="dash-title" style="margin-bottom:4px;">Niron vs Kampu</h3>
+            <p class="growth-subtitle">Projects, revenue and average revenue per project are separated for each shop.</p>
+        </div>
     </div>
 
     <div class="table-scroll">
-        <table class="growth-table">
+        <table class="growth-table" style="min-width:1250px;">
             <thead>
                 <tr>
                     <th>Month</th>
-                    <th>Revenue</th>
+                    <th>Total Revenue</th>
                     <th>Expense</th>
                     <th>Profit</th>
                     <th>Margin</th>
-                    <th>Projects</th>
+                    <th>Niron Projects</th>
+                    <th>Kampu Projects</th>
                     <th>Niron Revenue</th>
                     <th>Kampu Revenue</th>
-                    <th>Cloth Sold</th>
-                    <th>Cloth Revenue</th>
-                    <th>Film Sold</th>
-                    <th>Film Revenue</th>
-                    <th>Paid</th>
-                    <th>Receivable</th>
+                    <th>Niron Avg/Project</th>
+                    <th>Kampu Avg/Project</th>
                 </tr>
             </thead>
             <tbody>
                 {% for row in monthly_rows %}
                 <tr>
                     <td><span class="month-name">{{ row.month_full_name }}</span></td>
+                    <td><div class="metric-main">${{ row.revenue|floatformat:2 }}</div><span class="growth-badge {{ row.growth.revenue.css }}">{{ row.growth.revenue.display }}</span></td>
+                    <td><div class="metric-main">${{ row.expense|floatformat:2 }}</div><span class="growth-badge {{ row.growth.expense.css }}">{{ row.growth.expense.display }}</span></td>
+                    <td><div class="metric-main {% if row.profit < 0 %}red{% else %}green{% endif %}">${{ row.profit|floatformat:2 }}</div><span class="growth-badge {{ row.growth.profit.css }}">{{ row.growth.profit.display }}</span></td>
+                    <td><div class="metric-main">{{ row.margin|floatformat:2 }}%</div></td>
+                    <td><div class="metric-main">{{ row.niron_projects }}</div><span class="growth-badge {{ row.growth.niron_projects.css }}">{{ row.growth.niron_projects.display }}</span></td>
+                    <td><div class="metric-main">{{ row.kampu_projects }}</div><span class="growth-badge {{ row.growth.kampu_projects.css }}">{{ row.growth.kampu_projects.display }}</span></td>
+                    <td><div class="metric-main">${{ row.niron_revenue|floatformat:2 }}</div><span class="growth-badge {{ row.growth.niron_revenue.css }}">{{ row.growth.niron_revenue.display }}</span></td>
+                    <td><div class="metric-main">${{ row.kampu_revenue|floatformat:2 }}</div><span class="growth-badge {{ row.growth.kampu_revenue.css }}">{{ row.growth.kampu_revenue.display }}</span></td>
+                    <td><div class="metric-main">${{ row.niron_average|floatformat:2 }}</div></td>
+                    <td><div class="metric-main">${{ row.kampu_average|floatformat:2 }}</div></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 
-                    <td>
-                        <div class="metric-main">${{ row.revenue|floatformat:2 }}</div>
-                        <span class="growth-badge {{ row.growth.revenue.css }}">{{ row.growth.revenue.display }}</span>
-                    </td>
-                    <td>
-                        <div class="metric-main">${{ row.expense|floatformat:2 }}</div>
-                        <span class="growth-badge {{ row.growth.expense.css }}">{{ row.growth.expense.display }}</span>
-                    </td>
-                    <td>
-                        <div class="metric-main {% if row.profit < 0 %}red{% else %}green{% endif %}">${{ row.profit|floatformat:2 }}</div>
-                        <span class="growth-badge {{ row.growth.profit.css }}">{{ row.growth.profit.display }}</span>
-                    </td>
-                    <td>
-                        <div class="metric-main">{{ row.margin|floatformat:2 }}%</div>
-                    </td>
-                    <td>
-                        <div class="metric-main">{{ row.orders }}</div>
-                        <span class="growth-badge {{ row.growth.orders.css }}">{{ row.growth.orders.display }}</span>
-                    </td>
-                    <td>
-                        <div class="metric-main">${{ row.niron_revenue|floatformat:2 }}</div>
-                        <span class="growth-badge {{ row.growth.niron_revenue.css }}">{{ row.growth.niron_revenue.display }}</span>
-                    </td>
-                    <td>
-                        <div class="metric-main">${{ row.kampu_revenue|floatformat:2 }}</div>
-                        <span class="growth-badge {{ row.growth.kampu_revenue.css }}">{{ row.growth.kampu_revenue.display }}</span>
-                    </td>
-                    <td>
-                        <div class="metric-main">{{ row.cloth_sold|floatformat:0 }}</div>
-                        <span class="growth-badge {{ row.growth.cloth_sold.css }}">{{ row.growth.cloth_sold.display }}</span>
-                    </td>
-                    <td>
-                        <div class="metric-main">${{ row.cloth_revenue|floatformat:2 }}</div>
-                        <span class="growth-badge {{ row.growth.cloth_revenue.css }}">{{ row.growth.cloth_revenue.display }}</span>
-                    </td>
-                    <td>
-                        <div class="metric-main">{{ row.film_sold|floatformat:2 }}</div>
-                        <span class="growth-badge {{ row.growth.film_sold.css }}">{{ row.growth.film_sold.display }}</span>
-                    </td>
-                    <td>
-                        <div class="metric-main">${{ row.film_revenue|floatformat:2 }}</div>
-                        <span class="growth-badge {{ row.growth.film_revenue.css }}">{{ row.growth.film_revenue.display }}</span>
-                    </td>
-                    <td>
-                        <div class="metric-main">${{ row.paid|floatformat:2 }}</div>
-                        <span class="growth-badge {{ row.growth.paid.css }}">{{ row.growth.paid.display }}</span>
-                    </td>
-                    <td>
-                        <div class="metric-main">${{ row.receivable|floatformat:2 }}</div>
-                        <span class="growth-badge {{ row.growth.receivable.css }}">{{ row.growth.receivable.display }}</span>
-                    </td>
+    <div class="shop-compare-grid">
+        <div class="shop-card">
+            <div class="shop-card-head"><h4>Niron Service Summary</h4><span class="section-badge">Selected Range</span></div>
+            <div class="shop-kpis">
+                <div class="shop-kpi"><span>Projects</span><strong>{{ niron_service_summary.projects }}</strong></div>
+                <div class="shop-kpi"><span>Revenue</span><strong>${{ niron_service_summary.revenue|floatformat:2 }}</strong></div>
+                <div class="shop-kpi"><span>Avg / Project</span><strong>${{ niron_service_summary.average|floatformat:2 }}</strong></div>
+            </div>
+            <table class="service-summary-table">
+                <thead><tr><th>Service</th><th>Projects</th><th>Revenue</th><th>Avg</th><th>Share</th></tr></thead>
+                <tbody>
+                    {% for service in niron_service_summary.services %}
+                    <tr><td><strong>{{ service.label }}</strong></td><td>{{ service.projects }}</td><td>${{ service.revenue|floatformat:2 }}</td><td>${{ service.average|floatformat:2 }}</td><td>{{ service.share|floatformat:1 }}%</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="shop-card">
+            <div class="shop-card-head"><h4>Kampu Service Summary</h4><span class="section-badge">Selected Range</span></div>
+            <div class="shop-kpis">
+                <div class="shop-kpi"><span>Projects</span><strong>{{ kampu_service_summary.projects }}</strong></div>
+                <div class="shop-kpi"><span>Revenue</span><strong>${{ kampu_service_summary.revenue|floatformat:2 }}</strong></div>
+                <div class="shop-kpi"><span>Avg / Project</span><strong>${{ kampu_service_summary.average|floatformat:2 }}</strong></div>
+            </div>
+            <table class="service-summary-table">
+                <thead><tr><th>Service</th><th>Projects</th><th>Revenue</th><th>Avg</th><th>Share</th></tr></thead>
+                <tbody>
+                    {% for service in kampu_service_summary.services %}
+                    <tr><td><strong>{{ service.label }}</strong></td><td>{{ service.projects }}</td><td>${{ service.revenue|floatformat:2 }}</td><td>${{ service.average|floatformat:2 }}</td><td>{{ service.share|floatformat:1 }}%</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="section-divider"></div>
+    <div class="analysis-title-row">
+        <div>
+            <h3 class="dash-title" style="margin-bottom:4px;">Monthly Service Comparison</h3>
+            <p class="growth-subtitle">Full Order is separated between Niron and Kampu. Every other service is also separated by shop.</p>
+        </div>
+    </div>
+
+    <div class="table-scroll">
+        <table class="growth-table service-month-table">
+            <thead>
+                <tr>
+                    <th>Month</th>
+                    <th>Niron Full Order</th>
+                    <th>Niron Print & Heat Press</th>
+                    <th>Niron Film Only</th>
+                    <th>Niron Retail Sale</th>
+                    <th>Kampu Full Order</th>
+                    <th>Kampu Print & Heat Press</th>
+                    <th>Kampu Film Only</th>
+                    <th>Kampu Retail Sale</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in monthly_rows %}
+                <tr>
+                    <td><span class="month-name">{{ row.month_full_name }}</span></td>
+                    {% with s=row.niron_services.full %}<td class="service-cell"><div class="service-count">{{ s.projects }} projects</div><div class="service-money">${{ s.revenue|floatformat:2 }}</div><span class="growth-badge {{ s.revenue_growth.css }}">{{ s.revenue_growth.display }}</span></td>{% endwith %}
+                    {% with s=row.niron_services.print_heatpress %}<td class="service-cell"><div class="service-count">{{ s.projects }} projects</div><div class="service-money">${{ s.revenue|floatformat:2 }}</div><span class="growth-badge {{ s.revenue_growth.css }}">{{ s.revenue_growth.display }}</span></td>{% endwith %}
+                    {% with s=row.niron_services.film_only %}<td class="service-cell"><div class="service-count">{{ s.projects }} projects</div><div class="service-money">${{ s.revenue|floatformat:2 }}</div><span class="growth-badge {{ s.revenue_growth.css }}">{{ s.revenue_growth.display }}</span></td>{% endwith %}
+                    {% with s=row.niron_services.retail %}<td class="service-cell"><div class="service-count">{{ s.projects }} projects</div><div class="service-money">${{ s.revenue|floatformat:2 }}</div><span class="growth-badge {{ s.revenue_growth.css }}">{{ s.revenue_growth.display }}</span></td>{% endwith %}
+                    {% with s=row.kampu_services.full %}<td class="service-cell"><div class="service-count">{{ s.projects }} projects</div><div class="service-money">${{ s.revenue|floatformat:2 }}</div><span class="growth-badge {{ s.revenue_growth.css }}">{{ s.revenue_growth.display }}</span></td>{% endwith %}
+                    {% with s=row.kampu_services.print_heatpress %}<td class="service-cell"><div class="service-count">{{ s.projects }} projects</div><div class="service-money">${{ s.revenue|floatformat:2 }}</div><span class="growth-badge {{ s.revenue_growth.css }}">{{ s.revenue_growth.display }}</span></td>{% endwith %}
+                    {% with s=row.kampu_services.film_only %}<td class="service-cell"><div class="service-count">{{ s.projects }} projects</div><div class="service-money">${{ s.revenue|floatformat:2 }}</div><span class="growth-badge {{ s.revenue_growth.css }}">{{ s.revenue_growth.display }}</span></td>{% endwith %}
+                    {% with s=row.kampu_services.retail %}<td class="service-cell"><div class="service-count">{{ s.projects }} projects</div><div class="service-money">${{ s.revenue|floatformat:2 }}</div><span class="growth-badge {{ s.revenue_growth.css }}">{{ s.revenue_growth.display }}</span></td>{% endwith %}
                 </tr>
                 {% endfor %}
             </tbody>
@@ -808,28 +940,16 @@
     </div>
 
     <div class="growth-chart-grid">
-        <div class="dash-card">
-            <h3 class="dash-title">Monthly Revenue, Expense & Profit</h3>
-            <div class="chart-box"><canvas id="monthlyMoneyChart"></canvas></div>
-        </div>
-        <div class="dash-card">
-            <h3 class="dash-title">Monthly Growth Rate %</h3>
-            <div class="chart-box"><canvas id="monthlyGrowthChart"></canvas></div>
-        </div>
+        <div class="dash-card"><h3 class="dash-title">Revenue, Expense & Profit</h3><div class="chart-box"><canvas id="monthlyMoneyChart"></canvas></div></div>
+        <div class="dash-card"><h3 class="dash-title">Niron vs Kampu Projects</h3><div class="chart-box"><canvas id="monthlyProjectChart"></canvas></div></div>
     </div>
-
     <div class="growth-chart-grid">
-        <div class="dash-card">
-            <h3 class="dash-title">Niron vs Kampu Monthly Revenue</h3>
-            <div class="chart-box"><canvas id="monthlyBusinessChart"></canvas></div>
-        </div>
-        <div class="dash-card">
-            <h3 class="dash-title">Growth Reading</h3>
-            <div class="breakdown-row"><span>Positive percentage</span><strong class="green">Growth</strong></div>
-            <div class="breakdown-row"><span>Negative percentage</span><strong class="red">Decrease</strong></div>
-            <div class="breakdown-row"><span>New</span><strong>Previous month was zero</strong></div>
-            <div class="breakdown-row"><span>—</span><strong>First month has no comparison</strong></div>
-        </div>
+        <div class="dash-card"><h3 class="dash-title">Niron Service Revenue</h3><div class="chart-box"><canvas id="nironServiceChart"></canvas></div></div>
+        <div class="dash-card"><h3 class="dash-title">Kampu Service Revenue</h3><div class="chart-box"><canvas id="kampuServiceChart"></canvas></div></div>
+    </div>
+    <div class="growth-chart-grid">
+        <div class="dash-card"><h3 class="dash-title">Niron vs Kampu Revenue</h3><div class="chart-box"><canvas id="monthlyBusinessChart"></canvas></div></div>
+        <div class="dash-card"><h3 class="dash-title">Monthly Growth Rate %</h3><div class="chart-box"><canvas id="monthlyGrowthChart"></canvas></div></div>
     </div>
 </div>
 
@@ -920,6 +1040,10 @@
     const monthlyKampuValues = {{ monthly_kampu_values|safe }};
     const monthlyRevenueGrowthValues = {{ monthly_revenue_growth_values|safe }};
     const monthlyProfitGrowthValues = {{ monthly_profit_growth_values|safe }};
+    const monthlyNironProjectValues = {{ monthly_niron_project_values|safe }};
+    const monthlyKampuProjectValues = {{ monthly_kampu_project_values|safe }};
+    const nironServiceChart = {{ niron_service_chart|safe }};
+    const kampuServiceChart = {{ kampu_service_chart|safe }};
 
     const moneyFormat = new Intl.NumberFormat("en-US", {
         style: "currency",
@@ -1094,6 +1218,58 @@
             }
         });
     }
+
+    const monthlyProjectCanvas = document.getElementById("monthlyProjectChart");
+    if (monthlyProjectCanvas) {
+        new Chart(monthlyProjectCanvas, {
+            type: "bar",
+            data: {
+                labels: monthlyLabels,
+                datasets: [
+                    { label: "Niron Projects", data: monthlyNironProjectValues, borderWidth: 1, borderRadius: 7 },
+                    { label: "Kampu Projects", data: monthlyKampuProjectValues, borderWidth: 1, borderRadius: 7 }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                interaction: { mode: "index", intersect: false },
+                plugins: { legend: { position: "top" } },
+                scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+            }
+        });
+    }
+
+    function createServiceChart(canvasId, serviceData) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return;
+        new Chart(canvas, {
+            type: "bar",
+            data: {
+                labels: monthlyLabels,
+                datasets: [
+                    { label: "Full Order", data: serviceData.full, borderWidth: 1, borderRadius: 6 },
+                    { label: "Print & Heat Press", data: serviceData.print_heatpress, borderWidth: 1, borderRadius: 6 },
+                    { label: "Film Only", data: serviceData.film_only, borderWidth: 1, borderRadius: 6 },
+                    { label: "Retail Sale", data: serviceData.retail, borderWidth: 1, borderRadius: 6 }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                interaction: { mode: "index", intersect: false },
+                plugins: {
+                    legend: { position: "top" },
+                    tooltip: { callbacks: { label: ctx => ctx.dataset.label + ": " + moneyFormat.format(ctx.parsed.y || 0) } }
+                },
+                scales: {
+                    x: { stacked: true },
+                    y: { stacked: true, beginAtZero: true, ticks: { callback: value => "$" + value } }
+                }
+            }
+        });
+    }
+
+    createServiceChart("nironServiceChart", nironServiceChart);
+    createServiceChart("kampuServiceChart", kampuServiceChart);
 
     const monthlyBusinessCanvas = document.getElementById("monthlyBusinessChart");
     if (monthlyBusinessCanvas) {
