@@ -412,11 +412,13 @@ def profit_dashboard(request):
     base_order_qs = Order.objects.filter(
         created_at__date__gte=date_from,
         created_at__date__lte=date_to,
+        is_deleted=False,
     ).exclude(status__in=excluded_statuses)
 
     base_item_qs = OrderItem.objects.filter(
         order__created_at__date__gte=date_from,
         order__created_at__date__lte=date_to,
+        order__is_deleted=False,
     ).exclude(order__status__in=excluded_statuses)
 
     base_expense_qs = Expense.objects.filter(
@@ -615,11 +617,13 @@ def profit_dashboard(request):
         month_orders = Order.objects.filter(
             created_at__date__gte=month_start,
             created_at__date__lte=month_end,
+            is_deleted=False,
         ).exclude(status__in=excluded_statuses)
 
         month_items = OrderItem.objects.filter(
             order__created_at__date__gte=month_start,
             order__created_at__date__lte=month_end,
+            order__is_deleted=False,
         ).exclude(order__status__in=excluded_statuses)
 
         month_expenses = Expense.objects.filter(
@@ -731,6 +735,7 @@ def profit_dashboard(request):
     selected_orders = Order.objects.filter(
         created_at__date__gte=growth_from,
         created_at__date__lt=selected_end_exclusive,
+        is_deleted=False,
     ).exclude(status__in=excluded_statuses)
 
     def build_service_summary(order_type):
