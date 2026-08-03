@@ -8,7 +8,7 @@ from .models import UserProfile
 ADMIN_GROUP_NAME = "ADMIN FULL CONTROL"
 
 
-def update_user_role(user, selected_group):
+def sync_user_access(user, selected_group):
     """
     Keep the user's Django access flags synchronized with the selected role.
 
@@ -135,7 +135,7 @@ class UserCreateForm(forms.ModelForm):
             user.save()
 
             selected_group = self.cleaned_data.get("groups")
-            update_user_role(user, selected_group)
+            sync_user_access(user, selected_group)
 
             UserProfile.objects.get_or_create(user=user)
 
@@ -241,7 +241,7 @@ class UserEditForm(forms.ModelForm):
             user.save()
 
             selected_group = self.cleaned_data.get("groups")
-            update_user_role(user, selected_group)
+            sync_user_access(user, selected_group)
 
             UserProfile.objects.get_or_create(user=user)
 
