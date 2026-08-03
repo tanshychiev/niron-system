@@ -397,6 +397,254 @@
             height: 120px;
         }
     }
+
+    /* ===== FINAL PHONE RESPONSIVE + NO AUTO ZOOM ===== */
+    html {
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
+    }
+
+    @media (max-width: 700px) {
+        html,
+        body {
+            width: 100%;
+            max-width: 100%;
+            overflow-x: hidden;
+            -webkit-text-size-adjust: 100%;
+            text-size-adjust: 100%;
+        }
+
+        input,
+        select,
+        textarea,
+        button,
+        .form-control,
+        .form-select {
+            font-size: 16px !important;
+        }
+
+        .detail-shell {
+            width: 100%;
+            max-width: 100%;
+            min-width: 0;
+            margin: 0;
+        }
+
+        .detail-grid-2,
+        .design-grid {
+            grid-template-columns: 1fr !important;
+            gap: 12px;
+        }
+
+        .detail-card {
+            width: 100%;
+            max-width: 100%;
+            min-width: 0;
+            padding: 14px;
+            margin-bottom: 14px;
+            border-radius: 18px;
+            overflow: hidden;
+        }
+
+        .detail-title {
+            margin-bottom: 12px;
+            font-size: 17px;
+        }
+
+        .info-row {
+            grid-template-columns: 1fr auto;
+            gap: 10px;
+            padding: 10px 0;
+            align-items: center;
+        }
+
+        .info-label {
+            font-size: 10px;
+            letter-spacing: .55px;
+        }
+
+        .info-value {
+            min-width: 0;
+            max-width: 62vw;
+            text-align: right;
+            font-size: 13px;
+            overflow-wrap: anywhere;
+        }
+
+        .design-card-wrap {
+            width: 100%;
+            min-width: 0;
+            padding: 12px;
+            border-radius: 17px;
+        }
+
+        .design-card-head {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+        }
+
+        .design-meta-box {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 7px;
+            justify-content: stretch;
+        }
+
+        .design-mini {
+            width: 100%;
+            min-width: 0;
+            padding: 8px;
+            text-align: center;
+            white-space: normal;
+            font-size: 11px;
+        }
+
+        .design-images,
+        .design-items {
+            width: 100%;
+            min-width: 0;
+        }
+
+        .design-image-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+        }
+
+        .design-image-card img {
+            height: 110px;
+            object-fit: contain;
+            background: #fff;
+        }
+
+        .table-wrap {
+            width: 100%;
+            max-width: 100%;
+            overflow: visible;
+            border: 0;
+            background: transparent;
+        }
+
+        .detail-table {
+            width: 100%;
+            min-width: 0 !important;
+            border-collapse: separate;
+            border-spacing: 0 10px;
+        }
+
+        .detail-table thead {
+            display: none;
+        }
+
+        .detail-table,
+        .detail-table tbody,
+        .detail-table tr,
+        .detail-table td {
+            display: block;
+            width: 100%;
+        }
+
+        .detail-table tr {
+            padding: 10px 11px;
+            border: 1px solid var(--line);
+            border-radius: 15px;
+            background: #fff;
+            box-shadow: 0 5px 14px rgba(79,58,26,.04);
+        }
+
+        .detail-table td {
+            display: grid;
+            grid-template-columns: minmax(92px, 38%) minmax(0, 1fr);
+            gap: 10px;
+            padding: 7px 0;
+            border-bottom: 1px dashed var(--line);
+            font-size: 13px;
+            text-align: right;
+            overflow-wrap: anywhere;
+        }
+
+        .detail-table td:last-child {
+            border-bottom: 0;
+        }
+
+        .detail-table td::before {
+            color: var(--muted);
+            text-align: left;
+            font-size: 9.5px;
+            font-weight: 900;
+            letter-spacing: .45px;
+            text-transform: uppercase;
+        }
+
+        /* Design items table labels */
+        .design-items .detail-table td:nth-child(1)::before { content: "Mode"; }
+        .design-items .detail-table td:nth-child(2)::before { content: "Description"; }
+        .design-items .detail-table td:nth-child(3)::before { content: "Item"; }
+        .design-items .detail-table td:nth-child(4)::before { content: "Color"; }
+        .design-items .detail-table td:nth-child(5)::before { content: "Size"; }
+        .design-items .detail-table td:nth-child(6)::before { content: "Film Meter"; }
+        .design-items .detail-table td:nth-child(7)::before { content: "Qty"; }
+        .design-items .detail-table td:nth-child(8)::before { content: "Done"; }
+        .design-items .detail-table td:nth-child(9)::before { content: "Remaining"; }
+        .design-items .detail-table td:nth-child(10)::before { content: "Unit Price"; }
+        .design-items .detail-table td:nth-child(11)::before { content: "Total"; }
+
+        /* Stock deduction table labels */
+        .detail-card:nth-of-type(3) .detail-table td:nth-child(1)::before { content: "Batch"; }
+        .detail-card:nth-of-type(3) .detail-table td:nth-child(2)::before { content: "Item"; }
+        .detail-card:nth-of-type(3) .detail-table td:nth-child(3)::before { content: "Consumed Qty"; }
+        .detail-card:nth-of-type(3) .detail-table td:nth-child(4)::before { content: "Unit Cost"; }
+
+        .detail-table .empty-state {
+            display: block;
+            text-align: center;
+        }
+
+        .detail-table .empty-state::before {
+            display: none;
+        }
+
+        .history-item {
+            padding: 12px;
+            border-radius: 15px;
+        }
+
+        .history-top {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 7px;
+        }
+
+        .history-meta {
+            font-size: 11px;
+            overflow-wrap: anywhere;
+        }
+    }
+
+    @media (max-width: 390px) {
+        .info-row {
+            grid-template-columns: 1fr;
+            gap: 4px;
+            align-items: start;
+        }
+
+        .info-value {
+            max-width: 100%;
+            text-align: left;
+        }
+
+        .design-meta-box,
+        .design-image-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .detail-table td {
+            grid-template-columns: 1fr;
+            gap: 3px;
+            text-align: left;
+        }
+    }
+
 </style>
 {% endblock %}
 
