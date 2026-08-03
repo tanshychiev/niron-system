@@ -98,6 +98,8 @@ def _snapshot_order(order):
         "deadline": order.deadline.isoformat() if order.deadline else "",
         "remark": order.remark,
         "total_amount": str(order.total_amount or 0),
+        "shipping_fee": str(order.shipping_fee or 0),
+        "discount_amount": str(order.discount_amount or 0),
         "deposit_amount": str(order.deposit_amount or 0),
         "paid_amount": str(order.paid_amount or 0),
         "status": order.status,
@@ -401,8 +403,10 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
                 item_data["quantity"] = Decimal("0")
 
             elif order.service_type == Order.SERVICE_PRINT_HEATPRESS:
+                if not item_data["description"]:
+                    raise ValidationError("Printing Service requires customer cloth details.")
                 if item_data["quantity"] <= 0 or item_data["unit_price"] <= 0:
-                    raise ValidationError("Print & Heat Press requires Qty and Unit Price.")
+                    raise ValidationError("Printing Service requires Qty and Unit Price.")
 
                 item_data["shirt_item_id"] = None
                 item_data["film_item_id"] = None
@@ -897,6 +901,8 @@ def order_create(request):
                     deposit_amount = _money2(request.POST.get("deposit_amount"))
                     paid_amount = _money2(request.POST.get("paid_amount"))
 
+                    order.discount_amount = discount_amount
+                    order.shipping_fee = shipping_fee
                     order.total_amount = _money2(total_amount - discount_amount + shipping_fee)
                     order.deposit_amount = deposit_amount
                     order.paid_amount = paid_amount
@@ -912,6 +918,8 @@ def order_create(request):
                     order.save(update_fields=[
                         "customer",
                         "total_amount",
+                        "shipping_fee",
+                        "discount_amount",
                         "deposit_amount",
                         "paid_amount",
                         "total_pcs",
@@ -1244,6 +1252,8 @@ def order_edit(request, pk):
                     deposit_amount = _money2(request.POST.get("deposit_amount"))
                     paid_amount = _money2(request.POST.get("paid_amount"))
 
+                    order.discount_amount = discount_amount
+                    order.shipping_fee = shipping_fee
                     order.total_amount = _money2(total_amount - discount_amount + shipping_fee)
                     order.deposit_amount = deposit_amount
                     order.paid_amount = paid_amount
@@ -1269,6 +1279,8 @@ def order_edit(request, pk):
                         "deadline",
                         "remark",
                         "total_amount",
+                        "shipping_fee",
+                        "discount_amount",
                         "deposit_amount",
                         "paid_amount",
                         "total_pcs",
@@ -1295,8 +1307,6 @@ def order_edit(request, pk):
             messages.error(request, "Please fix the errors below and try again.")
     else:
         form = OrderForm(instance=order)
-        form.fields["discount_amount"].initial = Decimal("0")
-        form.fields["shipping_fee"].initial = Decimal("0")
 
     return render(
         request,

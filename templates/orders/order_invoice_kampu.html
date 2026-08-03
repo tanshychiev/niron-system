@@ -478,6 +478,20 @@ html, body {
         <div class="summary">
             <div class="summary-inner">
                 <div class="summary-row">
+                    <span>Subtotal</span>
+                    <span>${{ order.items_subtotal|floatformat:2 }}</span>
+                </div>
+                <div class="summary-row">
+                    <span>Delivery Fee</span>
+                    <span>${{ order.shipping_fee|floatformat:2 }}</span>
+                </div>
+                {% if order.discount_amount %}
+                <div class="summary-row">
+                    <span>Discount</span>
+                    <span>-${{ order.discount_amount|floatformat:2 }}</span>
+                </div>
+                {% endif %}
+                <div class="summary-row">
                     <span>Total</span>
                     <span>${{ order.total_amount|floatformat:2 }}</span>
                 </div>

@@ -1336,88 +1336,6 @@
                 {% url 'production_payment_list' 'sewer' as production_sewer_payment_url %}
                 {% url 'production_payment_list' 'staff' as production_staff_payment_url %}
 
-                {% if perms.inventory.view_inventorybatch or perms.production.view_fabricroll or perms.production.add_fabricreceipt %}
-                <div class="nav-group">
-                    <button class="nav-toggle" type="button" data-target="menu-inventory" aria-expanded="false">
-                        <span class="nav-main-icon icon-inventory" aria-hidden="true">
-                            <svg viewBox="0 0 24 24"><path d="M4 7.5 12 3l8 4.5-8 4.5-8-4.5Z"/><path d="M4 7.5v9L12 21l8-4.5v-9M12 12v9"/></svg>
-                        </span>
-                        <span class="nav-label">Inventory</span>
-                        <span class="nav-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 10 5 5 5-5"/></svg></span>
-                    </button>
-
-                    <div class="nav-submenu" id="menu-inventory">
-                        {% if perms.inventory.view_inventorybatch %}
-                        <a class="nav-link" href="{% url 'inventory_list' %}">
-                            <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M4 7h16v13H4zM7 4h10v3M8 11h8M8 15h5"/></svg></span>
-                            <span>Stock</span>
-                        </a>
-                        {% endif %}
-
-                        {% if perms.inventory.add_inventorybatch %}
-                        <a class="nav-link" href="{% url 'inventory_batch_create' %}">
-                            <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span>
-                            <span>Stock In</span>
-                        </a>
-                        {% endif %}
-
-                        {% if perms.inventory.add_inventoryadjustment %}
-                        <a class="nav-link" href="{% url 'material_usage' %}">
-                            <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M12 3s5 5.2 5 10a5 5 0 0 1-10 0c0-4.8 5-10 5-10Z"/><path d="M10 15c.6.8 1.2 1.2 2 1.2"/></svg></span>
-                            <span>Material Usage</span>
-                        </a>
-                        {% endif %}
-
-                        {% if perms.inventory.add_stockledger %}
-                        <a class="nav-link" href="{% url 'stock_confirm' %}">
-                            <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12 2.5 2.5L16.5 9"/></svg></span>
-                            <span>Stock Check</span>
-                        </a>
-                        {% endif %}
-
-                    </div>
-                </div>
-                {% endif %}
-
-                {% if perms.production.view_production_nav %}
-                <div class="nav-group">
-                    <button class="nav-toggle" type="button" data-target="menu-production" aria-expanded="false">
-                        <span class="nav-main-icon icon-production" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 20h18M5 20V10l4 3V8l4 3V6l6 4v10"/><path d="M8 20v-4h3v4M15 14h3M15 17h3"/></svg></span>
-                        <span class="nav-label">Production</span>
-                        <span class="nav-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 10 5 5 5-5"/></svg></span>
-                    </button>
-                    <div class="nav-submenu" id="menu-production">
-                        {% if production_dashboard_url %}
-                        <a class="nav-link" href="{{ production_dashboard_url }}"><span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg></span><span>Production Board</span></a>
-                        {% endif %}
-                        {% if perms.production.view_productionproject and production_project_list_url %}
-                        <a class="nav-link" href="{{ production_project_list_url }}"><span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M5 4h14v16H5zM8 8h8M8 12h8M8 16h5"/></svg></span><span>Projects</span></a>
-                        {% endif %}
-                        {% if perms.production.view_sewingreturn and production_return_list_url %}
-                        <a class="nav-link" href="{{ production_return_list_url }}"><span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M4 7h16v10H4zM8 11h8M12 7V4M9 4h6"/></svg></span><span>Sewing Returns</span></a>
-                        {% endif %}
-                    </div>
-                </div>
-                {% endif %}
-
-                {% if perms.production.view_sewingpartner or perms.production.view_productionsupplier %}
-                <div class="nav-group">
-                    <button class="nav-toggle" type="button" data-target="menu-partners" aria-expanded="false">
-                        <span class="nav-main-icon icon-users" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"/><path d="M3 20v-1a5 5 0 0 1 10 0v1M16 7h5M18.5 4.5v5"/></svg></span>
-                        <span class="nav-label">Partners</span>
-                        <span class="nav-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 10 5 5 5-5"/></svg></span>
-                    </button>
-                    <div class="nav-submenu" id="menu-partners">
-                        {% if perms.production.view_productionsupplier and production_supplier_list_url %}
-                        <a class="nav-link" href="{{ production_supplier_list_url }}"><span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M3 7h18v13H3zM7 7V4h10v3M7 12h10M7 16h6"/></svg></span><span>Suppliers</span></a>
-                        {% endif %}
-                        {% if perms.production.view_sewingpartner and production_partner_list_url %}
-                        <a class="nav-link" href="{{ production_partner_list_url }}"><span class="nav-mini-icon"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20v-1a6 6 0 0 1 12 0v1M16 7h5M18.5 4.5v5"/></svg></span><span>Sewing Partners</span></a>
-                        {% endif %}
-                    </div>
-                </div>
-                {% endif %}
-
                 {% if perms.orders.view_order or perms.orders.add_order %}
                 <div class="nav-group">
                     <button class="nav-toggle" type="button" data-target="menu-orders" aria-expanded="false">
@@ -1469,32 +1387,71 @@
                 </div>
                 {% endif %}
 
-                {% if perms.customers.view_customer %}
+{% if perms.production.view_production_nav %}
                 <div class="nav-group">
-                    <button class="nav-toggle" type="button" data-target="menu-customers" aria-expanded="false">
-                        <span class="nav-main-icon icon-customers" aria-hidden="true">
-                            <svg viewBox="0 0 24 24">
-                                <circle cx="9" cy="7" r="4"/>
-                                <path d="M2.5 20v-1.5A5.5 5.5 0 0 1 8 13h2a5.5 5.5 0 0 1 5.5 5.5V20"/>
-                                <path d="M16 5.5a3.5 3.5 0 0 1 0 7M17.5 14a5 5 0 0 1 4 4.8V20"/>
-                            </svg>
-                        </span>
-                        <span class="nav-label">Customers</span>
-                        <span class="nav-arrow" aria-hidden="true">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 10 5 5 5-5"/></svg>
-                        </span>
+                    <button class="nav-toggle" type="button" data-target="menu-production" aria-expanded="false">
+                        <span class="nav-main-icon icon-production" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 20h18M5 20V10l4 3V8l4 3V6l6 4v10"/><path d="M8 20v-4h3v4M15 14h3M15 17h3"/></svg></span>
+                        <span class="nav-label">Production</span>
+                        <span class="nav-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 10 5 5 5-5"/></svg></span>
                     </button>
-
-                    <div class="nav-submenu" id="menu-customers">
-                        <a class="nav-link" href="/customers/">
-                            <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"/><path d="M3 20v-1a5 5 0 0 1 5-5h1a5 5 0 0 1 5 5v1M16 7h5M18.5 4.5v5"/></svg></span>
-                            <span>Customer List</span>
-                        </a>
+                    <div class="nav-submenu" id="menu-production">
+                        {% if production_dashboard_url %}
+                        <a class="nav-link" href="{{ production_dashboard_url }}"><span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg></span><span>Production Board</span></a>
+                        {% endif %}
+                        {% if perms.production.view_productionproject and production_project_list_url %}
+                        <a class="nav-link" href="{{ production_project_list_url }}"><span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M5 4h14v16H5zM8 8h8M8 12h8M8 16h5"/></svg></span><span>Projects</span></a>
+                        {% endif %}
+                        {% if perms.production.view_sewingreturn and production_return_list_url %}
+                        <a class="nav-link" href="{{ production_return_list_url }}"><span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M4 7h16v10H4zM8 11h8M12 7V4M9 4h6"/></svg></span><span>Sewing Returns</span></a>
+                        {% endif %}
                     </div>
                 </div>
                 {% endif %}
 
-                {% if perms.finance.view_expense_summary_nav or perms.finance.view_other_expense_nav or perms.finance.view_batch_expense_nav or perms.finance.view_operating_expense_nav or perms.finance.view_profit_dashboard_nav or perms.production.view_productionexpense or perms.production.manage_production_payments %}
+{% if perms.inventory.view_inventorybatch or perms.production.view_fabricroll or perms.production.add_fabricreceipt %}
+                <div class="nav-group">
+                    <button class="nav-toggle" type="button" data-target="menu-inventory" aria-expanded="false">
+                        <span class="nav-main-icon icon-inventory" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><path d="M4 7.5 12 3l8 4.5-8 4.5-8-4.5Z"/><path d="M4 7.5v9L12 21l8-4.5v-9M12 12v9"/></svg>
+                        </span>
+                        <span class="nav-label">Inventory</span>
+                        <span class="nav-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 10 5 5 5-5"/></svg></span>
+                    </button>
+
+                    <div class="nav-submenu" id="menu-inventory">
+                        {% if perms.inventory.view_inventorybatch %}
+                        <a class="nav-link" href="{% url 'inventory_list' %}">
+                            <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M4 7h16v13H4zM7 4h10v3M8 11h8M8 15h5"/></svg></span>
+                            <span>Stock</span>
+                        </a>
+                        {% endif %}
+
+                        {% if perms.inventory.add_inventorybatch %}
+                        <a class="nav-link" href="{% url 'inventory_batch_create' %}">
+                            <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span>
+                            <span>Stock In</span>
+                        </a>
+                        {% endif %}
+
+                        {% if perms.inventory.add_inventoryadjustment %}
+                        <a class="nav-link" href="{% url 'material_usage' %}">
+                            <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M12 3s5 5.2 5 10a5 5 0 0 1-10 0c0-4.8 5-10 5-10Z"/><path d="M10 15c.6.8 1.2 1.2 2 1.2"/></svg></span>
+                            <span>Material Usage</span>
+                        </a>
+                        {% endif %}
+
+                        {% if perms.inventory.add_stockledger %}
+                        <a class="nav-link" href="{% url 'stock_confirm' %}">
+                            <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12 2.5 2.5L16.5 9"/></svg></span>
+                            <span>Stock Check</span>
+                        </a>
+                        {% endif %}
+
+                    </div>
+                </div>
+                {% endif %}
+
+{% if perms.finance.view_expense_summary_nav or perms.finance.view_other_expense_nav or perms.finance.view_batch_expense_nav or perms.finance.view_operating_expense_nav or perms.finance.view_profit_dashboard_nav or perms.production.view_productionexpense or perms.production.manage_production_payments %}
                 <div class="nav-group">
                     <button class="nav-toggle" type="button" data-target="menu-finance" aria-expanded="false">
                         <span class="nav-main-icon icon-finance" aria-hidden="true">
@@ -1552,7 +1509,50 @@
                 </div>
                 {% endif %}
 
-                {% if perms.inventory.view_inventoryitem or perms.inventory.view_color or perms.inventory.view_size %}
+{% if perms.production.view_sewingpartner or perms.production.view_productionsupplier %}
+                <div class="nav-group">
+                    <button class="nav-toggle" type="button" data-target="menu-partners" aria-expanded="false">
+                        <span class="nav-main-icon icon-users" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"/><path d="M3 20v-1a5 5 0 0 1 10 0v1M16 7h5M18.5 4.5v5"/></svg></span>
+                        <span class="nav-label">Partners</span>
+                        <span class="nav-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 10 5 5 5-5"/></svg></span>
+                    </button>
+                    <div class="nav-submenu" id="menu-partners">
+                        {% if perms.production.view_productionsupplier and production_supplier_list_url %}
+                        <a class="nav-link" href="{{ production_supplier_list_url }}"><span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M3 7h18v13H3zM7 7V4h10v3M7 12h10M7 16h6"/></svg></span><span>Suppliers</span></a>
+                        {% endif %}
+                        {% if perms.production.view_sewingpartner and production_partner_list_url %}
+                        <a class="nav-link" href="{{ production_partner_list_url }}"><span class="nav-mini-icon"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20v-1a6 6 0 0 1 12 0v1M16 7h5M18.5 4.5v5"/></svg></span><span>Sewing Partners</span></a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+{% if perms.customers.view_customer %}
+                <div class="nav-group">
+                    <button class="nav-toggle" type="button" data-target="menu-customers" aria-expanded="false">
+                        <span class="nav-main-icon icon-customers" aria-hidden="true">
+                            <svg viewBox="0 0 24 24">
+                                <circle cx="9" cy="7" r="4"/>
+                                <path d="M2.5 20v-1.5A5.5 5.5 0 0 1 8 13h2a5.5 5.5 0 0 1 5.5 5.5V20"/>
+                                <path d="M16 5.5a3.5 3.5 0 0 1 0 7M17.5 14a5 5 0 0 1 4 4.8V20"/>
+                            </svg>
+                        </span>
+                        <span class="nav-label">Customers</span>
+                        <span class="nav-arrow" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 10 5 5 5-5"/></svg>
+                        </span>
+                    </button>
+
+                    <div class="nav-submenu" id="menu-customers">
+                        <a class="nav-link" href="/customers/">
+                            <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"/><path d="M3 20v-1a5 5 0 0 1 5-5h1a5 5 0 0 1 5 5v1M16 7h5M18.5 4.5v5"/></svg></span>
+                            <span>Customer List</span>
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+
+{% if perms.inventory.view_inventoryitem or perms.inventory.view_color or perms.inventory.view_size %}
                 <div class="nav-group">
                     <button class="nav-toggle" type="button" data-target="menu-setup" aria-expanded="false">
                         <span class="nav-main-icon icon-setup" aria-hidden="true">
@@ -1584,7 +1584,7 @@
                 </div>
                 {% endif %}
 
-                {% if perms.auth.view_user or perms.auth.view_group %}
+{% if perms.auth.view_user or perms.auth.view_group %}
                 <div class="nav-group">
                     <button class="nav-toggle" type="button" data-target="menu-users" aria-expanded="false">
                         <span class="nav-main-icon icon-users" aria-hidden="true">
@@ -1619,7 +1619,8 @@
             </div>
 
             {% if user.is_authenticated %}
-            <div class="sidebar-footer">
+
+<div class="sidebar-footer">
                 <div class="sidebar-profile">
                     <span class="profile-avatar">{{ user.username|first|upper }}</span>
                     <span class="profile-copy">

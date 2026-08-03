@@ -1020,7 +1020,7 @@
 
                         <div class="item-board">
                             <div class="item-header-row">
-                                <div class="col-description">Description</div>
+                                <div class="col-description description-header">Description</div>
                                 <div class="col-retail-item service-retail-only">Item</div>
                                 <div class="col-shirt service-full-only">Shirt Item</div>
                                 <div class="col-color service-full-only">Color</div>
@@ -1045,7 +1045,7 @@
 
                                     <div class="item-input-row">
                                         <div class="field col-description">
-                                            <input type="text" name="design-{{ forloop.parentloop.counter0 }}-item-{{ forloop.counter0 }}-description" class="form-control" value="{{ item.description }}">
+                                            <input type="text" name="design-{{ forloop.parentloop.counter0 }}-item-{{ forloop.counter0 }}-description" class="form-control description-input" placeholder="e.g. 250 GSM Cotton / Black / XL" value="{{ item.description }}">
                                         </div>
 
                                         <div class="field col-retail-item service-retail-only">
@@ -1131,7 +1131,7 @@
 
                                     <div class="item-input-row">
                                         <div class="field col-description">
-                                            <input type="text" name="design-{{ forloop.parentloop.counter0 }}-item-0-description" class="form-control" value="">
+                                            <input type="text" name="design-{{ forloop.parentloop.counter0 }}-item-0-description" class="form-control description-input" placeholder="e.g. 250 GSM Cotton / Black / XL" value="">
                                         </div>
 
                                         <div class="field col-retail-item service-retail-only">
@@ -1264,7 +1264,7 @@
 
                         <div class="item-board">
                             <div class="item-header-row">
-                                <div class="col-description">Description</div>
+                                <div class="col-description description-header">Description</div>
                                 <div class="col-retail-item service-retail-only">Item</div>
                                 <div class="col-shirt service-full-only">Shirt Item</div>
                                 <div class="col-color service-full-only">Color</div>
@@ -1288,7 +1288,7 @@
 
                                     <div class="item-input-row">
                                         <div class="field col-description">
-                                            <input type="text" name="design-0-item-0-description" class="form-control" value="">
+                                            <input type="text" name="design-0-item-0-description" class="form-control description-input" placeholder="e.g. 250 GSM Cotton / Black / XL" value="">
                                         </div>
 
                                         <div class="field col-retail-item service-retail-only">
@@ -1383,7 +1383,7 @@
                 <div class="summary-note">
                     <div class="summary-note-title">Order Summary</div>
                     <div class="summary-note-text">
-                        Full Order = deduct shirt inventory. Retail Sale = use one Item field for shirt or material. Film Only = deduct film inventory. Print & Heat Press = service only, no inventory deduction.
+                        Full Order = deduct shirt inventory. Retail Sale = use one Item field for shirt or material. Film Only = deduct film inventory. Printing Service = customer brings cloth; record type/color/size in Description; no shirt stock deduction.
                     </div>
                 </div>
 
@@ -1401,7 +1401,7 @@
                     </div>
 
                     <div class="summary-line">
-                        <label>Shipping</label>
+                        <label>Delivery Fee</label>
                         {{ form.shipping_fee }}
                     </div>
 
@@ -1494,7 +1494,7 @@
 
         <div class="item-board">
             <div class="item-header-row">
-                <div class="col-description">Description</div>
+                <div class="col-description description-header">Description</div>
                 <div class="col-retail-item service-retail-only">Item</div>
                 <div class="col-shirt service-full-only">Shirt Item</div>
                 <div class="col-color service-full-only">Color</div>
@@ -1525,7 +1525,7 @@
 
         <div class="item-input-row">
             <div class="field col-description">
-                <input type="text" name="design-__DESIGN_INDEX__-item-__ITEM_INDEX__-description" class="form-control" value="">
+                <input type="text" name="design-__DESIGN_INDEX__-item-__ITEM_INDEX__-description" class="form-control description-input" placeholder="e.g. 250 GSM Cotton / Black / XL" value="">
             </div>
 
             <div class="field col-retail-item service-retail-only">
@@ -1935,13 +1935,22 @@ document.addEventListener("DOMContentLoaded", function () {
             } else if (serviceType === "FILM_ONLY") {
                 serviceHelpText.textContent = "Film Only: choose film item. Total = Film Meter × Unit Price.";
             } else if (serviceType === "PRINT_HEATPRESS") {
-                serviceHelpText.textContent = "Print & Heat Press: service only, no inventory deduction. Total = Qty × Unit Price.";
+                serviceHelpText.textContent = "Printing Service: customer brings cloth. Enter cloth type, color and size in Description. No shirt stock deduction."
             } else if (serviceType === "RETAIL") {
                 serviceHelpText.textContent = "Retail Sale: choose Shirt or Material in Item. Shirt needs Color/Size. Material uses wider Item and hides Color/Size.";
             } else {
                 serviceHelpText.textContent = "";
             }
         }
+
+        document.querySelectorAll(".description-header").forEach(function(el){
+            el.textContent = serviceType === "PRINT_HEATPRESS" ? "Customer Cloth Details" : "Description";
+        });
+        document.querySelectorAll('input[name$="-description"]').forEach(function(el){
+            el.placeholder = serviceType === "PRINT_HEATPRESS"
+                ? "e.g. 250 GSM Cotton / Black / XL"
+                : "Description";
+        });
 
         const showFull = serviceType === "FULL";
         const showRetail = serviceType === "RETAIL";
@@ -2362,6 +2371,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 const retailShirt = row.querySelector(".retail-shirt-hidden")?.value;
                 const retailMaterial = row.querySelector(".retail-material-hidden")?.value;
 
+                const description = (row.querySelector('input[name$="-description"]')?.value || "").trim();
                 const shirt = row.querySelector(".shirt-select")?.value;
                 const color = row.querySelector(".color-select")?.value;
                 const size = row.querySelector(".size-select")?.value;
@@ -2380,9 +2390,9 @@ document.addEventListener("DOMContentLoaded", function () {
                     errorMessage = "Please fill Film Item, Film Meter, and Unit Price.";
                 }
 
-                if (serviceType === "PRINT_HEATPRESS" && (qty <= 0 || price <= 0)) {
+                if (serviceType === "PRINT_HEATPRESS" && (!description || qty <= 0 || price <= 0)) {
                     hasError = true;
-                    errorMessage = "Please fill Qty and Unit Price.";
+                    errorMessage = "Printing Service: enter customer cloth type/color/size, Qty, and Unit Price.";
                 }
 
                 if (serviceType === "RETAIL") {

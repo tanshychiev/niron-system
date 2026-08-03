@@ -37,7 +37,7 @@ class Order(models.Model):
     SERVICE_CHOICES = [
         (SERVICE_FULL, "Full Order"),
         (SERVICE_FILM_ONLY, "Film Only"),
-        (SERVICE_PRINT_HEATPRESS, "Print & Heat Press"),
+        (SERVICE_PRINT_HEATPRESS, "Printing Service"),
         (SERVICE_RETAIL, "Retail Sale"),
     ]
 
@@ -86,6 +86,8 @@ class Order(models.Model):
 
     # ===== MONEY =====
     total_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    shipping_fee = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    discount_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     deposit_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     paid_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
@@ -129,6 +131,14 @@ class Order(models.Model):
 
     def __str__(self):
         return self.order_no or f"Order {self.pk}"
+
+    @property
+    def items_subtotal(self):
+        return (
+            (self.total_amount or Decimal("0"))
+            - (self.shipping_fee or Decimal("0"))
+            + (self.discount_amount or Decimal("0"))
+        )
 
     @property
     def balance_amount(self):
@@ -359,10 +369,12 @@ class OrderItem(models.Model):
             self.size = None
 
         elif service_type == Order.SERVICE_PRINT_HEATPRESS:
+            if not (self.description or "").strip():
+                raise ValidationError({"description": "Enter customer cloth type, color, and size."})
             if Decimal(self.quantity or 0) < 1:
-                raise ValidationError({"quantity": "Print & Heat Press requires quantity."})
+                raise ValidationError({"quantity": "Printing Service requires quantity."})
             if Decimal(self.unit_price or 0) <= 0:
-                raise ValidationError({"unit_price": "Print & Heat Press requires unit price."})
+                raise ValidationError({"unit_price": "Printing Service requires unit price."})
 
             self.quantity = Decimal(self.quantity or 0).quantize(Decimal("1"))
             self.shirt_item = None

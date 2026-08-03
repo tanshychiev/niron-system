@@ -63,6 +63,8 @@ class OrderForm(forms.ModelForm):
             "customer_location",
             "deadline",
             "remark",
+            "discount_amount",
+            "shipping_fee",
         ]
         widgets = {
             "order_type": forms.Select(attrs={"class": "form-select"}),
@@ -230,6 +232,17 @@ class OrderItemForm(forms.ModelForm):
                 self.add_error("color", "Please choose color.")
             if not size:
                 self.add_error("size", "Please choose size.")
+
+        elif service_type == Order.SERVICE_PRINT_HEATPRESS:
+            description = (cleaned.get("description") or "").strip()
+            quantity = cleaned.get("quantity") or 0
+            unit_price = cleaned.get("unit_price") or 0
+            if not description:
+                self.add_error("description", "Enter customer cloth type, color, and size.")
+            if quantity <= 0:
+                self.add_error("quantity", "Please enter quantity.")
+            if unit_price <= 0:
+                self.add_error("unit_price", "Please enter unit price.")
 
         elif service_type == Order.SERVICE_FILM_ONLY:
             if not film_item:

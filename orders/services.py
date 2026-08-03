@@ -118,7 +118,7 @@ def _log_order_restore(order, consume, qty, qty_before, qty_after, user=None):
 def get_order_shortages(order):
     shortages = []
 
-    # Film Only and Print & Heat Press do not deduct stock.
+    # Film Only and Printing Service do not deduct inventory stock.
     if order.service_type in [
         order.SERVICE_FILM_ONLY,
         order.SERVICE_PRINT_HEATPRESS,
@@ -334,7 +334,7 @@ def deduct_stock_for_order(order, allow_shortage=False, user=None):
     if order.stock_deducted:
         return []
 
-    # Film Only and Print & Heat Press do not deduct stock.
+    # Film Only and Printing Service do not deduct inventory stock.
     if order.service_type in [
         order.SERVICE_FILM_ONLY,
         order.SERVICE_PRINT_HEATPRESS,
