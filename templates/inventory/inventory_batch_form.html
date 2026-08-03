@@ -6358,3 +6358,77 @@
 </style>
 
 {% endblock %}
+<style id="niron-printing-material-popup-smaller-images">
+/* Keep cloth images unchanged; only make Printing Material popup pictures smaller. */
+#clothPickerModal.material-picker-mode .picker-option{
+  min-height:154px!important;
+  padding:10px!important;
+}
+
+#clothPickerModal.material-picker-mode .picker-shirt-stage{
+  height:84px!important;
+  border-radius:12px!important;
+}
+
+#clothPickerModal.material-picker-mode .picker-shirt-stage .inventory-item-image{
+  width:78%!important;
+  height:78%!important;
+  max-width:150px!important;
+  max-height:74px!important;
+  padding:2px!important;
+  object-fit:contain!important;
+}
+
+#clothPickerModal.material-picker-mode .picker-shirt-stage svg{
+  width:58px!important;
+  height:58px!important;
+}
+
+#clothPickerModal.material-picker-mode .material-fallback-icon{
+  width:56px!important;
+  height:56px!important;
+  border-radius:14px!important;
+  font-size:24px!important;
+}
+
+#clothPickerModal.material-picker-mode .picker-option strong{
+  margin-top:7px!important;
+  font-size:14px!important;
+}
+
+#clothPickerModal.material-picker-mode .picker-option small{
+  margin-top:3px!important;
+  font-size:10px!important;
+}
+
+@media(max-width:720px){
+  #clothPickerModal.material-picker-mode .picker-option{
+    min-height:144px!important;
+  }
+
+  #clothPickerModal.material-picker-mode .picker-shirt-stage{
+    height:78px!important;
+  }
+}
+</style>
+
+<script id="niron-printing-material-popup-mode-class">
+(function(){
+  const modal=document.getElementById('clothPickerModal');
+  const stockType=document.getElementById('inventoryStockType');
+  if(!modal||!stockType) return;
+
+  function syncMaterialPopupMode(){
+    modal.classList.toggle('material-picker-mode',stockType.value==='printing');
+  }
+
+  document.addEventListener('click',function(event){
+    if(event.target.closest('.visual-item-btn')||event.target.closest('.type-tab')){
+      syncMaterialPopupMode();
+      setTimeout(syncMaterialPopupMode,0);
+    }
+  },true);
+
+  syncMaterialPopupMode();
+})();
+</script>

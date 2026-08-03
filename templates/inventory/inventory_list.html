@@ -956,9 +956,10 @@
   }
 
   .material-image{
-    width:100%;
-    height:100%;
-    object-fit:cover;
+    width:88%;
+    height:88%;
+    object-fit:contain;
+    object-position:center;
     display:block;
   }
 
@@ -4347,5 +4348,52 @@
   applyPhoneState();
 })();
 </script>
+
+
+<style id="niron-final-button-hover-colors">
+/* Clear hover colours for Inventory List buttons */
+.inventory-page .btn-dark:hover{
+  background:linear-gradient(135deg,#5b3514,#9a641d)!important;
+  border-color:#8a5717!important;
+  color:#fff!important;
+}
+
+.inventory-page .btn-light:hover,
+.inventory-page .small-btn:hover{
+  background:linear-gradient(135deg,#fff4d6,#edc676)!important;
+  border-color:#d39a36!important;
+  color:#5b3514!important;
+  box-shadow:0 8px 18px rgba(121,76,20,.16)!important;
+}
+
+.inventory-page .btn-ledger:hover,
+.inventory-page .mini-ledger:hover{
+  background:linear-gradient(135deg,#dff8eb,#aee8cc)!important;
+  border-color:#67c69e!important;
+  color:#0f6b4c!important;
+}
+
+.inventory-page .mini-btn:hover{
+  background:linear-gradient(135deg,#fff8e8,#efd098)!important;
+  border-color:#d5a44e!important;
+  color:#684217!important;
+  transform:translateY(-1px)!important;
+}
+
+.inventory-page .inventory-type-btn:hover,
+.inventory-page .arrange-mode-btn:hover{
+  background:linear-gradient(135deg,#ffe9b6,#e9b952)!important;
+  border-color:#c98a22!important;
+  color:#56330d!important;
+}
+
+.inventory-page .table-action:hover,
+.inventory-page .matrix-ledger:hover,
+.inventory-page .size-ledger-link:hover{
+  background:#f1cf87!important;
+  border-color:#cf9b3f!important;
+  color:#4e2f0c!important;
+}
+</style>
 
 {% endblock %}
