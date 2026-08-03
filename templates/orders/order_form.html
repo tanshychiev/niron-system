@@ -859,6 +859,294 @@
             padding: 16px;
         }
     }
+
+    /* ===== FINAL PHONE RESPONSIVE LAYOUT ===== */
+    @media (max-width: 700px) {
+        html,
+        body {
+            width: 100%;
+            max-width: 100%;
+            overflow-x: hidden;
+        }
+
+        .order-shell {
+            width: 100%;
+            max-width: 100%;
+            margin: 0;
+        }
+
+        .order-shell form,
+        .qb-card,
+        .design-stack,
+        .design-block,
+        .item-board,
+        .items-container,
+        .summary-layout,
+        .invoice-summary {
+            width: 100%;
+            max-width: 100%;
+            min-width: 0;
+        }
+
+        .qb-card {
+            padding: 14px;
+            margin-bottom: 14px;
+            border-radius: 18px;
+        }
+
+        .qb-head {
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .qb-title {
+            font-size: 18px;
+        }
+
+        .qb-sub {
+            font-size: 11px;
+        }
+
+        .service-top-grid,
+        .customer-row-grid,
+        .design-row-grid,
+        .summary-layout {
+            grid-template-columns: 1fr !important;
+            gap: 10px;
+        }
+
+        .design-stack {
+            gap: 12px;
+        }
+
+        .design-block {
+            padding: 12px;
+            border-radius: 18px;
+            overflow: hidden;
+        }
+
+        .design-top {
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+
+        .design-actions {
+            width: 100%;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .design-actions .btn,
+        .design-actions button {
+            width: 100%;
+            min-width: 0;
+            padding: 9px 8px;
+            font-size: 11px;
+        }
+
+        .design-upload-field input[type="file"] {
+            width: 100%;
+            font-size: 12px;
+        }
+
+        .preview-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+        }
+
+        .preview-card img {
+            height: 100px;
+            object-fit: contain;
+            background: #fff;
+        }
+
+        .items-toolbar {
+            align-items: stretch;
+            gap: 8px;
+        }
+
+        .items-toolbar > * {
+            width: 100%;
+        }
+
+        .items-toolbar .btn,
+        .items-toolbar button {
+            width: 100%;
+        }
+
+        .item-board {
+            overflow-x: visible !important;
+            padding: 0;
+        }
+
+        .item-header-row {
+            display: none !important;
+        }
+
+        .item-input-row,
+        body.service-full-mode .item-input-row,
+        body.service-film-only-mode .item-input-row,
+        body.service-print-mode .item-input-row,
+        body.service-retail-mode .item-row.mode-shirt .item-input-row,
+        body.service-retail-mode .item-row.mode-material .item-input-row {
+            width: 100% !important;
+            min-width: 0 !important;
+            display: grid !important;
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            gap: 9px !important;
+            align-items: end;
+        }
+
+        .item-row {
+            width: 100%;
+            max-width: 100%;
+            padding: 11px;
+            border-radius: 16px;
+            margin-bottom: 10px;
+            overflow: hidden;
+        }
+
+        .item-row .field,
+        .item-row .remove-inline {
+            min-width: 0;
+        }
+
+        .item-row .field::before,
+        .item-row .remove-inline::before {
+            display: block;
+            margin-bottom: 5px;
+            color: var(--muted);
+            font-size: 9px;
+            line-height: 1.15;
+            font-weight: 900;
+            letter-spacing: .45px;
+            text-transform: uppercase;
+        }
+
+        .item-row .col-description::before { content: "Description"; }
+        .item-row .col-shirt::before { content: "Shirt Item"; }
+        .item-row .col-retail-item::before { content: "Item"; }
+        .item-row .col-color::before { content: "Color"; }
+        .item-row .col-size::before { content: "Size"; }
+        .item-row .col-film-item::before { content: "Film Item"; }
+        .item-row .col-film-meter::before { content: "Film Meter"; }
+        .item-row .col-qty::before { content: "Qty"; }
+        .item-row .col-unit-price::before { content: "Unit Price"; }
+        .item-row .col-unit-name::before { content: "Unit"; }
+        .item-row .col-total::before { content: "Total"; }
+        .item-row .remove-inline::before { content: "Action"; }
+
+        body.service-print-mode .item-row .col-description::before {
+            content: "Customer Cloth Details";
+        }
+
+        .item-row input,
+        .item-row select,
+        .item-row textarea {
+            width: 100%;
+            min-width: 0;
+            height: 44px;
+            font-size: 14px;
+        }
+
+        .col-description {
+            grid-column: 1 / -1;
+        }
+
+        body.service-print-mode .col-description {
+            grid-column: 1 / -1;
+        }
+
+        .col-total,
+        .remove-inline {
+            align-self: end;
+        }
+
+        .remove-inline {
+            justify-content: flex-start;
+        }
+
+        .trash-btn {
+            width: 44px;
+            height: 44px;
+        }
+
+        .summary-note {
+            padding: 14px;
+            border-radius: 16px;
+        }
+
+        .invoice-summary {
+            padding: 14px;
+            border-radius: 17px;
+        }
+
+        .summary-line {
+            gap: 8px;
+            padding: 9px 0;
+        }
+
+        .summary-line label {
+            min-width: 86px;
+            font-size: 10px;
+        }
+
+        .summary-line input {
+            width: 125px;
+            max-width: 52%;
+            height: 42px;
+        }
+
+        .summary-total {
+            gap: 10px;
+        }
+
+        .submit-row {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 9px;
+        }
+
+        .submit-row .btn,
+        .submit-row button {
+            width: 100%;
+            min-height: 48px;
+        }
+    }
+
+    @media (max-width: 390px) {
+        .item-input-row,
+        body.service-full-mode .item-input-row,
+        body.service-film-only-mode .item-input-row,
+        body.service-print-mode .item-input-row,
+        body.service-retail-mode .item-row.mode-shirt .item-input-row,
+        body.service-retail-mode .item-row.mode-material .item-input-row {
+            grid-template-columns: 1fr !important;
+        }
+
+        .col-description {
+            grid-column: auto;
+        }
+
+        .design-actions {
+            grid-template-columns: 1fr;
+        }
+
+        .preview-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .summary-line {
+            align-items: center;
+        }
+
+        .summary-line input {
+            width: 120px;
+            max-width: 55%;
+        }
+    }
+
 </style>
 {% endblock %}
 
@@ -1020,7 +1308,7 @@
 
                         <div class="item-board">
                             <div class="item-header-row">
-                                <div class="col-description description-header">Description</div>
+                                <div class="col-description">Description</div>
                                 <div class="col-retail-item service-retail-only">Item</div>
                                 <div class="col-shirt service-full-only">Shirt Item</div>
                                 <div class="col-color service-full-only">Color</div>
@@ -1045,7 +1333,7 @@
 
                                     <div class="item-input-row">
                                         <div class="field col-description">
-                                            <input type="text" name="design-{{ forloop.parentloop.counter0 }}-item-{{ forloop.counter0 }}-description" class="form-control description-input" placeholder="e.g. 250 GSM Cotton / Black / XL" value="{{ item.description }}">
+                                            <input type="text" name="design-{{ forloop.parentloop.counter0 }}-item-{{ forloop.counter0 }}-description" class="form-control" value="{{ item.description }}">
                                         </div>
 
                                         <div class="field col-retail-item service-retail-only">
@@ -1131,7 +1419,7 @@
 
                                     <div class="item-input-row">
                                         <div class="field col-description">
-                                            <input type="text" name="design-{{ forloop.parentloop.counter0 }}-item-0-description" class="form-control description-input" placeholder="e.g. 250 GSM Cotton / Black / XL" value="">
+                                            <input type="text" name="design-{{ forloop.parentloop.counter0 }}-item-0-description" class="form-control" value="">
                                         </div>
 
                                         <div class="field col-retail-item service-retail-only">
@@ -1264,7 +1552,7 @@
 
                         <div class="item-board">
                             <div class="item-header-row">
-                                <div class="col-description description-header">Description</div>
+                                <div class="col-description">Description</div>
                                 <div class="col-retail-item service-retail-only">Item</div>
                                 <div class="col-shirt service-full-only">Shirt Item</div>
                                 <div class="col-color service-full-only">Color</div>
@@ -1288,7 +1576,7 @@
 
                                     <div class="item-input-row">
                                         <div class="field col-description">
-                                            <input type="text" name="design-0-item-0-description" class="form-control description-input" placeholder="e.g. 250 GSM Cotton / Black / XL" value="">
+                                            <input type="text" name="design-0-item-0-description" class="form-control" value="">
                                         </div>
 
                                         <div class="field col-retail-item service-retail-only">
@@ -1383,7 +1671,7 @@
                 <div class="summary-note">
                     <div class="summary-note-title">Order Summary</div>
                     <div class="summary-note-text">
-                        Full Order = deduct shirt inventory. Retail Sale = use one Item field for shirt or material. Film Only = deduct film inventory. Printing Service = customer brings cloth; record type/color/size in Description; no shirt stock deduction.
+                        Full Order = deduct shirt inventory. Retail Sale = use one Item field for shirt or material. Film Only = deduct film inventory. Print & Heat Press = service only, no inventory deduction.
                     </div>
                 </div>
 
@@ -1494,7 +1782,7 @@
 
         <div class="item-board">
             <div class="item-header-row">
-                <div class="col-description description-header">Description</div>
+                <div class="col-description">Description</div>
                 <div class="col-retail-item service-retail-only">Item</div>
                 <div class="col-shirt service-full-only">Shirt Item</div>
                 <div class="col-color service-full-only">Color</div>
@@ -1525,7 +1813,7 @@
 
         <div class="item-input-row">
             <div class="field col-description">
-                <input type="text" name="design-__DESIGN_INDEX__-item-__ITEM_INDEX__-description" class="form-control description-input" placeholder="e.g. 250 GSM Cotton / Black / XL" value="">
+                <input type="text" name="design-__DESIGN_INDEX__-item-__ITEM_INDEX__-description" class="form-control" value="">
             </div>
 
             <div class="field col-retail-item service-retail-only">
@@ -1935,22 +2223,13 @@ document.addEventListener("DOMContentLoaded", function () {
             } else if (serviceType === "FILM_ONLY") {
                 serviceHelpText.textContent = "Film Only: choose film item. Total = Film Meter × Unit Price.";
             } else if (serviceType === "PRINT_HEATPRESS") {
-                serviceHelpText.textContent = "Printing Service: customer brings cloth. Enter cloth type, color and size in Description. No shirt stock deduction."
+                serviceHelpText.textContent = "Print & Heat Press: service only, no inventory deduction. Total = Qty × Unit Price.";
             } else if (serviceType === "RETAIL") {
                 serviceHelpText.textContent = "Retail Sale: choose Shirt or Material in Item. Shirt needs Color/Size. Material uses wider Item and hides Color/Size.";
             } else {
                 serviceHelpText.textContent = "";
             }
         }
-
-        document.querySelectorAll(".description-header").forEach(function(el){
-            el.textContent = serviceType === "PRINT_HEATPRESS" ? "Customer Cloth Details" : "Description";
-        });
-        document.querySelectorAll('input[name$="-description"]').forEach(function(el){
-            el.placeholder = serviceType === "PRINT_HEATPRESS"
-                ? "e.g. 250 GSM Cotton / Black / XL"
-                : "Description";
-        });
 
         const showFull = serviceType === "FULL";
         const showRetail = serviceType === "RETAIL";
@@ -2371,7 +2650,6 @@ document.addEventListener("DOMContentLoaded", function () {
                 const retailShirt = row.querySelector(".retail-shirt-hidden")?.value;
                 const retailMaterial = row.querySelector(".retail-material-hidden")?.value;
 
-                const description = (row.querySelector('input[name$="-description"]')?.value || "").trim();
                 const shirt = row.querySelector(".shirt-select")?.value;
                 const color = row.querySelector(".color-select")?.value;
                 const size = row.querySelector(".size-select")?.value;
@@ -2390,9 +2668,9 @@ document.addEventListener("DOMContentLoaded", function () {
                     errorMessage = "Please fill Film Item, Film Meter, and Unit Price.";
                 }
 
-                if (serviceType === "PRINT_HEATPRESS" && (!description || qty <= 0 || price <= 0)) {
+                if (serviceType === "PRINT_HEATPRESS" && (qty <= 0 || price <= 0)) {
                     hasError = true;
-                    errorMessage = "Printing Service: enter customer cloth type/color/size, Qty, and Unit Price.";
+                    errorMessage = "Please fill Qty and Unit Price.";
                 }
 
                 if (serviceType === "RETAIL") {
