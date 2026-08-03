@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block page_title %}{{ page_title|default:"Stock In" }}
-<style id="niron-final-compact-material-picker">
-/* Compact layout only for the Printing Material picker */
+<style id="niron-final-material-full-picture">
+/* Printing Material picker: compact cards and always show the full uploaded image */
 #clothPickerModal.material-picker-mode .visual-picker-card{
   width:min(760px,94vw)!important;
   max-height:min(78vh,650px)!important;
@@ -36,15 +36,27 @@
 
 #clothPickerModal.material-picker-mode .picker-shirt-stage{
   height:72px!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  overflow:hidden!important;
   border-radius:10px!important;
+  background:#fff!important;
 }
 
+#clothPickerModal.material-picker-mode .picker-shirt-stage img,
 #clothPickerModal.material-picker-mode .picker-shirt-stage .inventory-item-image{
-  width:82%!important;
-  height:82%!important;
+  width:100%!important;
+  height:100%!important;
+  max-width:100%!important;
+  max-height:100%!important;
   object-fit:contain!important;
   object-position:center!important;
-  padding:0!important;
+  display:block!important;
+  padding:6px!important;
+  box-sizing:border-box!important;
+  background:#fff!important;
+  transform:none!important;
 }
 
 #clothPickerModal.material-picker-mode .picker-shirt-stage svg{
@@ -90,29 +102,29 @@
 }
 </style>
 
-<script id="niron-material-picker-mode-class">
+<script id="niron-final-material-picker-mode">
 (function(){
   const modal=document.getElementById('clothPickerModal');
   const stockType=document.getElementById('inventoryStockType');
   if(!modal||!stockType) return;
 
-  function syncMaterialMode(){
+  function sync(){
     modal.classList.toggle('material-picker-mode',stockType.value==='printing');
   }
 
   document.addEventListener('click',function(event){
     if(event.target.closest('.visual-item-btn')){
-      syncMaterialMode();
+      sync();
     }
   },true);
 
   document.querySelectorAll('.type-tab').forEach(function(tab){
     tab.addEventListener('click',function(){
-      setTimeout(syncMaterialMode,0);
+      setTimeout(sync,0);
     });
   });
 
-  syncMaterialMode();
+  sync();
 })();
 </script>
 
