@@ -1324,26 +1324,35 @@
             <div class="sidebar-scroll">
                 <div class="nav-caption">Management</div>
 
-                {% if perms.inventory.view_inventorybatch %}
+                {# Workflow navigation: all existing functions kept, only reorganized #}
+                {% url 'production_dashboard' as production_dashboard_url %}
+                {% url 'production_material_stock' as production_material_stock_url %}
+                {% url 'production_fabric_receive' as production_fabric_receive_url %}
+                {% url 'production_project_list' as production_project_list_url %}
+                {% url 'production_return_list' as production_return_list_url %}
+                {% url 'production_partner_list' as production_partner_list_url %}
+                {% url 'production_supplier_list' as production_supplier_list_url %}
+                {% url 'production_expense_list' as production_expense_list_url %}
+                {% url 'production_payment_list' 'sewer' as production_sewer_payment_url %}
+                {% url 'production_payment_list' 'staff' as production_staff_payment_url %}
+
+                {% if perms.inventory.view_inventorybatch or perms.production.view_fabricroll or perms.production.add_fabricreceipt %}
                 <div class="nav-group">
                     <button class="nav-toggle" type="button" data-target="menu-inventory" aria-expanded="false">
                         <span class="nav-main-icon icon-inventory" aria-hidden="true">
-                            <svg viewBox="0 0 24 24">
-                                <path d="M4 7.5 12 3l8 4.5-8 4.5-8-4.5Z"/>
-                                <path d="M4 7.5v9L12 21l8-4.5v-9M12 12v9"/>
-                            </svg>
+                            <svg viewBox="0 0 24 24"><path d="M4 7.5 12 3l8 4.5-8 4.5-8-4.5Z"/><path d="M4 7.5v9L12 21l8-4.5v-9M12 12v9"/></svg>
                         </span>
                         <span class="nav-label">Inventory</span>
-                        <span class="nav-arrow" aria-hidden="true">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 10 5 5 5-5"/></svg>
-                        </span>
+                        <span class="nav-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 10 5 5 5-5"/></svg></span>
                     </button>
 
                     <div class="nav-submenu" id="menu-inventory">
+                        {% if perms.inventory.view_inventorybatch %}
                         <a class="nav-link" href="{% url 'inventory_list' %}">
                             <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M4 7h16v13H4zM7 4h10v3M8 11h8M8 15h5"/></svg></span>
-                            <span>Cloth Inventory</span>
+                            <span>Stock</span>
                         </a>
+                        {% endif %}
 
                         {% if perms.inventory.add_inventorybatch %}
                         <a class="nav-link" href="{% url 'inventory_batch_create' %}">
@@ -1353,11 +1362,6 @@
                         {% endif %}
 
                         {% if perms.inventory.add_inventoryadjustment %}
-                        <a class="nav-link" href="{% url 'inventory_adjust_stock_select' %}">
-                            <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg></span>
-                            <span>Adjust Cloth Stock</span>
-                        </a>
-
                         <a class="nav-link" href="{% url 'material_usage' %}">
                             <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M12 3s5 5.2 5 10a5 5 0 0 1-10 0c0-4.8 5-10 5-10Z"/><path d="M10 15c.6.8 1.2 1.2 2 1.2"/></svg></span>
                             <span>Material Usage</span>
@@ -1367,141 +1371,52 @@
                         {% if perms.inventory.add_stockledger %}
                         <a class="nav-link" href="{% url 'stock_confirm' %}">
                             <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12 2.5 2.5L16.5 9"/></svg></span>
-                            <span>Stock Confirm</span>
+                            <span>Stock Check</span>
                         </a>
                         {% endif %}
 
-                        {% if perms.inventory.view_stockledger %}
-                        <a class="nav-link" href="{% url 'stock_summary_report' %}">
-                            <span class="nav-mini-icon">
-                                <svg viewBox="0 0 24 24">
-                                    <path d="M4 19V10M10 19V5M16 19v-7M3 19h18"/>
-                                    <path d="m5 8 4-3 4 4 6-5"/>
-                                </svg>
-                            </span>
-                            <span>Stock Summary</span>
-                        </a>
+                    </div>
+                </div>
+                {% endif %}
 
-                        <a class="nav-link" href="{% url 'stock_history' %}">
-                            <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg></span>
-                            <span>Stock History</span>
-                        </a>
+                {% if perms.production.view_production_nav %}
+                <div class="nav-group">
+                    <button class="nav-toggle" type="button" data-target="menu-production" aria-expanded="false">
+                        <span class="nav-main-icon icon-production" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 20h18M5 20V10l4 3V8l4 3V6l6 4v10"/><path d="M8 20v-4h3v4M15 14h3M15 17h3"/></svg></span>
+                        <span class="nav-label">Production</span>
+                        <span class="nav-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 10 5 5 5-5"/></svg></span>
+                    </button>
+                    <div class="nav-submenu" id="menu-production">
+                        {% if production_dashboard_url %}
+                        <a class="nav-link" href="{{ production_dashboard_url }}"><span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg></span><span>Production Board</span></a>
                         {% endif %}
-
-                        {% if perms.inventory.view_inventoryadjustment %}
-                        <a class="nav-link" href="{% url 'inventory_adjustment_list' %}">
-                            <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M6 4h12v16H6zM9 8h6M9 12h6M9 16h4"/></svg></span>
-                            <span>Adjustment History</span>
-                        </a>
+                        {% if perms.production.view_productionproject and production_project_list_url %}
+                        <a class="nav-link" href="{{ production_project_list_url }}"><span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M5 4h14v16H5zM8 8h8M8 12h8M8 16h5"/></svg></span><span>Projects</span></a>
+                        {% endif %}
+                        {% if perms.production.view_sewingreturn and production_return_list_url %}
+                        <a class="nav-link" href="{{ production_return_list_url }}"><span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M4 7h16v10H4zM8 11h8M12 7V4M9 4h6"/></svg></span><span>Sewing Returns</span></a>
                         {% endif %}
                     </div>
                 </div>
                 {% endif %}
 
-
-{% if perms.production.view_production_nav %}
-{% url 'production_dashboard' as production_dashboard_url %}
-{% url 'production_material_stock' as production_material_stock_url %}
-{% url 'production_fabric_receive' as production_fabric_receive_url %}
-{% url 'production_project_list' as production_project_list_url %}
-{% url 'production_return_list' as production_return_list_url %}
-{% url 'production_partner_list' as production_partner_list_url %}
-{% url 'production_supplier_list' as production_supplier_list_url %}
-{% url 'production_expense_list' as production_expense_list_url %}
-{% url 'production_payment_list' 'sewer' as production_sewer_payment_url %}
-{% url 'production_payment_list' 'staff' as production_staff_payment_url %}
-
-<div class="nav-group">
-    <button class="nav-toggle" type="button" data-target="menu-production" aria-expanded="false">
-        <span class="nav-main-icon icon-production" aria-hidden="true">
-            <svg viewBox="0 0 24 24">
-                <path d="M3 20h18M5 20V10l4 3V8l4 3V6l6 4v10"/>
-                <path d="M8 20v-4h3v4M15 14h3M15 17h3"/>
-            </svg>
-        </span>
-        <span class="nav-label">Production</span>
-        <span class="nav-arrow" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="m7 10 5 5 5-5"/>
-            </svg>
-        </span>
-    </button>
-
-    <div class="nav-submenu" id="menu-production">
-        {% if production_dashboard_url %}
-        <a class="nav-link" href="{{ production_dashboard_url }}">
-            <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg></span>
-            <span>Production Dashboard</span>
-        </a>
-        {% endif %}
-
-        {% if perms.production.view_fabricroll and production_material_stock_url %}
-        <a class="nav-link" href="{{ production_material_stock_url }}">
-            <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M5 6h14v12H5zM8 3h8v3M8 18v3h8v-3"/></svg></span>
-            <span>Material Stock</span>
-        </a>
-        {% endif %}
-
-        {% if perms.production.add_fabricreceipt and production_fabric_receive_url %}
-        <a class="nav-link" href="{{ production_fabric_receive_url }}">
-            <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span>
-            <span>Receive Fabric</span>
-        </a>
-        {% endif %}
-
-        {% if perms.production.view_productionproject and production_project_list_url %}
-        <a class="nav-link" href="{{ production_project_list_url }}">
-            <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M5 4h14v16H5zM8 8h8M8 12h8M8 16h5"/></svg></span>
-            <span>Production Projects</span>
-        </a>
-        {% endif %}
-
-        {% if perms.production.view_sewingreturn and production_return_list_url %}
-        <a class="nav-link" href="{{ production_return_list_url }}">
-            <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M4 7h16v10H4zM8 11h8M12 7V4M9 4h6"/></svg></span>
-            <span>Sewing Returns</span>
-        </a>
-        {% endif %}
-
-        {% if perms.production.view_sewingpartner and production_partner_list_url %}
-        <a class="nav-link" href="{{ production_partner_list_url }}">
-            <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20v-1a6 6 0 0 1 12 0v1M16 7h5M18.5 4.5v5"/></svg></span>
-            <span>Sewing Partners</span>
-        </a>
-        {% endif %}
-
-        {% if perms.production.view_productionsupplier and production_supplier_list_url %}
-        <a class="nav-link" href="{{ production_supplier_list_url }}">
-            <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M3 7h18v13H3zM7 7V4h10v3M7 12h10M7 16h6"/></svg></span>
-            <span>Suppliers</span>
-        </a>
-        {% endif %}
-
-        {% if perms.production.view_productionexpense and production_expense_list_url %}
-        <a class="nav-link" href="{{ production_expense_list_url }}">
-            <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 9h18M8 14h4M16 13v3M14.5 14.5h3"/></svg></span>
-            <span>Production Expenses</span>
-        </a>
-        {% endif %}
-
-        {% if perms.production.manage_production_payments %}
-            {% if production_sewer_payment_url %}
-            <a class="nav-link" href="{{ production_sewer_payment_url }}">
-                <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18M7 15h3"/></svg></span>
-                <span>Sewing Payments</span>
-            </a>
-            {% endif %}
-
-            {% if production_staff_payment_url %}
-            <a class="nav-link" href="{{ production_staff_payment_url }}">
-                <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"/><path d="M3 20v-1a5 5 0 0 1 10 0v1M16 9h5M18 6l3 3-3 3"/></svg></span>
-                <span>Staff Payments</span>
-            </a>
-            {% endif %}
-        {% endif %}
-    </div>
-</div>
-{% endif %}
+                {% if perms.production.view_sewingpartner or perms.production.view_productionsupplier %}
+                <div class="nav-group">
+                    <button class="nav-toggle" type="button" data-target="menu-partners" aria-expanded="false">
+                        <span class="nav-main-icon icon-users" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"/><path d="M3 20v-1a5 5 0 0 1 10 0v1M16 7h5M18.5 4.5v5"/></svg></span>
+                        <span class="nav-label">Partners</span>
+                        <span class="nav-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 10 5 5 5-5"/></svg></span>
+                    </button>
+                    <div class="nav-submenu" id="menu-partners">
+                        {% if perms.production.view_productionsupplier and production_supplier_list_url %}
+                        <a class="nav-link" href="{{ production_supplier_list_url }}"><span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M3 7h18v13H3zM7 7V4h10v3M7 12h10M7 16h6"/></svg></span><span>Suppliers</span></a>
+                        {% endif %}
+                        {% if perms.production.view_sewingpartner and production_partner_list_url %}
+                        <a class="nav-link" href="{{ production_partner_list_url }}"><span class="nav-mini-icon"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20v-1a6 6 0 0 1 12 0v1M16 7h5M18.5 4.5v5"/></svg></span><span>Sewing Partners</span></a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
 
                 {% if perms.orders.view_order or perms.orders.add_order %}
                 <div class="nav-group">
@@ -1579,7 +1494,7 @@
                 </div>
                 {% endif %}
 
-                {% if perms.finance.view_expense_summary_nav or perms.finance.view_other_expense_nav or perms.finance.view_batch_expense_nav or perms.finance.view_operating_expense_nav or perms.finance.view_profit_dashboard_nav %}
+                {% if perms.finance.view_expense_summary_nav or perms.finance.view_other_expense_nav or perms.finance.view_batch_expense_nav or perms.finance.view_operating_expense_nav or perms.finance.view_profit_dashboard_nav or perms.production.view_productionexpense or perms.production.manage_production_payments %}
                 <div class="nav-group">
                     <button class="nav-toggle" type="button" data-target="menu-finance" aria-expanded="false">
                         <span class="nav-main-icon icon-finance" aria-hidden="true">
@@ -1611,6 +1526,24 @@
                             <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21h-4v-.1A1.7 1.7 0 0 0 8.5 19.4a1.7 1.7 0 0 0-1.9.3l-.1.1L3.7 17l.1-.1A1.7 1.7 0 0 0 4.1 15a1.7 1.7 0 0 0-.6-1A1.7 1.7 0 0 0 2.4 13H2V9h.4A1.7 1.7 0 0 0 4.1 8a1.7 1.7 0 0 0-.3-1.9L3.7 6 6.5 3.2l.1.1A1.7 1.7 0 0 0 8.5 3a1.7 1.7 0 0 0 1-.6A1.7 1.7 0 0 0 9.9 1H14v.1A1.7 1.7 0 0 0 15 3a1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 5.4l-.1.1A1.7 1.7 0 0 0 19.4 7a1.7 1.7 0 0 0 .6 1 1.7 1.7 0 0 0 1.1.4H22v4h-.9a1.7 1.7 0 0 0-1.7 2.6Z"/></svg></span>
                             <span>Operating Expense</span>
                         </a>
+                        {% if perms.production.view_productionexpense and production_expense_list_url %}
+                        <a class="nav-link" href="{{ production_expense_list_url }}">
+                            <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 9h18M8 14h4M16 13v3M14.5 14.5h3"/></svg></span>
+                            <span>Production Expenses</span>
+                        </a>
+                        {% endif %}
+                        {% if perms.production.manage_production_payments and production_sewer_payment_url %}
+                        <a class="nav-link" href="{{ production_sewer_payment_url }}">
+                            <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18M7 15h3"/></svg></span>
+                            <span>Sewing Partner Payments</span>
+                        </a>
+                        {% endif %}
+                        {% if perms.production.manage_production_payments and production_staff_payment_url %}
+                        <a class="nav-link" href="{{ production_staff_payment_url }}">
+                            <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"/><path d="M3 20v-1a5 5 0 0 1 10 0v1M16 9h5M18 6l3 3-3 3"/></svg></span>
+                            <span>Staff Salary & Commission</span>
+                        </a>
+                        {% endif %}
                         <a class="nav-link" href="/finance/profit-dashboard/">
                             <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/><path d="m4 7 5-4 5 5 6-5"/></svg></span>
                             <span>Profit Dashboard</span>
@@ -1628,7 +1561,7 @@
                                 <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21h-4v-.1A1.7 1.7 0 0 0 8.5 19.4a1.7 1.7 0 0 0-1.9.3l-.1.1L3.7 17l.1-.1A1.7 1.7 0 0 0 4.1 15a1.7 1.7 0 0 0-.6-1A1.7 1.7 0 0 0 2.4 13H2V9h.4A1.7 1.7 0 0 0 4.1 8a1.7 1.7 0 0 0-.3-1.9L3.7 6 6.5 3.2l.1.1A1.7 1.7 0 0 0 8.5 3a1.7 1.7 0 0 0 1-.6A1.7 1.7 0 0 0 9.9 1H14v.1A1.7 1.7 0 0 0 15 3a1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 5.4l-.1.1A1.7 1.7 0 0 0 19.4 7a1.7 1.7 0 0 0 .6 1 1.7 1.7 0 0 0 1.1.4H22v4h-.9a1.7 1.7 0 0 0-1.7 2.6Z"/>
                             </svg>
                         </span>
-                        <span class="nav-label">Setup</span>
+                        <span class="nav-label">Product Setup</span>
                         <span class="nav-arrow" aria-hidden="true">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 10 5 5 5-5"/></svg>
                         </span>
@@ -1661,7 +1594,7 @@
                                 <path d="M16 4.5a3.5 3.5 0 0 1 0 7M17 14a5 5 0 0 1 4.5 5V20"/>
                             </svg>
                         </span>
-                        <span class="nav-label">Users & Permissions</span>
+                        <span class="nav-label">Settings & Access</span>
                         <span class="nav-arrow" aria-hidden="true">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 10 5 5 5-5"/></svg>
                         </span>

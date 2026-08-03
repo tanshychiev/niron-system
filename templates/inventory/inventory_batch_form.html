@@ -1,35 +1,6360 @@
 {% extends "base.html" %}
 {% block page_title %}{{ page_title|default:"Stock In" }}{% endblock %}
-{% block page_subtitle %}Receive stock using the shared supplier master list{% endblock %}
+{% block page_subtitle %}Receive Cloth, Printing Material, or Fabric in one batch workflow{% endblock %}
+
 {% block content %}
 <style>
-.stock-wrap{max-width:1200px;margin:0 auto}.stock-card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:18px;box-shadow:var(--shadow-soft)}.head-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.full{grid-column:1/-1}.field label{display:block;margin-bottom:6px;font-weight:850}.supplier-row{display:grid;grid-template-columns:1fr auto;gap:8px}.rows{display:grid;gap:10px;margin-top:14px}.stock-row{display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:10px;align-items:end;padding:12px;border:1px solid var(--line);border-radius:14px}.error-highlight{border-color:#d94254!important;box-shadow:0 0 0 4px rgba(217,66,84,.12)!important}.row-error{background:#fff4f4;border-color:#d94254}.toast{position:fixed;right:20px;top:90px;z-index:9999;max-width:430px;padding:14px 16px;border-radius:14px;box-shadow:var(--shadow);display:none;font-weight:800}.toast.show{display:block}.toast.fail{background:#fdecec;color:#b42318;border:1px solid #f5c2c7}.toast.ok{background:#ecfdf3;color:#067647;border:1px solid #abefc6}.modal-mask{display:none;position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:9998;align-items:center;justify-content:center;padding:18px}.modal-mask.show{display:flex}.modal-card{width:min(520px,100%);background:#fff;padding:20px;border-radius:20px}.actions{display:flex;gap:9px;justify-content:flex-end;margin-top:16px}@media(max-width:800px){.head-grid,.stock-row{grid-template-columns:1fr}.full{grid-column:auto}}
+:root{
+  --stock-bg:#fbf2e3;
+  --stock-panel:rgba(255,255,255,.91);
+  --stock-soft:rgba(255,248,235,.88);
+  --stock-line:rgba(154,103,35,.18);
+  --stock-text:#2b1c0d;
+  --stock-muted:#7c6a55;
+  --stock-gold:#d49a32;
+  --stock-gold-dark:#704816;
+  --stock-green:#168b60;
+  --stock-red:#cf424d;
+  --stock-shadow:0 18px 48px rgba(74,42,10,.10);
+}
+
+.stock-page{
+  max-width:1420px;
+  margin:12px auto 44px;
+  padding:0 14px;
+  color:var(--stock-text);
+  font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+
+.stock-page::before{
+  content:"";
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  z-index:-2;
+  background:
+    radial-gradient(circle at 10% 5%,rgba(255,216,144,.22),transparent 27%),
+    radial-gradient(circle at 92% 12%,rgba(215,158,59,.12),transparent 24%),
+    linear-gradient(180deg,#fffdf8 0%,var(--stock-bg) 56%,#f1dfc1 100%);
+}
+
+.stock-page::after{
+  content:"";
+  position:fixed;
+  inset:0;
+  z-index:-1;
+  pointer-events:none;
+  opacity:.14;
+  background-image:
+    linear-gradient(rgba(130,86,29,.08) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(130,86,29,.08) 1px,transparent 1px);
+  background-size:30px 30px;
+}
+
+.stock-shell{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 310px;
+  gap:15px;
+  align-items:start;
+}
+
+.main-card,
+.side-card{
+  border:1px solid var(--stock-line);
+  background:linear-gradient(145deg,var(--stock-panel),var(--stock-soft));
+  border-radius:22px;
+  box-shadow:var(--stock-shadow);
+  backdrop-filter:blur(16px);
+}
+
+.main-card{padding:15px}
+.side-column{display:grid;gap:11px;position:sticky;top:10px}
+.side-card{padding:14px}
+
+.top-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:12px;
+  margin-bottom:12px;
+}
+
+.title h1{
+  margin:0;
+  font-size:30px;
+  line-height:1;
+  letter-spacing:-.04em;
+  font-weight:930;
+}
+
+.title p{
+  margin:7px 0 0;
+  color:var(--stock-muted);
+  font-size:12px;
+}
+
+.type-tabs{
+  display:flex;
+  gap:6px;
+  flex-wrap:wrap;
+}
+
+.type-tab{
+  min-height:38px;
+  padding:8px 13px;
+  border:1px solid var(--stock-line);
+  border-radius:11px;
+  background:rgba(255,255,255,.72);
+  color:#6d4717;
+  font-size:11px;
+  font-weight:900;
+  cursor:pointer;
+}
+
+.type-tab.active{
+  background:linear-gradient(145deg,#fff8e8,#edcd91);
+  border-color:rgba(194,130,35,.36);
+  box-shadow:0 7px 17px rgba(94,57,16,.09);
+}
+
+.mode-form[hidden]{display:none!important}
+
+.panel{
+  padding:12px;
+  margin-top:10px;
+  border:1px solid var(--stock-line);
+  border-radius:17px;
+  background:rgba(255,255,255,.57);
+}
+
+.panel-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:9px;
+  margin-bottom:10px;
+}
+
+.panel-title{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
+.panel-icon{
+  width:34px;
+  height:34px;
+  display:grid;
+  place-items:center;
+  border-radius:11px;
+  border:1px solid rgba(180,120,38,.18);
+  background:linear-gradient(145deg,#fff7e7,#ebca8b);
+}
+
+.panel-title h2{margin:0;font-size:15px;font-weight:900}
+.panel-title small{display:block;margin-top:2px;color:var(--stock-muted);font-size:10px}
+
+.field label{
+  display:block;
+  margin:0 0 5px;
+  color:#67451d;
+  font-size:9.5px;
+  font-weight:900;
+  letter-spacing:.055em;
+  text-transform:uppercase;
+}
+
+.field input,
+.field select,
+.field textarea,
+.field .form-control,
+.field .form-select{
+  width:100%;
+  min-height:41px;
+  padding:8px 10px;
+  border:1px solid var(--stock-line);
+  border-radius:11px;
+  background:rgba(255,255,255,.84);
+  color:var(--stock-text);
+  outline:none;
+  font-size:12px;
+  font-weight:720;
+}
+
+.field textarea{min-height:74px;resize:vertical}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus{
+  border-color:rgba(205,141,41,.46);
+  box-shadow:0 0 0 3px rgba(219,163,70,.10);
+  background:#fff;
+}
+
+.header-grid{
+  display:grid;
+  grid-template-columns:1fr 1.35fr;
+  gap:9px;
+}
+
+.full{grid-column:1/-1}
+
+.supplier-row{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:7px;
+}
+
+.btn-light,
+.btn-primary,
+.btn-danger-soft{
+  min-height:38px;
+  padding:8px 12px;
+  border-radius:11px;
+  border:1px solid var(--stock-line);
+  font-size:10.5px;
+  font-weight:900;
+  cursor:pointer;
+  text-decoration:none;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
+}
+
+.btn-light{background:rgba(255,255,255,.74);color:#674217}
+.btn-primary{
+  color:#fff;
+  background:linear-gradient(145deg,#382513,#715020);
+  border-color:#553715;
+  box-shadow:0 9px 20px rgba(73,42,11,.17);
+}
+.btn-danger-soft{background:#fff1f1;color:#b73540;border-color:rgba(207,66,77,.20)}
+
+.cost-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:8px;
+}
+
+.money-wrap{position:relative}
+.money-prefix{
+  position:absolute;
+  left:11px;
+  top:50%;
+  transform:translateY(-50%);
+  z-index:2;
+  color:#8b5a18;
+  font-size:16px;
+  font-weight:950;
+  pointer-events:none;
+}
+.money-wrap input{
+  min-height:48px!important;
+  padding-left:29px!important;
+  text-align:right;
+  font-size:17px!important;
+  font-weight:900!important;
+  background:linear-gradient(180deg,#fffdf8,#fff4df)!important;
+}
+
+.cost-total{
+  min-height:54px;
+  margin-top:8px;
+  padding:10px 13px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  border:1px solid rgba(192,130,38,.18);
+  border-radius:12px;
+  background:linear-gradient(145deg,#fff,#efd19b);
+}
+
+.cost-total span{
+  color:#78511d;
+  font-size:9.5px;
+  font-weight:900;
+  letter-spacing:.055em;
+  text-transform:uppercase;
+}
+.cost-total strong{font-size:25px;letter-spacing:-.03em}
+
+.cost-status{
+  padding:5px 8px;
+  border-radius:999px;
+  border:1px solid rgba(192,130,38,.18);
+  background:#fff1d5;
+  color:#8b5b14;
+  font-size:9px;
+  font-weight:900;
+}
+.cost-status.filled{
+  background:#eaf8f1;
+  color:#15714f;
+  border-color:rgba(22,139,96,.18);
+}
+
+.rows{display:grid;gap:8px}
+
+.stock-row{
+  display:grid;
+  grid-template-columns:30px minmax(190px,2fr) minmax(112px,1fr) minmax(86px,.8fr) minmax(88px,.75fr) 32px;
+  gap:7px;
+  align-items:end;
+  padding:9px;
+  border:1px solid var(--stock-line);
+  border-radius:14px;
+  background:linear-gradient(145deg,rgba(255,255,255,.89),rgba(249,237,217,.73));
+}
+
+.row-number{
+  width:27px;
+  height:27px;
+  align-self:center;
+  display:grid;
+  place-items:center;
+  border-radius:9px;
+  color:#694316;
+  background:linear-gradient(145deg,#fff8e7,#e8c681);
+  font-size:10px;
+  font-weight:950;
+}
+
+.row-type{
+  display:inline-flex;
+  margin-top:4px;
+  padding:3px 6px;
+  border-radius:7px;
+  color:#7c531d;
+  background:rgba(237,207,151,.58);
+  font-size:8px;
+  font-weight:900;
+}
+
+.row-material .color-field,
+.row-material .size-field{display:none}
+.row-material{
+  grid-template-columns:30px minmax(220px,2fr) minmax(95px,.8fr) 32px;
+}
+
+.remove-wrap{
+  min-height:40px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.remove-wrap input{
+  width:18px!important;
+  height:18px!important;
+  min-height:0!important;
+  accent-color:var(--stock-red);
+}
+
+.fabric-lines{display:grid;gap:8px}
+
+.fabric-line{
+  padding:10px;
+  border:1px solid var(--stock-line);
+  border-radius:14px;
+  background:linear-gradient(145deg,rgba(255,255,255,.90),rgba(249,237,217,.73));
+}
+
+.fabric-line-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:9px;
+  margin-bottom:8px;
+}
+
+.fabric-line-grid{
+  display:grid;
+  grid-template-columns:1.5fr 1fr .65fr repeat(3,.82fr) 1.2fr;
+  gap:7px;
+  align-items:end;
+}
+
+.fabric-line .cost-field input{
+  text-align:right;
+  font-weight:850;
+}
+
+.form-actions{
+  position:sticky;
+  bottom:5px;
+  z-index:30;
+  margin-top:11px;
+  padding:8px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:8px;
+  border:1px solid var(--stock-line);
+  border-radius:14px;
+  background:rgba(255,251,243,.92);
+  box-shadow:0 12px 28px rgba(70,40,10,.12);
+  backdrop-filter:blur(15px);
+}
+
+.action-group{display:flex;align-items:center;gap:7px}
+
+.summary-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:7px;
+}
+.summary-box{
+  padding:9px;
+  border:1px solid var(--stock-line);
+  border-radius:11px;
+  background:rgba(255,255,255,.66);
+}
+.summary-box span{
+  display:block;
+  color:var(--stock-muted);
+  font-size:8.5px;
+  font-weight:900;
+  text-transform:uppercase;
+  letter-spacing:.05em;
+}
+.summary-box strong{
+  display:block;
+  margin-top:4px;
+  font-size:19px;
+}
+
+.side-title{margin:0 0 9px;font-size:14px;font-weight:900}
+.side-lines{display:grid;gap:7px;margin-top:9px}
+.side-line{display:flex;justify-content:space-between;gap:8px;color:#705d47;font-size:10.5px}
+.side-line strong{color:#30200f}
+
+.help{
+  padding:10px;
+  border-radius:11px;
+  background:rgba(255,255,255,.58);
+  color:#76624c;
+  font-size:10.5px;
+  line-height:1.5;
+}
+
+.toast{
+  position:fixed;
+  right:18px;
+  top:82px;
+  z-index:9999;
+  display:none;
+  max-width:430px;
+  padding:13px 15px;
+  border-radius:13px;
+  font-size:12px;
+  font-weight:850;
+  box-shadow:var(--stock-shadow);
+}
+.toast.show{display:block}
+.toast.ok{background:#ecfdf3;color:#067647;border:1px solid #abefc6}
+.toast.fail{background:#fdecec;color:#b42318;border:1px solid #f5c2c7}
+
+.modal-mask{
+  display:none;
+  position:fixed;
+  inset:0;
+  z-index:9998;
+  padding:16px;
+  align-items:center;
+  justify-content:center;
+  background:rgba(25,16,8,.46);
+  backdrop-filter:blur(5px);
+}
+.modal-mask.show{display:flex}
+.modal-card{
+  width:min(520px,100%);
+  padding:16px;
+  border:1px solid var(--stock-line);
+  border-radius:20px;
+  background:linear-gradient(145deg,#fff,#faecd4);
+  box-shadow:0 24px 70px rgba(47,27,8,.24);
+}
+
+.error-highlight{
+  border-color:#d94254!important;
+  box-shadow:0 0 0 3px rgba(217,66,84,.10)!important;
+}
+.row-error{border-color:rgba(207,66,77,.5)!important;background:#fff4f4!important}
+
+@media(max-width:1120px){
+  .stock-shell{grid-template-columns:1fr}
+  .side-column{position:static;grid-template-columns:1fr 1fr}
+  .fabric-line-grid{grid-template-columns:repeat(3,1fr)}
+}
+
+@media(max-width:820px){
+  .stock-page{padding:0 7px}
+  .main-card{padding:10px;border-radius:17px}
+  .top-row{display:grid}
+  .title h1{font-size:25px}
+  .type-tabs{display:grid;grid-template-columns:repeat(3,1fr)}
+  .type-tab{padding:7px 4px;font-size:9.5px}
+  .header-grid,.cost-grid{grid-template-columns:1fr}
+  .full{grid-column:auto}
+  .stock-row,.row-material{
+    grid-template-columns:27px 1fr 32px;
+    align-items:center;
+  }
+  .stock-row .item-field,
+  .stock-row .color-field,
+  .stock-row .size-field,
+  .stock-row .qty-field{grid-column:2}
+  .stock-row .row-number{grid-column:1;grid-row:1}
+  .stock-row .remove-wrap{grid-column:3;grid-row:1}
+  .row-material .color-field,.row-material .size-field{display:none}
+  .fabric-line-grid{grid-template-columns:1fr}
+  .side-column{grid-template-columns:1fr}
+  .form-actions{display:grid}
+  .action-group{display:grid;grid-template-columns:1fr 1fr}
+}
+
+@media(max-width:420px){
+  .supplier-row{grid-template-columns:1fr}
+  .action-group{grid-template-columns:1fr}
+}
+
+/* Better aligned cloth entry rows */
+.stock-row{
+  grid-template-columns:
+    30px
+    minmax(220px,1.65fr)
+    minmax(140px,1fr)
+    minmax(105px,.72fr)
+    minmax(105px,.72fr)
+    32px!important;
+  align-items:start!important;
+}
+
+.stock-row .field{
+  min-width:0;
+}
+
+.stock-row .field input,
+.stock-row .field select{
+  min-height:42px!important;
+}
+
+.quick-size-bar{
+  grid-column:2 / 6;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-top:1px;
+  padding:7px 9px;
+  border-radius:10px;
+  background:rgba(255,250,241,.72);
+  border:1px dashed rgba(178,119,40,.18);
+}
+
+.quick-size-label{
+  flex:0 0 auto;
+  color:#76501e;
+  font-size:8.5px;
+  font-weight:900;
+  letter-spacing:.05em;
+  text-transform:uppercase;
+}
+
+.quick-size-buttons{
+  display:flex;
+  flex-wrap:wrap;
+  gap:5px;
+}
+
+.quick-size-btn{
+  min-width:34px;
+  min-height:28px;
+  padding:4px 8px;
+  border:1px solid rgba(178,119,40,.18);
+  border-radius:8px;
+  background:linear-gradient(145deg,#fff,#f2d7a8);
+  color:#5f3c13;
+  font-size:10px;
+  font-weight:900;
+  cursor:pointer;
+  transition:transform .14s ease,box-shadow .14s ease,background .14s ease;
+}
+
+.quick-size-btn:hover{
+  transform:translateY(-1px);
+  background:linear-gradient(145deg,#fff9eb,#eec981);
+  box-shadow:0 6px 14px rgba(81,47,13,.08);
+}
+
+.quick-size-btn.used{
+  background:#eaf8f1;
+  color:#15714f;
+  border-color:rgba(22,139,96,.18);
+}
+
+.quick-size-bar[hidden]{
+  display:none!important;
+}
+
+.row-material .quick-size-bar{
+  display:none!important;
+}
+
+@media(max-width:820px){
+  .quick-size-bar{
+    grid-column:2;
+    align-items:flex-start;
+    flex-direction:column;
+  }
+}
+
 </style>
+
 <div id="pageToast" class="toast"></div>
-<div class="stock-wrap"><div class="stock-card">
-<form method="post" id="stockForm" novalidate>{% csrf_token %}
-{% if form.non_field_errors %}<div class="flash-message flash-error">{{ form.non_field_errors }}</div>{% endif %}
-<div class="head-grid">
-<div class="field"><label>Received Date</label>{{ form.received_date }}</div>
-<div class="field"><label>Supplier</label><div class="supplier-row">{{ form.supplier_ref }}<button type="button" class="btn-light" id="openSupplier">+ New Supplier</button></div>{% for e in form.supplier_ref.errors %}<small style="color:#b42318">{{ e }}</small>{% endfor %}</div>
-<div class="field full"><label>Note</label>{{ form.note }}</div>
+
+<div class="stock-page">
+  <div class="stock-shell">
+    <main class="main-card">
+      <div class="top-row">
+        <div class="title">
+          <h1>Stock In</h1>
+          <p>One page for Cloth, Printing Material and Fabric.</p>
+        </div>
+
+        <div class="type-tabs" role="tablist">
+          <button type="button" class="type-tab" data-mode="cloth">Cloth</button>
+          <button type="button" class="type-tab" data-mode="printing">Printing Material</button>
+          <button type="button" class="type-tab" data-mode="fabric">Fabric</button>
+        </div>
+      </div>
+
+      <form method="post" id="inventoryStockForm" class="mode-form" data-form-mode="inventory" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="stock_type" id="inventoryStockType" value="{{ stock_type|default:'cloth' }}">
+
+        {% if form.non_field_errors %}
+          <div class="flash-message flash-error">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        <section class="panel">
+          <div class="panel-head">
+            <div class="panel-title">
+              <span class="panel-icon">⌁</span>
+              <div>
+                <h2>Batch information</h2>
+                <small>Shared information for Cloth or Printing Material</small>
+              </div>
+            </div>
+          </div>
+
+          <div class="header-grid">
+            <div class="field">
+              <label>Received Date</label>
+              {{ form.received_date }}
+            </div>
+
+            <div class="field">
+              <label>Supplier</label>
+              <div class="supplier-row">
+                {{ form.supplier_ref }}
+                <button type="button" class="btn-light openSupplier">＋ New Supplier</button>
+              </div>
+            </div>
+
+            <div class="field full">
+              <label>Note</label>
+              {{ form.note }}
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div class="panel-title">
+              <span class="panel-icon">＄</span>
+              <div>
+                <h2>Batch cost <span style="color:var(--stock-muted);font-weight:700">(optional)</span></h2>
+                <small>Staff may fill it now; Finance can review it later</small>
+              </div>
+            </div>
+            <span class="cost-status" id="inventoryCostStatus">Cost missing</span>
+          </div>
+
+          <div class="cost-grid">
+            <div class="field">
+              <label>Goods Cost</label>
+              <div class="money-wrap"><span class="money-prefix">$</span>{{ form.total_goods_cost }}</div>
+            </div>
+            <div class="field">
+              <label>Delivery Fee</label>
+              <div class="money-wrap"><span class="money-prefix">$</span>{{ form.shipping_cost }}</div>
+            </div>
+            <div class="field">
+              <label>Extra Cost</label>
+              <div class="money-wrap"><span class="money-prefix">$</span>{{ form.extra_cost }}</div>
+            </div>
+          </div>
+
+          <div class="cost-total">
+            <span>Total batch cost</span>
+            <strong>$<span id="inventoryCostTotal">0.00</span></strong>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div class="panel-title">
+              <span class="panel-icon">▦</span>
+              <div>
+                <h2>Batch items</h2>
+                <small>Cloth uses colour and size; Printing Material uses quantity only</small>
+              </div>
+            </div>
+            <button type="button" class="btn-light addInventoryRow">＋ Add Row</button>
+          </div>
+
+          {{ formset.management_form }}
+
+          <div class="rows" id="inventoryRows">
+            {% for row in formset %}
+              <div class="stock-row" data-row-index="{{ forloop.counter0 }}">
+                {% for hidden in row.hidden_fields %}{{ hidden }}{% endfor %}
+                <div class="row-number">{{ forloop.counter }}</div>
+
+                <div class="field item-field">
+                  <label>Item</label>
+                  {{ row.item }}
+                  <span class="row-type">Select item</span>
+                </div>
+
+                <div class="field color-field">
+                  <label>Colour</label>
+                  {{ row.color }}
+                </div>
+
+                <div class="field size-field">
+                  <label>Size</label>
+                  {{ row.size }}
+                </div>
+
+                <div class="field qty-field">
+                  <label>Quantity</label>
+                  <div class="quantity-with-unit">
+                    {{ row.quantity }}
+                    <span class="material-unit-badge">Unit</span>
+                  </div>
+                </div>
+
+                <div class="remove-wrap">
+                  <div class="delete-field-hidden">{{ row.DELETE }}</div>
+                  <button type="button" class="trash-row-btn" title="Remove row" aria-label="Remove row">🗑</button>
+                </div>
+
+                <div class="quick-size-bar">
+                  <span class="quick-size-label">Quick sizes</span>
+                  <div class="quick-size-buttons"></div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </section>
+
+        <div class="form-actions">
+          <div class="action-group">
+            <button type="button" class="btn-light addInventoryRow">＋ Add Row</button>
+            <a href="{% url 'inventory_list' %}" class="btn-light">Cancel</a>
+          </div>
+          <div class="action-group">
+            <span style="font-size:10px;color:var(--stock-muted)"><strong id="inventoryRowCount">0</strong> active rows</span>
+            <button type="submit" class="btn-primary" id="inventorySaveBtn">{{ submit_label|default:"Save Batch" }}</button>
+          </div>
+        </div>
+      </form>
+
+      <form method="post" id="fabricStockForm" class="mode-form" data-form-mode="fabric" novalidate hidden>
+        {% csrf_token %}
+        <input type="hidden" name="stock_type" value="fabric">
+
+        <section class="panel">
+          <div class="panel-head">
+            <div class="panel-title">
+              <span class="panel-icon">🧵</span>
+              <div>
+                <h2>Fabric batch information</h2>
+                <small>One supplier and received date for all fabric types below</small>
+              </div>
+            </div>
+          </div>
+
+          <div class="header-grid">
+            <div class="field">
+              <label>Received Date</label>
+              {{ fabric_header_form.received_date }}
+            </div>
+            <div class="field">
+              <label>Supplier</label>
+              {{ fabric_header_form.supplier }}
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div class="panel-title">
+              <span class="panel-icon">▦</span>
+              <div>
+                <h2>Fabric types</h2>
+                <small>Every line creates its own receipt and physical roll codes</small>
+              </div>
+            </div>
+            <button type="button" class="btn-light" id="addFabricRow">＋ Add Fabric</button>
+          </div>
+
+          {{ fabric_formset.management_form }}
+
+          <div class="fabric-lines" id="fabricLines">
+            {% for line_form in fabric_formset %}
+              <div class="fabric-line">
+                <div class="fabric-line-head">
+                  <span class="row-number">{{ forloop.counter }}</span>
+                  <button type="button" class="btn-danger-soft removeFabricRow">Remove</button>
+                </div>
+
+                <div class="fabric-line-grid">
+                  <div class="field">
+                    <label>Fabric Name</label>
+                    {{ line_form.fabric_name }}
+                  </div>
+                  <div class="field">
+                    <label>Colour</label>
+                    {{ line_form.color }}
+                  </div>
+                  <div class="field">
+                    <label>Roll Count</label>
+                    {{ line_form.roll_count }}
+                  </div>
+                  <div class="field cost-field">
+                    <label>Goods Cost</label>
+                    {{ line_form.total_goods_cost }}
+                  </div>
+                  <div class="field cost-field">
+                    <label>Delivery Fee</label>
+                    {{ line_form.shipping_cost }}
+                  </div>
+                  <div class="field cost-field">
+                    <label>Extra Cost</label>
+                    {{ line_form.extra_cost }}
+                  </div>
+                  <div class="field">
+                    <label>Note</label>
+                    {{ line_form.note }}
+                  </div>
+                  <div style="display:none">{{ line_form.DELETE }}</div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </section>
+
+        <div class="form-actions">
+          <div class="action-group">
+            <button type="button" class="btn-light" id="addFabricRowBottom">＋ Add Fabric</button>
+            <a href="{% url 'inventory_list' %}" class="btn-light">Cancel</a>
+          </div>
+          <div class="action-group">
+            <span style="font-size:10px;color:var(--stock-muted)"><strong id="fabricRowCount">0</strong> fabric types</span>
+            <button type="submit" class="btn-primary" id="fabricSaveBtn">Save Fabric Batch</button>
+          </div>
+        </div>
+      </form>
+    </main>
+
+    <aside class="side-column">
+      <div class="side-card">
+        <h3 class="side-title">Live batch summary</h3>
+        <div class="summary-grid">
+          <div class="summary-box"><span>Rows</span><strong id="summaryRows">0</strong></div>
+          <div class="summary-box"><span>Total Qty / Rolls</span><strong id="summaryQty">0</strong></div>
+        </div>
+        <div class="side-lines">
+          <div class="side-line"><span>Mode</span><strong id="summaryMode">Cloth</strong></div>
+          <div class="side-line"><span>Cost status</span><strong id="summaryCostStatus">Missing</strong></div>
+          <div class="side-line"><span>Total cost</span><strong>$<span id="summaryCostTotal">0.00</span></strong></div>
+        </div>
+      </div>
+
+      <div class="side-card">
+        <h3 class="side-title">How it works</h3>
+        <div class="help">
+          Cloth and Printing Material save into Inventory batches. Fabric saves into the existing Fabric Receipt and Fabric Roll records, so the same fabric data continues to work in Production.
+        </div>
+      </div>
+    </aside>
+  </div>
 </div>
-<h2 style="margin-top:24px">Rows</h2><p style="color:var(--muted)">Shirt needs colour and size. Material needs quantity only.</p>
-{{ formset.management_form }}
-<div class="rows" id="rows">
-{% for row in formset %}<div class="stock-row" data-row-index="{{ forloop.counter0 }}">
-{% for hidden in row.hidden_fields %}{{ hidden }}{% endfor %}
-<div class="field"><label>Item</label>{{ row.item }}{% for e in row.item.errors %}<small style="color:#b42318">{{ e }}</small>{% endfor %}</div>
-<div class="field"><label>Colour</label>{{ row.color }}</div><div class="field"><label>Size</label>{{ row.size }}</div><div class="field"><label>Quantity</label>{{ row.quantity }}</div>
-<div class="field"><label>Remove</label>{{ row.DELETE }}</div>
-</div>{% endfor %}
+
+<template id="emptyInventoryRow">
+  <div class="stock-row" data-row-index="__prefix__">
+    {% with row=formset.empty_form %}
+      {% for hidden in row.hidden_fields %}{{ hidden }}{% endfor %}
+      <div class="row-number">__number__</div>
+      <div class="field item-field"><label>Item</label>{{ row.item }}<span class="row-type">Select item</span></div>
+      <div class="field color-field"><label>Colour</label>{{ row.color }}</div>
+      <div class="field size-field"><label>Size</label>{{ row.size }}</div>
+      <div class="field qty-field">
+        <label>Quantity</label>
+        <div class="quantity-with-unit">
+          {{ row.quantity }}
+          <span class="material-unit-badge">Unit</span>
+        </div>
+      </div>
+      <div class="remove-wrap">
+                  <div class="delete-field-hidden">{{ row.DELETE }}</div>
+                  <button type="button" class="trash-row-btn" title="Remove row" aria-label="Remove row">🗑</button>
+                </div>
+      <div class="quick-size-bar">
+        <span class="quick-size-label">Quick sizes</span>
+        <div class="quick-size-buttons"></div>
+      </div>
+    {% endwith %}
+  </div>
+</template>
+
+<template id="emptyFabricRow">
+  <div class="fabric-line">
+    <div class="fabric-line-head">
+      <span class="row-number">__number__</span>
+      <button type="button" class="btn-danger-soft removeFabricRow">Remove</button>
+    </div>
+    <div class="fabric-line-grid">
+      <div class="field"><label>Fabric Name</label>{{ fabric_formset.empty_form.fabric_name }}</div>
+      <div class="field"><label>Colour</label>{{ fabric_formset.empty_form.color }}</div>
+      <div class="field"><label>Roll Count</label>{{ fabric_formset.empty_form.roll_count }}</div>
+      <div class="field cost-field"><label>Goods Cost</label>{{ fabric_formset.empty_form.total_goods_cost }}</div>
+      <div class="field cost-field"><label>Delivery Fee</label>{{ fabric_formset.empty_form.shipping_cost }}</div>
+      <div class="field cost-field"><label>Extra Cost</label>{{ fabric_formset.empty_form.extra_cost }}</div>
+      <div class="field"><label>Note</label>{{ fabric_formset.empty_form.note }}</div>
+      <div style="display:none">{{ fabric_formset.empty_form.DELETE }}</div>
+    </div>
+  </div>
+</template>
+
+
+<div class="visual-picker-mask" id="clothPickerModal" aria-hidden="true">
+  <div class="visual-picker-card" role="dialog" aria-modal="true" aria-labelledby="clothPickerTitle">
+    <div class="visual-picker-head">
+      <div>
+        <h2 id="clothPickerTitle">Choose Cloth</h2>
+        <p id="clothPickerSubtitle">Select the shirt style for this stock row.</p>
+      </div>
+      <button type="button" class="visual-picker-close" id="closeClothPicker" aria-label="Close">×</button>
+    </div>
+    <div class="visual-picker-grid" id="clothPickerGrid"></div>
+  </div>
 </div>
-<div class="actions"><button type="button" class="btn-light" id="addRow">+ Add Row</button><button type="submit" class="btn-primary" id="saveBtn">{{ submit_label|default:"Save Batch" }}</button></div>
-</form></div></div>
-<template id="emptyRow"><div class="stock-row" data-row-index="__prefix__">{% with row=formset.empty_form %}{% for hidden in row.hidden_fields %}{{ hidden }}{% endfor %}<div class="field"><label>Item</label>{{ row.item }}</div><div class="field"><label>Colour</label>{{ row.color }}</div><div class="field"><label>Size</label>{{ row.size }}</div><div class="field"><label>Quantity</label>{{ row.quantity }}</div><div class="field"><label>Remove</label>{{ row.DELETE }}</div>{% endwith %}</div></template>
-<div class="modal-mask" id="supplierModal"><div class="modal-card"><h2>New Supplier</h2><div class="field"><label>Name</label><input id="supplier-modal-name" class="form-control"></div><div class="field"><label>Phone</label><input id="supplier-modal-phone" class="form-control"></div><div class="field"><label>Location</label><input id="supplier-modal-location" class="form-control"></div><div class="actions"><button type="button" class="btn-light" id="closeSupplier">Cancel</button><button type="button" class="btn-primary" id="saveSupplier">Save Supplier</button></div></div></div>
+
+<div class="visual-picker-mask" id="colorPickerModal" aria-hidden="true">
+  <div class="visual-picker-card" role="dialog" aria-modal="true" aria-labelledby="colorPickerTitle">
+    <div class="visual-picker-head">
+      <div>
+        <h2 id="colorPickerTitle">Choose Colour</h2>
+        <p id="colorPickerSubtitle">Tap a colour to apply it to the selected cloth.</p>
+      </div>
+      <button type="button" class="visual-picker-close" id="closeColorPicker" aria-label="Close">×</button>
+    </div>
+    <div class="visual-picker-grid color-picker-grid" id="colorPickerGrid"></div>
+  </div>
+</div>
+
+
+<div class="visual-picker-mask" id="sizePickerModal" aria-hidden="true">
+  <div class="visual-picker-card size-picker-card" role="dialog" aria-modal="true" aria-labelledby="sizePickerTitle">
+    <div class="visual-picker-head">
+      <div>
+        <h2 id="sizePickerTitle">Choose Sizes</h2>
+        <p>Select one or more sizes, then press Generate.</p>
+      </div>
+      <button type="button" class="visual-picker-close" id="closeSizePicker" aria-label="Close">×</button>
+    </div>
+
+    <div class="size-choice-grid" id="sizeChoiceGrid"></div>
+
+    <div class="size-picker-actions">
+      <span id="sizeSelectedCount">0 sizes selected</span>
+      <button type="button" class="btn-primary" id="generateSizeRows">Generate Size Rows</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-mask" id="supplierModal">
+  <div class="modal-card">
+    <h2 style="margin:0 0 12px">New Supplier</h2>
+    <div class="field"><label>Name</label><input id="supplier-modal-name"></div>
+    <div class="field" style="margin-top:8px"><label>Phone</label><input id="supplier-modal-phone"></div>
+    <div class="field" style="margin-top:8px"><label>Location</label><input id="supplier-modal-location"></div>
+    <div style="display:flex;justify-content:flex-end;gap:7px;margin-top:12px">
+      <button type="button" class="btn-light" id="closeSupplier">Cancel</button>
+      <button type="button" class="btn-primary" id="saveSupplier">Save Supplier</button>
+    </div>
+  </div>
+</div>
+
 <script>
-(()=>{const form=document.getElementById('stockForm'),toast=document.getElementById('pageToast'),save=document.getElementById('saveBtn');const show=(m,ok=false)=>{toast.textContent=m;toast.className='toast show '+(ok?'ok':'fail');setTimeout(()=>toast.classList.remove('show'),5000)};document.getElementById('addRow').onclick=()=>{const total=document.getElementById('id_items-TOTAL_FORMS'),i=parseInt(total.value),html=document.getElementById('emptyRow').innerHTML.replaceAll('__prefix__',i);document.getElementById('rows').insertAdjacentHTML('beforeend',html);total.value=i+1};form.addEventListener('submit',async e=>{e.preventDefault();document.querySelectorAll('.error-highlight,.row-error').forEach(x=>x.classList.remove('error-highlight','row-error'));save.disabled=true;save.textContent='Saving…';try{const r=await fetch(location.href,{method:'POST',headers:{'X-Requested-With':'XMLHttpRequest'},body:new FormData(form)});const d=await r.json();if(!r.ok||!d.ok){show(d.message||'Failed: Could not save.');const all={...(d.field_errors||{}),...(d.row_errors||{})};const first=Object.keys(all)[0];Object.keys(all).forEach(id=>{const el=document.getElementById(id);if(el){el.classList.add('error-highlight');el.closest('.stock-row')?.classList.add('row-error')}});document.getElementById(first)?.scrollIntoView({behavior:'smooth',block:'center'});return}show(d.message,true);setTimeout(()=>location.href=d.redirect_url,500)}catch(err){show('Failed: Network or server error. Your entered data is still here.')}finally{save.disabled=false;save.textContent='{{ submit_label|default:"Save Batch"|escapejs }}'}});
-const modal=document.getElementById('supplierModal');document.getElementById('openSupplier').onclick=()=>modal.classList.add('show');document.getElementById('closeSupplier').onclick=()=>modal.classList.remove('show');document.getElementById('saveSupplier').onclick=async()=>{const btn=document.getElementById('saveSupplier'),name=document.getElementById('supplier-modal-name');name.classList.remove('error-highlight');btn.disabled=true;btn.textContent='Saving…';const fd=new FormData();fd.append('csrfmiddlewaretoken',form.querySelector('[name=csrfmiddlewaretoken]').value);fd.append('name',name.value);fd.append('phone',document.getElementById('supplier-modal-phone').value);fd.append('location',document.getElementById('supplier-modal-location').value);try{const r=await fetch('{% url "inventory_supplier_ajax_create" %}',{method:'POST',headers:{'X-Requested-With':'XMLHttpRequest'},body:fd});const d=await r.json();if(!r.ok||!d.ok){show(d.message||'Failed: Could not create supplier.');name.classList.add('error-highlight');return}const sel=document.getElementById('id_supplier_ref');let opt=[...sel.options].find(o=>o.value==d.supplier.id);if(!opt){opt=new Option(d.supplier.name,d.supplier.id);sel.add(opt)}sel.value=d.supplier.id;modal.classList.remove('show');show(d.message,true)}catch(e){show('Failed: Network or server error.')}finally{btn.disabled=false;btn.textContent='Save Supplier'}}})();})();
+(()=>{
+  const pageMode='{{ stock_type|default:"cloth"|escapejs }}';
+  const tabs=[...document.querySelectorAll('.type-tab')];
+  const inventoryForm=document.getElementById('inventoryStockForm');
+  const fabricForm=document.getElementById('fabricStockForm');
+  const toast=document.getElementById('pageToast');
+
+  const money=value=>{
+    const number=parseFloat(value||0);
+    return Number.isFinite(number)?number:0;
+  };
+
+  const show=(message,ok=false)=>{
+    toast.textContent=message;
+    toast.className='toast show '+(ok?'ok':'fail');
+    setTimeout(()=>toast.classList.remove('show'),5000);
+  };
+
+  let activeMode=pageMode==='fabric'?'fabric':(pageMode==='printing'?'printing':'cloth');
+
+  function setMode(mode){
+    activeMode=mode;
+    tabs.forEach(tab=>tab.classList.toggle('active',tab.dataset.mode===mode));
+
+    inventoryForm.hidden=mode==='fabric';
+    fabricForm.hidden=mode!=='fabric';
+
+    const hidden=document.getElementById('inventoryStockType');
+    if(hidden) hidden.value=mode;
+
+    document.getElementById('summaryMode').textContent=
+      mode==='fabric'?'Fabric':mode==='printing'?'Printing Material':'Cloth';
+
+    if(mode!=='fabric') filterInventoryItems(mode);
+    updateAllSummary();
+  }
+
+  tabs.forEach(tab=>tab.addEventListener('click',()=>setMode(tab.dataset.mode)));
+
+  const inventoryRows=document.getElementById('inventoryRows');
+  const inventoryTotal=document.getElementById('id_items-TOTAL_FORMS');
+
+  function inventoryRowInfo(row){
+    const select=row.querySelector('.item-select');
+    const option=select?.options[select.selectedIndex];
+    const hasItem=Boolean(select?.value);
+    const isShirt=option?.dataset.isShirt==='1';
+
+    row.classList.toggle('row-material',hasItem&&!isShirt);
+
+    const label=row.querySelector('.row-type');
+    if(label){
+      label.textContent=hasItem?(option?.dataset.typeLabel||'Item'):'Select item';
+    }
+
+    if(hasItem&&!isShirt){
+      const color=row.querySelector('.color-select');
+      const size=row.querySelector('.size-select');
+      if(color) color.value='';
+      if(size) size.value='';
+    }
+
+    refreshQuickSizes(row);
+  }
+
+
+  function copySelectValue(fromRow,toRow,selector){
+    const from=fromRow.querySelector(selector);
+    const to=toRow.querySelector(selector);
+    if(from&&to) to.value=from.value;
+  }
+
+  function refreshQuickSizes(row){
+    const bar=row.querySelector('.quick-size-bar');
+    const buttons=row.querySelector('.quick-size-buttons');
+    const item=row.querySelector('.item-select');
+    const sizeSelect=row.querySelector('.size-select');
+    const selectedItem=item?.options[item.selectedIndex];
+    const isShirt=selectedItem?.dataset.isShirt==='1';
+
+    if(!bar||!buttons||!sizeSelect){
+      return;
+    }
+
+    bar.hidden=!isShirt;
+    buttons.innerHTML='';
+
+    if(!isShirt){
+      return;
+    }
+
+    const existingKeys=new Set(
+      [...inventoryRows.querySelectorAll('.stock-row')]
+        .filter(other=>other!==row)
+        .map(other=>{
+          const itemValue=other.querySelector('.item-select')?.value||'';
+          const colorValue=other.querySelector('.color-select')?.value||'';
+          const sizeValue=other.querySelector('.size-select')?.value||'';
+          return `${itemValue}|${colorValue}|${sizeValue}`;
+        })
+    );
+
+    [...sizeSelect.options].forEach(option=>{
+      if(!option.value) return;
+
+      const button=document.createElement('button');
+      button.type='button';
+      button.className='quick-size-btn';
+      button.textContent=option.textContent.trim();
+      button.dataset.sizeValue=option.value;
+
+      const key=`${item.value}|${row.querySelector('.color-select')?.value||''}|${option.value}`;
+      if(existingKeys.has(key)||sizeSelect.value===option.value){
+        button.classList.add('used');
+      }
+
+      button.addEventListener('click',()=>{
+        const itemValue=item.value;
+        const colorValue=row.querySelector('.color-select')?.value||'';
+
+        if(!itemValue){
+          show('Choose the cloth item first.');
+          item.focus();
+          return;
+        }
+
+        if(!colorValue){
+          show('Choose the colour first.');
+          row.querySelector('.color-select')?.focus();
+          return;
+        }
+
+        const duplicate=[...inventoryRows.querySelectorAll('.stock-row')].find(other=>{
+          return other.querySelector('.item-select')?.value===itemValue
+            && other.querySelector('.color-select')?.value===colorValue
+            && other.querySelector('.size-select')?.value===option.value
+            && !other.querySelector('input[name$="-DELETE"]')?.checked;
+        });
+
+        if(duplicate){
+          duplicate.querySelector('input[name$="-quantity"]')?.focus();
+          duplicate.scrollIntoView({behavior:'smooth',block:'center'});
+          return;
+        }
+
+        if(!sizeSelect.value){
+          sizeSelect.value=option.value;
+          sizeSelect.dispatchEvent(new Event('change',{bubbles:true}));
+          row.querySelector('input[name$="-quantity"]')?.focus();
+          refreshAllQuickSizes();
+          return;
+        }
+
+        const index=parseInt(inventoryTotal.value,10);
+        const html=document.getElementById('emptyInventoryRow').innerHTML
+          .replaceAll('__prefix__',index)
+          .replaceAll('__number__',index+1);
+
+        inventoryRows.insertAdjacentHTML('beforeend',html);
+        inventoryTotal.value=index+1;
+
+        const newRow=inventoryRows.lastElementChild;
+        copySelectValue(row,newRow,'.item-select');
+        copySelectValue(row,newRow,'.color-select');
+        newRow.querySelector('.size-select').value=option.value;
+
+        inventoryRowInfo(newRow);
+        renumberInventoryRows();
+        refreshAllQuickSizes();
+        updateAllSummary();
+
+        newRow.querySelector('input[name$="-quantity"]')?.focus();
+        newRow.scrollIntoView({behavior:'smooth',block:'center'});
+      });
+
+      buttons.appendChild(button);
+    });
+  }
+
+  function refreshAllQuickSizes(){
+    inventoryRows.querySelectorAll('.stock-row').forEach(refreshQuickSizes);
+  }
+
+  function filterInventoryItems(mode){
+    inventoryRows.querySelectorAll('.stock-row').forEach(row=>{
+      const select=row.querySelector('.item-select');
+      if(!select) return;
+
+      [...select.options].forEach(option=>{
+        if(!option.value) return;
+        const isShirt=option.dataset.isShirt==='1';
+        option.hidden=(mode==='cloth'&&!isShirt)||(mode==='printing'&&isShirt);
+      });
+
+      const selected=select.options[select.selectedIndex];
+      if(mode==='cloth'&&selected?.dataset.isShirt!=='1') select.value='';
+      if(mode==='printing'&&selected?.dataset.isShirt==='1') select.value='';
+
+      inventoryRowInfo(row);
+    });
+  }
+
+  function addInventoryRow(){
+    const index=parseInt(inventoryTotal.value,10);
+    const html=document.getElementById('emptyInventoryRow').innerHTML
+      .replaceAll('__prefix__',index)
+      .replaceAll('__number__',index+1);
+
+    inventoryRows.insertAdjacentHTML('beforeend',html);
+    inventoryTotal.value=index+1;
+
+    const row=inventoryRows.lastElementChild;
+    filterInventoryItems(activeMode);
+    renumberInventoryRows();
+    refreshAllQuickSizes();
+    row?.querySelector('.item-select')?.focus();
+  }
+
+  function renumberInventoryRows(){
+    [...inventoryRows.querySelectorAll('.stock-row')].forEach((row,index)=>{
+      row.querySelector('.row-number').textContent=index+1;
+      inventoryRowInfo(row);
+    });
+  }
+
+  document.querySelectorAll('.addInventoryRow').forEach(button=>{
+    button.addEventListener('click',addInventoryRow);
+  });
+
+  inventoryRows.addEventListener('change',event=>{
+    const row=event.target.closest('.stock-row');
+    if(row) inventoryRowInfo(row);
+    refreshAllQuickSizes();
+    updateAllSummary();
+  });
+
+  inventoryRows.addEventListener('click',event=>{
+    const button=event.target.closest('.trash-row-btn');
+    if(!button) return;
+
+    const row=button.closest('.stock-row');
+    if(!row) return;
+
+    const visibleRows=[...inventoryRows.querySelectorAll('.stock-row')].filter(item=>{
+      return item.style.display!=='none'
+        && !item.querySelector('input[name$="-DELETE"]')?.checked;
+    });
+
+    const deleteInput=row.querySelector('input[name$="-DELETE"]');
+    const hasSavedId=Boolean(row.querySelector('input[name$="-id"]')?.value);
+
+    if(visibleRows.length===1){
+      row.querySelectorAll('select').forEach(select=>select.selectedIndex=0);
+      row.querySelectorAll('input[type="number"],input[type="text"]').forEach(input=>input.value='');
+      if(deleteInput) deleteInput.checked=false;
+      inventoryRowInfo(row);
+      refreshAllQuickSizes();
+      updateAllSummary();
+      return;
+    }
+
+    if(hasSavedId && deleteInput){
+      deleteInput.checked=true;
+      row.style.display='none';
+    }else{
+      row.remove();
+    }
+
+    renumberInventoryRows();
+    refreshAllQuickSizes();
+    updateAllSummary();
+
+    if(typeof groupClothRows==='function'){
+      window.requestAnimationFrame(groupClothRows);
+    }
+  });
+
+  inventoryRows.addEventListener('input',updateAllSummary);
+
+  const fabricLines=document.getElementById('fabricLines');
+  const fabricTotal=document.getElementById('id_fabric_items-TOTAL_FORMS');
+
+  function bindFabricRemove(row){
+    row.querySelector('.removeFabricRow')?.addEventListener('click',()=>{
+      const rows=[...fabricLines.querySelectorAll('.fabric-line')].filter(item=>item.style.display!=='none');
+
+      if(rows.length===1){
+        row.querySelectorAll('input:not([type=hidden]),select,textarea').forEach(field=>{
+          if(field.tagName==='SELECT') field.selectedIndex=0;
+          else if(field.name.includes('roll_count')) field.value=1;
+          else if(field.type==='number') field.value=0;
+          else field.value='';
+        });
+        updateAllSummary();
+        return;
+      }
+
+      const deleted=row.querySelector('input[name$="-DELETE"]');
+      if(deleted){
+        deleted.checked=true;
+        row.style.display='none';
+      }else{
+        row.remove();
+      }
+
+      renumberFabricRows();
+      updateAllSummary();
+    });
+  }
+
+  function renumberFabricRows(){
+    [...fabricLines.querySelectorAll('.fabric-line')]
+      .filter(row=>row.style.display!=='none')
+      .forEach((row,index)=>{
+        row.querySelector('.row-number').textContent=index+1;
+      });
+  }
+
+  function addFabricRow(){
+    const index=parseInt(fabricTotal.value,10);
+    const html=document.getElementById('emptyFabricRow').innerHTML
+      .replaceAll('__prefix__',index)
+      .replaceAll('__number__',index+1);
+
+    fabricLines.insertAdjacentHTML('beforeend',html);
+    fabricTotal.value=index+1;
+
+    const row=fabricLines.lastElementChild;
+    bindFabricRemove(row);
+    renumberFabricRows();
+    updateAllSummary();
+    row?.querySelector('input,select')?.focus();
+  }
+
+  fabricLines.querySelectorAll('.fabric-line').forEach(bindFabricRemove);
+  document.getElementById('addFabricRow').addEventListener('click',addFabricRow);
+  document.getElementById('addFabricRowBottom').addEventListener('click',addFabricRow);
+  fabricLines.addEventListener('input',updateAllSummary);
+  fabricLines.addEventListener('change',updateAllSummary);
+
+  function inventoryCost(){
+    return [
+      document.getElementById('id_total_goods_cost'),
+      document.getElementById('id_shipping_cost'),
+      document.getElementById('id_extra_cost')
+    ].filter(Boolean).reduce((sum,input)=>sum+money(input.value),0);
+  }
+
+  function fabricCost(){
+    return [...fabricLines.querySelectorAll('.fabric-line')]
+      .filter(row=>row.style.display!=='none')
+      .reduce((total,row)=>{
+        return total+
+          money(row.querySelector('input[name$="-total_goods_cost"]')?.value)+
+          money(row.querySelector('input[name$="-shipping_cost"]')?.value)+
+          money(row.querySelector('input[name$="-extra_cost"]')?.value);
+      },0);
+  }
+
+  function updateAllSummary(){
+    if(activeMode==='fabric'){
+      const rows=[...fabricLines.querySelectorAll('.fabric-line')]
+        .filter(row=>row.style.display!=='none');
+
+      const rolls=rows.reduce((sum,row)=>{
+        return sum+money(row.querySelector('input[name$="-roll_count"]')?.value);
+      },0);
+
+      const cost=fabricCost();
+
+      document.getElementById('summaryRows').textContent=rows.length;
+      document.getElementById('summaryQty').textContent=rolls.toFixed(0);
+      document.getElementById('fabricRowCount').textContent=rows.length;
+      document.getElementById('summaryCostTotal').textContent=cost.toFixed(2);
+      document.getElementById('summaryCostStatus').textContent=cost>0?'Filled':'Missing';
+      return;
+    }
+
+    const rows=[...inventoryRows.querySelectorAll('.stock-row')].filter(row=>{
+      return !row.querySelector('input[name$="-DELETE"]')?.checked;
+    });
+
+    const qty=rows.reduce((sum,row)=>{
+      return sum+money(row.querySelector('input[name$="-quantity"]')?.value);
+    },0);
+
+    const cost=inventoryCost();
+
+    document.getElementById('summaryRows').textContent=rows.length;
+    document.getElementById('summaryQty').textContent=qty%1===0?qty.toFixed(0):qty.toFixed(2);
+    document.getElementById('inventoryRowCount').textContent=rows.length;
+    document.getElementById('inventoryCostTotal').textContent=cost.toFixed(2);
+    document.getElementById('summaryCostTotal').textContent=cost.toFixed(2);
+    document.getElementById('summaryCostStatus').textContent=cost>0?'Filled':'Missing';
+
+    const badge=document.getElementById('inventoryCostStatus');
+    badge.textContent=cost>0?'✓ Cost filled':'Cost missing';
+    badge.classList.toggle('filled',cost>0);
+  }
+
+  inventoryForm.querySelectorAll('input,select,textarea').forEach(field=>{
+    field.addEventListener('input',updateAllSummary);
+    field.addEventListener('change',updateAllSummary);
+  });
+
+  async function ajaxSubmit(form,button){
+    document.querySelectorAll('.error-highlight,.row-error').forEach(element=>{
+      element.classList.remove('error-highlight','row-error');
+    });
+
+    const original=button.textContent;
+    button.disabled=true;
+    button.textContent='Saving…';
+
+    const failWithoutReload=(message,errors={})=>{
+      const safeMessage=message||'Failed: Could not save. Your entered data is still here.';
+
+      show(safeMessage,false);
+      window.alert(safeMessage);
+
+      const first=Object.keys(errors)[0];
+
+      Object.keys(errors).forEach(id=>{
+        const field=document.getElementById(id);
+        if(field){
+          field.classList.add('error-highlight');
+          field.closest('.stock-row,.fabric-line')?.classList.add('row-error');
+        }
+      });
+
+      if(first){
+        document.getElementById(first)?.scrollIntoView({behavior:'smooth',block:'center'});
+      }
+    };
+
+    try{
+      const response=await fetch(location.href,{
+        method:'POST',
+        headers:{
+          'X-Requested-With':'XMLHttpRequest',
+          'Accept':'application/json'
+        },
+        body:new FormData(form),
+        credentials:'same-origin',
+        redirect:'follow'
+      });
+
+      const contentType=response.headers.get('content-type')||'';
+      let data=null;
+
+      if(contentType.includes('application/json')){
+        data=await response.json();
+      }else{
+        const serverText=await response.text();
+        console.error('Stock In returned non-JSON response:',{
+          status:response.status,
+          redirected:response.redirected,
+          url:response.url,
+          body:serverText
+        });
+
+        let message=`Failed: Server returned ${response.status}.`;
+        if(response.redirected){
+          message+=' Your login may have expired.';
+        }else if(response.status===403){
+          message+=' CSRF permission was rejected.';
+        }else if(response.status>=500){
+          message+=' Please check the Django server log.';
+        }
+        message+=' Your entered data is still here.';
+
+        failWithoutReload(message);
+        return;
+      }
+
+      if(!response.ok||!data?.ok){
+        const errors={
+          ...(data?.field_errors||{}),
+          ...(data?.row_errors||{})
+        };
+
+        failWithoutReload(
+          data?.message||`Failed: Could not save (HTTP ${response.status}). Your entered data is still here.`,
+          errors
+        );
+        return;
+      }
+
+      show(data.message||'Saved successfully.',true);
+
+      // Redirect only after a confirmed successful save.
+      if(data.redirect_url){
+        setTimeout(()=>window.location.assign(data.redirect_url),450);
+      }
+    }catch(error){
+      console.error('Stock In save error:',error);
+      failWithoutReload(
+        'Failed: Network or server error. Your entered data is still here and the page was not reloaded.'
+      );
+    }finally{
+      button.disabled=false;
+      button.textContent=original;
+    }
+  }
+
+  inventoryForm.addEventListener('submit',event=>{
+    event.preventDefault();
+    ajaxSubmit(inventoryForm,document.getElementById('inventorySaveBtn'));
+  });
+
+  fabricForm.addEventListener('submit',event=>{
+    event.preventDefault();
+    ajaxSubmit(fabricForm,document.getElementById('fabricSaveBtn'));
+  });
+
+  const modal=document.getElementById('supplierModal');
+  document.querySelectorAll('.openSupplier').forEach(button=>{
+    button.addEventListener('click',()=>modal.classList.add('show'));
+  });
+  document.getElementById('closeSupplier').addEventListener('click',()=>modal.classList.remove('show'));
+
+  document.getElementById('saveSupplier').addEventListener('click',async()=>{
+    const button=document.getElementById('saveSupplier');
+    const name=document.getElementById('supplier-modal-name');
+
+    button.disabled=true;
+    button.textContent='Saving…';
+
+    const data=new FormData();
+    data.append('csrfmiddlewaretoken',inventoryForm.querySelector('[name=csrfmiddlewaretoken]').value);
+    data.append('name',name.value);
+    data.append('phone',document.getElementById('supplier-modal-phone').value);
+    data.append('location',document.getElementById('supplier-modal-location').value);
+
+    try{
+      const response=await fetch('{% url "inventory_supplier_ajax_create" %}',{
+        method:'POST',
+        headers:{'X-Requested-With':'XMLHttpRequest'},
+        body:data
+      });
+      const result=await response.json();
+
+      if(!response.ok||!result.ok){
+        show(result.message||'Failed: Could not create supplier.');
+        return;
+      }
+
+      [
+        document.getElementById('id_supplier_ref'),
+        document.getElementById('id_supplier')
+      ].filter(Boolean).forEach(select=>{
+        let option=[...select.options].find(item=>item.value==result.supplier.id);
+        if(!option){
+          option=new Option(result.supplier.name,result.supplier.id);
+          select.add(option);
+        }
+        select.value=result.supplier.id;
+      });
+
+      modal.classList.remove('show');
+      show(result.message,true);
+    }catch(error){
+      show('Failed: Network or server error.');
+    }finally{
+      button.disabled=false;
+      button.textContent='Save Supplier';
+    }
+  });
+
+  renumberInventoryRows();
+  renumberFabricRows();
+  refreshAllQuickSizes();
+  setMode(activeMode);
+})();
 </script>
+
+<style id="niron-equal-stock-row-boxes">
+/* Make every cloth entry box the same size and keep columns perfectly aligned */
+.stock-row{
+  min-height:104px!important;
+  grid-template-rows:auto 34px!important;
+  align-items:start!important;
+}
+
+.stock-row .item-field,
+.stock-row .color-field,
+.stock-row .size-field,
+.stock-row .qty-field{
+  align-self:start!important;
+}
+
+.stock-row .field input,
+.stock-row .field select{
+  height:42px!important;
+  min-height:42px!important;
+  box-sizing:border-box!important;
+}
+
+.quick-size-bar{
+  grid-column:2 / 6!important;
+  min-height:34px!important;
+  height:34px!important;
+  box-sizing:border-box!important;
+  align-self:end!important;
+  margin-top:0!important;
+  overflow:hidden;
+}
+
+.quick-size-buttons{
+  min-height:28px!important;
+  align-items:center!important;
+}
+
+.row-number,
+.remove-wrap{
+  align-self:start!important;
+  margin-top:18px!important;
+}
+
+.row-material{
+  min-height:84px!important;
+  grid-template-rows:auto!important;
+}
+
+.row-material .quick-size-bar{
+  display:none!important;
+}
+
+@media(max-width:820px){
+  .stock-row{
+    min-height:0!important;
+    grid-template-rows:auto!important;
+  }
+
+  .quick-size-bar{
+    height:auto!important;
+    min-height:34px!important;
+    grid-column:2!important;
+    overflow:visible!important;
+  }
+
+  .row-number,
+  .remove-wrap{
+    margin-top:18px!important;
+  }
+}
+</style>
+
+
+
+
+
+
+
+<style id="niron-trash-and-select-fix">
+.stock-row select,
+.stock-row input{
+  position:relative!important;
+  z-index:5!important;
+  pointer-events:auto!important;
+}
+
+.stock-row::before,
+.stock-row::after{
+  pointer-events:none!important;
+}
+
+.delete-field-hidden{
+  position:absolute!important;
+  width:1px!important;
+  height:1px!important;
+  overflow:hidden!important;
+  opacity:0!important;
+  pointer-events:none!important;
+}
+
+.trash-row-btn{
+  width:31px;
+  height:31px;
+  display:grid;
+  place-items:center;
+  padding:0;
+  border:1px solid rgba(207,66,77,.20);
+  border-radius:9px;
+  background:linear-gradient(145deg,#fff8f8,#f8dede);
+  color:#b73540;
+  font-size:14px;
+  cursor:pointer;
+  transition:transform .14s ease,box-shadow .14s ease,background .14s ease;
+}
+
+.trash-row-btn:hover{
+  transform:translateY(-1px);
+  background:#ffeaea;
+  box-shadow:0 6px 14px rgba(151,48,57,.12);
+}
+
+.remove-wrap{
+  position:relative;
+  z-index:6;
+}
+
+.stock-row.cloth-group-child .remove-wrap{
+  margin-top:18px!important;
+}
+
+@media(max-width:820px){
+  .trash-row-btn{
+    width:32px;
+    height:32px;
+  }
+}
+</style>
+
+
+
+
+
+
+
+<style id="niron-cloth-picture-size-picker">
+.cloth-merge-head{
+  padding:10px 12px!important;
+}
+
+.cloth-merge-title{
+  flex:1;
+}
+
+.cloth-color-picture{
+  width:58px;
+  height:58px;
+  flex:0 0 58px;
+  display:grid;
+  place-items:center;
+  position:relative;
+  overflow:hidden;
+  border-radius:15px;
+  border:1px solid rgba(178,119,40,.18);
+  background:
+    radial-gradient(circle at 50% 70%,rgba(245,211,144,.85),rgba(255,255,255,.92) 68%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.96),
+    0 8px 18px rgba(75,43,11,.09);
+}
+
+.cloth-color-picture::after{
+  content:"";
+  position:absolute;
+  left:50%;
+  bottom:7px;
+  width:38px;
+  height:8px;
+  transform:translateX(-50%);
+  border-radius:50%;
+  background:radial-gradient(ellipse,rgba(71,42,15,.20),transparent 70%);
+}
+
+.cloth-shirt-icon{
+  width:42px;
+  height:42px;
+  position:relative;
+  z-index:1;
+  filter:drop-shadow(0 7px 5px rgba(57,33,10,.18));
+}
+
+.cloth-merge-details{
+  min-width:0;
+}
+
+.cloth-merge-name strong{
+  font-size:14px!important;
+}
+
+.cloth-size-picker{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  flex-wrap:wrap;
+  gap:5px;
+  max-width:330px;
+}
+
+.cloth-size-picker-label{
+  margin-right:2px;
+  color:#80664a;
+  font-size:8.5px;
+  font-weight:900;
+  text-transform:uppercase;
+  letter-spacing:.05em;
+}
+
+.cloth-size-choice{
+  min-width:34px;
+  height:30px;
+  padding:4px 8px;
+  border:1px solid rgba(178,119,40,.20);
+  border-radius:9px;
+  background:linear-gradient(145deg,#fff,#f1d5a3);
+  color:#624014;
+  font-size:10px;
+  font-weight:950;
+  cursor:pointer;
+  transition:transform .14s ease,box-shadow .14s ease,background .14s ease;
+}
+
+.cloth-size-choice:hover{
+  transform:translateY(-1px);
+  background:linear-gradient(145deg,#fff9eb,#eec77b);
+  box-shadow:0 6px 13px rgba(81,47,13,.09);
+}
+
+.cloth-size-choice.used{
+  background:#eaf8f1;
+  color:#14704e;
+  border-color:rgba(22,139,96,.20);
+}
+
+.cloth-size-choice:disabled{
+  cursor:default;
+  opacity:.65;
+  transform:none;
+  box-shadow:none;
+}
+
+.cloth-merge-add-size{
+  display:none!important;
+}
+
+@media(max-width:820px){
+  .cloth-merge-head{
+    display:grid!important;
+    grid-template-columns:58px 1fr!important;
+  }
+
+  .cloth-merge-title{
+    display:contents!important;
+  }
+
+  .cloth-color-picture{
+    grid-column:1;
+    grid-row:1;
+  }
+
+  .cloth-merge-details{
+    grid-column:2;
+    grid-row:1;
+    align-self:center;
+  }
+
+  .cloth-size-picker{
+    grid-column:1/-1;
+    max-width:none;
+    justify-content:flex-start;
+    margin-top:8px;
+  }
+}
+</style>
+
+
+<style id="niron-visual-cloth-color-picker">
+.visual-select-native{
+  position:absolute!important;
+  width:1px!important;
+  height:1px!important;
+  opacity:0!important;
+  pointer-events:none!important;
+}
+
+.visual-select-btn{
+  width:100%;
+  min-height:48px;
+  padding:7px 10px;
+  border:1px solid var(--stock-line);
+  border-radius:11px;
+  background:linear-gradient(145deg,#fff,#f7e6c7);
+  color:var(--stock-text);
+  display:flex;
+  align-items:center;
+  gap:9px;
+  text-align:left;
+  cursor:pointer;
+  transition:transform .14s ease,box-shadow .14s ease,border-color .14s ease;
+}
+
+.visual-select-btn:hover{
+  transform:translateY(-1px);
+  border-color:rgba(194,130,35,.36);
+  box-shadow:0 8px 18px rgba(74,42,10,.08);
+}
+
+.visual-select-thumb{
+  width:38px;
+  height:38px;
+  flex:0 0 38px;
+  display:grid;
+  place-items:center;
+  border-radius:10px;
+  border:1px solid rgba(172,114,37,.18);
+  background:radial-gradient(circle at 50% 72%,rgba(244,211,145,.86),rgba(255,255,255,.95) 70%);
+}
+
+.visual-select-thumb svg{
+  width:29px;
+  height:29px;
+  filter:drop-shadow(0 4px 3px rgba(58,34,10,.18));
+}
+
+.visual-select-copy{
+  min-width:0;
+  flex:1;
+}
+
+.visual-select-copy strong{
+  display:block;
+  overflow:hidden;
+  white-space:nowrap;
+  text-overflow:ellipsis;
+  font-size:11.5px;
+}
+
+.visual-select-copy span{
+  display:block;
+  margin-top:2px;
+  color:var(--stock-muted);
+  font-size:9px;
+}
+
+.visual-select-arrow{
+  color:#966625;
+  font-size:14px;
+  font-weight:950;
+}
+
+.visual-picker-mask{
+  display:none;
+  position:fixed;
+  inset:0;
+  z-index:10050;
+  padding:18px;
+  align-items:center;
+  justify-content:center;
+  background:rgba(28,18,8,.52);
+  backdrop-filter:blur(7px);
+}
+
+.visual-picker-mask.show{
+  display:flex;
+}
+
+.visual-picker-card{
+  width:min(760px,100%);
+  max-height:min(82vh,760px);
+  overflow:auto;
+  padding:16px;
+  border:1px solid rgba(188,127,38,.24);
+  border-radius:22px;
+  background:
+    radial-gradient(circle at 90% 0%,rgba(255,220,151,.20),transparent 30%),
+    linear-gradient(145deg,#fffdf8,#f7e5c4);
+  box-shadow:0 30px 90px rgba(41,23,6,.30);
+}
+
+.visual-picker-head{
+  position:sticky;
+  top:-16px;
+  z-index:3;
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:12px;
+  margin:-16px -16px 14px;
+  padding:16px;
+  border-bottom:1px solid rgba(172,114,37,.14);
+  background:rgba(255,250,240,.94);
+  backdrop-filter:blur(12px);
+}
+
+.visual-picker-head h2{
+  margin:0;
+  font-size:22px;
+  letter-spacing:-.03em;
+}
+
+.visual-picker-head p{
+  margin:4px 0 0;
+  color:var(--stock-muted);
+  font-size:11px;
+}
+
+.visual-picker-close{
+  width:34px;
+  height:34px;
+  display:grid;
+  place-items:center;
+  border:1px solid rgba(172,114,37,.16);
+  border-radius:10px;
+  background:#fff;
+  color:#6c4618;
+  font-size:20px;
+  cursor:pointer;
+}
+
+.visual-picker-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:10px;
+}
+
+.picker-option{
+  min-height:132px;
+  padding:12px;
+  border:1px solid rgba(176,117,37,.18);
+  border-radius:16px;
+  background:linear-gradient(145deg,#fff,#f4dfba);
+  color:var(--stock-text);
+  text-align:left;
+  cursor:pointer;
+  transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease;
+}
+
+.picker-option:hover{
+  transform:translateY(-3px);
+  border-color:rgba(194,130,35,.38);
+  box-shadow:0 14px 30px rgba(74,42,10,.11);
+}
+
+.picker-option.selected{
+  border-color:rgba(22,139,96,.34);
+  box-shadow:0 0 0 3px rgba(22,139,96,.08);
+}
+
+.picker-shirt-stage{
+  height:72px;
+  display:grid;
+  place-items:center;
+  border-radius:13px;
+  background:radial-gradient(circle at 50% 72%,rgba(242,207,137,.90),rgba(255,255,255,.94) 72%);
+}
+
+.picker-shirt-stage svg{
+  width:58px;
+  height:58px;
+  filter:drop-shadow(0 8px 6px rgba(57,33,10,.20));
+}
+
+.picker-option strong{
+  display:block;
+  margin-top:9px;
+  font-size:12px;
+}
+
+.picker-option small{
+  display:block;
+  margin-top:3px;
+  color:var(--stock-muted);
+  font-size:9px;
+}
+
+.color-picker-grid{
+  grid-template-columns:repeat(4,minmax(0,1fr));
+}
+
+.color-picker-grid .picker-option{
+  min-height:150px;
+}
+
+.color-name-row{
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+
+.color-swatch{
+  width:14px;
+  height:14px;
+  flex:0 0 14px;
+  border-radius:50%;
+  border:1px solid rgba(0,0,0,.18);
+}
+
+@media(max-width:720px){
+  .visual-picker-grid,
+  .color-picker-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  .visual-picker-card{
+    padding:11px;
+    border-radius:17px;
+  }
+}
+
+@media(max-width:390px){
+  .visual-picker-grid,
+  .color-picker-grid{
+    grid-template-columns:1fr;
+  }
+}
+</style>
+
+
+
+
+
+<style id="niron-visual-picker-fix-css">
+.visual-picker-mask{
+  z-index:2147483000!important;
+}
+
+.visual-picker-card{
+  position:relative;
+  z-index:2147483001!important;
+}
+
+.visual-select-btn{
+  position:relative!important;
+  z-index:20!important;
+  pointer-events:auto!important;
+}
+
+.picker-empty{
+  grid-column:1/-1;
+  padding:24px;
+  border:1px dashed rgba(176,117,37,.25);
+  border-radius:14px;
+  background:rgba(255,255,255,.62);
+  color:#806a50;
+  text-align:center;
+  font-size:12px;
+  font-weight:800;
+}
+</style>
+
+
+
+
+<style id="niron-size-generator-ui">
+.size-picker-card{
+  width:min(620px,100%);
+}
+
+.size-choice-grid{
+  display:grid;
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  gap:10px;
+}
+
+.size-choice-card{
+  min-height:82px;
+  border:1px solid rgba(177,118,39,.20);
+  border-radius:14px;
+  background:linear-gradient(145deg,#fff,#f2d9ad);
+  color:#613f14;
+  font-size:18px;
+  font-weight:950;
+  cursor:pointer;
+  transition:transform .15s ease,box-shadow .15s ease,background .15s ease;
+}
+
+.size-choice-card:hover{
+  transform:translateY(-2px);
+  box-shadow:0 10px 24px rgba(73,42,10,.10);
+}
+
+.size-choice-card.selected{
+  background:linear-gradient(145deg,#eaf8f1,#ccebdc);
+  color:#13704e;
+  border-color:rgba(22,139,96,.30);
+  box-shadow:0 0 0 3px rgba(22,139,96,.08);
+}
+
+.size-choice-card.used{
+  opacity:.45;
+  cursor:not-allowed;
+  background:#eee8dd;
+  box-shadow:none;
+  transform:none;
+}
+
+.size-picker-actions{
+  position:sticky;
+  bottom:-16px;
+  margin:16px -16px -16px;
+  padding:12px 16px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  border-top:1px solid rgba(177,118,39,.16);
+  background:rgba(255,250,240,.96);
+  backdrop-filter:blur(12px);
+}
+
+.size-picker-actions span{
+  color:var(--stock-muted);
+  font-size:11px;
+  font-weight:850;
+}
+
+.stock-row.awaiting-size .size-field,
+.stock-row.awaiting-size .qty-field{
+  display:none!important;
+}
+
+.stock-row.awaiting-size{
+  min-height:88px!important;
+}
+
+.stock-row.awaiting-size::after{
+  content:"Choose cloth and colour, then select sizes";
+  grid-column:3 / 6;
+  align-self:center;
+  padding:10px 12px;
+  border:1px dashed rgba(177,118,39,.22);
+  border-radius:10px;
+  color:#8a7152;
+  background:rgba(255,250,241,.70);
+  font-size:10px;
+  font-weight:800;
+}
+
+@media(max-width:720px){
+  .size-choice-grid{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+  }
+
+  .size-choice-card{
+    min-height:70px;
+  }
+
+  .size-picker-actions{
+    align-items:stretch;
+    flex-direction:column;
+  }
+
+  .stock-row.awaiting-size::after{
+    grid-column:2!important;
+  }
+}
+</style>
+
+
+
+
+
+<style id="niron-stock-in-stable-picker-layout">
+/* Stable, aligned stock row */
+.stock-row{
+  display:grid!important;
+  grid-template-columns:30px minmax(250px,1.35fr) minmax(220px,1fr) 34px!important;
+  grid-template-rows:auto!important;
+  gap:10px!important;
+  align-items:start!important;
+  min-height:118px!important;
+  padding:12px!important;
+}
+
+.stock-row .row-number{
+  grid-column:1!important;
+  grid-row:1!important;
+  margin-top:19px!important;
+}
+
+.stock-row .item-field{
+  grid-column:2!important;
+  grid-row:1!important;
+}
+
+.stock-row .color-field{
+  grid-column:3!important;
+  grid-row:1!important;
+}
+
+.stock-row .remove-wrap{
+  grid-column:4!important;
+  grid-row:1!important;
+  margin-top:19px!important;
+}
+
+.stock-row .size-field,
+.stock-row .qty-field{
+  display:none!important;
+}
+
+/* The visual selectors remain above every decoration */
+.visual-select-btn{
+  position:relative!important;
+  z-index:100!important;
+  pointer-events:auto!important;
+  min-height:54px!important;
+}
+
+.stock-row::before,
+.stock-row::after,
+.stock-row.awaiting-size::after{
+  pointer-events:none!important;
+}
+
+.stock-row.awaiting-size::after{
+  content:"Choose cloth → choose colour → choose sizes"!important;
+  grid-column:2 / 4!important;
+  grid-row:2!important;
+  display:block!important;
+  margin-top:0!important;
+  padding:10px 12px!important;
+  border:1px dashed rgba(177,118,39,.22)!important;
+  border-radius:10px!important;
+  color:#806a50!important;
+  background:rgba(255,250,241,.72)!important;
+  font-size:10px!important;
+  font-weight:800!important;
+}
+
+/* Smaller, cleaner currency */
+.money-prefix{
+  font-size:12px!important;
+  left:11px!important;
+}
+
+.money-wrap input{
+  min-height:44px!important;
+  padding-left:25px!important;
+  font-size:15px!important;
+  font-weight:850!important;
+}
+
+.cost-total{
+  min-height:48px!important;
+}
+
+.cost-total strong{
+  font-size:18px!important;
+}
+
+.cost-total strong::first-letter{
+  font-size:14px;
+}
+
+/* Popup must always sit over the app */
+.visual-picker-mask{
+  z-index:2147483000!important;
+}
+
+.visual-picker-card{
+  z-index:2147483001!important;
+}
+
+.picker-option,
+.size-choice-card,
+.visual-picker-close,
+#generateSizeRows{
+  pointer-events:auto!important;
+  position:relative!important;
+  z-index:10!important;
+}
+
+@media(max-width:820px){
+  .stock-row{
+    grid-template-columns:28px minmax(0,1fr) 34px!important;
+    min-height:0!important;
+  }
+
+  .stock-row .item-field,
+  .stock-row .color-field{
+    grid-column:2!important;
+  }
+
+  .stock-row .item-field{grid-row:1!important}
+  .stock-row .color-field{grid-row:2!important}
+
+  .stock-row .remove-wrap{
+    grid-column:3!important;
+    grid-row:1!important;
+  }
+
+  .stock-row.awaiting-size::after{
+    grid-column:2!important;
+    grid-row:3!important;
+  }
+}
+</style>
+
+
+
+
+<style id="niron-full-button-tech-hover">
+/* Make the entire visual selector button clickable */
+.visual-select-btn{
+  position:relative!important;
+  z-index:200!important;
+  pointer-events:auto!important;
+  cursor:pointer!important;
+  overflow:hidden!important;
+  isolation:isolate!important;
+  border:1px solid rgba(184,122,36,.24)!important;
+  background:
+    linear-gradient(145deg,rgba(255,255,255,.96),rgba(246,226,191,.90))!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.95),
+    0 6px 16px rgba(77,44,11,.06)!important;
+  transition:
+    transform .16s ease,
+    box-shadow .16s ease,
+    border-color .16s ease,
+    background .16s ease!important;
+}
+
+/* Every child passes the click to the button */
+.visual-select-btn *{
+  pointer-events:none!important;
+}
+
+.visual-select-btn::before{
+  content:"";
+  position:absolute;
+  inset:-1px;
+  z-index:-1;
+  opacity:0;
+  pointer-events:none;
+  background:
+    radial-gradient(
+      180px circle at var(--btn-x,50%) var(--btn-y,50%),
+      rgba(255,255,255,.95),
+      rgba(255,214,130,.34) 35%,
+      transparent 72%
+    );
+  transition:opacity .16s ease;
+}
+
+.visual-select-btn::after{
+  content:"";
+  position:absolute;
+  top:0;
+  bottom:0;
+  width:42%;
+  left:-48%;
+  pointer-events:none;
+  background:
+    linear-gradient(
+      105deg,
+      transparent 0%,
+      rgba(255,255,255,.12) 32%,
+      rgba(255,248,215,.92) 50%,
+      rgba(255,220,145,.56) 56%,
+      transparent 72%
+    );
+  filter:drop-shadow(0 0 8px rgba(255,203,96,.42));
+}
+
+.visual-select-btn:hover{
+  transform:translateY(-2px)!important;
+  border-color:rgba(214,151,51,.44)!important;
+  background:
+    linear-gradient(145deg,#fffdf7,#f0ce91)!important;
+  box-shadow:
+    0 12px 28px rgba(79,45,11,.12),
+    0 0 0 1px rgba(255,211,126,.14)!important;
+}
+
+.visual-select-btn:hover::before{
+  opacity:1;
+}
+
+.visual-select-btn:hover::after{
+  animation:visualButtonShine .72s cubic-bezier(.2,.72,.18,1) both;
+}
+
+.visual-select-btn:active{
+  transform:translateY(0) scale(.995)!important;
+}
+
+.visual-select-btn:focus-visible{
+  outline:3px solid rgba(214,151,51,.20)!important;
+  outline-offset:2px!important;
+}
+
+@keyframes visualButtonShine{
+  0%{left:-48%;opacity:0}
+  12%{opacity:1}
+  100%{left:112%;opacity:0}
+}
+
+.visual-select-thumb{
+  transition:transform .16s ease,filter .16s ease!important;
+}
+
+.visual-select-btn:hover .visual-select-thumb{
+  transform:translateY(-1px) scale(1.04)!important;
+  filter:drop-shadow(0 7px 6px rgba(61,35,10,.16))!important;
+}
+
+.visual-select-arrow{
+  transition:transform .16s ease,color .16s ease!important;
+}
+
+.visual-select-btn:hover .visual-select-arrow{
+  transform:translateX(3px)!important;
+  color:#b57518!important;
+}
+
+/* Keep row overlays from blocking clicks */
+.stock-row::before,
+.stock-row::after,
+.stock-row.awaiting-size::after,
+.quick-size-bar,
+.quick-size-bar::before,
+.quick-size-bar::after{
+  pointer-events:none!important;
+}
+
+/* Popup always above everything */
+.visual-picker-mask{
+  z-index:2147483000!important;
+}
+
+.visual-picker-card{
+  z-index:2147483001!important;
+}
+
+/* Touch devices: no hover animation, but full click area stays */
+@media(hover:none),(pointer:coarse){
+  .visual-select-btn:hover{
+    transform:none!important;
+  }
+
+  .visual-select-btn::after{
+    display:none!important;
+  }
+}
+</style>
+
+
+
+
+<style id="niron-picker-card-hover-real-image">
+/* Picker cards: stronger clean technology hover */
+.picker-option{
+  position:relative!important;
+  overflow:hidden!important;
+  isolation:isolate!important;
+  border:1px solid rgba(184,122,36,.20)!important;
+  background:linear-gradient(145deg,#fffdf8,#f4dcae)!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.95),
+    0 7px 18px rgba(76,43,10,.06)!important;
+  transition:
+    transform .17s ease,
+    box-shadow .17s ease,
+    border-color .17s ease,
+    background .17s ease!important;
+}
+
+.picker-option::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:-1;
+  opacity:0;
+  pointer-events:none;
+  background:
+    radial-gradient(
+      210px circle at var(--card-x,50%) var(--card-y,50%),
+      rgba(255,255,255,.98),
+      rgba(255,216,135,.35) 34%,
+      transparent 70%
+    );
+  transition:opacity .16s ease;
+}
+
+.picker-option::after{
+  content:"";
+  position:absolute;
+  top:-15%;
+  bottom:-15%;
+  width:38%;
+  left:-48%;
+  pointer-events:none;
+  background:
+    linear-gradient(
+      105deg,
+      transparent,
+      rgba(255,255,255,.14) 30%,
+      rgba(255,249,218,.95) 50%,
+      rgba(255,211,115,.52) 58%,
+      transparent 76%
+    );
+  filter:drop-shadow(0 0 9px rgba(255,198,76,.44));
+}
+
+.picker-option:hover{
+  transform:translateY(-4px) scale(1.015)!important;
+  border-color:rgba(214,151,51,.44)!important;
+  background:linear-gradient(145deg,#fff,#efc980)!important;
+  box-shadow:
+    0 18px 34px rgba(75,42,10,.15),
+    0 0 0 1px rgba(255,215,130,.18)!important;
+}
+
+.picker-option:hover::before{
+  opacity:1;
+}
+
+.picker-option:hover::after{
+  animation:pickerCardShine .72s cubic-bezier(.2,.72,.18,1) both;
+}
+
+.picker-option:active{
+  transform:translateY(-1px) scale(.995)!important;
+}
+
+@keyframes pickerCardShine{
+  0%{left:-48%;opacity:0}
+  12%{opacity:1}
+  100%{left:112%;opacity:0}
+}
+
+.picker-shirt-stage{
+  overflow:hidden!important;
+  position:relative!important;
+}
+
+.inventory-item-image{
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  display:block;
+  transition:transform .18s ease,filter .18s ease;
+}
+
+.picker-option:hover .inventory-item-image,
+.picker-option:hover .picker-shirt-stage svg{
+  transform:translateY(-2px) scale(1.07);
+  filter:drop-shadow(0 10px 7px rgba(54,31,9,.22));
+}
+
+/* Close button: red hover */
+.visual-picker-close{
+  color:#75501e!important;
+  background:#fff!important;
+  border-color:rgba(177,118,39,.18)!important;
+  transition:
+    transform .15s ease,
+    background .15s ease,
+    color .15s ease,
+    border-color .15s ease,
+    box-shadow .15s ease!important;
+}
+
+.visual-picker-close:hover{
+  transform:rotate(5deg) scale(1.06)!important;
+  color:#fff!important;
+  background:linear-gradient(145deg,#e94b58,#b91f2d)!important;
+  border-color:#b91f2d!important;
+  box-shadow:
+    0 8px 18px rgba(185,31,45,.24),
+    0 0 0 3px rgba(233,75,88,.10)!important;
+}
+
+.visual-picker-close:active{
+  transform:scale(.96)!important;
+}
+
+@media(hover:none),(pointer:coarse){
+  .picker-option:hover{
+    transform:none!important;
+  }
+
+  .picker-option::after{
+    display:none!important;
+  }
+
+  .visual-picker-close:hover{
+    transform:none!important;
+  }
+}
+</style>
+
+<script id="niron-full-button-picker-js">
+(function(){
+  const rows=document.getElementById('inventoryRows');
+  const clothModal=document.getElementById('clothPickerModal');
+  const colorModal=document.getElementById('colorPickerModal');
+  const sizeModal=document.getElementById('sizePickerModal');
+  const clothGrid=document.getElementById('clothPickerGrid');
+  const colorGrid=document.getElementById('colorPickerGrid');
+  const sizeGrid=document.getElementById('sizeChoiceGrid');
+  const generateButton=document.getElementById('generateSizeRows');
+  const selectedCount=document.getElementById('sizeSelectedCount');
+
+  if(!rows||!clothModal||!colorModal||!sizeModal) return;
+
+  [clothModal,colorModal,sizeModal].forEach(modal=>{
+    if(modal.parentElement!==document.body){
+      document.body.appendChild(modal);
+    }
+  });
+
+  let activeRow=null;
+  let chosenSizes=new Set();
+
+  const itemSelect=row=>row?.querySelector('.item-select');
+  const colorSelect=row=>row?.querySelector('.color-select');
+  const sizeSelect=row=>row?.querySelector('.size-select');
+
+  function safe(value){
+    const div=document.createElement('div');
+    div.textContent=value||'';
+    return div.innerHTML;
+  }
+
+  function shirtSvg(color){
+    const fill=/^#[0-9a-f]{6}$/i.test(color||'')?color:'#D1D5DB';
+    return `<svg viewBox="0 0 64 64" aria-hidden="true">
+      <path fill="${fill}" d="M21 9 13 13 5 25l10 6 5-7v31h24V24l5 7 10-6-8-12-8-4c-2 4-5 6-11 6s-9-2-11-6Z"/>
+      <path fill="rgba(255,255,255,.46)" d="M25 10c1.5 2 3.7 3 7 3s5.5-1 7-3l-3-1c-.8 1.2-2 1.8-4 1.8S28.8 10.2 28 9l-3 1Z"/>
+    </svg>`;
+  }
+
+  function itemVisual(option,color){
+    const image=option?.dataset.itemImage||'';
+    const isPrinting=document.getElementById('inventoryStockType')?.value==='printing';
+
+    if(image){
+      return `<img class="inventory-item-image" src="${safe(image)}" alt="${safe(option?.dataset.itemName||option?.textContent?.trim()||'Inventory item')}">`;
+    }
+
+    if(isPrinting){
+      const itemType=(option?.dataset.itemType||'').toLowerCase();
+      const unit=(option?.dataset.unit||'').toLowerCase();
+
+      let icon='▦';
+      if(itemType.includes('ink') || unit.includes('ml')) icon='◉';
+      else if(itemType.includes('film') || unit.includes('roll')) icon='▤';
+      else if(unit.includes('bottle')) icon='◍';
+      else if(unit.includes('pcs') || unit.includes('piece')) icon='◆';
+
+      return `<span class="material-fallback-icon">${icon}</span>`;
+    }
+
+    return shirtSvg(color);
+  }
+
+  function openModal(modal){
+    modal.classList.add('show');
+    modal.setAttribute('aria-hidden','false');
+    document.body.style.overflow='hidden';
+  }
+
+  function closeModal(modal){
+    modal.classList.remove('show');
+    modal.setAttribute('aria-hidden','true');
+
+    if(![clothModal,colorModal,sizeModal].some(item=>item.classList.contains('show'))){
+      document.body.style.overflow='';
+    }
+  }
+
+  function itemData(row){
+    const select=itemSelect(row);
+    const option=select?.options[select.selectedIndex];
+    const label=option?.textContent?.trim()||'';
+
+    return {
+      value:select?.value||'',
+      code:option?.dataset.itemCode||label.split(' - ')[0]||'',
+      name:option?.dataset.itemName||label.split(' - ').slice(1).join(' - ')||label,
+      style:option?.dataset.itemStyle||'',
+      typeLabel:option?.dataset.typeLabel||'',
+      unitLabel:option?.dataset.unitLabel||option?.dataset.unit||'',
+      image:option?.dataset.itemImage||'',
+      option
+    };
+  }
+
+  function colorData(row){
+    const select=colorSelect(row);
+    const option=select?.options[select.selectedIndex];
+
+    return {
+      value:select?.value||'',
+      name:option?.dataset.colorName||option?.textContent?.trim()||'',
+      hex:option?.dataset.colorHex||'#D1D5DB'
+    };
+  }
+
+  function refreshRow(row){
+    const item=itemData(row);
+    const color=colorData(row);
+    const itemButton=row.querySelector('.visual-item-btn');
+    const colorButton=row.querySelector('.visual-color-btn');
+    const isPrinting=document.getElementById('inventoryStockType')?.value==='printing';
+
+    if(itemButton){
+      itemButton.innerHTML=`
+        <span class="visual-select-thumb">${itemVisual(item.option,color.hex)}</span>
+        <span class="visual-select-copy">
+          <strong>${item.value?safe((item.code?item.code+' - ':'')+item.name):(isPrinting?'Choose Material':'Choose Cloth')}</strong>
+          <span>${item.value?safe(
+            isPrinting
+              ? ([item.typeLabel,item.unitLabel].filter(Boolean).join(' · ')||'Printing Material')
+              : (item.style||'Cloth')
+          ):(isPrinting?'Tap anywhere to choose material':'Tap anywhere to choose cloth')}</span>
+        </span>
+        <span class="visual-select-arrow">›</span>`;
+    }
+
+    if(colorButton){
+      colorButton.hidden=isPrinting;
+      colorButton.innerHTML=`
+        <span class="visual-select-thumb">${itemVisual(item.option,color.hex)}</span>
+        <span class="visual-select-copy">
+          <strong>${color.value?safe(color.name):'Choose Colour'}</strong>
+          <span>${color.value?'Tap anywhere to change colour':'Tap anywhere to choose colour'}</span>
+        </span>
+        <span class="visual-select-arrow">›</span>`;
+    }
+
+    row.classList.toggle('awaiting-size',!isPrinting&&!sizeSelect(row)?.value);
+    row.classList.toggle('row-material',isPrinting);
+  }
+
+  function ensureRow(row){
+    const itemField=row.querySelector('.item-field');
+    const colorField=row.querySelector('.color-field');
+    const item=itemSelect(row);
+    const color=colorSelect(row);
+
+    if(!itemField||!colorField||!item||!color) return;
+
+    item.classList.add('visual-select-native');
+    color.classList.add('visual-select-native');
+
+    if(!itemField.querySelector('.visual-item-btn')){
+      const button=document.createElement('button');
+      button.type='button';
+      button.className='visual-select-btn visual-item-btn';
+
+      /* Direct handler: the whole button always opens the cloth popup. */
+      button.onclick=function(event){
+        event.preventDefault();
+        event.stopPropagation();
+
+        activeRow=row;
+        buildCloth(row);
+        document.getElementById('clothPickerTitle').textContent=
+          document.getElementById('inventoryStockType')?.value==='printing'
+            ? 'Choose Printing Material'
+            : 'Choose Cloth';
+        document.getElementById('clothPickerSubtitle').textContent=
+          document.getElementById('inventoryStockType')?.value==='printing'
+            ? 'Select a material item from Inventory.'
+            : 'Select the shirt style for this stock row.';
+        openModal(clothModal);
+      };
+
+      itemField.insertBefore(button,itemField.querySelector('.row-type'));
+    }
+
+    if(!colorField.querySelector('.visual-color-btn')){
+      const button=document.createElement('button');
+      button.type='button';
+      button.className='visual-select-btn visual-color-btn';
+
+      /* Direct handler: the whole button always opens the colour popup. */
+      button.onclick=function(event){
+        event.preventDefault();
+        event.stopPropagation();
+
+        activeRow=row;
+
+        if(!itemSelect(row)?.value){
+          buildCloth(row);
+          openModal(clothModal);
+          return;
+        }
+
+        buildColors(row);
+        openModal(colorModal);
+      };
+
+      colorField.appendChild(button);
+    }
+
+    refreshRow(row);
+  }
+
+  function buildCloth(row){
+    const select=itemSelect(row);
+    clothGrid.innerHTML='';
+
+    const isPrinting=document.getElementById('inventoryStockType')?.value==='printing';
+
+    [...select.options].forEach(option=>{
+      if(!option.value) return;
+
+      const isShirt=option.dataset.isShirt==='1';
+      if(isPrinting&&isShirt) return;
+      if(!isPrinting&&!isShirt) return;
+
+      const label=option.textContent.trim();
+      const code=option.dataset.itemCode||label.split(' - ')[0]||'';
+      const name=option.dataset.itemName||label.split(' - ').slice(1).join(' - ')||label;
+      const style=option.dataset.itemStyle||'Shirt';
+      const color=colorData(row);
+
+      const card=document.createElement('button');
+      card.type='button';
+      card.className='picker-option'+(select.value===option.value?' selected':'');
+      card.innerHTML=`
+        <span class="picker-shirt-stage">${itemVisual(option,color.hex)}</span>
+        <strong>${safe(name)}</strong>
+        <small>${safe(code)} · ${safe(style)}${option.dataset.itemImage?' · Inventory picture':' · No picture uploaded'}</small>`;
+
+      card.addEventListener('click',()=>{
+        select.value=option.value;
+        select.dispatchEvent(new Event('change',{bubbles:true}));
+        refreshRow(row);
+        closeModal(clothModal);
+
+        const isPrinting=document.getElementById('inventoryStockType')?.value==='printing';
+        if(isPrinting){
+          const color=colorSelect(row);
+          const size=sizeSelect(row);
+          if(color) color.value='';
+          if(size) size.value='';
+          row.classList.add('row-material');
+          row.querySelector('input[name$="-quantity"]')?.focus();
+          return;
+        }
+
+        setTimeout(()=>{
+          buildColors(row);
+          openModal(colorModal);
+        },80);
+      });
+
+      clothGrid.appendChild(card);
+    });
+  }
+
+  function buildColors(row){
+    const select=colorSelect(row);
+    const item=itemData(row);
+    colorGrid.innerHTML='';
+
+    [...select.options].forEach(option=>{
+      if(!option.value) return;
+
+      const name=option.dataset.colorName||option.textContent.trim();
+      const hex=option.dataset.colorHex||'#D1D5DB';
+
+      const card=document.createElement('button');
+      card.type='button';
+      card.className='picker-option'+(select.value===option.value?' selected':'');
+      card.innerHTML=`
+        <span class="picker-shirt-stage">${itemVisual(item.option,hex)}</span>
+        <strong class="color-name-row">
+          <span class="color-swatch" style="background:${hex}"></span>
+          ${safe(name)}
+        </strong>
+        <small>Choose this colour</small>`;
+
+      card.addEventListener('click',()=>{
+        select.value=option.value;
+        select.dispatchEvent(new Event('change',{bubbles:true}));
+        refreshRow(row);
+        closeModal(colorModal);
+
+        setTimeout(()=>{
+          buildSizes(row);
+          openModal(sizeModal);
+        },80);
+      });
+
+      colorGrid.appendChild(card);
+    });
+  }
+
+  function buildSizes(row){
+    const select=sizeSelect(row);
+    chosenSizes=new Set();
+    sizeGrid.innerHTML='';
+    selectedCount.textContent='0 sizes selected';
+
+    const used=new Set(
+      [...rows.querySelectorAll('.stock-row')]
+        .filter(other=>other!==row)
+        .filter(other=>itemSelect(other)?.value===itemSelect(row)?.value)
+        .filter(other=>colorSelect(other)?.value===colorSelect(row)?.value)
+        .map(other=>sizeSelect(other)?.value)
+        .filter(Boolean)
+    );
+
+    [...select.options].forEach(option=>{
+      if(!option.value) return;
+
+      const label=option.textContent.trim().toUpperCase();
+      if(!['S','M','L','XL','XXL'].includes(label)) return;
+
+      const button=document.createElement('button');
+      button.type='button';
+      button.className='size-choice-card';
+      button.textContent=label;
+
+      if(used.has(option.value)){
+        button.classList.add('used');
+        button.disabled=true;
+      }else{
+        button.addEventListener('click',()=>{
+          if(chosenSizes.has(option.value)){
+            chosenSizes.delete(option.value);
+            button.classList.remove('selected');
+          }else{
+            chosenSizes.add(option.value);
+            button.classList.add('selected');
+          }
+
+          selectedCount.textContent=
+            `${chosenSizes.size} size${chosenSizes.size===1?'':'s'} selected`;
+        });
+      }
+
+      sizeGrid.appendChild(button);
+    });
+  }
+
+  function addSizeRow(source,sizeValue,useSource){
+    let target=source;
+
+    if(!useSource){
+      document.querySelector('.addInventoryRow')?.click();
+      const all=[...rows.querySelectorAll('.stock-row')];
+      target=all[all.length-1];
+
+      if(!target) return null;
+
+      itemSelect(target).value=itemSelect(source).value;
+      colorSelect(target).value=colorSelect(source).value;
+    }
+
+    sizeSelect(target).value=sizeValue;
+    itemSelect(target)?.dispatchEvent(new Event('change',{bubbles:true}));
+    colorSelect(target)?.dispatchEvent(new Event('change',{bubbles:true}));
+    sizeSelect(target)?.dispatchEvent(new Event('change',{bubbles:true}));
+    target.classList.remove('awaiting-size');
+    refreshRow(target);
+
+    return target;
+  }
+
+  generateButton.addEventListener('click',()=>{
+    if(!activeRow||chosenSizes.size===0) return;
+
+    let last=null;
+    [...chosenSizes].forEach((value,index)=>{
+      last=addSizeRow(activeRow,value,index===0);
+    });
+
+    closeModal(sizeModal);
+
+    setTimeout(()=>{
+      last?.querySelector('input[name$="-quantity"]')?.focus();
+    },100);
+  });
+
+  /* Fallback for dynamically inserted buttons. Direct onclick handlers do the main work. */
+  rows.addEventListener('click',event=>{
+    const button=event.target.closest('.visual-select-btn');
+    if(!button) return;
+    event.preventDefault();
+  });
+
+  rows.addEventListener('change',event=>{
+    const row=event.target.closest('.stock-row');
+    if(row) refreshRow(row);
+  });
+
+  document.getElementById('closeClothPicker')?.addEventListener('click',()=>closeModal(clothModal));
+  document.getElementById('closeColorPicker')?.addEventListener('click',()=>closeModal(colorModal));
+  document.getElementById('closeSizePicker')?.addEventListener('click',()=>closeModal(sizeModal));
+
+  [clothModal,colorModal,sizeModal].forEach(modal=>{
+    modal.addEventListener('click',event=>{
+      if(event.target===modal) closeModal(modal);
+    });
+  });
+
+  function refreshAll(){
+    rows.querySelectorAll('.stock-row').forEach(ensureRow);
+  }
+
+  document.querySelectorAll('.addInventoryRow').forEach(button=>{
+    button.addEventListener('click',()=>setTimeout(refreshAll,0));
+  });
+
+  refreshAll();
+})();
+</script>
+
+
+<style id="niron-perfect-alignment-cost-addrow">
+/* =========================================================
+   PERFECT ROW ALIGNMENT
+   Cleaner spacing, aligned trash, stronger total number,
+   green Add Row hover
+   ========================================================= */
+
+/* Main batch row alignment */
+.stock-row{
+  grid-template-columns:
+    30px
+    minmax(260px,1.35fr)
+    minmax(220px,1fr)
+    36px!important;
+  grid-template-rows:auto auto!important;
+  align-items:start!important;
+  column-gap:10px!important;
+  row-gap:8px!important;
+  min-height:0!important;
+  padding:12px!important;
+}
+
+/* Number, cloth, colour and trash all share the same top line */
+.stock-row .row-number{
+  grid-column:1!important;
+  grid-row:1!important;
+  margin-top:18px!important;
+  align-self:start!important;
+}
+
+.stock-row .item-field{
+  grid-column:2!important;
+  grid-row:1!important;
+  align-self:start!important;
+}
+
+.stock-row .color-field{
+  grid-column:3!important;
+  grid-row:1!important;
+  align-self:start!important;
+}
+
+.stock-row .remove-wrap{
+  grid-column:4!important;
+  grid-row:1!important;
+  margin-top:18px!important;
+  min-height:54px!important;
+  display:flex!important;
+  align-items:flex-start!important;
+  justify-content:center!important;
+}
+
+/* Compact instruction row, no large blank area */
+.stock-row.awaiting-size::after{
+  grid-column:2 / 4!important;
+  grid-row:2!important;
+  min-height:38px!important;
+  margin:0!important;
+  padding:9px 11px!important;
+  display:flex!important;
+  align-items:center!important;
+  border-radius:10px!important;
+}
+
+/* Hide unused empty layout space */
+.stock-row .size-field,
+.stock-row .qty-field{
+  display:none!important;
+}
+
+.stock-row{
+  overflow:visible!important;
+}
+
+/* Cleaner visual selector height */
+.visual-select-btn{
+  min-height:54px!important;
+  height:54px!important;
+}
+
+.visual-select-thumb{
+  width:38px!important;
+  height:38px!important;
+  flex:0 0 38px!important;
+}
+
+/* Trash aligns with selectors */
+.trash-row-btn{
+  width:32px!important;
+  height:32px!important;
+  margin-top:0!important;
+  border-radius:9px!important;
+}
+
+/* Batch total: smaller $, larger number */
+.cost-total{
+  min-height:58px!important;
+  padding:10px 14px!important;
+  align-items:center!important;
+}
+
+.cost-total > span{
+  font-size:9.5px!important;
+}
+
+.cost-total strong{
+  display:flex!important;
+  align-items:flex-end!important;
+  gap:2px!important;
+  font-size:30px!important;
+  line-height:1!important;
+  font-weight:950!important;
+  color:#32200d!important;
+  letter-spacing:-.04em!important;
+}
+
+.cost-total strong::first-letter{
+  font-size:14px!important;
+  font-weight:850!important;
+  color:#8a5b1a!important;
+}
+
+#inventoryCostTotal{
+  font-size:30px!important;
+  font-weight:950!important;
+  color:#32200d!important;
+}
+
+.cost-total strong small,
+.cost-total strong .decimal{
+  font-size:13px!important;
+}
+
+/* Cost input currency: small $, clear number */
+.money-prefix{
+  font-size:11px!important;
+  font-weight:850!important;
+}
+
+.money-wrap input{
+  font-size:17px!important;
+  font-weight:900!important;
+}
+
+/* Add Row: green hover */
+.addInventoryRow,
+#addFabricRow,
+#addFabricRowBottom{
+  transition:
+    transform .15s ease,
+    background .15s ease,
+    color .15s ease,
+    border-color .15s ease,
+    box-shadow .15s ease!important;
+}
+
+.addInventoryRow:hover,
+#addFabricRow:hover,
+#addFabricRowBottom:hover{
+  transform:translateY(-1px)!important;
+  color:#fff!important;
+  background:linear-gradient(145deg,#2fb67f,#168b60)!important;
+  border-color:#168b60!important;
+  box-shadow:
+    0 9px 20px rgba(22,139,96,.20),
+    0 0 0 3px rgba(22,139,96,.08)!important;
+}
+
+.addInventoryRow:active,
+#addFabricRow:active,
+#addFabricRowBottom:active{
+  transform:translateY(0) scale(.98)!important;
+}
+
+/* Desktop panel alignment */
+.panel-head{
+  align-items:center!important;
+}
+
+@media(max-width:820px){
+  .stock-row{
+    grid-template-columns:28px minmax(0,1fr) 34px!important;
+    grid-template-rows:auto auto auto!important;
+  }
+
+  .stock-row .item-field{
+    grid-column:2!important;
+    grid-row:1!important;
+  }
+
+  .stock-row .color-field{
+    grid-column:2!important;
+    grid-row:2!important;
+  }
+
+  .stock-row .remove-wrap{
+    grid-column:3!important;
+    grid-row:1!important;
+  }
+
+  .stock-row.awaiting-size::after{
+    grid-column:2!important;
+    grid-row:3!important;
+  }
+
+  .cost-total strong,
+  #inventoryCostTotal{
+    font-size:25px!important;
+  }
+}
+</style>
+
+
+
+
+
+
+
+<style id="niron-choose-button-selection-fix">
+.visual-item-btn,
+.visual-color-btn{
+  cursor:pointer!important;
+  pointer-events:auto!important;
+  touch-action:manipulation!important;
+  user-select:none!important;
+}
+
+.visual-item-btn *,
+.visual-color-btn *{
+  pointer-events:none!important;
+}
+
+.visual-item-btn{
+  z-index:500!important;
+}
+
+.visual-color-btn{
+  z-index:500!important;
+}
+
+/* Keep the uncompleted row visible and simple until sizes are generated. */
+#inventoryRows > .stock-row.awaiting-size{
+  display:grid!important;
+}
+
+/* Avoid decorative layers intercepting clicks. */
+.stock-row,
+.item-field,
+.color-field{
+  overflow:visible!important;
+}
+
+.stock-row::before,
+.stock-row::after,
+.item-field::before,
+.item-field::after,
+.color-field::before,
+.color-field::after{
+  pointer-events:none!important;
+}
+</style>
+
+
+<style id="niron-popup-final-fix-css">
+.visual-picker-mask{z-index:2147483000!important;}
+.visual-picker-card{z-index:2147483001!important;}
+.visual-item-btn,.visual-color-btn{pointer-events:auto!important;cursor:pointer!important;}
+.visual-item-btn *,.visual-color-btn *{pointer-events:none!important;}
+.stock-row::before,.stock-row::after{pointer-events:none!important;}
+</style>
+
+
+<style id="niron-final-parent-child-cloth-layout">
+/* =========================================================
+   FINAL CLOTH STRUCTURE
+   One parent card: POLO + Black
+   Children: S / M / L / XL + Quantity
+   ========================================================= */
+#inventoryRows.niron-parent-child-mode{
+  display:grid!important;
+  gap:12px!important;
+}
+
+.niron-cloth-parent{
+  overflow:hidden;
+  border:1px solid rgba(175,116,37,.22);
+  border-radius:17px;
+  background:linear-gradient(145deg,#fffdf8,#f5dfb7);
+  box-shadow:0 10px 28px rgba(73,42,10,.08);
+}
+
+.niron-cloth-parent-head{
+  display:grid;
+  grid-template-columns:minmax(0,1.65fr) minmax(180px,.8fr) 38px;
+  gap:10px;
+  align-items:center;
+  padding:11px;
+  border-bottom:1px solid rgba(168,110,35,.14);
+  background:
+    radial-gradient(circle at 10% 0%,rgba(255,225,162,.25),transparent 32%),
+    linear-gradient(145deg,#fffaf0,#efcf95);
+}
+
+.niron-parent-item,
+.niron-parent-color{
+  min-height:62px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:8px 10px;
+  border:1px solid rgba(176,117,37,.17);
+  border-radius:13px;
+  background:rgba(255,255,255,.74);
+}
+
+.niron-parent-picture{
+  width:46px;
+  height:46px;
+  flex:0 0 46px;
+  display:grid;
+  place-items:center;
+  overflow:hidden;
+  border-radius:12px;
+  border:1px solid rgba(176,117,37,.16);
+  background:radial-gradient(circle at 50% 72%,rgba(243,208,137,.88),rgba(255,255,255,.95) 72%);
+}
+
+.niron-parent-picture img{
+  width:100%;
+  height:100%;
+  object-fit:contain;
+}
+
+.niron-parent-picture svg{
+  width:36px;
+  height:36px;
+  filter:drop-shadow(0 6px 5px rgba(58,34,10,.18));
+}
+
+.niron-parent-copy{
+  min-width:0;
+}
+
+.niron-parent-copy strong{
+  display:block;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  color:#30200f;
+  font-size:14px;
+  font-weight:950;
+}
+
+.niron-parent-copy span{
+  display:block;
+  margin-top:3px;
+  color:#7b6750;
+  font-size:9.5px;
+  font-weight:700;
+}
+
+.niron-color-dot{
+  width:22px;
+  height:22px;
+  flex:0 0 22px;
+  border-radius:50%;
+  border:2px solid #fff;
+  box-shadow:0 0 0 1px rgba(53,33,11,.18),0 4px 10px rgba(53,33,11,.10);
+}
+
+.niron-delete-parent{
+  width:36px;
+  height:36px;
+  display:grid;
+  place-items:center;
+  border:1px solid rgba(207,66,77,.20);
+  border-radius:10px;
+  background:linear-gradient(145deg,#fff7f7,#f7dcdc);
+  color:#bd3542;
+  cursor:pointer;
+}
+
+.niron-delete-parent:hover{
+  color:#fff;
+  background:linear-gradient(145deg,#e94b58,#b91f2d);
+  box-shadow:0 8px 18px rgba(185,31,45,.20);
+}
+
+.niron-size-children{
+  display:grid;
+}
+
+.niron-cloth-parent .stock-row{
+  display:grid!important;
+  grid-template-columns:42px 92px minmax(180px,1fr) 38px!important;
+  grid-template-rows:auto!important;
+  min-height:64px!important;
+  gap:10px!important;
+  align-items:center!important;
+  margin:0!important;
+  padding:9px 12px!important;
+  border:0!important;
+  border-bottom:1px solid rgba(166,109,34,.10)!important;
+  border-radius:0!important;
+  background:rgba(255,255,255,.48)!important;
+  box-shadow:none!important;
+}
+
+.niron-cloth-parent .stock-row:last-child{
+  border-bottom:0!important;
+}
+
+.niron-cloth-parent .stock-row .item-field,
+.niron-cloth-parent .stock-row .color-field,
+.niron-cloth-parent .stock-row .quick-size-bar,
+.niron-cloth-parent .stock-row::before,
+.niron-cloth-parent .stock-row::after{
+  display:none!important;
+}
+
+.niron-cloth-parent .stock-row .row-number{
+  grid-column:1!important;
+  grid-row:1!important;
+  margin:0!important;
+  align-self:center!important;
+}
+
+.niron-cloth-parent .stock-row .size-field{
+  display:block!important;
+  grid-column:2!important;
+  grid-row:1!important;
+}
+
+.niron-cloth-parent .stock-row .qty-field{
+  display:block!important;
+  grid-column:3!important;
+  grid-row:1!important;
+}
+
+.niron-cloth-parent .stock-row .remove-wrap{
+  grid-column:4!important;
+  grid-row:1!important;
+  min-height:38px!important;
+  margin:0!important;
+  align-items:center!important;
+}
+
+.niron-cloth-parent .size-field label,
+.niron-cloth-parent .qty-field label{
+  margin-bottom:4px!important;
+}
+
+.niron-cloth-parent .size-field select{
+  min-height:39px!important;
+  height:39px!important;
+}
+
+.niron-cloth-parent .qty-field input{
+  min-height:39px!important;
+  height:39px!important;
+  text-align:center;
+  font-size:16px!important;
+  font-weight:900!important;
+}
+
+/* Unselected row remains as the visual Choose Cloth / Colour row */
+#inventoryRows > .stock-row{
+  border-radius:15px!important;
+}
+
+@media(max-width:820px){
+  .niron-cloth-parent-head{
+    grid-template-columns:1fr 36px;
+  }
+
+  .niron-parent-color{
+    grid-column:1;
+  }
+
+  .niron-delete-parent{
+    grid-column:2;
+    grid-row:1 / 3;
+  }
+
+  .niron-cloth-parent .stock-row{
+    grid-template-columns:34px 1fr 38px!important;
+  }
+
+  .niron-cloth-parent .stock-row .size-field,
+  .niron-cloth-parent .stock-row .qty-field{
+    grid-column:2!important;
+  }
+
+  .niron-cloth-parent .stock-row .size-field{grid-row:1!important}
+  .niron-cloth-parent .stock-row .qty-field{grid-row:2!important}
+  .niron-cloth-parent .stock-row .remove-wrap{
+    grid-column:3!important;
+    grid-row:1!important;
+  }
+}
+</style>
+
+<script id="niron-final-parent-child-cloth-js">
+(function(){
+  const container=document.getElementById('inventoryRows');
+  const stockType=document.getElementById('inventoryStockType');
+  if(!container||!stockType) return;
+
+  let rebuilding=false;
+  let scheduled=false;
+  let observer=null;
+
+  const itemSelect=row=>row?.querySelector('.item-select');
+  const colorSelect=row=>row?.querySelector('.color-select');
+  const sizeSelect=row=>row?.querySelector('.size-select');
+
+  function shirtSvg(color){
+    const fill=/^#[0-9a-f]{6}$/i.test(color||'')?color:'#D1D5DB';
+    return `<svg viewBox="0 0 64 64" aria-hidden="true">
+      <path fill="${fill}" d="M21 9 13 13 5 25l10 6 5-7v31h24V24l5 7 10-6-8-12-8-4c-2 4-5 6-11 6s-9-2-11-6Z"/>
+      <path fill="rgba(255,255,255,.46)" d="M25 10c1.5 2 3.7 3 7 3s5.5-1 7-3l-3-1c-.8 1.2-2 1.8-4 1.8S28.8 10.2 28 9l-3 1Z"/>
+    </svg>`;
+  }
+
+  function rowKey(row){
+    const item=itemSelect(row)?.value||'';
+    const color=colorSelect(row)?.value||'';
+    const size=sizeSelect(row)?.value||'';
+
+    /* Only group completed size rows. */
+    return item&&color&&size?`${item}|${color}`:'';
+  }
+
+  function itemMeta(row){
+    const select=itemSelect(row);
+    const option=select?.options[select.selectedIndex];
+    const label=option?.textContent?.trim()||'';
+
+    return {
+      code:option?.dataset.itemCode||label.split(' - ')[0]||'',
+      name:option?.dataset.itemName||label.split(' - ').slice(1).join(' - ')||label,
+      style:option?.dataset.itemStyle||'Cloth',
+      image:option?.dataset.itemImage||''
+    };
+  }
+
+  function colorMeta(row){
+    const select=colorSelect(row);
+    const option=select?.options[select.selectedIndex];
+
+    return {
+      name:option?.dataset.colorName||option?.textContent?.trim()||'',
+      hex:option?.dataset.colorHex||'#D1D5DB'
+    };
+  }
+
+  function unwrap(){
+    [...container.querySelectorAll(':scope > .niron-cloth-parent')].forEach(card=>{
+      [...card.querySelectorAll('.stock-row')].forEach(row=>{
+        container.insertBefore(row,card);
+      });
+      card.remove();
+    });
+  }
+
+  function makeParent(group,index){
+    const first=group[0];
+    const item=itemMeta(first);
+    const color=colorMeta(first);
+
+    const card=document.createElement('section');
+    card.className='niron-cloth-parent';
+
+    const head=document.createElement('div');
+    head.className='niron-cloth-parent-head';
+
+    const itemBox=document.createElement('div');
+    itemBox.className='niron-parent-item';
+    itemBox.innerHTML=`
+      <span class="niron-parent-picture">
+        ${item.image?`<img src="${item.image}" alt="">`:shirtSvg(color.hex)}
+      </span>
+      <span class="niron-parent-copy">
+        <strong>${item.code?item.code+' - ':''}${item.name}</strong>
+        <span>${item.style} · ${group.length} size${group.length===1?'':'s'}</span>
+      </span>`;
+
+    const colorBox=document.createElement('div');
+    colorBox.className='niron-parent-color';
+    colorBox.innerHTML=`
+      <span class="niron-color-dot" style="background:${color.hex}"></span>
+      <span class="niron-parent-copy">
+        <strong>${color.name}</strong>
+        <span>Selected colour</span>
+      </span>`;
+
+    const deleteButton=document.createElement('button');
+    deleteButton.type='button';
+    deleteButton.className='niron-delete-parent';
+    deleteButton.title='Delete this cloth and all sizes';
+    deleteButton.textContent='🗑';
+
+    deleteButton.addEventListener('click',()=>{
+      [...group].forEach(row=>{
+        const deleteInput=row.querySelector('input[name$="-DELETE"]');
+        const savedId=row.querySelector('input[name$="-id"]')?.value;
+
+        if(savedId&&deleteInput){
+          deleteInput.checked=true;
+          row.style.display='none';
+        }else{
+          row.remove();
+        }
+      });
+      schedule();
+    });
+
+    head.append(itemBox,colorBox,deleteButton);
+
+    const children=document.createElement('div');
+    children.className='niron-size-children';
+
+    group
+      .sort((a,b)=>{
+        const order=['S','M','L','XL','XXL','XXXL'];
+        const aText=sizeSelect(a)?.options[sizeSelect(a).selectedIndex]?.text?.trim().toUpperCase()||'';
+        const bText=sizeSelect(b)?.options[sizeSelect(b).selectedIndex]?.text?.trim().toUpperCase()||'';
+        return order.indexOf(aText)-order.indexOf(bText);
+      })
+      .forEach(row=>children.appendChild(row));
+
+    card.append(head,children);
+    return card;
+  }
+
+  function rebuild(){
+    if(rebuilding) return;
+    rebuilding=true;
+    observer?.disconnect();
+
+    try{
+      unwrap();
+      container.classList.toggle('niron-parent-child-mode',stockType.value==='cloth');
+
+      if(stockType.value!=='cloth') return;
+
+      const rows=[...container.querySelectorAll(':scope > .stock-row')].filter(row=>{
+        return row.style.display!=='none'
+          && !row.querySelector('input[name$="-DELETE"]')?.checked;
+      });
+
+      const groups=new Map();
+      const incomplete=[];
+
+      rows.forEach(row=>{
+        const key=rowKey(row);
+        if(!key){
+          incomplete.push(row);
+          return;
+        }
+
+        if(!groups.has(key)) groups.set(key,[]);
+        groups.get(key).push(row);
+      });
+
+      const fragment=document.createDocumentFragment();
+      let index=0;
+
+      groups.forEach(group=>{
+        fragment.appendChild(makeParent(group,index++));
+      });
+
+      incomplete.forEach(row=>fragment.appendChild(row));
+      container.appendChild(fragment);
+
+      [...container.querySelectorAll('.stock-row')].forEach((row,rowIndex)=>{
+        const number=row.querySelector('.row-number');
+        if(number) number.textContent=rowIndex+1;
+      });
+    }finally{
+      rebuilding=false;
+      observer?.observe(container,{childList:true,subtree:false});
+    }
+  }
+
+  function schedule(){
+    if(scheduled||rebuilding) return;
+    scheduled=true;
+
+    requestAnimationFrame(()=>{
+      scheduled=false;
+      rebuild();
+    });
+  }
+
+  container.addEventListener('change',event=>{
+    if(event.target.matches('.item-select,.color-select,.size-select,input[name$="-DELETE"]')){
+      schedule();
+    }
+  });
+
+  container.addEventListener('click',event=>{
+    if(event.target.closest('.trash-row-btn')){
+      setTimeout(schedule,0);
+    }
+  });
+
+  document.getElementById('generateSizeRows')?.addEventListener('click',()=>{
+    setTimeout(schedule,140);
+  });
+
+  document.querySelectorAll('.type-tab').forEach(tab=>{
+    tab.addEventListener('click',()=>setTimeout(schedule,0));
+  });
+
+  observer=new MutationObserver(schedule);
+  observer.observe(container,{childList:true,subtree:false});
+
+  window.addEventListener('load',schedule);
+  setTimeout(schedule,0);
+})();
+</script>
+
+
+<style id="niron-balanced-parent-and-material-picker">
+/* Balanced cloth parent: larger picture, no messy blank gap */
+.niron-cloth-parent{
+  display:grid!important;
+  grid-template-columns:280px minmax(0,1fr)!important;
+  align-items:stretch!important;
+}
+
+.niron-cloth-parent-head{
+  grid-column:1!important;
+  display:flex!important;
+  flex-direction:column!important;
+  gap:10px!important;
+  padding:12px!important;
+  border-right:1px solid rgba(168,110,35,.14)!important;
+  border-bottom:0!important;
+}
+
+.niron-parent-item{
+  min-height:112px!important;
+  align-items:center!important;
+}
+
+.niron-parent-picture{
+  width:82px!important;
+  height:82px!important;
+  flex:0 0 82px!important;
+  border-radius:17px!important;
+}
+
+.niron-parent-picture img{
+  width:100%!important;
+  height:100%!important;
+  object-fit:contain!important;
+}
+
+.niron-parent-picture svg{
+  width:66px!important;
+  height:66px!important;
+}
+
+.niron-parent-copy strong{
+  font-size:17px!important;
+}
+
+.niron-parent-copy span{
+  font-size:10.5px!important;
+}
+
+.niron-parent-color{
+  min-height:64px!important;
+}
+
+.niron-delete-parent{
+  position:absolute!important;
+  top:12px!important;
+  right:12px!important;
+  z-index:5!important;
+}
+
+.niron-cloth-parent-head{
+  position:relative!important;
+  padding-top:56px!important;
+}
+
+.niron-size-children{
+  grid-column:2!important;
+  align-self:stretch!important;
+  background:rgba(255,255,255,.34)!important;
+}
+
+.niron-cloth-parent .stock-row{
+  grid-template-columns:42px 90px minmax(180px,1fr) 38px!important;
+  min-height:72px!important;
+  padding:11px 13px!important;
+}
+
+.niron-cloth-parent .qty-field input{
+  font-size:17px!important;
+}
+
+/* Printing Material must show material image/button and quantity only */
+#inventoryRows .stock-row.row-material{
+  grid-template-columns:30px minmax(320px,1fr) minmax(180px,.45fr) 36px!important;
+  grid-template-rows:auto!important;
+  min-height:82px!important;
+}
+
+#inventoryRows .stock-row.row-material .item-field{
+  grid-column:2!important;
+  grid-row:1!important;
+}
+
+#inventoryRows .stock-row.row-material .color-field,
+#inventoryRows .stock-row.row-material .size-field,
+#inventoryRows .stock-row.row-material .quick-size-bar,
+#inventoryRows .stock-row.row-material::after{
+  display:none!important;
+}
+
+#inventoryRows .stock-row.row-material .qty-field{
+  display:block!important;
+  grid-column:3!important;
+  grid-row:1!important;
+}
+
+#inventoryRows .stock-row.row-material .remove-wrap{
+  grid-column:4!important;
+  grid-row:1!important;
+}
+
+#inventoryRows .stock-row.row-material .visual-item-btn{
+  min-height:58px!important;
+}
+
+#inventoryRows .stock-row.row-material .visual-select-thumb{
+  width:44px!important;
+  height:44px!important;
+  flex:0 0 44px!important;
+}
+
+#inventoryRows .stock-row.row-material .qty-field input{
+  min-height:58px!important;
+  height:58px!important;
+  text-align:center!important;
+  font-size:18px!important;
+  font-weight:900!important;
+}
+
+/* Popup material images are larger */
+.picker-shirt-stage{
+  height:92px!important;
+}
+
+.picker-shirt-stage .inventory-item-image{
+  width:100%!important;
+  height:100%!important;
+  object-fit:contain!important;
+}
+
+/* Fix mode switching immediately */
+.type-tab[data-mode="printing"]:hover{
+  border-color:rgba(22,139,96,.28)!important;
+}
+
+@media(max-width:820px){
+  .niron-cloth-parent{
+    grid-template-columns:1fr!important;
+  }
+
+  .niron-cloth-parent-head,
+  .niron-size-children{
+    grid-column:1!important;
+  }
+
+  .niron-cloth-parent-head{
+    border-right:0!important;
+    border-bottom:1px solid rgba(168,110,35,.14)!important;
+  }
+
+  #inventoryRows .stock-row.row-material{
+    grid-template-columns:28px minmax(0,1fr) 34px!important;
+  }
+
+  #inventoryRows .stock-row.row-material .qty-field{
+    grid-column:2!important;
+    grid-row:2!important;
+  }
+
+  #inventoryRows .stock-row.row-material .remove-wrap{
+    grid-column:3!important;
+    grid-row:1!important;
+  }
+}
+</style>
+
+<script id="niron-mode-aware-visual-refresh">
+(function(){
+  const rows=document.getElementById('inventoryRows');
+  const stockType=document.getElementById('inventoryStockType');
+  if(!rows||!stockType) return;
+
+  document.querySelectorAll('.type-tab').forEach(tab=>{
+    tab.addEventListener('click',()=>{
+      setTimeout(()=>{
+        rows.querySelectorAll('.stock-row').forEach(row=>{
+          const itemButton=row.querySelector('.visual-item-btn');
+          const colorButton=row.querySelector('.visual-color-btn');
+          const isPrinting=stockType.value==='printing';
+
+          if(itemButton && !row.querySelector('.item-select')?.value){
+            const strong=itemButton.querySelector('strong');
+            const small=itemButton.querySelector('.visual-select-copy span');
+            if(strong) strong.textContent=isPrinting?'Choose Material':'Choose Cloth';
+            if(small) small.textContent=isPrinting
+              ?'Tap anywhere to choose material'
+              :'Tap anywhere to choose cloth';
+          }
+
+          if(colorButton) colorButton.hidden=isPrinting;
+          row.classList.toggle('row-material',isPrinting);
+          row.classList.toggle(
+            'awaiting-size',
+            !isPrinting&&!row.querySelector('.size-select')?.value
+          );
+        });
+      },20);
+    });
+  });
+})();
+</script>
+
+
+<style id="niron-popup-readable-real-image">
+.visual-picker-card{
+  width:min(880px,96vw)!important;
+}
+
+.visual-picker-head h2{
+  font-size:26px!important;
+  font-weight:950!important;
+}
+
+.visual-picker-head p{
+  font-size:13px!important;
+  line-height:1.45!important;
+}
+
+.visual-picker-grid{
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  gap:14px!important;
+}
+
+.picker-option{
+  min-height:190px!important;
+  padding:13px!important;
+  border-radius:17px!important;
+}
+
+.picker-shirt-stage{
+  height:122px!important;
+  border-radius:14px!important;
+}
+
+.picker-shirt-stage .inventory-item-image{
+  width:100%!important;
+  height:100%!important;
+  object-fit:contain!important;
+  padding:5px!important;
+  box-sizing:border-box!important;
+}
+
+.picker-shirt-stage svg{
+  width:82px!important;
+  height:82px!important;
+}
+
+.picker-option strong{
+  margin-top:11px!important;
+  font-size:16px!important;
+  line-height:1.25!important;
+  font-weight:950!important;
+  color:#281a0c!important;
+}
+
+.picker-option small{
+  margin-top:5px!important;
+  font-size:11px!important;
+  line-height:1.35!important;
+  color:#76624a!important;
+  font-weight:750!important;
+}
+
+.material-fallback-icon{
+  width:78px;
+  height:78px;
+  display:grid;
+  place-items:center;
+  border-radius:18px;
+  background:linear-gradient(145deg,#fff7dc,#e6b653);
+  color:#6e470f;
+  font-size:34px;
+  font-weight:950;
+  box-shadow:0 10px 18px rgba(94,58,13,.14);
+}
+
+.picker-option:hover strong{
+  color:#8a560f!important;
+}
+
+@media(max-width:720px){
+  .visual-picker-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  }
+
+  .picker-option{
+    min-height:170px!important;
+  }
+
+  .picker-shirt-stage{
+    height:106px!important;
+  }
+
+  .picker-option strong{
+    font-size:15px!important;
+  }
+}
+
+@media(max-width:420px){
+  .visual-picker-grid{
+    grid-template-columns:1fr!important;
+  }
+}
+</style>
+
+
+<style id="niron-material-row-alignment-unit">
+/* Printing Material row: item, quantity and trash perfectly aligned */
+#inventoryRows .stock-row.row-material{
+  display:grid!important;
+  grid-template-columns:
+    30px
+    minmax(360px,1fr)
+    minmax(210px,.46fr)
+    38px!important;
+  grid-template-rows:auto!important;
+  align-items:end!important;
+  gap:12px!important;
+  min-height:92px!important;
+  padding:12px!important;
+}
+
+#inventoryRows .stock-row.row-material .row-number{
+  grid-column:1!important;
+  grid-row:1!important;
+  align-self:center!important;
+  margin:0!important;
+}
+
+#inventoryRows .stock-row.row-material .item-field{
+  grid-column:2!important;
+  grid-row:1!important;
+  align-self:end!important;
+}
+
+#inventoryRows .stock-row.row-material .qty-field{
+  display:block!important;
+  grid-column:3!important;
+  grid-row:1!important;
+  align-self:end!important;
+}
+
+#inventoryRows .stock-row.row-material .remove-wrap{
+  grid-column:4!important;
+  grid-row:1!important;
+  align-self:end!important;
+  min-height:58px!important;
+  margin:0!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+}
+
+#inventoryRows .stock-row.row-material .visual-item-btn{
+  min-height:58px!important;
+  height:58px!important;
+}
+
+.quantity-with-unit{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  align-items:stretch;
+  gap:7px;
+}
+
+.quantity-with-unit input{
+  min-height:58px!important;
+  height:58px!important;
+  text-align:center!important;
+  font-size:18px!important;
+  font-weight:900!important;
+}
+
+.material-unit-badge{
+  min-width:72px;
+  min-height:58px;
+  padding:0 11px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border:1px solid rgba(176,117,37,.20);
+  border-radius:11px;
+  background:linear-gradient(145deg,#fffaf0,#efd29d);
+  color:#664116;
+  font-size:11px;
+  font-weight:950;
+  text-transform:uppercase;
+  letter-spacing:.04em;
+}
+
+#inventoryRows .stock-row:not(.row-material) .material-unit-badge{
+  display:none;
+}
+
+#inventoryRows .stock-row:not(.row-material) .quantity-with-unit{
+  display:block;
+}
+
+#inventoryRows .stock-row.row-material .trash-row-btn{
+  width:34px!important;
+  height:34px!important;
+}
+
+/* Selected material button copy */
+#inventoryRows .stock-row.row-material .visual-select-copy strong{
+  font-size:13px!important;
+}
+
+#inventoryRows .stock-row.row-material .visual-select-copy span{
+  font-size:10px!important;
+}
+
+@media(max-width:820px){
+  #inventoryRows .stock-row.row-material{
+    grid-template-columns:28px minmax(0,1fr) 36px!important;
+    grid-template-rows:auto auto!important;
+  }
+
+  #inventoryRows .stock-row.row-material .item-field{
+    grid-column:2!important;
+    grid-row:1!important;
+  }
+
+  #inventoryRows .stock-row.row-material .qty-field{
+    grid-column:2!important;
+    grid-row:2!important;
+  }
+
+  #inventoryRows .stock-row.row-material .remove-wrap{
+    grid-column:3!important;
+    grid-row:1!important;
+  }
+
+  .material-unit-badge{
+    min-width:64px;
+  }
+}
+</style>
+
+<script id="niron-material-unit-display">
+(function(){
+  const rows=document.getElementById('inventoryRows');
+  const stockType=document.getElementById('inventoryStockType');
+  if(!rows||!stockType) return;
+
+  function updateUnit(row){
+    const select=row.querySelector('.item-select');
+    const badge=row.querySelector('.material-unit-badge');
+    if(!select||!badge) return;
+
+    const option=select.options[select.selectedIndex];
+    const unitLabel=
+      option?.dataset.unitLabel ||
+      option?.dataset.unit ||
+      'Unit';
+
+    badge.textContent=unitLabel;
+    badge.title=`Quantity unit: ${unitLabel}`;
+  }
+
+  function updateAll(){
+    rows.querySelectorAll('.stock-row').forEach(row=>{
+      const isPrinting=stockType.value==='printing';
+      row.classList.toggle('row-material',isPrinting);
+      updateUnit(row);
+    });
+  }
+
+  rows.addEventListener('change',event=>{
+    const row=event.target.closest('.stock-row');
+    if(row) updateUnit(row);
+  });
+
+  document.querySelectorAll('.type-tab').forEach(tab=>{
+    tab.addEventListener('click',()=>setTimeout(updateAll,30));
+  });
+
+  document.querySelectorAll('.addInventoryRow').forEach(button=>{
+    button.addEventListener('click',()=>setTimeout(updateAll,0));
+  });
+
+  updateAll();
+})();
+</script>
+
+
+<style id="niron-stock-in-performance-mode">
+/* Performance mode: keep the modern appearance without heavy repainting. */
+.stock-page::after{
+  display:none!important;
+}
+
+.stock-page::before{
+  position:absolute!important;
+}
+
+.main-card,
+.side-card,
+.form-actions,
+.visual-picker-head{
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+}
+
+.stock-row,
+.niron-cloth-parent,
+.fabric-line,
+.picker-option{
+  contain:layout paint style;
+}
+
+.stock-row{
+  content-visibility:auto;
+  contain-intrinsic-size:90px;
+}
+
+.picker-option::before,
+.picker-option::after,
+.visual-select-btn::before,
+.visual-select-btn::after{
+  display:none!important;
+}
+
+.picker-option,
+.visual-select-btn,
+.btn-light,
+.btn-primary,
+.trash-row-btn{
+  transition:
+    transform .12s ease,
+    border-color .12s ease,
+    background .12s ease,
+    box-shadow .12s ease!important;
+}
+
+.picker-option:hover{
+  transform:translateY(-2px)!important;
+}
+
+.visual-select-btn:hover{
+  transform:translateY(-1px)!important;
+}
+
+.stock-row:hover::before{
+  opacity:0!important;
+}
+
+@media(max-width:820px){
+  .stock-row{
+    content-visibility:visible;
+  }
+}
+</style>
+
+
+<style id="niron-final-row-alignment-bigger-picture">
+/* =========================================================
+   FINAL ALIGNMENT
+   - Cloth parent and size rows align cleanly
+   - Material row aligns on one line
+   - Bigger cloth/material picture
+   ========================================================= */
+
+/* ---------- PRINTING MATERIAL ---------- */
+#inventoryRows .stock-row.row-material{
+  display:grid!important;
+  grid-template-columns:
+    34px
+    minmax(360px,1.45fr)
+    minmax(210px,.55fr)
+    82px
+    38px!important;
+  grid-template-rows:auto!important;
+  align-items:end!important;
+  gap:10px!important;
+  min-height:92px!important;
+  padding:12px!important;
+}
+
+#inventoryRows .stock-row.row-material .row-number{
+  grid-column:1!important;
+  grid-row:1!important;
+  align-self:center!important;
+  margin:0!important;
+}
+
+#inventoryRows .stock-row.row-material .item-field{
+  grid-column:2!important;
+  grid-row:1!important;
+  align-self:end!important;
+}
+
+#inventoryRows .stock-row.row-material .qty-field{
+  display:block!important;
+  grid-column:3!important;
+  grid-row:1!important;
+  align-self:end!important;
+}
+
+#inventoryRows .stock-row.row-material .material-unit-badge{
+  grid-column:4!important;
+  grid-row:1!important;
+  min-width:82px!important;
+  width:82px!important;
+  min-height:58px!important;
+  height:58px!important;
+}
+
+#inventoryRows .stock-row.row-material .remove-wrap{
+  grid-column:5!important;
+  grid-row:1!important;
+  align-self:end!important;
+  min-height:58px!important;
+  margin:0!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+}
+
+#inventoryRows .stock-row.row-material .quantity-with-unit{
+  display:contents!important;
+}
+
+#inventoryRows .stock-row.row-material .visual-item-btn,
+#inventoryRows .stock-row.row-material .qty-field input{
+  min-height:58px!important;
+  height:58px!important;
+}
+
+#inventoryRows .stock-row.row-material .visual-select-thumb{
+  width:48px!important;
+  height:48px!important;
+  flex:0 0 48px!important;
+}
+
+#inventoryRows .stock-row.row-material .visual-select-thumb img{
+  width:100%!important;
+  height:100%!important;
+  object-fit:contain!important;
+}
+
+/* ---------- CLOTH PARENT CARD ---------- */
+.niron-cloth-parent{
+  display:grid!important;
+  grid-template-columns:320px minmax(0,1fr)!important;
+  align-items:stretch!important;
+}
+
+.niron-cloth-parent-head{
+  grid-column:1!important;
+  display:flex!important;
+  flex-direction:column!important;
+  justify-content:flex-start!important;
+  gap:12px!important;
+  padding:14px!important;
+  border-right:1px solid rgba(168,110,35,.14)!important;
+  border-bottom:0!important;
+  position:relative!important;
+}
+
+.niron-parent-item{
+  min-height:132px!important;
+  padding:12px!important;
+}
+
+.niron-parent-picture{
+  width:104px!important;
+  height:104px!important;
+  flex:0 0 104px!important;
+  border-radius:20px!important;
+}
+
+.niron-parent-picture img{
+  width:100%!important;
+  height:100%!important;
+  object-fit:contain!important;
+}
+
+.niron-parent-picture svg{
+  width:84px!important;
+  height:84px!important;
+}
+
+.niron-parent-copy strong{
+  font-size:19px!important;
+  line-height:1.15!important;
+}
+
+.niron-parent-copy span{
+  font-size:11px!important;
+}
+
+.niron-parent-color{
+  min-height:72px!important;
+  padding:10px 12px!important;
+}
+
+.niron-color-dot{
+  width:28px!important;
+  height:28px!important;
+  flex:0 0 28px!important;
+}
+
+.niron-delete-parent{
+  position:absolute!important;
+  top:12px!important;
+  right:12px!important;
+  width:36px!important;
+  height:36px!important;
+}
+
+.niron-size-children{
+  grid-column:2!important;
+  display:grid!important;
+  align-content:start!important;
+  background:rgba(255,255,255,.34)!important;
+}
+
+/* Size child rows: same alignment on every row */
+.niron-cloth-parent .stock-row{
+  display:grid!important;
+  grid-template-columns:42px 96px minmax(220px,1fr) 38px!important;
+  grid-template-rows:auto!important;
+  min-height:74px!important;
+  gap:10px!important;
+  align-items:center!important;
+  margin:0!important;
+  padding:11px 14px!important;
+  border:0!important;
+  border-bottom:1px solid rgba(166,109,34,.10)!important;
+  border-radius:0!important;
+  background:rgba(255,255,255,.46)!important;
+  box-shadow:none!important;
+}
+
+.niron-cloth-parent .stock-row:last-child{
+  border-bottom:0!important;
+}
+
+.niron-cloth-parent .stock-row .row-number{
+  grid-column:1!important;
+  grid-row:1!important;
+  margin:0!important;
+  align-self:center!important;
+}
+
+.niron-cloth-parent .stock-row .size-field{
+  display:block!important;
+  grid-column:2!important;
+  grid-row:1!important;
+}
+
+.niron-cloth-parent .stock-row .qty-field{
+  display:block!important;
+  grid-column:3!important;
+  grid-row:1!important;
+}
+
+.niron-cloth-parent .stock-row .remove-wrap{
+  grid-column:4!important;
+  grid-row:1!important;
+  margin:0!important;
+  min-height:40px!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+}
+
+.niron-cloth-parent .stock-row .size-field select,
+.niron-cloth-parent .stock-row .qty-field input{
+  min-height:42px!important;
+  height:42px!important;
+}
+
+.niron-cloth-parent .stock-row .qty-field input{
+  font-size:17px!important;
+  font-weight:900!important;
+  text-align:center!important;
+}
+
+/* Remove hidden repeated fields from child rows */
+.niron-cloth-parent .stock-row .item-field,
+.niron-cloth-parent .stock-row .color-field,
+.niron-cloth-parent .stock-row .quick-size-bar,
+.niron-cloth-parent .stock-row::before,
+.niron-cloth-parent .stock-row::after{
+  display:none!important;
+}
+
+/* Mobile */
+@media(max-width:820px){
+  #inventoryRows .stock-row.row-material{
+    grid-template-columns:30px minmax(0,1fr) 38px!important;
+    grid-template-rows:auto auto auto!important;
+  }
+
+  #inventoryRows .stock-row.row-material .item-field{
+    grid-column:2!important;
+    grid-row:1!important;
+  }
+
+  #inventoryRows .stock-row.row-material .qty-field{
+    grid-column:2!important;
+    grid-row:2!important;
+  }
+
+  #inventoryRows .stock-row.row-material .material-unit-badge{
+    grid-column:2!important;
+    grid-row:3!important;
+    width:100%!important;
+  }
+
+  #inventoryRows .stock-row.row-material .remove-wrap{
+    grid-column:3!important;
+    grid-row:1!important;
+  }
+
+  .niron-cloth-parent{
+    grid-template-columns:1fr!important;
+  }
+
+  .niron-cloth-parent-head,
+  .niron-size-children{
+    grid-column:1!important;
+  }
+
+  .niron-cloth-parent-head{
+    border-right:0!important;
+    border-bottom:1px solid rgba(168,110,35,.14)!important;
+  }
+
+  .niron-cloth-parent .stock-row{
+    grid-template-columns:36px 1fr 38px!important;
+    grid-template-rows:auto auto!important;
+  }
+
+  .niron-cloth-parent .stock-row .size-field{
+    grid-column:2!important;
+    grid-row:1!important;
+  }
+
+  .niron-cloth-parent .stock-row .qty-field{
+    grid-column:2!important;
+    grid-row:2!important;
+  }
+
+  .niron-cloth-parent .stock-row .remove-wrap{
+    grid-column:3!important;
+    grid-row:1!important;
+  }
+
+  .niron-parent-picture{
+    width:88px!important;
+    height:88px!important;
+    flex-basis:88px!important;
+  }
+}
+</style>
+
+
+<style id="niron-material-single-line-final">
+/* Printing Material: Item | Quantity | Unit | Trash on one single row */
+#inventoryRows .stock-row.row-material{
+  display:grid!important;
+  grid-template-columns:
+    34px
+    minmax(360px,1fr)
+    210px
+    90px
+    40px!important;
+  grid-template-rows:58px!important;
+  align-items:center!important;
+  column-gap:10px!important;
+  row-gap:0!important;
+  min-height:82px!important;
+  padding:12px!important;
+}
+
+#inventoryRows .stock-row.row-material .row-number{
+  grid-column:1!important;
+  grid-row:1!important;
+  align-self:center!important;
+  margin:0!important;
+}
+
+#inventoryRows .stock-row.row-material .item-field{
+  grid-column:2!important;
+  grid-row:1!important;
+  align-self:center!important;
+  margin:0!important;
+}
+
+#inventoryRows .stock-row.row-material .qty-field{
+  display:block!important;
+  grid-column:3!important;
+  grid-row:1!important;
+  align-self:center!important;
+  margin:0!important;
+}
+
+#inventoryRows .stock-row.row-material .quantity-with-unit{
+  display:contents!important;
+}
+
+#inventoryRows .stock-row.row-material .qty-field input{
+  grid-column:3!important;
+  grid-row:1!important;
+  width:100%!important;
+  min-height:58px!important;
+  height:58px!important;
+  margin:0!important;
+  text-align:center!important;
+  font-size:18px!important;
+  font-weight:900!important;
+}
+
+#inventoryRows .stock-row.row-material .material-unit-badge{
+  grid-column:4!important;
+  grid-row:1!important;
+  width:90px!important;
+  min-width:90px!important;
+  min-height:58px!important;
+  height:58px!important;
+  margin:0!important;
+  align-self:center!important;
+}
+
+#inventoryRows .stock-row.row-material .remove-wrap{
+  grid-column:5!important;
+  grid-row:1!important;
+  align-self:center!important;
+  justify-self:center!important;
+  min-height:58px!important;
+  margin:0!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+}
+
+#inventoryRows .stock-row.row-material .trash-row-btn{
+  width:34px!important;
+  height:34px!important;
+  margin:0!important;
+}
+
+#inventoryRows .stock-row.row-material .visual-item-btn{
+  width:100%!important;
+  min-height:58px!important;
+  height:58px!important;
+  margin:0!important;
+}
+
+/* Keep labels aligned above the same row */
+#inventoryRows .stock-row.row-material .item-field label,
+#inventoryRows .stock-row.row-material .qty-field label{
+  margin-bottom:5px!important;
+}
+
+@media(max-width:820px){
+  #inventoryRows .stock-row.row-material{
+    grid-template-columns:30px minmax(0,1fr) 38px!important;
+    grid-template-rows:auto auto auto!important;
+  }
+
+  #inventoryRows .stock-row.row-material .item-field{
+    grid-column:2!important;
+    grid-row:1!important;
+  }
+
+  #inventoryRows .stock-row.row-material .qty-field{
+    grid-column:2!important;
+    grid-row:2!important;
+  }
+
+  #inventoryRows .stock-row.row-material .material-unit-badge{
+    grid-column:2!important;
+    grid-row:3!important;
+    width:100%!important;
+  }
+
+  #inventoryRows .stock-row.row-material .remove-wrap{
+    grid-column:3!important;
+    grid-row:1!important;
+  }
+}
+</style>
+
+
+<style id="niron-material-clean-final">
+/* =========================================================
+   CLEAN PRINTING MATERIAL ROW
+   Item | Quantity | Unit | Trash — one clean line
+   ========================================================= */
+
+#inventoryRows .stock-row.row-material{
+  display:grid!important;
+  grid-template-columns:
+    34px
+    minmax(330px,1fr)
+    170px
+    88px
+    38px!important;
+  grid-template-rows:64px!important;
+  align-items:center!important;
+  gap:10px!important;
+  min-height:88px!important;
+  padding:11px 12px!important;
+  overflow:hidden!important;
+}
+
+#inventoryRows .stock-row.row-material .row-number{
+  grid-column:1!important;
+  grid-row:1!important;
+  margin:0!important;
+  align-self:center!important;
+}
+
+#inventoryRows .stock-row.row-material .item-field{
+  grid-column:2!important;
+  grid-row:1!important;
+  margin:0!important;
+  align-self:center!important;
+}
+
+#inventoryRows .stock-row.row-material .item-field > label,
+#inventoryRows .stock-row.row-material .qty-field > label{
+  display:none!important;
+}
+
+#inventoryRows .stock-row.row-material .visual-item-btn{
+  width:100%!important;
+  min-height:58px!important;
+  height:58px!important;
+  margin:0!important;
+}
+
+#inventoryRows .stock-row.row-material .qty-field{
+  display:block!important;
+  grid-column:3!important;
+  grid-row:1!important;
+  margin:0!important;
+  align-self:center!important;
+}
+
+#inventoryRows .stock-row.row-material .quantity-with-unit{
+  display:contents!important;
+}
+
+#inventoryRows .stock-row.row-material .qty-field input{
+  grid-column:3!important;
+  grid-row:1!important;
+  width:100%!important;
+  min-height:58px!important;
+  height:58px!important;
+  margin:0!important;
+  padding:0 12px!important;
+  box-sizing:border-box!important;
+  text-align:center!important;
+  font-size:18px!important;
+  font-weight:900!important;
+}
+
+#inventoryRows .stock-row.row-material .material-unit-badge{
+  grid-column:4!important;
+  grid-row:1!important;
+  width:88px!important;
+  min-width:88px!important;
+  min-height:58px!important;
+  height:58px!important;
+  margin:0!important;
+  padding:0 8px!important;
+  box-sizing:border-box!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  align-self:center!important;
+  border-radius:11px!important;
+}
+
+#inventoryRows .stock-row.row-material .remove-wrap{
+  grid-column:5!important;
+  grid-row:1!important;
+  margin:0!important;
+  min-height:58px!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  align-self:center!important;
+}
+
+#inventoryRows .stock-row.row-material .trash-row-btn{
+  width:34px!important;
+  height:34px!important;
+  margin:0!important;
+}
+
+/* Remove all leftover fields and empty space */
+#inventoryRows .stock-row.row-material .color-field,
+#inventoryRows .stock-row.row-material .size-field,
+#inventoryRows .stock-row.row-material .quick-size-bar,
+#inventoryRows .stock-row.row-material::before,
+#inventoryRows .stock-row.row-material::after{
+  display:none!important;
+}
+
+/* Material button icon */
+#inventoryRows .stock-row.row-material .visual-select-thumb{
+  width:48px!important;
+  height:48px!important;
+  flex:0 0 48px!important;
+}
+
+.material-fallback-icon{
+  width:40px!important;
+  height:40px!important;
+  display:grid!important;
+  place-items:center!important;
+  border-radius:11px!important;
+  background:linear-gradient(145deg,#fff5d8,#e7b95c)!important;
+  color:#6b4310!important;
+  font-size:22px!important;
+  font-weight:950!important;
+}
+
+/* Keep each row compact */
+#inventoryRows .stock-row.row-material .row-type{
+  display:none!important;
+}
+
+@media(max-width:820px){
+  #inventoryRows .stock-row.row-material{
+    grid-template-columns:28px minmax(0,1fr) 36px!important;
+    grid-template-rows:auto auto!important;
+  }
+
+  #inventoryRows .stock-row.row-material .item-field{
+    grid-column:2!important;
+    grid-row:1!important;
+  }
+
+  #inventoryRows .stock-row.row-material .qty-field{
+    grid-column:2!important;
+    grid-row:2!important;
+  }
+
+  #inventoryRows .stock-row.row-material .qty-field input{
+    grid-column:2!important;
+    grid-row:2!important;
+  }
+
+  #inventoryRows .stock-row.row-material .material-unit-badge{
+    grid-column:2!important;
+    grid-row:2!important;
+    justify-self:end!important;
+    width:76px!important;
+    min-width:76px!important;
+  }
+
+  #inventoryRows .stock-row.row-material .qty-field input{
+    padding-right:88px!important;
+  }
+
+  #inventoryRows .stock-row.row-material .remove-wrap{
+    grid-column:3!important;
+    grid-row:1!important;
+  }
+}
+</style>
+
+
+<style id="niron-material-one-line-definitive">
+#inventoryRows .stock-row.row-material{
+  display:grid!important;
+  grid-template-columns:34px minmax(360px,1fr) 285px 38px!important;
+  grid-template-rows:64px!important;
+  align-items:center!important;
+  gap:10px!important;
+  min-height:88px!important;
+  padding:11px 12px!important;
+  overflow:hidden!important;
+}
+
+#inventoryRows .stock-row.row-material .row-number{
+  grid-column:1!important;
+  grid-row:1!important;
+  align-self:center!important;
+  margin:0!important;
+}
+
+#inventoryRows .stock-row.row-material .item-field{
+  grid-column:2!important;
+  grid-row:1!important;
+  align-self:center!important;
+  margin:0!important;
+}
+
+#inventoryRows .stock-row.row-material .qty-field{
+  display:block!important;
+  grid-column:3!important;
+  grid-row:1!important;
+  align-self:center!important;
+  margin:0!important;
+}
+
+#inventoryRows .stock-row.row-material .quantity-with-unit{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) 86px!important;
+  align-items:stretch!important;
+  gap:8px!important;
+  width:100%!important;
+}
+
+#inventoryRows .stock-row.row-material .qty-field input{
+  width:100%!important;
+  min-width:0!important;
+  height:58px!important;
+  min-height:58px!important;
+  margin:0!important;
+  box-sizing:border-box!important;
+  text-align:center!important;
+  font-size:18px!important;
+  font-weight:900!important;
+}
+
+#inventoryRows .stock-row.row-material .material-unit-badge{
+  position:static!important;
+  width:86px!important;
+  min-width:86px!important;
+  height:58px!important;
+  min-height:58px!important;
+  margin:0!important;
+  padding:0 8px!important;
+  box-sizing:border-box!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  border-radius:11px!important;
+}
+
+#inventoryRows .stock-row.row-material .remove-wrap{
+  grid-column:4!important;
+  grid-row:1!important;
+  align-self:center!important;
+  justify-self:center!important;
+  min-height:58px!important;
+  margin:0!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+}
+
+#inventoryRows .stock-row.row-material .visual-item-btn{
+  width:100%!important;
+  height:58px!important;
+  min-height:58px!important;
+  margin:0!important;
+}
+
+#inventoryRows .stock-row.row-material .item-field > label,
+#inventoryRows .stock-row.row-material .qty-field > label,
+#inventoryRows .stock-row.row-material .row-type,
+#inventoryRows .stock-row.row-material .color-field,
+#inventoryRows .stock-row.row-material .size-field,
+#inventoryRows .stock-row.row-material .quick-size-bar{
+  display:none!important;
+}
+
+#inventoryRows .stock-row.row-material .visual-select-thumb{
+  width:48px!important;
+  height:48px!important;
+  flex:0 0 48px!important;
+}
+
+#inventoryRows .stock-row.row-material .visual-select-thumb .inventory-item-image{
+  width:100%!important;
+  height:100%!important;
+  object-fit:contain!important;
+  padding:2px!important;
+}
+
+#inventoryRows .stock-row.row-material .visual-select-thumb svg{
+  display:none!important;
+}
+
+#inventoryRows .stock-row.row-material .material-fallback-icon{
+  display:grid!important;
+}
+
+@media(max-width:820px){
+  #inventoryRows .stock-row.row-material{
+    grid-template-columns:30px minmax(0,1fr) 38px!important;
+    grid-template-rows:auto auto!important;
+  }
+
+  #inventoryRows .stock-row.row-material .item-field{
+    grid-column:2!important;
+    grid-row:1!important;
+  }
+
+  #inventoryRows .stock-row.row-material .qty-field{
+    grid-column:2!important;
+    grid-row:2!important;
+  }
+
+  #inventoryRows .stock-row.row-material .remove-wrap{
+    grid-column:3!important;
+    grid-row:1!important;
+  }
+
+  #inventoryRows .stock-row.row-material .quantity-with-unit{
+    grid-template-columns:minmax(0,1fr) 76px!important;
+  }
+
+  #inventoryRows .stock-row.row-material .material-unit-badge{
+    width:76px!important;
+    min-width:76px!important;
+  }
+}
+</style>
+
+
+<style id="niron-material-clean-equal-height-final">
+/* =========================================================
+   CLEAN MATERIAL ROW
+   Number | Item | Quantity | Unit | Trash
+   All controls use the same height and vertical position.
+   ========================================================= */
+
+#inventoryRows .stock-row.row-material{
+  display:grid!important;
+  grid-template-columns:
+    34px
+    minmax(360px,1fr)
+    150px
+    88px
+    38px!important;
+  grid-template-rows:54px!important;
+  align-items:center!important;
+  column-gap:9px!important;
+  row-gap:0!important;
+  min-height:76px!important;
+  padding:10px 12px!important;
+  overflow:hidden!important;
+}
+
+#inventoryRows .stock-row.row-material .row-number{
+  grid-column:1!important;
+  grid-row:1!important;
+  width:28px!important;
+  height:28px!important;
+  margin:0!important;
+  align-self:center!important;
+  justify-self:center!important;
+}
+
+#inventoryRows .stock-row.row-material .item-field{
+  grid-column:2!important;
+  grid-row:1!important;
+  margin:0!important;
+  padding:0!important;
+  align-self:center!important;
+}
+
+#inventoryRows .stock-row.row-material .visual-item-btn{
+  width:100%!important;
+  height:54px!important;
+  min-height:54px!important;
+  margin:0!important;
+  padding:5px 9px!important;
+  box-sizing:border-box!important;
+  border-radius:11px!important;
+}
+
+#inventoryRows .stock-row.row-material .visual-select-thumb{
+  width:42px!important;
+  height:42px!important;
+  flex:0 0 42px!important;
+  border-radius:9px!important;
+}
+
+#inventoryRows .stock-row.row-material .visual-select-copy strong{
+  font-size:12px!important;
+  line-height:1.15!important;
+}
+
+#inventoryRows .stock-row.row-material .visual-select-copy span{
+  margin-top:2px!important;
+  font-size:9px!important;
+  line-height:1.15!important;
+}
+
+#inventoryRows .stock-row.row-material .qty-field{
+  display:block!important;
+  grid-column:3!important;
+  grid-row:1!important;
+  margin:0!important;
+  padding:0!important;
+  align-self:center!important;
+}
+
+#inventoryRows .stock-row.row-material .quantity-with-unit{
+  display:contents!important;
+}
+
+#inventoryRows .stock-row.row-material .qty-field input{
+  grid-column:3!important;
+  grid-row:1!important;
+  width:100%!important;
+  height:54px!important;
+  min-height:54px!important;
+  margin:0!important;
+  padding:0 10px!important;
+  box-sizing:border-box!important;
+  text-align:center!important;
+  font-size:16px!important;
+  font-weight:900!important;
+  border-radius:11px!important;
+}
+
+#inventoryRows .stock-row.row-material .material-unit-badge{
+  grid-column:4!important;
+  grid-row:1!important;
+  position:static!important;
+  width:88px!important;
+  min-width:88px!important;
+  height:54px!important;
+  min-height:54px!important;
+  margin:0!important;
+  padding:0 7px!important;
+  box-sizing:border-box!important;
+  align-self:center!important;
+  justify-self:stretch!important;
+  border-radius:11px!important;
+  font-size:10px!important;
+  line-height:1!important;
+}
+
+#inventoryRows .stock-row.row-material .remove-wrap{
+  grid-column:5!important;
+  grid-row:1!important;
+  width:38px!important;
+  height:54px!important;
+  min-height:54px!important;
+  margin:0!important;
+  padding:0!important;
+  align-self:center!important;
+  justify-self:center!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+}
+
+#inventoryRows .stock-row.row-material .trash-row-btn{
+  width:32px!important;
+  height:32px!important;
+  margin:0!important;
+  padding:0!important;
+  border-radius:9px!important;
+}
+
+/* Remove all unused labels and extra vertical space. */
+#inventoryRows .stock-row.row-material .item-field > label,
+#inventoryRows .stock-row.row-material .qty-field > label,
+#inventoryRows .stock-row.row-material .row-type,
+#inventoryRows .stock-row.row-material .color-field,
+#inventoryRows .stock-row.row-material .size-field,
+#inventoryRows .stock-row.row-material .quick-size-bar,
+#inventoryRows .stock-row.row-material::before,
+#inventoryRows .stock-row.row-material::after{
+  display:none!important;
+}
+
+@media(max-width:820px){
+  #inventoryRows .stock-row.row-material{
+    grid-template-columns:30px minmax(0,1fr) 36px!important;
+    grid-template-rows:54px 54px!important;
+    row-gap:8px!important;
+  }
+
+  #inventoryRows .stock-row.row-material .item-field{
+    grid-column:2!important;
+    grid-row:1!important;
+  }
+
+  #inventoryRows .stock-row.row-material .qty-field{
+    grid-column:2!important;
+    grid-row:2!important;
+  }
+
+  #inventoryRows .stock-row.row-material .quantity-with-unit{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr) 78px!important;
+    gap:7px!important;
+  }
+
+  #inventoryRows .stock-row.row-material .qty-field input{
+    grid-column:1!important;
+    grid-row:1!important;
+  }
+
+  #inventoryRows .stock-row.row-material .material-unit-badge{
+    grid-column:2!important;
+    grid-row:1!important;
+    width:78px!important;
+    min-width:78px!important;
+  }
+
+  #inventoryRows .stock-row.row-material .remove-wrap{
+    grid-column:3!important;
+    grid-row:1!important;
+  }
+}
+</style>
+
+
+<style id="niron-material-one-row-final">
+/* Final Printing Material layout:
+   Number | Item | Quantity | Unit | Trash — all in one row */
+#inventoryRows .stock-row.row-material{
+  display:grid!important;
+  grid-template-columns:
+    34px
+    minmax(420px,1fr)
+    150px
+    90px
+    38px!important;
+  grid-template-rows:64px!important;
+  align-items:center!important;
+  column-gap:10px!important;
+  row-gap:0!important;
+  min-height:84px!important;
+  padding:10px 12px!important;
+  overflow:hidden!important;
+}
+
+#inventoryRows .stock-row.row-material .row-number{
+  grid-column:1!important;
+  grid-row:1!important;
+  align-self:center!important;
+  justify-self:center!important;
+  margin:0!important;
+}
+
+#inventoryRows .stock-row.row-material .item-field{
+  grid-column:2!important;
+  grid-row:1!important;
+  align-self:center!important;
+  margin:0!important;
+  padding:0!important;
+}
+
+#inventoryRows .stock-row.row-material .visual-item-btn{
+  width:100%!important;
+  min-height:64px!important;
+  height:64px!important;
+  margin:0!important;
+  padding:6px 10px!important;
+  box-sizing:border-box!important;
+}
+
+#inventoryRows .stock-row.row-material .visual-select-thumb{
+  width:50px!important;
+  height:50px!important;
+  flex:0 0 50px!important;
+}
+
+#inventoryRows .stock-row.row-material .visual-select-copy strong{
+  font-size:14px!important;
+  line-height:1.15!important;
+}
+
+#inventoryRows .stock-row.row-material .visual-select-copy span{
+  font-size:10px!important;
+  line-height:1.15!important;
+}
+
+#inventoryRows .stock-row.row-material .qty-field{
+  display:block!important;
+  grid-column:3!important;
+  grid-row:1!important;
+  align-self:center!important;
+  margin:0!important;
+  padding:0!important;
+}
+
+#inventoryRows .stock-row.row-material .quantity-with-unit{
+  display:contents!important;
+}
+
+#inventoryRows .stock-row.row-material .qty-field input{
+  grid-column:3!important;
+  grid-row:1!important;
+  width:100%!important;
+  min-height:64px!important;
+  height:64px!important;
+  margin:0!important;
+  padding:0 10px!important;
+  box-sizing:border-box!important;
+  text-align:center!important;
+  font-size:18px!important;
+  font-weight:900!important;
+}
+
+#inventoryRows .stock-row.row-material .material-unit-badge{
+  grid-column:4!important;
+  grid-row:1!important;
+  position:static!important;
+  width:90px!important;
+  min-width:90px!important;
+  min-height:64px!important;
+  height:64px!important;
+  margin:0!important;
+  padding:0 8px!important;
+  box-sizing:border-box!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  align-self:center!important;
+  font-size:10px!important;
+  font-weight:950!important;
+}
+
+#inventoryRows .stock-row.row-material .remove-wrap{
+  grid-column:5!important;
+  grid-row:1!important;
+  min-height:64px!important;
+  height:64px!important;
+  margin:0!important;
+  padding:0!important;
+  align-self:center!important;
+  justify-self:center!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+}
+
+#inventoryRows .stock-row.row-material .trash-row-btn{
+  width:34px!important;
+  height:34px!important;
+  margin:0!important;
+}
+
+/* Remove anything that creates a second line or blank gap */
+#inventoryRows .stock-row.row-material .item-field > label,
+#inventoryRows .stock-row.row-material .qty-field > label,
+#inventoryRows .stock-row.row-material .row-type,
+#inventoryRows .stock-row.row-material .color-field,
+#inventoryRows .stock-row.row-material .size-field,
+#inventoryRows .stock-row.row-material .quick-size-bar,
+#inventoryRows .stock-row.row-material::before,
+#inventoryRows .stock-row.row-material::after{
+  display:none!important;
+}
+
+/* Phone: stack only when screen is too narrow */
+@media(max-width:820px){
+  #inventoryRows .stock-row.row-material{
+    grid-template-columns:30px minmax(0,1fr) 36px!important;
+    grid-template-rows:64px 64px!important;
+    row-gap:8px!important;
+  }
+
+  #inventoryRows .stock-row.row-material .item-field{
+    grid-column:2!important;
+    grid-row:1!important;
+  }
+
+  #inventoryRows .stock-row.row-material .qty-field{
+    grid-column:2!important;
+    grid-row:2!important;
+  }
+
+  #inventoryRows .stock-row.row-material .quantity-with-unit{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr) 82px!important;
+    gap:8px!important;
+  }
+
+  #inventoryRows .stock-row.row-material .qty-field input{
+    grid-column:1!important;
+    grid-row:1!important;
+  }
+
+  #inventoryRows .stock-row.row-material .material-unit-badge{
+    grid-column:2!important;
+    grid-row:1!important;
+    width:82px!important;
+    min-width:82px!important;
+  }
+
+  #inventoryRows .stock-row.row-material .remove-wrap{
+    grid-column:3!important;
+    grid-row:1!important;
+  }
+}
+</style>
+
+
+<style id="niron-material-row-real-fix">
+/* Real fix: Quantity + Unit stay inside one wrapper on the same row */
+#inventoryRows .stock-row.row-material{
+  display:grid!important;
+  grid-template-columns:34px minmax(360px,1fr) 248px 38px!important;
+  grid-template-rows:64px!important;
+  align-items:center!important;
+  gap:10px!important;
+  min-height:84px!important;
+  padding:10px 12px!important;
+  overflow:hidden!important;
+}
+
+#inventoryRows .stock-row.row-material .row-number{
+  grid-column:1!important;
+  grid-row:1!important;
+  margin:0!important;
+  align-self:center!important;
+  justify-self:center!important;
+}
+
+#inventoryRows .stock-row.row-material .item-field{
+  grid-column:2!important;
+  grid-row:1!important;
+  margin:0!important;
+  align-self:center!important;
+}
+
+#inventoryRows .stock-row.row-material .visual-item-btn{
+  width:100%!important;
+  height:64px!important;
+  min-height:64px!important;
+  margin:0!important;
+  box-sizing:border-box!important;
+}
+
+#inventoryRows .stock-row.row-material .qty-field{
+  display:block!important;
+  grid-column:3!important;
+  grid-row:1!important;
+  margin:0!important;
+  align-self:center!important;
+}
+
+#inventoryRows .stock-row.row-material .quantity-with-unit{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) 82px!important;
+  gap:8px!important;
+  width:100%!important;
+  height:64px!important;
+  align-items:stretch!important;
+}
+
+#inventoryRows .stock-row.row-material .qty-field input{
+  width:100%!important;
+  height:64px!important;
+  min-height:64px!important;
+  margin:0!important;
+  padding:0 10px!important;
+  box-sizing:border-box!important;
+  text-align:center!important;
+  font-size:18px!important;
+  font-weight:900!important;
+}
+
+#inventoryRows .stock-row.row-material .material-unit-badge{
+  position:static!important;
+  width:82px!important;
+  min-width:82px!important;
+  height:64px!important;
+  min-height:64px!important;
+  margin:0!important;
+  padding:0 8px!important;
+  box-sizing:border-box!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  align-self:stretch!important;
+  font-size:10px!important;
+  font-weight:950!important;
+}
+
+#inventoryRows .stock-row.row-material .remove-wrap{
+  grid-column:4!important;
+  grid-row:1!important;
+  width:38px!important;
+  height:64px!important;
+  min-height:64px!important;
+  margin:0!important;
+  padding:0!important;
+  align-self:center!important;
+  justify-self:center!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+}
+
+#inventoryRows .stock-row.row-material .trash-row-btn{
+  width:34px!important;
+  height:34px!important;
+  margin:0!important;
+}
+
+/* Remove every element that can create another line */
+#inventoryRows .stock-row.row-material .item-field > label,
+#inventoryRows .stock-row.row-material .qty-field > label,
+#inventoryRows .stock-row.row-material .row-type,
+#inventoryRows .stock-row.row-material .color-field,
+#inventoryRows .stock-row.row-material .size-field,
+#inventoryRows .stock-row.row-material .quick-size-bar,
+#inventoryRows .stock-row.row-material::before,
+#inventoryRows .stock-row.row-material::after{
+  display:none!important;
+}
+
+@media(max-width:820px){
+  #inventoryRows .stock-row.row-material{
+    grid-template-columns:30px minmax(0,1fr) 38px!important;
+    grid-template-rows:64px 64px!important;
+    row-gap:8px!important;
+  }
+
+  #inventoryRows .stock-row.row-material .item-field{
+    grid-column:2!important;
+    grid-row:1!important;
+  }
+
+  #inventoryRows .stock-row.row-material .qty-field{
+    grid-column:2!important;
+    grid-row:2!important;
+  }
+
+  #inventoryRows .stock-row.row-material .remove-wrap{
+    grid-column:3!important;
+    grid-row:1!important;
+  }
+}
+</style>
+
+
+
+<style id="niron-final-stock-row-alignment-fix">
+/* FINAL OVERRIDE: clean, equal and perfectly aligned inventory rows */
+#inventoryRows .stock-row,
+#inventoryRows .stock-row.row-material{
+  display:grid!important;
+  grid-template-columns:32px minmax(280px,1fr) minmax(190px,240px) 38px!important;
+  grid-template-rows:64px!important;
+  column-gap:10px!important;
+  row-gap:0!important;
+  align-items:center!important;
+  min-height:86px!important;
+  padding:10px 12px!important;
+  box-sizing:border-box!important;
+  overflow:visible!important;
+}
+
+/* Printing-material row only needs item, quantity/unit and delete. */
+#inventoryRows .stock-row.row-material .row-number{
+  grid-column:1!important;
+  grid-row:1!important;
+}
+#inventoryRows .stock-row.row-material .item-field{
+  grid-column:2!important;
+  grid-row:1!important;
+}
+#inventoryRows .stock-row.row-material .qty-field{
+  grid-column:3!important;
+  grid-row:1!important;
+}
+#inventoryRows .stock-row.row-material .remove-wrap{
+  grid-column:4!important;
+  grid-row:1!important;
+}
+
+#inventoryRows .stock-row.row-material .row-number,
+#inventoryRows .stock-row.row-material .item-field,
+#inventoryRows .stock-row.row-material .qty-field,
+#inventoryRows .stock-row.row-material .remove-wrap{
+  min-width:0!important;
+  margin:0!important;
+  align-self:center!important;
+}
+
+#inventoryRows .stock-row.row-material .row-number{
+  width:28px!important;
+  height:28px!important;
+  justify-self:center!important;
+}
+
+#inventoryRows .stock-row.row-material .visual-item-btn{
+  width:100%!important;
+  height:64px!important;
+  min-height:64px!important;
+  margin:0!important;
+  padding:8px 12px!important;
+  box-sizing:border-box!important;
+  border-radius:12px!important;
+  display:flex!important;
+  align-items:center!important;
+}
+
+#inventoryRows .stock-row.row-material .quantity-with-unit{
+  display:grid!important;
+  grid-template-columns:minmax(88px,1fr) 76px!important;
+  gap:8px!important;
+  width:100%!important;
+  height:64px!important;
+  margin:0!important;
+  align-items:stretch!important;
+}
+
+#inventoryRows .stock-row.row-material .qty-field input{
+  position:static!important;
+  grid-column:1!important;
+  width:100%!important;
+  height:64px!important;
+  min-height:64px!important;
+  margin:0!important;
+  padding:0 12px!important;
+  box-sizing:border-box!important;
+  text-align:center!important;
+  font-size:17px!important;
+  font-weight:900!important;
+  border-radius:12px!important;
+}
+
+#inventoryRows .stock-row.row-material .material-unit-badge{
+  position:static!important;
+  grid-column:2!important;
+  width:76px!important;
+  min-width:76px!important;
+  height:64px!important;
+  min-height:64px!important;
+  margin:0!important;
+  padding:0 8px!important;
+  box-sizing:border-box!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  border-radius:12px!important;
+  white-space:nowrap!important;
+}
+
+#inventoryRows .stock-row.row-material .remove-wrap{
+  width:38px!important;
+  height:64px!important;
+  min-height:64px!important;
+  padding:0!important;
+  justify-self:center!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+}
+
+#inventoryRows .stock-row.row-material .trash-row-btn{
+  width:34px!important;
+  height:34px!important;
+  min-width:34px!important;
+  min-height:34px!important;
+  margin:0!important;
+  padding:0!important;
+  display:grid!important;
+  place-items:center!important;
+  box-sizing:border-box!important;
+}
+
+/* These fields are not used by Printing Material and must not reserve space. */
+#inventoryRows .stock-row.row-material .item-field > label,
+#inventoryRows .stock-row.row-material .qty-field > label,
+#inventoryRows .stock-row.row-material .row-type,
+#inventoryRows .stock-row.row-material .color-field,
+#inventoryRows .stock-row.row-material .size-field,
+#inventoryRows .stock-row.row-material .quick-size-bar,
+#inventoryRows .stock-row.row-material::before,
+#inventoryRows .stock-row.row-material::after{
+  display:none!important;
+  content:none!important;
+}
+
+@media(max-width:900px){
+  #inventoryRows .stock-row.row-material{
+    grid-template-columns:30px minmax(0,1fr) 38px!important;
+    grid-template-rows:64px 64px!important;
+    row-gap:9px!important;
+    min-height:159px!important;
+  }
+  #inventoryRows .stock-row.row-material .row-number{
+    grid-column:1!important;
+    grid-row:1!important;
+  }
+  #inventoryRows .stock-row.row-material .item-field{
+    grid-column:2!important;
+    grid-row:1!important;
+  }
+  #inventoryRows .stock-row.row-material .qty-field{
+    grid-column:2!important;
+    grid-row:2!important;
+  }
+  #inventoryRows .stock-row.row-material .remove-wrap{
+    grid-column:3!important;
+    grid-row:1!important;
+  }
+}
+
+@media(max-width:480px){
+  #inventoryRows .stock-row.row-material{
+    padding:9px!important;
+    column-gap:7px!important;
+  }
+  #inventoryRows .stock-row.row-material .quantity-with-unit{
+    grid-template-columns:minmax(70px,1fr) 68px!important;
+    gap:6px!important;
+  }
+  #inventoryRows .stock-row.row-material .material-unit-badge{
+    width:68px!important;
+    min-width:68px!important;
+  }
+}
+</style>
+
+<style id="niron-printing-row-final-fix-v2">
+/* FINAL FIX V2: one clean Printing Material row without clipping */
+#inventoryRows .stock-row.row-material{
+  display:grid!important;
+  grid-template-columns:34px minmax(0,1fr) 120px 70px 40px!important;
+  grid-template-rows:54px!important;
+  gap:10px!important;
+  align-items:center!important;
+  min-height:76px!important;
+  height:auto!important;
+  padding:10px!important;
+  overflow:visible!important;
+  box-sizing:border-box!important;
+}
+
+#inventoryRows .stock-row.row-material > *{
+  min-width:0!important;
+  min-height:0!important;
+  margin:0!important;
+  transform:none!important;
+  position:relative!important;
+  inset:auto!important;
+}
+
+#inventoryRows .stock-row.row-material .row-number{
+  grid-column:1!important;
+  grid-row:1!important;
+  width:28px!important;
+  height:28px!important;
+  justify-self:center!important;
+  align-self:center!important;
+}
+
+#inventoryRows .stock-row.row-material .item-field{
+  grid-column:2!important;
+  grid-row:1!important;
+  width:100%!important;
+  height:54px!important;
+  overflow:visible!important;
+}
+
+#inventoryRows .stock-row.row-material .visual-item-btn{
+  display:flex!important;
+  align-items:center!important;
+  width:100%!important;
+  height:54px!important;
+  min-height:54px!important;
+  padding:7px 11px!important;
+  margin:0!important;
+  transform:none!important;
+  box-sizing:border-box!important;
+  overflow:hidden!important;
+}
+
+#inventoryRows .stock-row.row-material .qty-field{
+  display:contents!important;
+}
+
+#inventoryRows .stock-row.row-material .quantity-with-unit{
+  display:contents!important;
+}
+
+#inventoryRows .stock-row.row-material .qty-field input{
+  grid-column:3!important;
+  grid-row:1!important;
+  position:relative!important;
+  inset:auto!important;
+  width:100%!important;
+  height:54px!important;
+  min-height:54px!important;
+  margin:0!important;
+  padding:0 10px!important;
+  transform:none!important;
+  box-sizing:border-box!important;
+  text-align:center!important;
+}
+
+#inventoryRows .stock-row.row-material .material-unit-badge{
+  grid-column:4!important;
+  grid-row:1!important;
+  position:relative!important;
+  inset:auto!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  width:100%!important;
+  height:54px!important;
+  min-height:54px!important;
+  margin:0!important;
+  padding:0 6px!important;
+  transform:none!important;
+  box-sizing:border-box!important;
+}
+
+#inventoryRows .stock-row.row-material .remove-wrap{
+  grid-column:5!important;
+  grid-row:1!important;
+  width:40px!important;
+  height:54px!important;
+  min-height:54px!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  padding:0!important;
+}
+
+#inventoryRows .stock-row.row-material .trash-row-btn{
+  width:32px!important;
+  height:32px!important;
+  min-width:32px!important;
+  min-height:32px!important;
+  margin:0!important;
+  padding:0!important;
+  transform:none!important;
+}
+
+#inventoryRows .stock-row.row-material .item-field > label,
+#inventoryRows .stock-row.row-material .qty-field > label,
+#inventoryRows .stock-row.row-material .row-type,
+#inventoryRows .stock-row.row-material .color-field,
+#inventoryRows .stock-row.row-material .size-field,
+#inventoryRows .stock-row.row-material .quick-size-bar{
+  display:none!important;
+}
+
+@media(max-width:760px){
+  #inventoryRows .stock-row.row-material{
+    grid-template-columns:30px minmax(0,1fr) 38px!important;
+    grid-template-rows:54px 54px!important;
+    gap:8px!important;
+    min-height:136px!important;
+  }
+  #inventoryRows .stock-row.row-material .item-field{grid-column:2!important;grid-row:1!important}
+  #inventoryRows .stock-row.row-material .qty-field input{grid-column:2!important;grid-row:2!important}
+  #inventoryRows .stock-row.row-material .material-unit-badge{grid-column:3!important;grid-row:2!important}
+  #inventoryRows .stock-row.row-material .remove-wrap{grid-column:3!important;grid-row:1!important}
+}
+</style>
+
+<style id="niron-printing-row-true-final-fix">
+/* TRUE FINAL FIX: remove old absolute positioning that pushes the material selector down */
+#inventoryRows .stock-row.row-material{
+  display:grid!important;
+  grid-template-columns:32px minmax(0,1fr) 110px 64px 36px!important;
+  grid-template-rows:56px!important;
+  align-items:center!important;
+  column-gap:8px!important;
+  row-gap:0!important;
+  min-height:76px!important;
+  height:76px!important;
+  padding:10px!important;
+  overflow:hidden!important;
+  box-sizing:border-box!important;
+}
+
+#inventoryRows .stock-row.row-material .row-number,
+#inventoryRows .stock-row.row-material .item-field,
+#inventoryRows .stock-row.row-material .qty-field,
+#inventoryRows .stock-row.row-material .remove-wrap{
+  position:static!important;
+  inset:auto!important;
+  top:auto!important;
+  right:auto!important;
+  bottom:auto!important;
+  left:auto!important;
+  margin:0!important;
+  padding-top:0!important;
+  transform:none!important;
+  align-self:center!important;
+  min-width:0!important;
+}
+
+#inventoryRows .stock-row.row-material .row-number{
+  grid-column:1!important;
+  grid-row:1!important;
+  width:24px!important;
+  height:24px!important;
+  justify-self:center!important;
+}
+
+#inventoryRows .stock-row.row-material .item-field{
+  grid-column:2!important;
+  grid-row:1!important;
+  width:100%!important;
+  height:56px!important;
+  display:block!important;
+  overflow:hidden!important;
+}
+
+#inventoryRows .stock-row.row-material .visual-item-btn{
+  position:static!important;
+  inset:auto!important;
+  top:auto!important;
+  right:auto!important;
+  bottom:auto!important;
+  left:auto!important;
+  margin:0!important;
+  transform:none!important;
+  width:100%!important;
+  height:56px!important;
+  min-height:56px!important;
+  max-height:56px!important;
+  box-sizing:border-box!important;
+  display:flex!important;
+  align-items:center!important;
+  overflow:hidden!important;
+}
+
+#inventoryRows .stock-row.row-material .qty-field,
+#inventoryRows .stock-row.row-material .quantity-with-unit{
+  display:contents!important;
+}
+
+#inventoryRows .stock-row.row-material .qty-field input{
+  grid-column:3!important;
+  grid-row:1!important;
+  position:static!important;
+  inset:auto!important;
+  margin:0!important;
+  transform:none!important;
+  width:100%!important;
+  height:56px!important;
+  min-height:56px!important;
+  padding:0 8px!important;
+  box-sizing:border-box!important;
+  text-align:center!important;
+}
+
+#inventoryRows .stock-row.row-material .material-unit-badge{
+  grid-column:4!important;
+  grid-row:1!important;
+  position:static!important;
+  inset:auto!important;
+  margin:0!important;
+  transform:none!important;
+  width:64px!important;
+  min-width:64px!important;
+  height:56px!important;
+  min-height:56px!important;
+  padding:0 5px!important;
+  box-sizing:border-box!important;
+}
+
+#inventoryRows .stock-row.row-material .remove-wrap{
+  grid-column:5!important;
+  grid-row:1!important;
+  width:36px!important;
+  height:56px!important;
+  min-height:56px!important;
+  justify-self:center!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+}
+
+#inventoryRows .stock-row.row-material .trash-row-btn{
+  position:static!important;
+  inset:auto!important;
+  margin:0!important;
+  transform:none!important;
+  width:30px!important;
+  height:30px!important;
+  min-width:30px!important;
+  min-height:30px!important;
+}
+
+#inventoryRows .stock-row.row-material .item-field > label,
+#inventoryRows .stock-row.row-material .qty-field > label,
+#inventoryRows .stock-row.row-material .row-type,
+#inventoryRows .stock-row.row-material .color-field,
+#inventoryRows .stock-row.row-material .size-field,
+#inventoryRows .stock-row.row-material .quick-size-bar{
+  display:none!important;
+}
+
+@media(max-width:760px){
+  #inventoryRows .stock-row.row-material{
+    grid-template-columns:28px minmax(0,1fr) 34px!important;
+    grid-template-rows:56px 56px!important;
+    height:132px!important;
+    min-height:132px!important;
+    row-gap:8px!important;
+  }
+  #inventoryRows .stock-row.row-material .row-number{grid-column:1!important;grid-row:1!important}
+  #inventoryRows .stock-row.row-material .item-field{grid-column:2!important;grid-row:1!important}
+  #inventoryRows .stock-row.row-material .qty-field input{grid-column:2!important;grid-row:2!important}
+  #inventoryRows .stock-row.row-material .material-unit-badge{grid-column:3!important;grid-row:2!important;width:34px!important;min-width:34px!important;font-size:8px!important}
+  #inventoryRows .stock-row.row-material .remove-wrap{grid-column:3!important;grid-row:1!important;width:34px!important}
+}
+</style>
+
+
+<style id="niron-printing-row-absolute-layout-fix">
+/* Definitive printing-material row layout. Absolute placement prevents older grid rules from pushing the material selector downward. */
+#inventoryRows .stock-row.row-material{
+  position:relative!important;
+  display:block!important;
+  height:76px!important;
+  min-height:76px!important;
+  padding:10px!important;
+  overflow:hidden!important;
+  box-sizing:border-box!important;
+}
+
+#inventoryRows .stock-row.row-material .row-number{
+  position:absolute!important;
+  left:10px!important;
+  top:50%!important;
+  transform:translateY(-50%)!important;
+  width:24px!important;
+  height:24px!important;
+  margin:0!important;
+}
+
+#inventoryRows .stock-row.row-material .item-field{
+  position:absolute!important;
+  left:50px!important;
+  right:218px!important;
+  top:10px!important;
+  bottom:auto!important;
+  width:auto!important;
+  height:56px!important;
+  min-height:56px!important;
+  margin:0!important;
+  padding:0!important;
+  overflow:hidden!important;
+  display:block!important;
+  transform:none!important;
+}
+
+#inventoryRows .stock-row.row-material .visual-item-btn{
+  position:absolute!important;
+  inset:0!important;
+  width:100%!important;
+  height:56px!important;
+  min-height:56px!important;
+  max-height:56px!important;
+  margin:0!important;
+  padding:7px 11px!important;
+  transform:none!important;
+  box-sizing:border-box!important;
+}
+
+#inventoryRows .stock-row.row-material .qty-field{
+  display:block!important;
+  position:static!important;
+  margin:0!important;
+  padding:0!important;
+}
+
+#inventoryRows .stock-row.row-material .quantity-with-unit{
+  display:block!important;
+  position:static!important;
+}
+
+#inventoryRows .stock-row.row-material .qty-field input{
+  position:absolute!important;
+  top:10px!important;
+  right:112px!important;
+  left:auto!important;
+  width:100px!important;
+  height:56px!important;
+  min-height:56px!important;
+  margin:0!important;
+  padding:0 8px!important;
+  transform:none!important;
+  box-sizing:border-box!important;
+  text-align:center!important;
+}
+
+#inventoryRows .stock-row.row-material .material-unit-badge{
+  position:absolute!important;
+  top:10px!important;
+  right:42px!important;
+  left:auto!important;
+  width:64px!important;
+  min-width:64px!important;
+  height:56px!important;
+  min-height:56px!important;
+  margin:0!important;
+  padding:0!important;
+  transform:none!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  box-sizing:border-box!important;
+}
+
+#inventoryRows .stock-row.row-material .remove-wrap{
+  position:absolute!important;
+  top:10px!important;
+  right:6px!important;
+  left:auto!important;
+  width:32px!important;
+  height:56px!important;
+  min-height:56px!important;
+  margin:0!important;
+  padding:0!important;
+  transform:none!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+}
+
+#inventoryRows .stock-row.row-material .trash-row-btn{
+  width:30px!important;
+  height:30px!important;
+  min-width:30px!important;
+  min-height:30px!important;
+  margin:0!important;
+  padding:0!important;
+  transform:none!important;
+}
+
+#inventoryRows .stock-row.row-material .item-field > label,
+#inventoryRows .stock-row.row-material .qty-field > label,
+#inventoryRows .stock-row.row-material .row-type,
+#inventoryRows .stock-row.row-material .color-field,
+#inventoryRows .stock-row.row-material .size-field,
+#inventoryRows .stock-row.row-material .quick-size-bar{
+  display:none!important;
+}
+
+@media(max-width:760px){
+  #inventoryRows .stock-row.row-material{
+    height:140px!important;
+    min-height:140px!important;
+  }
+  #inventoryRows .stock-row.row-material .row-number{
+    top:38px!important;
+  }
+  #inventoryRows .stock-row.row-material .item-field{
+    left:44px!important;
+    right:44px!important;
+    top:10px!important;
+  }
+  #inventoryRows .stock-row.row-material .qty-field input{
+    left:44px!important;
+    right:82px!important;
+    top:74px!important;
+    width:auto!important;
+  }
+  #inventoryRows .stock-row.row-material .material-unit-badge{
+    top:74px!important;
+    right:44px!important;
+    width:34px!important;
+    min-width:34px!important;
+    font-size:8px!important;
+  }
+  #inventoryRows .stock-row.row-material .remove-wrap{
+    top:10px!important;
+    right:6px!important;
+  }
+}
+</style>
+
+<style id="niron-cloth-unselected-row-upper-final">
+/* Keep the unfinished Cloth row at the top of its card. */
+#inventoryRows > .stock-row:not(.row-material){
+  display:grid!important;
+  grid-template-columns:30px minmax(260px,1.7fr) minmax(190px,1fr) 34px!important;
+  grid-template-rows:72px!important;
+  align-items:start!important;
+  min-height:92px!important;
+  height:auto!important;
+  padding:10px!important;
+  row-gap:0!important;
+  overflow:visible!important;
+}
+#inventoryRows > .stock-row:not(.row-material) .row-number{
+  grid-column:1!important;grid-row:1!important;align-self:center!important;margin:0!important;
+}
+#inventoryRows > .stock-row:not(.row-material) .item-field{
+  grid-column:2!important;grid-row:1!important;align-self:start!important;margin:0!important;padding:0!important;
+}
+#inventoryRows > .stock-row:not(.row-material) .color-field{
+  grid-column:3!important;grid-row:1!important;align-self:start!important;margin:0!important;padding:0!important;
+}
+#inventoryRows > .stock-row:not(.row-material) .remove-wrap{
+  grid-column:4!important;grid-row:1!important;align-self:center!important;margin:0!important;min-height:54px!important;
+}
+#inventoryRows > .stock-row:not(.row-material) .visual-select-btn{
+  position:relative!important;top:0!important;bottom:auto!important;left:auto!important;right:auto!important;
+  transform:none!important;margin:0!important;width:100%!important;height:54px!important;min-height:54px!important;
+}
+#inventoryRows > .stock-row:not(.row-material) .visual-select-btn:hover{transform:none!important;}
+#inventoryRows > .stock-row:not(.row-material) .row-type{display:none!important;}
+#inventoryRows > .stock-row:not(.row-material) .size-field,
+#inventoryRows > .stock-row:not(.row-material) .qty-field,
+#inventoryRows > .stock-row:not(.row-material) .quick-size-bar{display:none!important;}
+@media(max-width:820px){
+  #inventoryRows > .stock-row:not(.row-material){
+    grid-template-columns:28px minmax(0,1fr) 34px!important;
+    grid-template-rows:auto auto!important;
+    min-height:160px!important;
+    row-gap:8px!important;
+  }
+  #inventoryRows > .stock-row:not(.row-material) .item-field{grid-column:2!important;grid-row:1!important;}
+  #inventoryRows > .stock-row:not(.row-material) .color-field{grid-column:2!important;grid-row:2!important;}
+  #inventoryRows > .stock-row:not(.row-material) .remove-wrap{grid-column:3!important;grid-row:1!important;}
+}
+</style>
+
 {% endblock %}

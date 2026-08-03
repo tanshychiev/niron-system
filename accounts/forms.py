@@ -5,6 +5,32 @@ from django.contrib.auth.models import Group, Permission, User
 from .models import UserProfile
 
 
+ADMIN_GROUP_NAME = "ADMIN FULL CONTROL"
+
+
+def update_user_role(user, selected_group):
+    """
+    Keep the user's Django access flags synchronized with the selected role.
+
+    Users assigned to ADMIN FULL CONTROL become staff and superusers.
+    Users assigned to any other role remain normal active users and receive
+    access from their group's permissions.
+    """
+    user.groups.clear()
+
+    if selected_group:
+        user.groups.add(selected_group)
+
+    is_admin = bool(
+        selected_group
+        and selected_group.name.strip().upper() == ADMIN_GROUP_NAME
+    )
+
+    user.is_staff = is_admin
+    user.is_superuser = is_admin
+    user.save(update_fields=["is_staff", "is_superuser"])
+
+
 class LoginForm(AuthenticationForm):
     username = forms.CharField(
         widget=forms.TextInput(
@@ -51,13 +77,42 @@ class UserCreateForm(forms.ModelForm):
 
     class Meta:
         model = User
-        fields = ["username", "first_name", "last_name", "email", "is_active", "groups"]
+        fields = [
+            "username",
+            "first_name",
+            "last_name",
+            "email",
+            "is_active",
+            "groups",
+        ]
         widgets = {
-            "username": forms.TextInput(attrs={"class": "form-control", "placeholder": "Username"}),
-            "first_name": forms.TextInput(attrs={"class": "form-control", "placeholder": "First name"}),
-            "last_name": forms.TextInput(attrs={"class": "form-control", "placeholder": "Last name"}),
-            "email": forms.EmailInput(attrs={"class": "form-control", "placeholder": "Email"}),
-            "is_active": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "username": forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "Username",
+                }
+            ),
+            "first_name": forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "First name",
+                }
+            ),
+            "last_name": forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "Last name",
+                }
+            ),
+            "email": forms.EmailInput(
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "Email",
+                }
+            ),
+            "is_active": forms.CheckboxInput(
+                attrs={"class": "form-check-input"}
+            ),
         }
 
     def clean(self):
@@ -66,7 +121,9 @@ class UserCreateForm(forms.ModelForm):
         confirm_password = cleaned_data.get("confirm_password")
 
         if password != confirm_password:
-            raise forms.ValidationError("Password and confirm password do not match.")
+            raise forms.ValidationError(
+                "Password and confirm password do not match."
+            )
 
         return cleaned_data
 
@@ -78,9 +135,7 @@ class UserCreateForm(forms.ModelForm):
             user.save()
 
             selected_group = self.cleaned_data.get("groups")
-            user.groups.clear()
-            if selected_group:
-                user.groups.add(selected_group)
+            update_user_role(user, selected_group)
 
             UserProfile.objects.get_or_create(user=user)
 
@@ -116,13 +171,42 @@ class UserEditForm(forms.ModelForm):
 
     class Meta:
         model = User
-        fields = ["username", "first_name", "last_name", "email", "is_active", "groups"]
+        fields = [
+            "username",
+            "first_name",
+            "last_name",
+            "email",
+            "is_active",
+            "groups",
+        ]
         widgets = {
-            "username": forms.TextInput(attrs={"class": "form-control", "placeholder": "Username"}),
-            "first_name": forms.TextInput(attrs={"class": "form-control", "placeholder": "First name"}),
-            "last_name": forms.TextInput(attrs={"class": "form-control", "placeholder": "Last name"}),
-            "email": forms.EmailInput(attrs={"class": "form-control", "placeholder": "Email"}),
-            "is_active": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "username": forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "Username",
+                }
+            ),
+            "first_name": forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "First name",
+                }
+            ),
+            "last_name": forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "Last name",
+                }
+            ),
+            "email": forms.EmailInput(
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "Email",
+                }
+            ),
+            "is_active": forms.CheckboxInput(
+                attrs={"class": "form-check-input"}
+            ),
         }
 
     def __init__(self, *args, **kwargs):
@@ -140,7 +224,9 @@ class UserEditForm(forms.ModelForm):
 
         if new_password or confirm_password:
             if new_password != confirm_password:
-                raise forms.ValidationError("New password and confirm password do not match.")
+                raise forms.ValidationError(
+                    "New password and confirm password do not match."
+                )
 
         return cleaned_data
 
@@ -155,9 +241,7 @@ class UserEditForm(forms.ModelForm):
             user.save()
 
             selected_group = self.cleaned_data.get("groups")
-            user.groups.clear()
-            if selected_group:
-                user.groups.add(selected_group)
+            update_user_role(user, selected_group)
 
             UserProfile.objects.get_or_create(user=user)
 

@@ -51,10 +51,8 @@ class FabricReceiptForm(forms.ModelForm):
         self.user = user
         self.fields["color"].queryset = Color.objects.filter(is_active=True).order_by("name")
         self.fields["supplier_ref"].queryset = ProductionSupplier.objects.filter(is_active=True).order_by("name")
-        can_view_cost = bool(user and user.has_perm("production.view_production_cost"))
-        if not can_view_cost:
-            for field in ["total_goods_cost", "shipping_cost", "extra_cost"]:
-                self.fields.pop(field, None)
+        # Cost entry is optional and available to stock-in staff.
+        # Finance can review or correct it later.
         if self.instance and self.instance.pk:
             self.fields["roll_count"].disabled = True
             self.fields["roll_count"].help_text = "Create another receipt to add more physical rolls."
@@ -116,10 +114,8 @@ class FabricReceiptLineForm(forms.Form):
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["color"].queryset = Color.objects.filter(is_active=True).order_by("name")
-        can_view_cost = bool(user and user.has_perm("production.view_production_cost"))
-        if not can_view_cost:
-            for field_name in ["total_goods_cost", "shipping_cost", "extra_cost"]:
-                self.fields.pop(field_name, None)
+        # Cost entry is optional and available to stock-in staff.
+        # Finance can review or correct it later.
 
 
 def fabric_receipt_line_formset(*, data=None, user=None, prefix="items"):

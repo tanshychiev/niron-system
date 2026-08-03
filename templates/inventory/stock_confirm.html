@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
-{% block title %}Stock Confirm | Niron{% endblock %}
-{% block page_title %}Stock Confirm{% endblock %}
+{% block title %}Stock Count | Niron{% endblock %}
+{% block page_title %}Stock Count{% endblock %}
 {% block page_subtitle %}
 Tick only the sizes you checked. Leave unticked sizes for later. Change Real Qty when system stock is wrong.
 {% endblock %}
@@ -11,13 +11,13 @@ Tick only the sizes you checked. Leave unticked sizes for later. Change Real Qty
 <div class="result-report {% if last_report.wrong %}has-wrong{% endif %}">
   <div class="report-title">
     <div>
-      <span class="report-kicker">Latest Confirmation Report</span>
+      <span class="report-kicker">Latest Stock Count Report</span>
       <h3>{{ last_report.total }} type{{ last_report.total|pluralize }} confirmed</h3>
     </div>
 
     <div class="report-links">
-      <a href="{% url 'stock_summary_report' %}" class="btn-light">View Daily Report</a>
-      <a href="{% url 'stock_history' %}" class="btn-light">Full History</a>
+      <a href="{% url 'stock_summary_report' %}" class="btn-light">View Count Report</a>
+      <a href="{% url 'stock_history' %}" class="btn-light">Count History</a>
     </div>
   </div>
 
@@ -72,8 +72,8 @@ Tick only the sizes you checked. Leave unticked sizes for later. Change Real Qty
         <span>Select All Sizes</span>
       </label>
 
-      <a href="{% url 'stock_summary_report' %}" class="btn-light">Daily Report</a>
-      <a href="{% url 'stock_history' %}" class="btn-light">Stock History</a>
+      <a href="{% url 'stock_summary_report' %}" class="btn-light">Count Report</a>
+      <a href="{% url 'stock_history' %}" class="btn-light">Count History</a>
 
       <button
         type="submit"

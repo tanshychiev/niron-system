@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
-{% block title %}Stock History Detail | Niron{% endblock %}
-{% block page_title %}Stock History Detail{% endblock %}
+{% block title %}Count History Detail | Niron{% endblock %}
+{% block page_title %}Count History Detail{% endblock %}
 {% block page_subtitle %}
 {{ report_date|date:"d F Y" }} — review correct and wrong stock checks for this date.
 {% endblock %}
@@ -12,10 +12,10 @@
     href="{% url 'stock_history' %}?date_from={{ report_date|date:'Y-m-d' }}&date_to={{ report_date|date:'Y-m-d' }}"
     class="btn-light"
   >
-    ← Back to History List
+    ← Back to Count History
   </a>
 
-  <a href="{% url 'stock_confirm' %}" class="btn-primary">Stock Confirm</a>
+  <a href="{% url 'stock_confirm' %}" class="btn-primary">Stock Count</a>
 </div>
 
 <div class="date-banner">

@@ -119,9 +119,46 @@ class InventoryBatchForm(forms.ModelForm):
 
     class Meta:
         model = InventoryBatch
-        fields = ["received_date", "supplier_ref", "note"]
+        fields = [
+            "received_date",
+            "supplier_ref",
+            "total_goods_cost",
+            "shipping_cost",
+            "extra_cost",
+            "note",
+        ]
         widgets = {
-            "note": forms.Textarea(attrs={"class": "form-control", "rows": 3, "placeholder": "Note"}),
+            "total_goods_cost": forms.NumberInput(
+                attrs={
+                    "class": "form-control cost-input",
+                    "step": "0.01",
+                    "min": "0",
+                    "placeholder": "0.00",
+                }
+            ),
+            "shipping_cost": forms.NumberInput(
+                attrs={
+                    "class": "form-control cost-input",
+                    "step": "0.01",
+                    "min": "0",
+                    "placeholder": "0.00",
+                }
+            ),
+            "extra_cost": forms.NumberInput(
+                attrs={
+                    "class": "form-control cost-input",
+                    "step": "0.01",
+                    "min": "0",
+                    "placeholder": "0.00",
+                }
+            ),
+            "note": forms.Textarea(
+                attrs={
+                    "class": "form-control",
+                    "rows": 3,
+                    "placeholder": "Batch note, receipt number, payment detail...",
+                }
+            ),
         }
 
     def __init__(self, *args, **kwargs):
@@ -169,8 +206,27 @@ class InventoryItemSelect(forms.Select):
                     "data-unit": item.unit or "",
                     "data-unit-label": item.get_unit_display(),
                     "data-is-shirt": "1" if is_shirt else "0",
+                    "data-item-code": item.code or "",
+                    "data-item-name": item.name or "",
+                    "data-item-style": item.sample_style or "",
+                    "data-item-image": item.image.url if getattr(item, "image", None) else "",
                 }
             )
+
+        return option
+
+
+
+class InventoryColorSelect(forms.Select):
+    """Expose the inventory colour hex code to the Stock In interface."""
+
+    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
+        option = super().create_option(name, value, label, selected, index, subindex, attrs)
+        color = getattr(value, "instance", None)
+
+        if color:
+            option["attrs"]["data-color-hex"] = color.hex_code or "#D1D5DB"
+            option["attrs"]["data-color-name"] = color.name or ""
 
         return option
 
@@ -193,7 +249,7 @@ class InventoryBatchItemForm(forms.ModelForm):
         fields = ["item", "color", "size", "quantity"]
         widgets = {
             "item": InventoryItemSelect(attrs={"class": "form-select item-select"}),
-            "color": forms.Select(attrs={"class": "form-select color-select"}),
+            "color": InventoryColorSelect(attrs={"class": "form-select color-select"}),
             "size": forms.Select(attrs={"class": "form-select size-select"}),
         }
 

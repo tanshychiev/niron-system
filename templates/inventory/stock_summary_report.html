@@ -1,15 +1,15 @@
 {% extends "base.html" %}
 
-{% block title %}Stock Summary Report | Niron{% endblock %}
-{% block page_title %}Stock Summary Report{% endblock %}
+{% block title %}Stock Count Report | Niron{% endblock %}
+{% block page_title %}Stock Count Report{% endblock %}
 {% block page_subtitle %}
 Daily stock-count results. Each Product + Color + Size is counted once per day using its latest check.
 {% endblock %}
 
 {% block content %}
 <div class="report-actions">
-  <a href="{% url 'stock_confirm' %}" class="btn-primary">← Stock Confirm</a>
-  <a href="{% url 'stock_history' %}" class="btn-light">Full Stock History</a>
+  <a href="{% url 'stock_confirm' %}" class="btn-primary">← Stock Count</a>
+  <a href="{% url 'stock_history' %}" class="btn-light">Count History</a>
 </div>
 
 <form method="get" class="filter-card">
@@ -209,7 +209,7 @@ Daily stock-count results. Each Product + Color + Size is counted once per day u
 <div class="report-note">
   <strong>How this report counts:</strong>
   If the same product, color and size is checked more than once on the same day,
-  this summary uses only the latest result. Full Stock History still keeps every check.
+  this summary uses only the latest result. Count History still keeps every check.
 </div>
 
 <style>

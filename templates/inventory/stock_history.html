@@ -1,15 +1,15 @@
 {% extends "base.html" %}
 
-{% block title %}Stock History | Niron{% endblock %}
-{% block page_title %}Stock History{% endblock %}
+{% block title %}Count History | Niron{% endblock %}
+{% block page_title %}Count History{% endblock %}
 {% block page_subtitle %}
 Daily stock-count list. Every count represents a product variety or material type, not the number of pieces.
 {% endblock %}
 
 {% block content %}
 <div class="history-actions">
-  <a href="{% url 'stock_confirm' %}" class="btn-primary">← Stock Confirm</a>
-  <a href="{% url 'stock_summary_report' %}" class="btn-light">Daily Summary Report</a>
+  <a href="{% url 'stock_confirm' %}" class="btn-primary">← Stock Count</a>
+  <a href="{% url 'stock_summary_report' %}" class="btn-light">Count Report</a>
 </div>
 
 <form method="get" class="date-filter-card">

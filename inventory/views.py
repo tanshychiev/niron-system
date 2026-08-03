@@ -1,4 +1,4 @@
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
 from decimal import Decimal
 
 from django.contrib import messages
@@ -9,7 +9,9 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from orders.models import Order, OrderItem
-from production.models import ProductionSupplier
+from production.forms import FabricReceiptHeaderForm, fabric_receipt_line_formset
+from production.models import FabricReceipt, FabricRoll, ProductionSupplier
+from production.services import create_fabric_rolls
 
 from .forms import (
     ColorForm,
@@ -130,6 +132,11 @@ def _log_batch_history(batch, action, user=None, note=""):
 @login_required
 @permission_required("inventory.view_inventorybatch", raise_exception=True)
 def inventory_list(request):
+    inventory_type = (request.GET.get("type") or "all").strip().lower()
+    if inventory_type not in {"all", "cloth", "printing", "fabric"}:
+        inventory_type = "all"
+
+    q = (request.GET.get("q") or "").strip()
     items = InventoryItem.objects.all().order_by("code", "name")
     batches = InventoryBatch.objects.filter(is_deleted=False).order_by("-received_date", "-id")
 
@@ -336,6 +343,51 @@ def inventory_list(request):
         material.stock_qty = stock_qty
         material_rows.append(material)
 
+    # Existing fabric data stays in Production models, but is displayed inside
+    # this same Inventory page so users no longer need a separate stock page.
+    fabric_rolls = FabricRoll.objects.select_related("receipt", "receipt__color").all()
+    if q:
+        fabric_rolls = fabric_rolls.filter(
+            Q(roll_code__icontains=q)
+            | Q(receipt__fabric_name__icontains=q)
+            | Q(receipt__color__name__icontains=q)
+            | Q(receipt__supplier__icontains=q)
+        )
+
+    fabric_grouped = OrderedDict()
+    for roll in fabric_rolls.order_by(
+        "receipt__fabric_name", "receipt__color__name", "roll_code"
+    ):
+        fabric_key = (roll.receipt.fabric_name.strip().lower(), roll.receipt.fabric_name)
+        color_key = roll.receipt.color_id
+        if fabric_key not in fabric_grouped:
+            fabric_grouped[fabric_key] = {
+                "fabric_name": roll.receipt.fabric_name,
+                "colors": OrderedDict(),
+                "roll_count": 0,
+                "remaining_total": Decimal("0"),
+            }
+        fabric = fabric_grouped[fabric_key]
+        if color_key not in fabric["colors"]:
+            fabric["colors"][color_key] = {
+                "color": roll.receipt.color,
+                "rolls": [],
+                "roll_count": 0,
+                "remaining_total": Decimal("0"),
+            }
+        color_group = fabric["colors"][color_key]
+        color_group["rolls"].append(roll)
+        if Decimal(roll.remaining_qty or 0) > 0:
+            color_group["roll_count"] += 1
+            color_group["remaining_total"] += Decimal(roll.remaining_qty or 0)
+            fabric["roll_count"] += 1
+            fabric["remaining_total"] += Decimal(roll.remaining_qty or 0)
+
+    fabric_groups = []
+    for fabric in fabric_grouped.values():
+        fabric["colors"] = list(fabric["colors"].values())
+        fabric_groups.append(fabric)
+
     batch_rows = []
 
     for batch in batches:
@@ -363,6 +415,9 @@ def inventory_list(request):
             "items": items,
             "style_groups": style_groups,
             "materials": material_rows,
+            "fabric_groups": fabric_groups,
+            "inventory_type": inventory_type,
+            "q": q,
             "batches": batch_rows,
         },
     )
@@ -590,9 +645,136 @@ def inventory_supplier_ajax_create(request):
 @permission_required("inventory.add_inventorybatch", raise_exception=True)
 @transaction.atomic
 def inventory_batch_create(request):
+    stock_type = (request.POST.get("stock_type") or request.GET.get("type") or "cloth").strip().lower()
+    if stock_type not in {"cloth", "printing", "fabric"}:
+        stock_type = "cloth"
+
+    # ---------------------------------------------------------
+    # FABRIC: save through the existing Production receipt/roll
+    # models so no duplicate fabric stock system is created.
+    # ---------------------------------------------------------
+    if stock_type == "fabric":
+        if request.method == "POST":
+            fabric_header_form = FabricReceiptHeaderForm(request.POST)
+            fabric_formset = fabric_receipt_line_formset(
+                data=request.POST,
+                user=request.user,
+                prefix="fabric_items",
+            )
+
+            if fabric_header_form.is_valid() and fabric_formset.is_valid():
+                total_rolls = 0
+                saved_lines = 0
+                created_receipts = []
+
+                for line_form in fabric_formset:
+                    if not line_form.cleaned_data or line_form.cleaned_data.get("DELETE"):
+                        continue
+
+                    data = line_form.cleaned_data
+                    supplier = fabric_header_form.cleaned_data["supplier"]
+
+                    receipt = FabricReceipt(
+                        received_date=fabric_header_form.cleaned_data["received_date"],
+                        supplier_ref=supplier,
+                        supplier=supplier.name,
+                        fabric_name=data["fabric_name"],
+                        color=data["color"],
+                        roll_count=data["roll_count"],
+                        total_goods_cost=data.get("total_goods_cost") or Decimal("0"),
+                        shipping_cost=data.get("shipping_cost") or Decimal("0"),
+                        extra_cost=data.get("extra_cost") or Decimal("0"),
+                        note=data.get("note") or "",
+                        created_by=request.user,
+                        updated_by=request.user,
+                    )
+                    receipt.save()
+                    create_fabric_rolls(receipt)
+
+                    created_receipts.append(receipt)
+                    total_rolls += receipt.roll_count
+                    saved_lines += 1
+
+                message = (
+                    f"{total_rolls} fabric roll(s) across "
+                    f"{saved_lines} fabric type(s) received successfully."
+                )
+
+                if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                    return JsonResponse(
+                        {
+                            "ok": True,
+                            "message": message,
+                            "redirect_url": "/inventory/?type=fabric",
+                        }
+                    )
+
+                messages.success(request, message)
+                return redirect("/inventory/?type=fabric")
+
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                transaction.set_rollback(True)
+
+                field_errors = {}
+                for name, errors in fabric_header_form.errors.items():
+                    field_errors[f"id_{name}"] = [str(error) for error in errors]
+
+                row_errors = {}
+                for index, row_form in enumerate(fabric_formset.forms):
+                    for name, errors in row_form.errors.items():
+                        row_errors[f"id_fabric_items-{index}-{name}"] = [
+                            str(error) for error in errors
+                        ]
+
+                first = (
+                    next(iter(field_errors.values()), None)
+                    or next(iter(row_errors.values()), None)
+                )
+                message = first[0] if first else "Please check the highlighted fields."
+
+                return JsonResponse(
+                    {
+                        "ok": False,
+                        "message": f"Failed: {message}",
+                        "field_errors": field_errors,
+                        "row_errors": row_errors,
+                    },
+                    status=400,
+                )
+        else:
+            fabric_header_form = FabricReceiptHeaderForm(
+                initial={"received_date": timezone.localdate()}
+            )
+            fabric_formset = fabric_receipt_line_formset(
+                user=request.user,
+                prefix="fabric_items",
+            )
+
+        # Keep the ordinary forms available because the template contains both modes.
+        form = InventoryBatchForm(initial={"received_date": timezone.localdate()})
+        formset = InventoryBatchItemFormSet(prefix="items")
+
+        return render(
+            request,
+            "inventory/inventory_batch_form.html",
+            {
+                "form": form,
+                "formset": formset,
+                "fabric_header_form": fabric_header_form,
+                "fabric_formset": fabric_formset,
+                "stock_type": "fabric",
+                "page_title": "Stock In",
+                "submit_label": "Save Fabric Batch",
+                "items": InventoryItem.objects.filter(is_active=True).order_by("code", "name"),
+            },
+        )
+
+    # ---------------------------------------------------------
+    # CLOTH / PRINTING MATERIAL: existing inventory batch logic.
+    # ---------------------------------------------------------
     if request.method == "POST":
         form = InventoryBatchForm(request.POST)
-        formset = InventoryBatchItemFormSet(request.POST)
+        formset = InventoryBatchItemFormSet(request.POST, prefix="items")
 
         if form.is_valid() and formset.is_valid():
             batch = form.save(commit=False)
@@ -640,15 +822,31 @@ def inventory_batch_create(request):
             )
 
             if request.headers.get("x-requested-with") == "XMLHttpRequest":
-                return JsonResponse({"ok": True, "message": f"Inventory batch {batch.batch_no} created successfully.", "redirect_url": f"/inventory/batches/{batch.pk}/"})
+                return JsonResponse(
+                    {
+                        "ok": True,
+                        "message": f"Inventory batch {batch.batch_no} created successfully.",
+                        "redirect_url": f"/inventory/batches/{batch.pk}/",
+                    }
+                )
+
             messages.success(request, f"Inventory batch {batch.batch_no} created.")
             return redirect("inventory_batch_detail", pk=batch.pk)
+
         if request.headers.get("x-requested-with") == "XMLHttpRequest":
             transaction.set_rollback(True)
             return JsonResponse(_form_error_payload(form, formset), status=400)
     else:
         form = InventoryBatchForm(initial={"received_date": timezone.localdate()})
-        formset = InventoryBatchItemFormSet()
+        formset = InventoryBatchItemFormSet(prefix="items")
+
+    fabric_header_form = FabricReceiptHeaderForm(
+        initial={"received_date": timezone.localdate()}
+    )
+    fabric_formset = fabric_receipt_line_formset(
+        user=request.user,
+        prefix="fabric_items",
+    )
 
     return render(
         request,
@@ -656,6 +854,9 @@ def inventory_batch_create(request):
         {
             "form": form,
             "formset": formset,
+            "fabric_header_form": fabric_header_form,
+            "fabric_formset": fabric_formset,
+            "stock_type": stock_type,
             "page_title": "Stock In",
             "submit_label": "Save Batch",
             "items": InventoryItem.objects.filter(is_active=True).order_by("code", "name"),

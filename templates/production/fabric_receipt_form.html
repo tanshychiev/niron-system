@@ -1,112 +1,797 @@
 {% extends "base.html" %}
 {% block page_title %}{{ page_title_text }}{% endblock %}
 {% block page_subtitle %}Receive several fabric types in one save while keeping every physical roll separate{% endblock %}
+
 {% block content %}
 <style>
-.prod-wrap{max-width:1450px;margin:0 auto}.prod-actions{display:flex;gap:9px;flex-wrap:wrap;justify-content:flex-end;margin-bottom:14px}.prod-card{background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:17px}.field label{display:block;margin-bottom:6px;font-size:11px;font-weight:900;text-transform:uppercase;color:var(--muted)}.field input,.field select,.field textarea{width:100%}.header-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.line-card{border:1px solid var(--line);border-radius:16px;padding:14px;margin-top:12px;background:#fffdf9}.line-grid{display:grid;grid-template-columns:1.5fr 1fr .65fr repeat(3,.8fr) 1.2fr auto;gap:10px;align-items:end}.line-title{display:flex;align-items:center;justify-content:space-between;gap:12px}.line-number{display:inline-flex;width:28px;height:28px;align-items:center;justify-content:center;border-radius:999px;background:var(--accent-soft);font-weight:900}.remove-row{border:1px solid #f1b5b5;background:#fff5f5;color:#b42318;border-radius:10px;padding:10px 12px;cursor:pointer}.error-box{padding:12px;border-radius:12px;background:#fdecec;color:#b42318;margin-bottom:12px}.cost-protected{margin-top:12px;background:#f1fff6}.color-preview{width:22px;height:22px;border-radius:50%;border:1px solid rgba(0,0,0,.18);display:inline-block;vertical-align:middle;margin-right:7px}@media(max-width:1200px){.line-grid{grid-template-columns:repeat(3,1fr)}.line-grid .wide{grid-column:span 2}}@media(max-width:700px){.header-grid,.line-grid{grid-template-columns:1fr}.line-grid .wide{grid-column:auto}.prod-actions>*{flex:1}}
+:root{
+  --fabric-bg:#fbf2e3;
+  --fabric-panel:rgba(255,255,255,.92);
+  --fabric-soft:rgba(255,248,235,.88);
+  --fabric-line:rgba(154,103,35,.18);
+  --fabric-text:#2b1c0d;
+  --fabric-muted:#7c6a55;
+  --fabric-gold:#d49a32;
+  --fabric-gold-dark:#704816;
+  --fabric-red:#cf424d;
+  --fabric-shadow:0 18px 48px rgba(74,42,10,.10);
+}
+
+.fabric-page{
+  max-width:1420px;
+  margin:12px auto 44px;
+  padding:0 14px;
+  color:var(--fabric-text);
+  font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+
+.fabric-page::before{
+  content:"";
+  position:fixed;
+  inset:0;
+  z-index:-2;
+  pointer-events:none;
+  background:
+    radial-gradient(circle at 10% 5%,rgba(255,216,144,.22),transparent 27%),
+    radial-gradient(circle at 92% 12%,rgba(215,158,59,.12),transparent 24%),
+    linear-gradient(180deg,#fffdf8 0%,var(--fabric-bg) 56%,#f1dfc1 100%);
+}
+
+.fabric-shell{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 310px;
+  gap:15px;
+  align-items:start;
+}
+
+.fabric-main,
+.fabric-side-card{
+  border:1px solid var(--fabric-line);
+  background:linear-gradient(145deg,var(--fabric-panel),var(--fabric-soft));
+  border-radius:22px;
+  box-shadow:var(--fabric-shadow);
+  backdrop-filter:blur(16px);
+}
+
+.fabric-main{padding:15px}
+.fabric-side{display:grid;gap:11px;position:sticky;top:10px}
+.fabric-side-card{padding:14px}
+
+.page-top{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:12px;
+  margin-bottom:12px;
+}
+
+.page-title h1{
+  margin:0;
+  font-size:30px;
+  line-height:1;
+  letter-spacing:-.04em;
+  font-weight:930;
+}
+
+.page-title p{
+  margin:7px 0 0;
+  color:var(--fabric-muted);
+  font-size:12px;
+}
+
+.btn-light,
+.btn-primary,
+.remove-row{
+  min-height:38px;
+  padding:8px 12px;
+  border-radius:11px;
+  border:1px solid var(--fabric-line);
+  font-size:10.5px;
+  font-weight:900;
+  cursor:pointer;
+  text-decoration:none;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
+}
+
+.btn-light{
+  background:rgba(255,255,255,.76);
+  color:#674217;
+}
+
+.btn-primary{
+  color:#fff;
+  background:linear-gradient(145deg,#382513,#715020);
+  border-color:#553715;
+  box-shadow:0 9px 20px rgba(73,42,11,.17);
+}
+
+.remove-row{
+  min-height:34px;
+  padding:7px 10px;
+  background:#fff1f1;
+  color:#b73540;
+  border-color:rgba(207,66,77,.20);
+}
+
+.panel{
+  padding:12px;
+  margin-top:10px;
+  border:1px solid var(--fabric-line);
+  border-radius:17px;
+  background:rgba(255,255,255,.58);
+}
+
+.panel-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:9px;
+  margin-bottom:10px;
+}
+
+.panel-title{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
+.panel-icon{
+  width:34px;
+  height:34px;
+  display:grid;
+  place-items:center;
+  border-radius:11px;
+  border:1px solid rgba(180,120,38,.18);
+  background:linear-gradient(145deg,#fff7e7,#ebca8b);
+}
+
+.panel-title h2{
+  margin:0;
+  font-size:15px;
+  font-weight:900;
+}
+
+.panel-title small{
+  display:block;
+  margin-top:2px;
+  color:var(--fabric-muted);
+  font-size:10px;
+}
+
+.header-grid{
+  display:grid;
+  grid-template-columns:1fr 1.35fr;
+  gap:9px;
+}
+
+.full{grid-column:1/-1}
+
+.field{
+  min-width:0;
+}
+
+.field label{
+  display:block;
+  margin:0 0 5px;
+  color:#67451d;
+  font-size:9.5px;
+  font-weight:900;
+  letter-spacing:.055em;
+  text-transform:uppercase;
+}
+
+.field input,
+.field select,
+.field textarea,
+.field .form-control,
+.field .form-select{
+  width:100%;
+  min-height:42px;
+  padding:8px 10px;
+  border:1px solid var(--fabric-line);
+  border-radius:11px;
+  background:rgba(255,255,255,.86);
+  color:var(--fabric-text);
+  outline:none;
+  font-size:12px;
+  font-weight:720;
+  box-sizing:border-box;
+}
+
+.field textarea{
+  min-height:74px;
+  resize:vertical;
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus{
+  border-color:rgba(205,141,41,.46);
+  box-shadow:0 0 0 3px rgba(219,163,70,.10);
+  background:#fff;
+}
+
+.fabric-lines{
+  display:grid;
+  gap:9px;
+}
+
+.fabric-line{
+  padding:10px;
+  border:1px solid var(--fabric-line);
+  border-radius:14px;
+  background:linear-gradient(145deg,rgba(255,255,255,.90),rgba(249,237,217,.73));
+}
+
+.fabric-line-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:9px;
+  margin-bottom:9px;
+}
+
+.line-number{
+  width:28px;
+  height:28px;
+  display:grid;
+  place-items:center;
+  border-radius:9px;
+  color:#694316;
+  background:linear-gradient(145deg,#fff8e7,#e8c681);
+  font-size:10px;
+  font-weight:950;
+}
+
+.fabric-line-grid{
+  display:grid;
+  grid-template-columns:
+    minmax(190px,1.45fr)
+    minmax(130px,1fr)
+    minmax(90px,.65fr)
+    minmax(105px,.78fr)
+    minmax(105px,.78fr)
+    minmax(105px,.78fr)
+    minmax(180px,1.2fr);
+  gap:8px;
+  align-items:end;
+}
+
+.fabric-line-grid.no-cost{
+  grid-template-columns:
+    minmax(220px,1.45fr)
+    minmax(150px,1fr)
+    minmax(100px,.65fr)
+    minmax(220px,1.3fr);
+}
+
+.cost-field input{
+  text-align:right;
+  font-weight:850;
+  background:linear-gradient(180deg,#fffdf8,#fff4df);
+}
+
+.error-box{
+  padding:12px;
+  border-radius:12px;
+  background:#fdecec;
+  color:#b42318;
+  border:1px solid #f5c2c7;
+  margin-bottom:12px;
+  font-size:12px;
+}
+
+.form-actions{
+  position:sticky;
+  bottom:5px;
+  z-index:30;
+  margin-top:11px;
+  padding:8px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:8px;
+  border:1px solid var(--fabric-line);
+  border-radius:14px;
+  background:rgba(255,251,243,.93);
+  box-shadow:0 12px 28px rgba(70,40,10,.12);
+  backdrop-filter:blur(15px);
+}
+
+.action-group{
+  display:flex;
+  align-items:center;
+  gap:7px;
+}
+
+.cost-protected{
+  padding:11px 12px;
+  margin-top:10px;
+  border:1px solid rgba(22,139,96,.18);
+  border-radius:13px;
+  background:#f1fff6;
+  color:#255d47;
+  font-size:11px;
+}
+
+.side-title{
+  margin:0 0 9px;
+  font-size:14px;
+  font-weight:900;
+}
+
+.summary-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:7px;
+}
+
+.summary-box{
+  padding:9px;
+  border:1px solid var(--fabric-line);
+  border-radius:11px;
+  background:rgba(255,255,255,.66);
+}
+
+.summary-box span{
+  display:block;
+  color:var(--fabric-muted);
+  font-size:8.5px;
+  font-weight:900;
+  text-transform:uppercase;
+  letter-spacing:.05em;
+}
+
+.summary-box strong{
+  display:block;
+  margin-top:4px;
+  font-size:19px;
+}
+
+.side-lines{
+  display:grid;
+  gap:7px;
+  margin-top:9px;
+}
+
+.side-line{
+  display:flex;
+  justify-content:space-between;
+  gap:8px;
+  color:#705d47;
+  font-size:10.5px;
+}
+
+.side-line strong{color:#30200f}
+
+.help{
+  padding:10px;
+  border-radius:11px;
+  background:rgba(255,255,255,.58);
+  color:#76624c;
+  font-size:10.5px;
+  line-height:1.5;
+}
+
+@media(max-width:1180px){
+  .fabric-shell{grid-template-columns:1fr}
+  .fabric-side{position:static;grid-template-columns:1fr 1fr}
+  .fabric-line-grid{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+  }
+  .fabric-line-grid .note-field{
+    grid-column:span 3;
+  }
+}
+
+@media(max-width:820px){
+  .fabric-page{padding:0 7px}
+  .fabric-main{padding:10px;border-radius:17px}
+  .page-top{display:grid}
+  .page-title h1{font-size:25px}
+  .header-grid{grid-template-columns:1fr}
+  .full{grid-column:auto}
+  .fabric-line-grid,
+  .fabric-line-grid.no-cost{
+    grid-template-columns:1fr;
+  }
+  .fabric-line-grid .note-field{
+    grid-column:auto;
+  }
+  .fabric-side{grid-template-columns:1fr}
+  .form-actions{display:grid}
+  .action-group{display:grid;grid-template-columns:1fr 1fr}
+}
+
+@media(max-width:420px){
+  .action-group{grid-template-columns:1fr}
+}
 </style>
-<div class="prod-wrap" style="max-width:1280px">
-  <div class="prod-actions"><a class="btn-light" href="{% url 'production_material_stock' %}">← Material Stock</a></div>
 
-  {% if is_multi_create %}
-  <form method="post" id="multi-receipt-form">
-    {% csrf_token %}
-    <div class="prod-card">
-      {% if header_form.errors %}<div class="error-box">{{ header_form.errors }}</div>{% endif %}
-      <div class="header-grid">
-        <div class="field"><label>{{ header_form.received_date.label }}</label>{{ header_form.received_date }}</div>
-        <div class="field"><label>{{ header_form.supplier.label }}</label>{{ header_form.supplier }}</div>
+<div class="fabric-page">
+  <div class="fabric-shell">
+    <main class="fabric-main">
+      <div class="page-top">
+        <div class="page-title">
+          <h1>{{ page_title_text|default:"Fabric Stock In" }}</h1>
+          <p>Receive multiple fabric types and keep every physical roll separate.</p>
+        </div>
+        <a class="btn-light" href="{% url 'production_material_stock' %}">← Material Stock</a>
       </div>
-    </div>
 
-    <div class="prod-card" style="margin-top:14px">
-      <div class="line-title">
-        <div><h2 style="margin:0">Fabric Types</h2><p style="margin:4px 0 0;color:var(--muted)">Add each fabric and colour received from this supplier.</p></div>
-        <button type="button" class="btn-light" id="add-row">+ Add More</button>
-      </div>
-      {{ line_formset.management_form }}
-      {% if line_formset.non_form_errors %}<div class="error-box">{{ line_formset.non_form_errors }}</div>{% endif %}
-      <div id="line-container">
-        {% for line_form in line_formset %}
-        <div class="line-card receipt-line">
-          <div class="line-title"><span class="line-number">{{ forloop.counter }}</span><button type="button" class="remove-row">Remove</button></div>
-          {% if line_form.errors %}<div class="error-box" style="margin-top:10px">{{ line_form.errors }}</div>{% endif %}
-          <div class="line-grid">
-            <div class="field wide"><label>Fabric Name</label>{{ line_form.fabric_name }}</div>
-            <div class="field"><label>Colour</label>{{ line_form.color }}</div>
-            <div class="field"><label>Roll Count</label>{{ line_form.roll_count }}</div>
-            {% if can_view_cost %}
-            <div class="field"><label>Goods Cost</label>{{ line_form.total_goods_cost }}</div>
-            <div class="field"><label>Shipping</label>{{ line_form.shipping_cost }}</div>
-            <div class="field"><label>Extra Cost</label>{{ line_form.extra_cost }}</div>
-            {% endif %}
-            <div class="field wide"><label>Note</label>{{ line_form.note }}</div>
-            <div style="display:none">{{ line_form.DELETE }}</div>
+      {% if is_multi_create %}
+      <form method="post" id="multi-receipt-form">
+        {% csrf_token %}
+
+        <section class="panel">
+          <div class="panel-head">
+            <div class="panel-title">
+              <span class="panel-icon">⌁</span>
+              <div>
+                <h2>Batch information</h2>
+                <small>Shared supplier and received date for all fabric types</small>
+              </div>
+            </div>
+          </div>
+
+          {% if header_form.errors %}
+          <div class="error-box">{{ header_form.errors }}</div>
+          {% endif %}
+
+          <div class="header-grid">
+            <div class="field">
+              <label>{{ header_form.received_date.label }}</label>
+              {{ header_form.received_date }}
+            </div>
+            <div class="field">
+              <label>{{ header_form.supplier.label }}</label>
+              {{ header_form.supplier }}
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div class="panel-title">
+              <span class="panel-icon">▦</span>
+              <div>
+                <h2>Fabric types</h2>
+                <small>Add each fabric, colour, roll count and cost in one batch</small>
+              </div>
+            </div>
+            <button type="button" class="btn-light" id="add-row">＋ Add Fabric</button>
+          </div>
+
+          {{ line_formset.management_form }}
+
+          {% if line_formset.non_form_errors %}
+          <div class="error-box">{{ line_formset.non_form_errors }}</div>
+          {% endif %}
+
+          <div class="fabric-lines" id="line-container">
+            {% for line_form in line_formset %}
+            <div class="fabric-line receipt-line">
+              <div class="fabric-line-head">
+                <span class="line-number">{{ forloop.counter }}</span>
+                <button type="button" class="remove-row">Remove</button>
+              </div>
+
+              {% if line_form.errors %}
+              <div class="error-box">{{ line_form.errors }}</div>
+              {% endif %}
+
+              <div class="fabric-line-grid {% if not can_view_cost %}no-cost{% endif %}">
+                <div class="field">
+                  <label>Fabric Name</label>
+                  {{ line_form.fabric_name }}
+                </div>
+
+                <div class="field">
+                  <label>Colour</label>
+                  {{ line_form.color }}
+                </div>
+
+                <div class="field">
+                  <label>Roll Count</label>
+                  {{ line_form.roll_count }}
+                </div>
+
+                {% if can_view_cost %}
+                <div class="field cost-field">
+                  <label>Goods Cost</label>
+                  {{ line_form.total_goods_cost }}
+                </div>
+
+                <div class="field cost-field">
+                  <label>Shipping</label>
+                  {{ line_form.shipping_cost }}
+                </div>
+
+                <div class="field cost-field">
+                  <label>Extra Cost</label>
+                  {{ line_form.extra_cost }}
+                </div>
+                {% endif %}
+
+                <div class="field note-field">
+                  <label>Note</label>
+                  {{ line_form.note }}
+                </div>
+
+                <div style="display:none">{{ line_form.DELETE }}</div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </section>
+
+        <template id="empty-row-template">
+          <div class="fabric-line receipt-line">
+            <div class="fabric-line-head">
+              <span class="line-number"></span>
+              <button type="button" class="remove-row">Remove</button>
+            </div>
+
+            <div class="fabric-line-grid {% if not can_view_cost %}no-cost{% endif %}">
+              <div class="field">
+                <label>Fabric Name</label>
+                {{ line_formset.empty_form.fabric_name }}
+              </div>
+
+              <div class="field">
+                <label>Colour</label>
+                {{ line_formset.empty_form.color }}
+              </div>
+
+              <div class="field">
+                <label>Roll Count</label>
+                {{ line_formset.empty_form.roll_count }}
+              </div>
+
+              {% if can_view_cost %}
+              <div class="field cost-field">
+                <label>Goods Cost</label>
+                {{ line_formset.empty_form.total_goods_cost }}
+              </div>
+
+              <div class="field cost-field">
+                <label>Shipping</label>
+                {{ line_formset.empty_form.shipping_cost }}
+              </div>
+
+              <div class="field cost-field">
+                <label>Extra Cost</label>
+                {{ line_formset.empty_form.extra_cost }}
+              </div>
+              {% endif %}
+
+              <div class="field note-field">
+                <label>Note</label>
+                {{ line_formset.empty_form.note }}
+              </div>
+
+              <div style="display:none">{{ line_formset.empty_form.DELETE }}</div>
+            </div>
+          </div>
+        </template>
+
+        {% if not can_view_cost %}
+        <div class="cost-protected">
+          <strong>Cost is protected.</strong>
+          You can record fabric, colour and physical rolls. Purchase cost is available only to authorised managers or accounting.
+        </div>
+        {% endif %}
+
+        <div class="form-actions">
+          <div class="action-group">
+            <button type="button" class="btn-light" id="add-row-bottom">＋ Add Fabric</button>
+            <a class="btn-light" href="{% url 'production_material_stock' %}">Cancel</a>
+          </div>
+
+          <div class="action-group">
+            <span style="font-size:10px;color:var(--fabric-muted)">
+              <strong id="fabric-row-count">0</strong> fabric types
+            </span>
+            <button type="submit" class="btn-primary">Save All Fabric Receipts</button>
           </div>
         </div>
-        {% endfor %}
-      </div>
-      <template id="empty-row-template">
-        <div class="line-card receipt-line">
-          <div class="line-title"><span class="line-number"></span><button type="button" class="remove-row">Remove</button></div>
-          <div class="line-grid">
-            <div class="field wide"><label>Fabric Name</label>{{ line_formset.empty_form.fabric_name }}</div>
-            <div class="field"><label>Colour</label>{{ line_formset.empty_form.color }}</div>
-            <div class="field"><label>Roll Count</label>{{ line_formset.empty_form.roll_count }}</div>
-            {% if can_view_cost %}
-            <div class="field"><label>Goods Cost</label>{{ line_formset.empty_form.total_goods_cost }}</div>
-            <div class="field"><label>Shipping</label>{{ line_formset.empty_form.shipping_cost }}</div>
-            <div class="field"><label>Extra Cost</label>{{ line_formset.empty_form.extra_cost }}</div>
-            {% endif %}
-            <div class="field wide"><label>Note</label>{{ line_formset.empty_form.note }}</div>
-            <div style="display:none">{{ line_formset.empty_form.DELETE }}</div>
+      </form>
+
+      {% else %}
+      <form method="post">
+        {% csrf_token %}
+
+        <section class="panel">
+          <div class="panel-head">
+            <div class="panel-title">
+              <span class="panel-icon">🧵</span>
+              <div>
+                <h2>Fabric receipt</h2>
+                <small>Record one fabric receipt</small>
+              </div>
+            </div>
+          </div>
+
+          {% if form.errors %}
+          <div class="error-box">{{ form.errors }}</div>
+          {% endif %}
+
+          <div class="header-grid">
+            {% for field in form %}
+            <div class="field {% if field.name == 'note' %}full{% endif %}">
+              <label>{{ field.label }}</label>
+              {{ field }}
+              {% if field.help_text %}
+              <small>{{ field.help_text }}</small>
+              {% endif %}
+            </div>
+            {% endfor %}
+          </div>
+        </section>
+
+        <div class="form-actions">
+          <div class="action-group">
+            <a class="btn-light" href="{% url 'production_material_stock' %}">Cancel</a>
+          </div>
+          <div class="action-group">
+            <button type="submit" class="btn-primary">Save Fabric Receipt</button>
           </div>
         </div>
-      </template>
-      <div class="prod-actions" style="margin-top:18px"><button class="btn-primary">Save All Fabric Receipts</button></div>
-    </div>
-  </form>
-  {% else %}
-  <div class="prod-card"><form method="post">{% csrf_token %}{% if form.errors %}<div class="error-box">{{ form.errors }}</div>{% endif %}<div class="header-grid">{% for field in form %}<div class="field {% if field.name == 'note' %}full{% endif %}"><label>{{ field.label }}</label>{{ field }}{% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}</div>{% endfor %}</div><div class="prod-actions" style="margin-top:18px"><button class="btn-primary">Save Fabric Receipt</button></div></form></div>
-  {% endif %}
+      </form>
+      {% endif %}
+    </main>
 
-  {% if not can_view_cost %}<div class="prod-card cost-protected"><strong>Cost is protected.</strong><p style="margin:5px 0 0;color:var(--muted)">You can record physical rolls, fabric and colour. Purchase cost is only available to authorised managers/accounting.</p></div>{% endif %}
+    <aside class="fabric-side">
+      <div class="fabric-side-card">
+        <h3 class="side-title">Live batch summary</h3>
+
+        <div class="summary-grid">
+          <div class="summary-box">
+            <span>Fabric types</span>
+            <strong id="summary-rows">0</strong>
+          </div>
+          <div class="summary-box">
+            <span>Total rolls</span>
+            <strong id="summary-rolls">0</strong>
+          </div>
+        </div>
+
+        <div class="side-lines">
+          <div class="side-line">
+            <span>Mode</span>
+            <strong>{% if is_multi_create %}Batch{% else %}Single{% endif %}</strong>
+          </div>
+          <div class="side-line">
+            <span>Cost access</span>
+            <strong>{% if can_view_cost %}Allowed{% else %}Protected{% endif %}</strong>
+          </div>
+        </div>
+      </div>
+
+      <div class="fabric-side-card">
+        <h3 class="side-title">How it works</h3>
+        <div class="help">
+          Each fabric line creates its own receipt. Roll count keeps every physical fabric roll separate so it can continue to work correctly in Production.
+        </div>
+      </div>
+    </aside>
+  </div>
 </div>
+
 {% if is_multi_create %}
 <script>
 (function(){
-  const container=document.getElementById('line-container');
-  const total=document.getElementById('id_items-TOTAL_FORMS');
-  const template=document.getElementById('empty-row-template');
-  function renumber(){
-    [...container.querySelectorAll('.receipt-line')].forEach((row,index)=>{
-      row.querySelector('.line-number').textContent=index+1;
-    });
+  const container = document.getElementById('line-container');
+  const total = document.getElementById('id_items-TOTAL_FORMS');
+  const template = document.getElementById('empty-row-template');
+  const addTop = document.getElementById('add-row');
+  const addBottom = document.getElementById('add-row-bottom');
+
+  if(!container || !total || !template) return;
+
+  function visibleRows(){
+    return [...container.querySelectorAll('.receipt-line')]
+      .filter(row => row.style.display !== 'none');
   }
+
+  function updateSummary(){
+    const rows = visibleRows();
+    let rolls = 0;
+
+    rows.forEach(row => {
+      const input = row.querySelector('input[name$="-roll_count"]');
+      const value = parseFloat(input?.value || 0);
+      if(Number.isFinite(value)) rolls += value;
+    });
+
+    document.getElementById('fabric-row-count').textContent = rows.length;
+    document.getElementById('summary-rows').textContent = rows.length;
+    document.getElementById('summary-rolls').textContent =
+      Number.isInteger(rolls) ? rolls : rolls.toFixed(2);
+  }
+
+  function renumber(){
+    visibleRows().forEach((row,index) => {
+      const number = row.querySelector('.line-number');
+      if(number) number.textContent = index + 1;
+    });
+    updateSummary();
+  }
+
+  function clearRow(row){
+    row.querySelectorAll('input:not([type=hidden]),select,textarea').forEach(el => {
+      if(el.tagName === 'SELECT'){
+        el.selectedIndex = 0;
+      }else if(el.name.includes('roll_count')){
+        el.value = 1;
+      }else if(el.type === 'number'){
+        el.value = 0;
+      }else{
+        el.value = '';
+      }
+    });
+
+    const del = row.querySelector('input[name$="-DELETE"]');
+    if(del) del.checked = false;
+  }
+
   function bindRemove(row){
-    row.querySelector('.remove-row').addEventListener('click',()=>{
-      const rows=container.querySelectorAll('.receipt-line');
-      if(rows.length===1){
-        row.querySelectorAll('input:not([type=hidden]),select,textarea').forEach(el=>{if(el.tagName==='SELECT')el.selectedIndex=0;else if(el.name.includes('roll_count'))el.value=1;else if(el.type==='number')el.value=0;else el.value='';});
+    const button = row.querySelector('.remove-row');
+    if(!button || button.dataset.bound === '1') return;
+
+    button.dataset.bound = '1';
+    button.addEventListener('click', () => {
+      const rows = visibleRows();
+
+      if(rows.length === 1){
+        clearRow(row);
+        updateSummary();
         return;
       }
-      const del=row.querySelector('input[name$="-DELETE"]');
-      if(del && row.dataset.existing==='1'){del.checked=true;row.style.display='none';}else{row.remove();}
+
+      const del = row.querySelector('input[name$="-DELETE"]');
+      const savedId = row.querySelector('input[name$="-id"]')?.value;
+
+      if(del && savedId){
+        del.checked = true;
+        row.style.display = 'none';
+      }else{
+        row.remove();
+      }
+
       renumber();
     });
   }
-  container.querySelectorAll('.receipt-line').forEach(bindRemove);
-  document.getElementById('add-row').addEventListener('click',()=>{
-    const index=parseInt(total.value,10);
-    const wrapper=document.createElement('div');
-    wrapper.innerHTML=template.innerHTML.replaceAll('__prefix__',index).trim();
-    const row=wrapper.firstElementChild;
+
+  function addRow(){
+    const index = parseInt(total.value,10);
+    const wrapper = document.createElement('div');
+
+    wrapper.innerHTML = template.innerHTML
+      .replaceAll('__prefix__',index)
+      .trim();
+
+    const row = wrapper.firstElementChild;
+    if(!row) return;
+
     container.appendChild(row);
-    total.value=index+1;
+    total.value = index + 1;
+
     bindRemove(row);
     renumber();
-    row.querySelector('input,select')?.focus();
-  });
+    row.querySelector('input,select,textarea')?.focus();
+  }
+
+  container.querySelectorAll('.receipt-line').forEach(bindRemove);
+  container.addEventListener('input',updateSummary);
+  container.addEventListener('change',updateSummary);
+
+  addTop?.addEventListener('click',addRow);
+  addBottom?.addEventListener('click',addRow);
+
   renumber();
 })();
 </script>

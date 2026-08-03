@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
-{% block page_title %}Material Usage{% endblock %}
-{% block page_subtitle %}Deduct material stock and view usage history{% endblock %}
+{% block page_title %}Stock Out{% endblock %}
+{% block page_subtitle %}Record printing-material usage and other approved material deductions{% endblock %}
 
 {% block content %}
 <style>
@@ -226,12 +226,12 @@
 
 <div class="material-wrap">
   <div class="notice-box">
-    This page is for MATERIAL USE only. Use it when staff opens film roll, ink bottle, powder pack, tube, damper, or motor.
-    Do not use this page to fix cloth stock.
+    Use this page when printing material leaves stock, such as film, ink, powder, cleaning parts, samples, waste, or internal use.
+    Cloth corrections must still be completed from Inventory List / Stock Count.
   </div>
 
   <div class="card">
-    <h2 class="section-title">Create Material Usage</h2>
+    <h2 class="section-title">Create Stock Out</h2>
 
     <div class="material-grid">
       {% for row in material_rows %}
@@ -291,7 +291,7 @@
   </div>
 
   <div class="filter-card">
-    <h2 class="section-title">Material Usage Records</h2>
+    <h2 class="section-title">Stock Out Records</h2>
 
     <form method="get">
       <div class="filter-grid">
