@@ -43,26 +43,43 @@ def create_fabric_rolls(receipt):
 
 @transaction.atomic
 def confirm_cutting(project, user=None):
-    project = ProductionProject.objects.select_for_update().get(pk=project.pk)
+    project = ProductionProject.objects.select_for_update().prefetch_related("project_colors").get(pk=project.pk)
     if project.status in [ProductionProject.STATUS_SENT, ProductionProject.STATUS_PARTIAL_RETURN, ProductionProject.STATUS_COMPLETED]:
         raise ValidationError("Cutting is already confirmed for this project.")
 
+    colors = list(project.project_colors.select_related("color").all())
+    if not colors:
+        raise ValidationError("Add at least one colour to the project.")
+    if project.cut_total <= 0:
+        raise ValidationError("Enter the actual cut quantity by colour and size first.")
+
     usages = list(
-        project.roll_usages.select_related("roll__receipt", "roll__receipt__color").select_for_update()
+        project.roll_usages.select_related(
+            "project_color__color", "roll__receipt", "roll__receipt__color", "roll__receipt__fabric_type"
+        ).select_for_update()
     )
     if not usages:
-        raise ValidationError("Add at least one fabric roll before confirming cutting.")
-    if project.cut_total <= 0:
-        raise ValidationError("Enter the actual cut quantity by size first.")
+        raise ValidationError("Reserve at least one fabric roll before confirming cutting.")
+
+    usage_color_ids = {u.project_color_id for u in usages if u.project_color_id}
+    cut_color_ids = set(project.cut_sizes.filter(cut_qty__gt=0).values_list("project_color_id", flat=True))
+    missing = cut_color_ids - usage_color_ids
+    if missing:
+        names = list(project.project_colors.filter(id__in=missing).values_list("color__name", flat=True))
+        raise ValidationError("Reserve fabric rolls for: " + ", ".join(names))
 
     for usage in usages:
         if usage.applied:
             continue
-        roll = FabricRoll.objects.select_for_update().get(pk=usage.roll_id)
+        if not usage.project_color_id:
+            raise ValidationError("A reserved roll is missing its project colour.")
+        roll = FabricRoll.objects.select_for_update().select_related("receipt").get(pk=usage.roll_id)
         issued = Decimal(usage.issued_qty or 0)
         returned = Decimal(usage.returned_qty or 0)
-        if roll.receipt.color_id != project.color_id:
-            raise ValidationError(f"{roll.roll_code} has the wrong color.")
+        if roll.receipt.color_id != usage.project_color.color_id:
+            raise ValidationError(f"{roll.roll_code} has the wrong colour.")
+        if project.fabric_type_id and roll.receipt.fabric_type_id != project.fabric_type_id:
+            raise ValidationError(f"{roll.roll_code} has the wrong fabric type.")
         if issued > Decimal(roll.remaining_qty or 0):
             raise ValidationError(f"{roll.roll_code} does not have enough remaining quantity.")
         if returned > issued:
@@ -72,7 +89,6 @@ def confirm_cutting(project, user=None):
         after = before - issued + returned
         roll.remaining_qty = after
         roll.save(update_fields=["remaining_qty", "status"])
-
         usage.roll_qty_before = before
         usage.roll_qty_after = after
         usage.applied = True
@@ -144,10 +160,10 @@ def sync_sewing_payables(job):
         payable, _ = ProductionPayable.objects.get_or_create(
             sewing_return=sewing_return,
             defaults={
-                "payable_type": ProductionPayable.TYPE_SEWER,
+                "payable_type": (ProductionPayable.TYPE_STAFF if job.worker_type == SewingJob.WORKER_STAFF else ProductionPayable.TYPE_SEWER),
                 "project": job.project,
                 "sewing_job": job,
-                "payee_name": job.partner.name,
+                "payee_name": job.payee_name,
                 "description": f"Sewing return {sewing_return.return_no}",
                 "amount": amount,
                 "created_by": sewing_return.stocked_by or sewing_return.created_by,
@@ -155,7 +171,7 @@ def sync_sewing_payables(job):
         )
         if payable.paid_amount <= 0:
             payable.amount = amount
-            payable.payee_name = job.partner.name
+            payable.payee_name = job.payee_name
             payable.save(update_fields=["amount", "payee_name"])
 
 
@@ -163,7 +179,7 @@ def sync_sewing_payables(job):
 def confirm_sewing_return(sewing_return, user=None):
     sewing_return = (
         SewingReturn.objects.select_for_update()
-        .select_related("job__project__finished_item", "job__project__color", "job__partner")
+        .select_related("job__project__finished_item", "job__project_color__color", "job__partner")
         .get(pk=sewing_return.pk)
     )
     if sewing_return.status == SewingReturn.STATUS_STOCKED:
@@ -185,7 +201,7 @@ def confirm_sewing_return(sewing_return, user=None):
     batch_no = f"PROD-{sewing_return.return_no}"
     batch = InventoryBatch.objects.create(
         batch_no=batch_no,
-        supplier=job.partner.name,
+        supplier=job.payee_name,
         received_date=sewing_return.return_date,
         total_goods_cost=ZERO,
         shipping_cost=ZERO,
@@ -203,7 +219,7 @@ def confirm_sewing_return(sewing_return, user=None):
         batch_item = InventoryBatchItem.objects.create(
             batch=batch,
             item=job.project.finished_item,
-            color=job.project.color,
+            color=job.project_color.color if job.project_color_id else job.project.color,
             size=line.size,
             qty_received=good_qty,
             qty_remaining=good_qty,

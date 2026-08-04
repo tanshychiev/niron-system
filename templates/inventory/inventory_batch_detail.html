@@ -4,75 +4,716 @@
 {% block page_subtitle %}Batch detail and stock rows{% endblock %}
 
 {% block content %}
-<div class="top-actions">
-  <a href="{% url 'inventory_batch_edit' batch.id %}" class="btn-primary">Edit Batch</a>
-  <a href="{% url 'inventory_batch_history' batch.id %}" class="btn-light">View History</a>
-  <a href="{% url 'inventory_batch_delete' batch.id %}" class="btn-danger">Delete Batch</a>
-  <a href="{% url 'inventory_list' %}" class="btn-light">Back to Inventory</a>
-</div>
+<style>
+.batch-wrap{
+  max-width:1380px;
+  margin:0 auto;
+}
 
-<div class="grid-2">
-  <div class="info-card">
-    <h3 class="card-title">Batch Info</h3>
-    <p><strong>Batch No:</strong> {{ batch.batch_no }}</p>
-    <p><strong>Supplier:</strong> {% if batch.supplier_ref %}<a href="{% url 'production_supplier_detail' batch.supplier_ref.id %}">{{ batch.supplier_ref.name }}</a>{% else %}{{ batch.supplier|default:"-" }}{% endif %}</p>
-    <p><strong>Received Date:</strong> {{ batch.received_date|date:"d/m/Y" }}</p>
-    <p><strong>Status:</strong> {{ batch.get_status_display }}</p>
-    <p><strong>Created By:</strong> {% if batch.created_by %}{{ batch.created_by.username }}{% else %}-{% endif %}</p>
-    <p><strong>Updated By:</strong> {% if batch.updated_by %}{{ batch.updated_by.username }}{% else %}-{% endif %}</p>
-    <p><strong>Note:</strong> {{ batch.note|default:"-" }}</p>
+.batch-toolbar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  flex-wrap:wrap;
+  margin-bottom:14px;
+}
+
+.batch-toolbar-left,
+.batch-toolbar-right{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+}
+
+.batch-hero{
+  position:relative;
+  overflow:hidden;
+  padding:22px;
+  margin-bottom:14px;
+  border:1px solid var(--line);
+  border-radius:22px;
+  background:
+    radial-gradient(circle at 90% 15%, rgba(255,184,0,.18), transparent 28%),
+    linear-gradient(145deg,#fff,#fff8e9);
+  box-shadow:var(--shadow);
+}
+
+.batch-hero::after{
+  content:"";
+  position:absolute;
+  width:180px;
+  height:180px;
+  right:-70px;
+  bottom:-95px;
+  border:18px solid rgba(255,181,0,.12);
+  border-radius:50%;
+}
+
+.batch-hero-top{
+  position:relative;
+  z-index:1;
+  display:flex;
+  justify-content:space-between;
+  gap:16px;
+  align-items:flex-start;
+  flex-wrap:wrap;
+}
+
+.batch-title{
+  margin:0;
+  font-size:30px;
+  line-height:1.1;
+}
+
+.batch-subtitle{
+  margin:7px 0 0;
+  color:var(--muted);
+}
+
+.status-pill{
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  padding:8px 12px;
+  border-radius:999px;
+  font-size:11px;
+  font-weight:900;
+  background:#ecfdf3;
+  color:#067647;
+  border:1px solid #abefc6;
+}
+
+.status-pill.deleted{
+  background:#fef3f2;
+  color:#b42318;
+  border-color:#fecdca;
+}
+
+.batch-metrics{
+  position:relative;
+  z-index:1;
+  display:grid;
+  grid-template-columns:repeat(4,minmax(120px,1fr));
+  gap:10px;
+  margin-top:18px;
+}
+
+.metric-card{
+  padding:14px;
+  border:1px solid rgba(226,213,185,.9);
+  border-radius:16px;
+  background:rgba(255,255,255,.78);
+  backdrop-filter:blur(8px);
+}
+
+.metric-card span{
+  display:block;
+  color:var(--muted);
+  font-size:9px;
+  font-weight:900;
+  text-transform:uppercase;
+}
+
+.metric-card strong{
+  display:block;
+  margin-top:5px;
+  font-size:20px;
+}
+
+.batch-grid{
+  display:grid;
+  grid-template-columns:minmax(0,1.25fr) minmax(300px,.75fr);
+  gap:14px;
+  margin-bottom:14px;
+}
+
+.card{
+  padding:18px;
+  border:1px solid var(--line);
+  border-radius:20px;
+  background:#fff;
+  box-shadow:var(--shadow);
+}
+
+.card-head{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  align-items:center;
+  margin-bottom:14px;
+}
+
+.card-head h3{
+  margin:0;
+  font-size:18px;
+}
+
+.detail-list{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+
+.detail-item{
+  padding:12px;
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:#fafafa;
+  min-width:0;
+}
+
+.detail-item.full{
+  grid-column:1/-1;
+}
+
+.detail-item span{
+  display:block;
+  color:var(--muted);
+  font-size:9px;
+  font-weight:900;
+  text-transform:uppercase;
+}
+
+.detail-item strong,
+.detail-item a{
+  display:block;
+  margin-top:5px;
+  font-size:13px;
+  word-break:break-word;
+}
+
+.note-box{
+  min-height:94px;
+  white-space:pre-wrap;
+}
+
+.summary-stack{
+  display:grid;
+  gap:10px;
+}
+
+.summary-item{
+  display:flex;
+  justify-content:space-between;
+  gap:14px;
+  align-items:center;
+  padding:13px 14px;
+  border-radius:14px;
+  background:#f7f7f8;
+}
+
+.summary-item span{
+  color:var(--muted);
+  font-size:11px;
+}
+
+.summary-item strong{
+  font-size:13px;
+  text-align:right;
+}
+
+.rows-card{
+  padding:0;
+  overflow:hidden;
+}
+
+.rows-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  flex-wrap:wrap;
+  padding:18px;
+  border-bottom:1px solid var(--line);
+}
+
+.rows-head h2{
+  margin:0;
+  font-size:20px;
+}
+
+.rows-count{
+  padding:6px 10px;
+  border-radius:999px;
+  background:#fff3d6;
+  color:#8a5a10;
+  font-size:10px;
+  font-weight:900;
+}
+
+.table-wrap{
+  overflow:auto;
+}
+
+.batch-table{
+  width:100%;
+  min-width:920px;
+  border-collapse:collapse;
+}
+
+.batch-table th,
+.batch-table td{
+  padding:12px 14px;
+  border-bottom:1px solid var(--line);
+  text-align:left;
+  vertical-align:middle;
+  font-size:12px;
+}
+
+.batch-table th{
+  color:var(--muted);
+  font-size:9px;
+  font-weight:900;
+  text-transform:uppercase;
+  background:#fcfcfc;
+}
+
+.item-cell{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+
+.item-avatar{
+  display:grid;
+  place-items:center;
+  width:38px;
+  height:38px;
+  flex:0 0 38px;
+  border-radius:12px;
+  background:#fff5dc;
+  font-size:11px;
+  font-weight:900;
+  color:#8a5a10;
+}
+
+.item-meta strong,
+.item-meta span{
+  display:block;
+}
+
+.item-meta span{
+  margin-top:2px;
+  color:var(--muted);
+  font-size:10px;
+}
+
+.qty-badge{
+  display:inline-flex;
+  min-width:56px;
+  justify-content:center;
+  padding:7px 9px;
+  border-radius:10px;
+  font-weight:900;
+  background:#f7f7f8;
+}
+
+.qty-badge.remaining{
+  background:#ecfdf3;
+  color:#067647;
+}
+
+.qty-badge.used{
+  background:#fff3d6;
+  color:#8a5a10;
+}
+
+.mobile-row-list{
+  display:none;
+  padding:12px;
+  gap:10px;
+}
+
+.mobile-row-card{
+  padding:14px;
+  border:1px solid var(--line);
+  border-radius:16px;
+  background:#fff;
+}
+
+.mobile-row-top{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  align-items:flex-start;
+  margin-bottom:12px;
+}
+
+.mobile-row-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+}
+
+.mobile-stat{
+  padding:10px;
+  border-radius:12px;
+  background:#f7f7f8;
+}
+
+.mobile-stat span{
+  display:block;
+  color:var(--muted);
+  font-size:9px;
+  font-weight:900;
+  text-transform:uppercase;
+}
+
+.mobile-stat strong{
+  display:block;
+  margin-top:4px;
+  font-size:13px;
+}
+
+.mobile-actions{
+  margin-top:12px;
+}
+
+.mobile-actions .btn-light{
+  display:flex;
+  width:100%;
+  justify-content:center;
+}
+
+.empty-state{
+  padding:32px;
+  text-align:center;
+  color:var(--muted);
+}
+
+@media(max-width:980px){
+  .batch-grid{
+    grid-template-columns:1fr;
+  }
+
+  .batch-metrics{
+    grid-template-columns:1fr 1fr;
+  }
+}
+
+@media(max-width:720px){
+  .batch-wrap{
+    padding:0 2px;
+  }
+
+  .batch-toolbar{
+    position:sticky;
+    top:0;
+    z-index:20;
+    padding:10px;
+    margin:0 -2px 12px;
+    border-bottom:1px solid var(--line);
+    background:rgba(250,247,239,.94);
+    backdrop-filter:blur(10px);
+  }
+
+  .batch-toolbar-left,
+  .batch-toolbar-right{
+    width:100%;
+  }
+
+  .batch-toolbar a{
+    flex:1;
+    text-align:center;
+  }
+
+  .batch-hero{
+    padding:18px;
+    border-radius:18px;
+  }
+
+  .batch-title{
+    font-size:24px;
+  }
+
+  .batch-metrics{
+    grid-template-columns:1fr 1fr;
+  }
+
+  .detail-list{
+    grid-template-columns:1fr;
+  }
+
+  .detail-item.full{
+    grid-column:auto;
+  }
+
+  .table-wrap{
+    display:none;
+  }
+
+  .mobile-row-list{
+    display:grid;
+  }
+}
+
+@media(max-width:480px){
+  .batch-metrics{
+    grid-template-columns:1fr;
+  }
+
+  .batch-toolbar a{
+    flex:1 1 46%;
+  }
+
+  .card{
+    padding:14px;
+    border-radius:16px;
+  }
+
+  .rows-head{
+    padding:14px;
+  }
+
+  .mobile-row-grid{
+    grid-template-columns:1fr;
+  }
+}
+</style>
+
+<div class="batch-wrap">
+
+  <div class="batch-toolbar">
+    <div class="batch-toolbar-left">
+      <a href="{% url 'inventory_list' %}" class="btn-light">← Inventory</a>
+      <a href="{% url 'inventory_batch_history' batch.id %}" class="btn-light">History</a>
+    </div>
+
+    <div class="batch-toolbar-right">
+      <a href="{% url 'inventory_batch_edit' batch.id %}" class="btn-primary">Edit Batch</a>
+      <a href="{% url 'inventory_batch_delete' batch.id %}" class="btn-danger">Delete</a>
+    </div>
   </div>
 
-  <div class="info-card">
-    <h3 class="card-title">Summary</h3>
-    <p><strong>Total Cloth:</strong> {{ batch.total_cloth|floatformat:0 }}</p>
-    <p><strong>Received At:</strong> {{ batch.created_at|date:"d/m/Y H:i" }}</p>
-    <p><strong>Last Updated:</strong> {{ batch.updated_at|date:"d/m/Y H:i" }}</p>
-    {% if batch.is_deleted %}
-      <p><strong>Deleted:</strong> Yes</p>
-      <p><strong>Deleted At:</strong> {{ batch.deleted_at|date:"d/m/Y H:i" }}</p>
-    {% endif %}
-  </div>
-</div>
+  <section class="batch-hero">
+    <div class="batch-hero-top">
+      <div>
+        <h1 class="batch-title">{{ batch.batch_no }}</h1>
+        <p class="batch-subtitle">
+          {% if batch.supplier_ref %}
+            {{ batch.supplier_ref.name }}
+          {% else %}
+            {{ batch.supplier|default:"No supplier" }}
+          {% endif %}
+          · Received {{ batch.received_date|date:"d M Y" }}
+        </p>
+      </div>
 
-<div class="table-card">
-  <div class="section-head">
-    <h2>Batch Rows</h2>
+      <div class="status-pill {% if batch.is_deleted %}deleted{% endif %}">
+        {% if batch.is_deleted %}
+          Deleted
+        {% else %}
+          {{ batch.get_status_display }}
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="batch-metrics">
+      <div class="metric-card">
+        <span>Total Received</span>
+        <strong>{{ batch.total_cloth|floatformat:0 }}</strong>
+      </div>
+
+      <div class="metric-card">
+        <span>Batch Rows</span>
+        <strong>{{ batch.items.count }}</strong>
+      </div>
+
+      <div class="metric-card">
+        <span>Created By</span>
+        <strong>{% if batch.created_by %}{{ batch.created_by.username }}{% else %}-{% endif %}</strong>
+      </div>
+
+      <div class="metric-card">
+        <span>Last Updated</span>
+        <strong>{{ batch.updated_at|date:"d M Y" }}</strong>
+      </div>
+    </div>
+  </section>
+
+  <div class="batch-grid">
+    <section class="card">
+      <div class="card-head">
+        <h3>Batch Information</h3>
+      </div>
+
+      <div class="detail-list">
+        <div class="detail-item">
+          <span>Batch Number</span>
+          <strong>{{ batch.batch_no }}</strong>
+        </div>
+
+        <div class="detail-item">
+          <span>Supplier</span>
+          {% if batch.supplier_ref %}
+            <a href="{% url 'production_supplier_detail' batch.supplier_ref.id %}">
+              {{ batch.supplier_ref.name }}
+            </a>
+          {% else %}
+            <strong>{{ batch.supplier|default:"-" }}</strong>
+          {% endif %}
+        </div>
+
+        <div class="detail-item">
+          <span>Received Date</span>
+          <strong>{{ batch.received_date|date:"d M Y" }}</strong>
+        </div>
+
+        <div class="detail-item">
+          <span>Status</span>
+          <strong>{{ batch.get_status_display }}</strong>
+        </div>
+
+        <div class="detail-item">
+          <span>Created By</span>
+          <strong>{% if batch.created_by %}{{ batch.created_by.username }}{% else %}-{% endif %}</strong>
+        </div>
+
+        <div class="detail-item">
+          <span>Updated By</span>
+          <strong>{% if batch.updated_by %}{{ batch.updated_by.username }}{% else %}-{% endif %}</strong>
+        </div>
+
+        <div class="detail-item full">
+          <span>Note</span>
+          <strong class="note-box">{{ batch.note|default:"-" }}</strong>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h3>Summary</h3>
+      </div>
+
+      <div class="summary-stack">
+        <div class="summary-item">
+          <span>Total Cloth / Quantity</span>
+          <strong>{{ batch.total_cloth|floatformat:0 }}</strong>
+        </div>
+
+        <div class="summary-item">
+          <span>Received At</span>
+          <strong>{{ batch.created_at|date:"d M Y H:i" }}</strong>
+        </div>
+
+        <div class="summary-item">
+          <span>Last Updated</span>
+          <strong>{{ batch.updated_at|date:"d M Y H:i" }}</strong>
+        </div>
+
+        {% if batch.is_deleted %}
+          <div class="summary-item">
+            <span>Deleted</span>
+            <strong>Yes</strong>
+          </div>
+
+          <div class="summary-item">
+            <span>Deleted At</span>
+            <strong>{{ batch.deleted_at|date:"d M Y H:i" }}</strong>
+          </div>
+        {% endif %}
+      </div>
+    </section>
   </div>
 
-  <table class="app-table">
-    <thead>
-      <tr>
-        <th>Item Code</th>
-        <th>Item Name</th>
-        <th>Color</th>
-        <th>Size</th>
-        <th>Qty Received</th>
-        <th>Qty Remaining</th>
-        <th>Qty Used</th>
-        <th>Action</th>
-      </tr>
-    </thead>
-    <tbody>
+  <section class="card rows-card">
+    <div class="rows-head">
+      <h2>Batch Rows</h2>
+      <span class="rows-count">{{ batch.items.count }} row{{ batch.items.count|pluralize }}</span>
+    </div>
+
+    <div class="table-wrap">
+      <table class="batch-table">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Color</th>
+            <th>Size</th>
+            <th>Received</th>
+            <th>Remaining</th>
+            <th>Used</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {% for row in batch.items.all %}
+            <tr>
+              <td>
+                <div class="item-cell">
+                  <div class="item-avatar">{{ row.item.code|slice:":2" }}</div>
+                  <div class="item-meta">
+                    <strong>{{ row.item.name }}</strong>
+                    <span>{{ row.item.code }}</span>
+                  </div>
+                </div>
+              </td>
+
+              <td>{{ row.color.name|default:"-" }}</td>
+              <td>{{ row.size.name|default:"-" }}</td>
+              <td><span class="qty-badge">{{ row.qty_received|floatformat:0 }}</span></td>
+              <td><span class="qty-badge remaining">{{ row.qty_remaining|floatformat:0 }}</span></td>
+              <td><span class="qty-badge used">{{ row.qty_used|floatformat:0 }}</span></td>
+              <td>
+                <a href="{% url 'inventory_adjustment_create' row.id %}" class="btn-light">Adjust</a>
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="7" class="empty-state">No rows found.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="mobile-row-list">
       {% for row in batch.items.all %}
-        <tr>
-          <td>{{ row.item.code }}</td>
-          <td>{{ row.item.name }}</td>
-          <td>{{ row.color.name|default:"-" }}</td>
-          <td>{{ row.size.name|default:"-" }}</td>
-          <td>{{ row.qty_received|floatformat:0 }}</td>
-          <td>{{ row.qty_remaining|floatformat:0 }}</td>
-          <td>{{ row.qty_used|floatformat:0 }}</td>
-          <td>
-            <a href="{% url 'inventory_adjustment_create' row.id %}" class="btn-light">Adjust</a>
-          </td>
-        </tr>
+        <article class="mobile-row-card">
+          <div class="mobile-row-top">
+            <div class="item-cell">
+              <div class="item-avatar">{{ row.item.code|slice:":2" }}</div>
+              <div class="item-meta">
+                <strong>{{ row.item.name }}</strong>
+                <span>{{ row.item.code }} · {{ row.color.name|default:"-" }} · {{ row.size.name|default:"-" }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="mobile-row-grid">
+            <div class="mobile-stat">
+              <span>Received</span>
+              <strong>{{ row.qty_received|floatformat:0 }}</strong>
+            </div>
+
+            <div class="mobile-stat">
+              <span>Remaining</span>
+              <strong>{{ row.qty_remaining|floatformat:0 }}</strong>
+            </div>
+
+            <div class="mobile-stat">
+              <span>Used</span>
+              <strong>{{ row.qty_used|floatformat:0 }}</strong>
+            </div>
+
+            <div class="mobile-stat">
+              <span>Size</span>
+              <strong>{{ row.size.name|default:"-" }}</strong>
+            </div>
+          </div>
+
+          <div class="mobile-actions">
+            <a href="{% url 'inventory_adjustment_create' row.id %}" class="btn-light">Adjust Stock</a>
+          </div>
+        </article>
       {% empty %}
-        <tr>
-          <td colspan="8">No rows found.</td>
-        </tr>
+        <div class="empty-state">No rows found.</div>
       {% endfor %}
-    </tbody>
-  </table>
+    </div>
+  </section>
+
 </div>
 {% endblock %}

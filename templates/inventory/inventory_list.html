@@ -39,10 +39,10 @@
       <button type="button" id="inventorySearchClear" class="instant-search-clear" hidden aria-label="Clear search">×</button>
     </div>
     <div class="picker-actions">
-      <button type="button" class="inventory-type-btn is-active" data-inventory-filter="all">All</button>
-      <button type="button" class="inventory-type-btn" data-inventory-filter="cloth">Cloth</button>
-      <button type="button" class="inventory-type-btn" data-inventory-filter="material">Printing Material</button>
+      <button type="button" class="inventory-type-btn is-active" data-inventory-filter="cloth">Cloth</button>
+      <button type="button" class="inventory-type-btn" data-inventory-filter="material">Material</button>
       <button type="button" class="inventory-type-btn" data-inventory-filter="fabric">Fabric</button>
+      <button type="button" class="inventory-type-btn" data-inventory-filter="all">All</button>
     </div>
     <div class="picker-tools">
       <button type="button" id="arrangeModeBtn" class="arrange-mode-btn">↕ Arrange</button>
@@ -320,20 +320,35 @@
                 <span>{{ color_group.roll_count }} roll{{ color_group.roll_count|pluralize }} · {{ color_group.remaining_total|floatformat:"-3" }}</span>
               </div>
               <div class="fabric-roll-list sortable-zone" data-sort-zone="fabric-rolls-{{ fabric.fabric_name|slugify }}-{{ color_group.color.id }}">
-              {% for roll in color_group.rolls %}
-                <div class="fabric-roll-row draggable-item {% if roll.remaining_qty <= 0 %}used-roll{% endif %}" draggable="false" data-order-key="fabric-roll-{{ roll.id }}">
-                  <span class="drag-handle">⋮⋮</span>
-                  <strong>{{ roll.roll_code }}</strong>
-                  <span>{{ roll.receipt.supplier|default:"-" }}</span>
-                  <span>{{ roll.remaining_qty|floatformat:"-3" }}</span>
-                  <span class="roll-status status-{{ roll.status|lower }}">{{ roll.get_status_display }}</span>
-                  {% if perms.production.change_fabricreceipt %}
-                    <a href="{% url 'production_fabric_receipt_edit' roll.receipt_id %}" class="mini-btn">Receipt</a>
+                {% if color_group.full_count %}
+                  <div class="fabric-roll-row combined-full-row">
+                    <span class="drag-handle">⋮⋮</span>
+                    <strong>Full Rolls</strong>
+                    <span>{{ color_group.full_rolls.0.receipt.supplier|default:"-" }}</span>
+                    <span>{{ color_group.full_count }} roll{{ color_group.full_count|pluralize }}</span>
+                    <span class="roll-status status-full">Full</span>
+                    {% if perms.production.change_fabricreceipt and color_group.full_rolls.0 %}
+                      <a href="{% url 'production_fabric_receipt_edit' color_group.full_rolls.0.receipt_id %}" class="mini-btn">Receipt</a>
+                    {% endif %}
+                  </div>
+                {% endif %}
+
+                {% for roll in color_group.partial_rolls %}
+                  <div class="fabric-roll-row draggable-item" draggable="false" data-order-key="fabric-roll-{{ roll.id }}">
+                    <span class="drag-handle">⋮⋮</span>
+                    <strong>Partial Roll {{ forloop.counter }}</strong>
+                    <span>{{ roll.receipt.supplier|default:"-" }}</span>
+                    <span>{{ roll.remaining_qty|floatformat:"-3" }} roll</span>
+                    <span class="roll-status status-partial">Partial</span>
+                    {% if perms.production.change_fabricreceipt %}
+                      <a href="{% url 'production_fabric_receipt_edit' roll.receipt_id %}" class="mini-btn">Detail</a>
+                    {% endif %}
+                  </div>
+                {% empty %}
+                  {% if not color_group.full_count %}
+                    <div class="empty-size">No rolls</div>
                   {% endif %}
-                </div>
-              {% empty %}
-                <div class="empty-size">No rolls</div>
-              {% endfor %}
+                {% endfor %}
               </div>
             </div>
           {% empty %}
@@ -397,6 +412,53 @@
           </tbody>
         </table>
       </div>
+    </div>
+  </section>
+
+  <section class="recent-stock-section">
+    <div class="section-head">
+      <div class="section-title-row">
+        <h2>Recent Stock In Activity</h2>
+        <span class="count-pill">Last 5</span>
+      </div>
+    </div>
+
+    <div class="recent-stock-list">
+      {% for activity in recent_stock_activities %}
+        <div class="recent-stock-row">
+          <div class="recent-type recent-type-{{ activity.type|slugify }}">
+            {{ activity.type }}
+          </div>
+
+          <div class="recent-main">
+            <strong>{{ activity.summary }}</strong>
+            <span>{{ activity.reference|default:"-" }} · {{ activity.supplier }}</span>
+          </div>
+
+          <div class="recent-qty">
+            <strong>{{ activity.quantity|floatformat:"-3" }}</strong>
+            <span>{{ activity.unit }}</span>
+          </div>
+
+          <div class="recent-user">
+            <span>Recorded by</span>
+            <strong>{{ activity.created_by }}</strong>
+          </div>
+
+          <div class="recent-date">
+            {{ activity.received_date|date:"d M Y" }}
+          </div>
+
+          <a
+            class="mini-btn"
+            href="{% if activity.type == 'Fabric' %}{% url 'production_fabric_receipt_edit' activity.detail_id %}{% else %}{% url 'inventory_batch_detail' activity.detail_id %}{% endif %}"
+          >
+            View
+          </a>
+        </div>
+      {% empty %}
+        <div class="empty-block">No recent Stock In activity.</div>
+      {% endfor %}
     </div>
   </section>
 </div>
@@ -1191,6 +1253,117 @@
   .inventory-type-btn:hover,.inventory-type-btn.is-active{background:var(--accent-soft);border-color:#EDCA83;color:#8A5100}
   .inventory-type-btn:disabled{opacity:.45;cursor:not-allowed}
   @media(max-width:720px){.inventory-type-picker{align-items:stretch}.picker-actions{display:grid;grid-template-columns:1fr 1fr;width:100%}.inventory-type-btn{width:100%}}
+
+  .combined-full-row{
+    background:linear-gradient(90deg,#fffdf8,#fff4d8)!important;
+  }
+
+  .recent-stock-section{
+    margin-top:26px;
+  }
+
+  .recent-stock-list{
+    display:grid;
+    gap:8px;
+  }
+
+  .recent-stock-row{
+    display:grid;
+    grid-template-columns:130px minmax(220px,1.5fr) 110px 130px 110px auto;
+    gap:12px;
+    align-items:center;
+    padding:12px 14px;
+    border:1px solid var(--n99-line, var(--line));
+    border-radius:16px;
+    background:rgba(255,255,255,.84);
+    box-shadow:var(--n99-shadow-soft, var(--shadow-soft));
+  }
+
+  .recent-type{
+    display:inline-flex;
+    width:max-content;
+    padding:6px 9px;
+    border-radius:999px;
+    font-size:10px;
+    font-weight:900;
+    background:#eef2ff;
+    color:#4338ca;
+  }
+
+  .recent-type-fabric{
+    background:#ecfdf5;
+    color:#047857;
+  }
+
+  .recent-type-printing-material{
+    background:#ecfeff;
+    color:#0e7490;
+  }
+
+  .recent-main{
+    min-width:0;
+  }
+
+  .recent-main strong,
+  .recent-main span{
+    display:block;
+  }
+
+  .recent-main strong{
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    font-size:12px;
+  }
+
+  .recent-main span,
+  .recent-user span{
+    margin-top:3px;
+    color:var(--n99-muted, var(--muted));
+    font-size:9.5px;
+  }
+
+  .recent-qty strong,
+  .recent-qty span,
+  .recent-user strong{
+    display:block;
+  }
+
+  .recent-qty strong{
+    font-size:15px;
+  }
+
+  .recent-qty span{
+    color:var(--n99-muted, var(--muted));
+    font-size:9.5px;
+  }
+
+  .recent-date{
+    font-size:10.5px;
+    font-weight:800;
+  }
+
+  @media(max-width:900px){
+    .recent-stock-row{
+      grid-template-columns:1fr 1fr;
+    }
+
+    .recent-main{
+      grid-column:1/-1;
+      grid-row:1;
+    }
+  }
+
+  @media(max-width:520px){
+    .recent-stock-row{
+      grid-template-columns:1fr;
+    }
+
+    .recent-main{
+      grid-column:auto;
+    }
+  }
+
 </style>
 
 
@@ -1472,12 +1645,12 @@
       el.hidden=!show;
     });
     buttons.forEach(btn=>btn.classList.toggle('is-active',btn.dataset.inventoryFilter===filter));
-    try{localStorage.setItem('nironInventoryFilter',filter)}catch(e){}
+    try{localStorage.setItem('nironInventoryFilterV2',filter)}catch(e){}
   }
   buttons.forEach(btn=>btn.addEventListener('click',()=>apply(btn.dataset.inventoryFilter)));
-  let saved='all';
-  try{saved=localStorage.getItem('nironInventoryFilter')||'all'}catch(e){}
-  if(!['all','cloth','material','fabric'].includes(saved)) saved='all';
+  let saved='cloth';
+  try{saved=localStorage.getItem('nironInventoryFilterV2')||'cloth'}catch(e){}
+  if(!['cloth','material','fabric','all'].includes(saved)) saved='cloth';
   apply(saved);
 })();
 </script>

@@ -49,6 +49,28 @@ class ProductionSupplier(models.Model):
         return self.name
 
 
+
+
+class FabricType(models.Model):
+    name = models.CharField(max_length=150, unique=True)
+    gsm = models.PositiveIntegerField(null=True, blank=True)
+    composition = models.CharField(max_length=150, blank=True, default="")
+    is_active = models.BooleanField(default=True)
+    note = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        details = []
+        if self.gsm:
+            details.append(f"{self.gsm} GSM")
+        if self.composition:
+            details.append(self.composition)
+        return f"{self.name} ({' / '.join(details)})" if details else self.name
+
 class FabricReceipt(models.Model):
     receipt_no = models.CharField(max_length=50, unique=True, blank=True)
     supplier = models.CharField(max_length=150)
@@ -59,7 +81,15 @@ class FabricReceipt(models.Model):
         blank=True,
         related_name="fabric_receipts",
     )
+    fabric_type = models.ForeignKey(
+        "FabricType",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="fabric_receipts",
+    )
     received_date = models.DateField(default=timezone.localdate)
+    # Legacy snapshot kept so all old receipts and reports remain compatible.
     fabric_name = models.CharField(max_length=150)
     color = models.ForeignKey(
         "inventory.Color",
@@ -102,6 +132,8 @@ class FabricReceipt(models.Model):
     def save(self, *args, **kwargs):
         if self.supplier_ref_id:
             self.supplier = self.supplier_ref.name
+        if self.fabric_type_id:
+            self.fabric_name = self.fabric_type.name
         if not self.receipt_no:
             self.receipt_no = _next_number(
                 FabricReceipt,
@@ -265,10 +297,20 @@ class ProductionProject(models.Model):
         related_name="production_projects",
         limit_choices_to={"item_type": "SHIRT"},
     )
+    fabric_type = models.ForeignKey(
+        "FabricType",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="production_projects",
+    )
     color = models.ForeignKey(
         "inventory.Color",
         on_delete=models.PROTECT,
         related_name="production_projects",
+        null=True,
+        blank=True,
+        help_text="Legacy first colour; new projects use project_colors.",
     )
     expected_qty = models.PositiveIntegerField(default=0)
     status = models.CharField(max_length=30, choices=STATUS_CHOICES, default=STATUS_DRAFT)
@@ -287,7 +329,8 @@ class ProductionProject(models.Model):
         ordering = ["-created_at", "-id"]
 
     def __str__(self):
-        return f"{self.project_no} - {self.finished_item.name} / {self.color.name}"
+        colors = ", ".join(self.project_colors.values_list("color__name", flat=True)[:3])
+        return f"{self.project_no} - {self.finished_item.name} / {colors or 'No colour'}"
 
     def save(self, *args, **kwargs):
         if not self.project_no:
@@ -372,7 +415,36 @@ class ProductionProject(models.Model):
         return self.total_production_cost / good if good > 0 else ZERO
 
 
+class ProductionProjectColor(models.Model):
+    project = models.ForeignKey(ProductionProject, on_delete=models.CASCADE, related_name="project_colors")
+    color = models.ForeignKey("inventory.Color", on_delete=models.PROTECT, related_name="production_project_colors")
+    sort_order = models.PositiveIntegerField(default=0)
+    note = models.CharField(max_length=255, blank=True, default="")
+
+    class Meta:
+        ordering = ["sort_order", "color__name", "id"]
+        constraints = [models.UniqueConstraint(fields=["project", "color"], name="uniq_production_project_color")]
+
+    def __str__(self):
+        return f"{self.project.project_no} / {self.color.name}"
+
+    @property
+    def plan_total(self):
+        return self.plan_sizes.aggregate(total=Sum("planned_qty"))["total"] or 0
+
+    @property
+    def cut_total(self):
+        return self.cut_sizes.aggregate(total=Sum("cut_qty"))["total"] or 0
+
+    @property
+    def sent_total(self):
+        return self.sewing_jobs.aggregate(total=Sum("lines__sent_qty"))["total"] or 0
+
+
 class ProductionPlanSize(models.Model):
+    project_color = models.ForeignKey(
+        ProductionProjectColor, on_delete=models.CASCADE, related_name="plan_sizes", null=True, blank=True
+    )
     project = models.ForeignKey(
         ProductionProject,
         on_delete=models.CASCADE,
@@ -388,7 +460,7 @@ class ProductionPlanSize(models.Model):
     class Meta:
         ordering = ["size__sort_order", "size__id"]
         constraints = [
-            models.UniqueConstraint(fields=["project", "size"], name="uniq_project_plan_size"),
+            models.UniqueConstraint(fields=["project_color", "size"], name="uniq_project_color_plan_size"),
         ]
 
     def __str__(self):
@@ -396,6 +468,9 @@ class ProductionPlanSize(models.Model):
 
 
 class CuttingRollUsage(models.Model):
+    project_color = models.ForeignKey(
+        ProductionProjectColor, on_delete=models.CASCADE, related_name="roll_usages", null=True, blank=True
+    )
     project = models.ForeignKey(
         ProductionProject,
         on_delete=models.CASCADE,
@@ -417,7 +492,7 @@ class CuttingRollUsage(models.Model):
     class Meta:
         ordering = ["id"]
         constraints = [
-            models.UniqueConstraint(fields=["project", "roll"], name="uniq_project_fabric_roll"),
+            models.UniqueConstraint(fields=["project_color", "roll"], name="uniq_project_color_fabric_roll"),
         ]
 
     def __str__(self):
@@ -428,7 +503,7 @@ class CuttingRollUsage(models.Model):
         returned = Decimal(self.returned_qty or 0)
         if returned > issued:
             raise ValidationError("Returned roll quantity cannot exceed issued quantity.")
-        if self.roll_id and self.project_id and self.roll.receipt.color_id != self.project.color_id:
+        if self.roll_id and self.project_id and self.project_color_id and self.roll.receipt.color_id != self.project_color.color_id:
             raise ValidationError("Fabric roll color must match the production project color.")
         if self.roll_id and not self.applied:
             reserved_elsewhere = (
@@ -447,6 +522,9 @@ class CuttingRollUsage(models.Model):
 
 
 class CuttingSizeLine(models.Model):
+    project_color = models.ForeignKey(
+        ProductionProjectColor, on_delete=models.CASCADE, related_name="cut_sizes", null=True, blank=True
+    )
     project = models.ForeignKey(
         ProductionProject,
         on_delete=models.CASCADE,
@@ -462,7 +540,7 @@ class CuttingSizeLine(models.Model):
     class Meta:
         ordering = ["size__sort_order", "size__id"]
         constraints = [
-            models.UniqueConstraint(fields=["project", "size"], name="uniq_project_cut_size"),
+            models.UniqueConstraint(fields=["project_color", "size"], name="uniq_project_color_cut_size"),
         ]
 
     def __str__(self):
@@ -490,11 +568,25 @@ class SewingJob(models.Model):
         on_delete=models.PROTECT,
         related_name="sewing_jobs",
     )
+    project_color = models.ForeignKey(
+        ProductionProjectColor,
+        on_delete=models.PROTECT,
+        related_name="sewing_jobs",
+        null=True,
+        blank=True,
+    )
+    WORKER_PARTNER = "PARTNER"
+    WORKER_STAFF = "STAFF"
+    WORKER_CHOICES = [(WORKER_PARTNER, "Sewing Partner"), (WORKER_STAFF, "Internal Staff")]
+    worker_type = models.CharField(max_length=20, choices=WORKER_CHOICES, default=WORKER_PARTNER)
     partner = models.ForeignKey(
         SewingPartner,
         on_delete=models.PROTECT,
         related_name="sewing_jobs",
+        null=True,
+        blank=True,
     )
+    staff_name = models.CharField(max_length=150, blank=True, default="")
     sent_date = models.DateField(default=timezone.localdate)
     expected_return_date = models.DateField(null=True, blank=True)
     price_per_piece = models.DecimalField(max_digits=12, decimal_places=4, default=ZERO)
@@ -513,9 +605,28 @@ class SewingJob(models.Model):
         ordering = ["-sent_date", "-id"]
 
     def __str__(self):
-        return f"{self.job_no} - {self.partner.name}"
+        return f"{self.job_no} - {self.payee_name}"
+
+    @property
+    def payee_name(self):
+        if self.worker_type == self.WORKER_STAFF:
+            return self.staff_name or "Staff"
+        return self.partner.name if self.partner_id else "Sewing partner"
+
+    def clean(self):
+        if self.project_color_id and self.project_color.project_id != self.project_id:
+            raise ValidationError("Selected colour does not belong to this production project.")
+        if self.worker_type == self.WORKER_PARTNER:
+            if not self.partner_id:
+                raise ValidationError({"partner": "Choose a sewing partner."})
+            self.staff_name = ""
+        elif self.worker_type == self.WORKER_STAFF:
+            if not (self.staff_name or "").strip():
+                raise ValidationError({"staff_name": "Enter the staff name."})
+            self.partner = None
 
     def save(self, *args, **kwargs):
+        self.full_clean()
         if not self.job_no:
             self.job_no = _next_number(SewingJob, "job_no", "SEW", self.sent_date)
         super().save(*args, **kwargs)

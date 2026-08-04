@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block page_title %}Stock In Expense{% endblock %}
+{% block page_subtitle %}Every Fabric, Cloth and Printing Material Stock In appears here for Finance{% endblock %}
+{% block content %}
+<style>
+.stock-exp-wrap{max-width:1380px;margin:0 auto}.stock-exp-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap;margin-bottom:14px}
+.stock-exp-stats{display:grid;grid-template-columns:repeat(3,minmax(150px,1fr));gap:9px}.stat{padding:12px 14px;border:1px solid var(--line);border-radius:15px;background:#fff;box-shadow:var(--shadow-soft)}
+.stat span{display:block;color:var(--muted);font-size:10px;font-weight:900;text-transform:uppercase}.stat strong{display:block;margin-top:4px;font-size:21px}
+.filters{display:grid;grid-template-columns:repeat(5,minmax(135px,1fr)) auto;gap:8px;padding:12px;border:1px solid var(--line);border-radius:16px;background:#fff;margin-bottom:12px}
+.filters label{display:block;margin-bottom:5px;color:var(--muted);font-size:9px;font-weight:900;text-transform:uppercase}.filters input,.filters select{width:100%;min-height:42px}
+.table-card{border:1px solid var(--line);border-radius:18px;background:#fff;box-shadow:var(--shadow);overflow:auto}.stock-table{width:100%;min-width:1050px;border-collapse:collapse}
+.stock-table th,.stock-table td{padding:11px 12px;border-bottom:1px solid var(--line);font-size:12px;text-align:left;vertical-align:middle}.stock-table th{color:var(--muted);font-size:9px;text-transform:uppercase}
+.badge{display:inline-flex;padding:5px 9px;border-radius:999px;font-size:9px;font-weight:950}.pending{background:#fff1d5;color:#8a5a10}.done{background:#eaf8f1;color:#14704e}.type{background:#eef2ff;color:#4338ca}
+.money{text-align:right!important;font-weight:900;white-space:nowrap}.muted{color:var(--muted);font-size:10px}.empty{padding:34px!important;text-align:center!important;color:var(--muted)}
+@media(max-width:900px){.stock-exp-stats{grid-template-columns:1fr 1fr}.filters{grid-template-columns:1fr 1fr}}
+@media(max-width:520px){.stock-exp-stats,.filters{grid-template-columns:1fr}}
+</style>
+<div class="stock-exp-wrap">
+  <div class="stock-exp-head">
+    <div class="stock-exp-stats">
+      <div class="stat"><span>Waiting for Cost</span><strong>{{ pending_count }}</strong></div>
+      <div class="stat"><span>Cost Added</span><strong>{{ completed_count }}</strong></div>
+      <div class="stat"><span>Filtered Total</span><strong>${{ total_expense|floatformat:2 }}</strong></div>
+    </div>
+  </div>
+
+  <form method="get" class="filters">
+    <div><label>Cost Status</label><select name="status">
+      <option value="">All</option>
+      <option value="PENDING" {% if selected_status == "PENDING" %}selected{% endif %}>Waiting for Cost</option>
+      <option value="COMPLETED" {% if selected_status == "COMPLETED" %}selected{% endif %}>Cost Added</option>
+    </select></div>
+    <div><label>Item Type</label><select name="stock_type">
+      <option value="">All Types</option>
+      <option value="FABRIC" {% if selected_stock_type == "FABRIC" %}selected{% endif %}>Fabric</option>
+      <option value="CLOTH" {% if selected_stock_type == "CLOTH" %}selected{% endif %}>Cloth</option>
+      <option value="PRINTING" {% if selected_stock_type == "PRINTING" %}selected{% endif %}>Printing Material</option>
+    </select></div>
+    <div><label>Supplier</label><input name="supplier" value="{{ selected_supplier }}" placeholder="Supplier name"></div>
+    <div><label>Month</label><input type="month" name="month" value="{{ selected_month }}"></div>
+    <div><label>Sort By</label><select name="sort">
+      <option value="-date" {% if selected_sort == "-date" %}selected{% endif %}>Newest</option>
+      <option value="date" {% if selected_sort == "date" %}selected{% endif %}>Oldest</option>
+      <option value="supplier" {% if selected_sort == "supplier" %}selected{% endif %}>Supplier A–Z</option>
+      <option value="-amount" {% if selected_sort == "-amount" %}selected{% endif %}>Highest Cost</option>
+      <option value="status" {% if selected_sort == "status" %}selected{% endif %}>Status</option>
+    </select></div>
+    <div style="align-self:end"><button class="btn-primary" style="width:100%">Apply</button></div>
+  </form>
+
+  <div class="table-card">
+    <table class="stock-table">
+      <thead><tr><th>Date</th><th>Reference</th><th>Item Type</th><th>Supplier</th><th>Total Quantity</th><th>Recorded By</th><th>Status</th><th class="money">Goods Cost</th><th class="money">Delivery</th><th class="money">Extra</th><th class="money">Total</th><th>Action</th></tr></thead>
+      <tbody>
+      {% for expense in expenses %}
+        <tr>
+          <td>{{ expense.received_date|default:expense.created_at|date:"d M Y" }}</td>
+          <td>
+            <strong>
+              {% if expense.source_reference %}
+                {{ expense.source_reference }}
+              {% elif expense.batch %}
+                {{ expense.batch.batch_no|default:"-" }}
+              {% else %}
+                -
+              {% endif %}
+            </strong>
+            <div class="muted">
+              By
+              {% if expense.batch and expense.batch.created_by %}
+                {{ expense.batch.created_by.get_full_name|default:expense.batch.created_by.username }}
+              {% elif expense.created_by %}
+                {{ expense.created_by.get_full_name|default:expense.created_by.username }}
+              {% else %}
+                -
+              {% endif %}
+            </div>
+          </td>
+          <td><span class="badge type">
+            {% if expense.stock_source_type == "FABRIC" %}Fabric
+            {% elif "printing" in expense.note|lower %}Printing Material
+            {% elif "cloth" in expense.note|lower %}Cloth
+            {% else %}Inventory{% endif %}
+          </span></td>
+          <td>
+            {% if expense.supplier_name %}
+              {{ expense.supplier_name }}
+            {% elif expense.batch %}
+              {{ expense.batch.supplier_name|default:"-" }}
+            {% else %}
+              -
+            {% endif %}
+          </td>
+          <td><strong>{{ expense.total_received_label }}</strong></td>
+          <td>
+            {% if expense.batch and expense.batch.created_by %}
+              {{ expense.batch.created_by.get_full_name|default:expense.batch.created_by.username }}
+            {% elif expense.created_by %}
+              {{ expense.created_by.get_full_name|default:expense.created_by.username }}
+            {% else %}
+              -
+            {% endif %}
+          </td>
+          <td><span class="badge {% if expense.expense_status == "COMPLETED" %}done{% else %}pending{% endif %}">
+            {% if expense.expense_status == "COMPLETED" %}Cost Added{% else %}Waiting for Cost{% endif %}
+          </span></td>
+          <td class="money">${{ expense.batch_cost|floatformat:2 }}</td>
+          <td class="money">${{ expense.batch_delivery_fee|floatformat:2 }}</td>
+          <td class="money">${{ expense.batch_other_fee|floatformat:2 }}</td>
+          <td class="money">${{ expense.amount|floatformat:2 }}</td>
+          <td><a class="btn-light" href="{% url 'batch_expense_cost_edit' expense.id %}">{% if expense.expense_status == "PENDING" %}Add Cost{% else %}Edit Cost{% endif %}</a></td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="12" class="empty">No Stock In Expense found.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

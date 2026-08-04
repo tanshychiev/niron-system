@@ -5,30 +5,65 @@ from django.contrib.auth.models import Group, Permission, User
 from .models import UserProfile
 
 
-ADMIN_GROUP_NAME = "ADMIN FULL CONTROL"
+ADMIN_GROUP_NAMES = {
+    "ADMIN",
+    "ADMIN FULL CONTROL",
+    "ADMINISTRATOR",
+}
+
+
+def _normalized_role_name(group):
+    if not group:
+        return ""
+    return " ".join((group.name or "").strip().upper().split())
+
+
+def is_admin_role(group):
+    return _normalized_role_name(group) in ADMIN_GROUP_NAMES
+
+
+def clear_permission_cache(user):
+    """
+    Remove Django's cached permission values from the current User object.
+    This makes a changed role take effect immediately in the current process.
+    """
+    for cache_name in (
+        "_perm_cache",
+        "_user_perm_cache",
+        "_group_perm_cache",
+    ):
+        if hasattr(user, cache_name):
+            delattr(user, cache_name)
 
 
 def sync_user_access(user, selected_group):
     """
-    Keep the user's Django access flags synchronized with the selected role.
+    Make the selected role the single source of truth for user access.
 
-    Users assigned to ADMIN FULL CONTROL become staff and superusers.
-    Users assigned to any other role remain normal active users and receive
-    access from their group's permissions.
+    Admin roles:
+    - receive every Django permission
+    - are marked is_staff=True
+    - are marked is_superuser=True
+
+    Other roles:
+    - receive only permissions selected on their Group/Role
+    - are not staff or superusers
     """
     user.groups.clear()
 
     if selected_group:
+        if is_admin_role(selected_group):
+            selected_group.permissions.set(Permission.objects.all())
+
         user.groups.add(selected_group)
 
-    is_admin = bool(
-        selected_group
-        and selected_group.name.strip().upper() == ADMIN_GROUP_NAME
-    )
+    admin_access = is_admin_role(selected_group)
 
-    user.is_staff = is_admin
-    user.is_superuser = is_admin
+    user.is_staff = admin_access
+    user.is_superuser = admin_access
     user.save(update_fields=["is_staff", "is_superuser"])
+
+    clear_permission_cache(user)
 
 
 class LoginForm(AuthenticationForm):
@@ -283,3 +318,21 @@ class RoleForm(forms.ModelForm):
                 }
             )
         }
+
+    def save(self, commit=True):
+        role = super().save(commit=commit)
+
+        if not commit:
+            return role
+
+        # Admin roles always have full permission without requiring every
+        # checkbox to be selected manually.
+        if is_admin_role(role):
+            role.permissions.set(Permission.objects.all())
+
+        # Re-sync all existing users of this role after role name or
+        # permissions are changed.
+        for user in role.user_set.all():
+            sync_user_access(user, role)
+
+        return role

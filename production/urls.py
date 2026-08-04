@@ -9,9 +9,14 @@ urlpatterns = [
     path("materials/receive/", views.fabric_receipt_create, name="production_fabric_receive"),
     path("materials/receipts/<int:pk>/edit/", views.fabric_receipt_edit, name="production_fabric_receipt_edit"),
 
+    path("fabric-types/", views.fabric_type_list, name="production_fabric_type_list"),
+    path("fabric-types/new/", views.fabric_type_create, name="production_fabric_type_create"),
+    path("fabric-types/<int:pk>/edit/", views.fabric_type_edit, name="production_fabric_type_edit"),
+
     path("projects/", views.project_list, name="production_project_list"),
     path("projects/new/", views.project_create, name="production_project_create"),
     path("projects/<int:pk>/", views.project_detail, name="production_project_detail"),
+    path("projects/<int:pk>/edit/", views.project_edit, name="production_project_edit"),
     path("projects/<int:pk>/rolls/add/", views.project_add_roll, name="production_project_add_roll"),
     path("projects/<int:pk>/rolls/<int:usage_id>/remove/", views.project_remove_roll, name="production_project_remove_roll"),
     path("projects/<int:pk>/plan-sizes/save/", views.project_save_plan_sizes, name="production_project_save_plan_sizes"),

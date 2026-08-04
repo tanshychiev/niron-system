@@ -1,77 +1,51 @@
 {% extends "base.html" %}
-{% block page_title %}Production Projects{% endblock %}
-{% block page_subtitle %}Plan, cut, send to sewing and track production progress{% endblock %}
+{% block page_title %}Production Orders{% endblock %}
+{% block page_subtitle %}Create orders, edit plans and manage every production process in one place{% endblock %}
 {% block content %}
 <style>
-.prod-wrap{max-width:1450px;margin:0 auto}.prod-actions{display:flex;gap:9px;flex-wrap:wrap;justify-content:flex-end;margin-bottom:14px}.prod-card{background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:17px}.filter-grid{display:grid;grid-template-columns:minmax(240px,1fr) 220px auto auto;gap:10px;align-items:end;margin-bottom:14px}.field label{display:block;margin-bottom:6px;font-size:11px;font-weight:900;text-transform:uppercase;color:var(--muted)}.field input,.field select{width:100%}.prod-table-wrap{overflow-x:auto}.prod-table{width:100%;border-collapse:collapse;min-width:1050px}.prod-table th,.prod-table td{padding:12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}.prod-table th{font-size:10px;color:var(--muted);text-transform:uppercase}.num{text-align:right!important}.pill{display:inline-flex;padding:6px 9px;border-radius:999px;background:#f3f4f6;font-weight:850;font-size:11px}.pill.good{background:#eaf8ef;color:#087535}.pill.warn{background:#fff1df;color:#a95500}.pill.bad{background:#fdecec;color:#b42318}.empty{padding:28px;text-align:center;color:var(--muted)}.project-link{font-weight:950;color:var(--text);text-decoration:none}.project-link:hover{text-decoration:underline}.muted{display:block;margin-top:3px;color:var(--muted);font-size:12px}@media(max-width:800px){.filter-grid{grid-template-columns:1fr}.filter-grid>*{width:100%}.prod-actions>*{flex:1}}
+.prod-wrap{max-width:1450px;margin:0 auto}.prod-actions{display:flex;gap:9px;flex-wrap:wrap;justify-content:flex-end;margin-bottom:14px}.prod-card{background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:17px}.prod-summary{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;margin-bottom:14px}.prod-metric span{display:block;color:var(--muted);font-size:10px;font-weight:900;text-transform:uppercase}.prod-metric strong{display:block;margin-top:5px;font-size:25px}.prod-metric small{display:block;margin-top:3px;color:var(--muted)}.filter-grid{display:grid;grid-template-columns:minmax(240px,1fr) 220px auto auto;gap:10px;align-items:end;margin-bottom:14px}.field label{display:block;margin-bottom:6px;font-size:11px;font-weight:900;text-transform:uppercase;color:var(--muted)}.field input,.field select{width:100%}.prod-table-wrap{overflow-x:auto}.prod-table{width:100%;border-collapse:collapse;min-width:1180px}.prod-table th,.prod-table td{padding:12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}.prod-table th{font-size:10px;color:var(--muted);text-transform:uppercase}.num{text-align:right!important}.pill{display:inline-flex;padding:6px 9px;border-radius:999px;background:#f3f4f6;font-weight:850;font-size:11px}.pill.good{background:#eaf8ef;color:#087535}.pill.warn{background:#fff1df;color:#a95500}.pill.bad{background:#fdecec;color:#b42318}.empty{padding:28px;text-align:center;color:var(--muted)}.project-link{font-weight:950;color:var(--text);text-decoration:none}.project-link:hover{text-decoration:underline}.muted{display:block;margin-top:3px;color:var(--muted);font-size:12px}.row-actions{display:flex;gap:6px;justify-content:flex-end}.mini-btn{display:inline-flex;align-items:center;justify-content:center;min-height:32px;padding:0 10px;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--text);font-size:11px;font-weight:900;text-decoration:none}.mini-btn.primary{background:#f5ad00;border-color:#f5ad00;color:#241900}.section-title{display:flex;align-items:end;justify-content:space-between;gap:12px;margin-bottom:12px}.section-title h2{margin:0}.section-title p{margin:4px 0 0;color:var(--muted)}
+@media(max-width:1100px){.prod-summary{grid-template-columns:repeat(3,1fr)}}@media(max-width:800px){.filter-grid{grid-template-columns:1fr}.filter-grid>*{width:100%}.prod-actions>*{flex:1}.prod-summary{grid-template-columns:repeat(2,1fr)}}
 </style>
 <div class="prod-wrap">
   <div class="prod-actions">
-    {% if perms.production.add_productionproject %}
-      <a class="btn-primary" href="{% url 'production_project_create' %}">+ New Project</a>
-    {% endif %}
+    {% if perms.production.add_fabricreceipt %}<a class="btn-light" href="{% url 'production_fabric_receive' %}">+ Receive Fabric</a>{% endif %}
+    {% if perms.production.add_productionproject %}<a class="btn-primary" href="{% url 'production_project_create' %}">+ Create Order</a>{% endif %}
+  </div>
+
+  <div class="prod-summary">
+    <div class="prod-card prod-metric"><span>All Orders</span><strong>{{ project_count }}</strong></div>
+    <div class="prod-card prod-metric"><span>Active</span><strong>{{ active_project_count }}</strong></div>
+    <div class="prod-card prod-metric"><span>Cutting</span><strong>{{ cutting_count }}</strong></div>
+    <div class="prod-card prod-metric"><span>With Sewing</span><strong>{{ sewing_count }}</strong></div>
+    <div class="prod-card prod-metric"><span>Fabric Available</span><strong>{{ equivalent_rolls|floatformat:"-3" }}</strong><small>{{ available_roll_count }} physical rolls</small></div>
+    <div class="prod-card prod-metric"><span>Unpaid Sewing</span><strong>{{ unpaid_count }}</strong>{% if can_view_cost %}<small>${{ unpaid_total|floatformat:2 }}</small>{% endif %}</div>
   </div>
 
   <div class="prod-card" style="margin-bottom:14px">
     <form method="get" class="filter-grid">
-      <div class="field">
-        <label>Search Project</label>
-        <input class="form-control" type="search" name="q" value="{{ q }}" placeholder="Project no, item or colour">
-      </div>
-      <div class="field">
-        <label>Status</label>
-        <select class="form-select" name="status">
-          <option value="">All Statuses</option>
-          {% for value, label in status_choices %}
-            <option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>
-          {% endfor %}
-        </select>
-      </div>
+      <div class="field"><label>Search Order</label><input class="form-control" type="search" name="q" value="{{ q }}" placeholder="Order no, product, fabric or colour"></div>
+      <div class="field"><label>Status</label><select class="form-select" name="status"><option value="">All Statuses</option>{% for value,label in status_choices %}<option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
       <button class="btn-primary" type="submit">Search</button>
       <a class="btn-light" href="{% url 'production_project_list' %}">Reset</a>
     </form>
   </div>
 
-  <div class="prod-card prod-table-wrap">
-    <table class="prod-table">
-      <thead>
-        <tr>
-          <th>Project</th>
-          <th>Finished Item</th>
-          <th>Colour</th>
-          <th class="num">Plan</th>
-          <th class="num">Cut</th>
-          <th class="num">Sent</th>
-          <th class="num">Done</th>
-          <th class="num">Pending</th>
-          <th>Status</th>
-          <th>Created</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for project in projects %}
-          <tr>
-            <td>
-              <a class="project-link" href="{% url 'production_project_detail' project.id %}">{{ project.project_no }}</a>
-              {% if project.note %}<span class="muted">{{ project.note|truncatechars:45 }}</span>{% endif %}
-            </td>
-            <td><strong>{{ project.finished_item.name }}</strong><span class="muted">{{ project.finished_item.code }}</span></td>
-            <td>{{ project.color.name }}</td>
-            <td class="num">{{ project.plan_total }}</td>
-            <td class="num">{{ project.cut_total }}</td>
-            <td class="num">{{ project.sent_total }}</td>
-            <td class="num">{{ project.returned_good_total }}</td>
-            <td class="num"><span class="pill {% if project.still_with_sewer %}warn{% else %}good{% endif %}">{{ project.still_with_sewer }}</span></td>
-            <td>
-              <span class="pill {% if project.status == 'COMPLETED' %}good{% elif project.status == 'CANCELLED' %}bad{% else %}warn{% endif %}">{{ project.get_status_display }}</span>
-            </td>
-            <td>{{ project.created_at|date:'d M Y' }}{% if project.created_by %}<span class="muted">{{ project.created_by.get_full_name|default:project.created_by.username }}</span>{% endif %}</td>
-          </tr>
-        {% empty %}
-          <tr><td colspan="10" class="empty">No production projects found.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  <div class="prod-card">
+    <div class="section-title"><div><h2>Order List</h2><p>Open Processing to reserve fabric, record cutting, sewing and finished returns.</p></div></div>
+    <div class="prod-table-wrap"><table class="prod-table"><thead><tr><th>Order</th><th>Product</th><th>Fabric</th><th>Colours</th><th class="num">Plan</th><th class="num">Cut</th><th class="num">Sent</th><th class="num">Finished</th><th>Status</th><th>Created</th><th class="num">Action</th></tr></thead><tbody>
+      {% for project in projects %}
+      <tr>
+        <td><a class="project-link" href="{% url 'production_project_detail' project.id %}">{{ project.project_no }}</a>{% if project.note %}<span class="muted">{{ project.note|truncatechars:38 }}</span>{% endif %}</td>
+        <td><strong>{{ project.finished_item.name }}</strong><span class="muted">{{ project.finished_item.code }}</span></td>
+        <td>{{ project.fabric_type|default:"-" }}</td>
+        <td>{% for pc in project.project_colors.all %}<span style="display:inline-flex;align-items:center;gap:5px;margin:2px 7px 2px 0"><i style="width:9px;height:9px;border-radius:50%;background:{{ pc.color.hex_code }};border:1px solid rgba(0,0,0,.15)"></i>{{ pc.color.name }}</span>{% empty %}-{% endfor %}</td>
+        <td class="num">{{ project.plan_total }}</td><td class="num">{{ project.cut_total }}</td><td class="num">{{ project.sent_total }}</td><td class="num">{{ project.returned_good_total }}</td>
+        <td><span class="pill {% if project.status == 'COMPLETED' %}good{% elif project.status == 'CANCELLED' %}bad{% else %}warn{% endif %}">{{ project.get_status_display }}</span></td>
+        <td>{{ project.created_at|date:'d M Y' }}{% if project.created_by %}<span class="muted">{{ project.created_by.get_full_name|default:project.created_by.username }}</span>{% endif %}</td>
+        <td><div class="row-actions">{% if perms.production.change_productionproject and project.status == 'CUTTING' and project.sent_total == 0 %}<a class="mini-btn" href="{% url 'production_project_edit' project.id %}">Edit</a>{% endif %}<a class="mini-btn primary" href="{% url 'production_project_detail' project.id %}">Processing</a></div></td>
+      </tr>
+      {% empty %}<tr><td colspan="11" class="empty">No production orders found.</td></tr>{% endfor %}
+    </tbody></table></div>
   </div>
 </div>
 {% endblock %}

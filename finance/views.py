@@ -3,20 +3,22 @@ from decimal import Decimal
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
-from django.db.models import Q, Sum
+from django.db.models import Count, Q, Sum
 from django.db.models.functions import TruncDate, TruncMonth
 from django.http import JsonResponse, HttpResponse
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from openpyxl import Workbook
 
 from .forms import (
     BatchExpenseForm,
+    BatchExpenseCostForm,
     ExpenseFilterForm,
     OperatingExpenseForm,
     OtherExpenseForm,
 )
 from .models import Expense
+from production.models import FabricReceipt
 
 
 def _to_decimal(value):
@@ -207,27 +209,94 @@ def other_expense_list(request):
 @login_required
 @permission_required("finance.view_batch_expense_nav", raise_exception=True)
 def batch_expense_list(request):
+    """Stock In Expense list synced from cloth, printing material and fabric Stock In."""
     qs = Expense.objects.select_related("created_by", "batch").filter(
         expense_type=Expense.TYPE_BATCH
     )
-    form, qs = _apply_filters(request, qs)
+
+    status = (request.GET.get("status") or "").strip().upper()
+    stock_type = (request.GET.get("stock_type") or "").strip().upper()
+    supplier = (request.GET.get("supplier") or "").strip()
+    month = (request.GET.get("month") or "").strip()
+    sort = (request.GET.get("sort") or "-received_date").strip()
+
+    if status in {Expense.STATUS_PENDING, Expense.STATUS_COMPLETED}:
+        qs = qs.filter(expense_status=status)
+
+    valid_sources = {
+        Expense.SOURCE_FABRIC,
+        Expense.SOURCE_INVENTORY,
+        "CLOTH",
+        "PRINTING",
+    }
+    if stock_type in valid_sources:
+        if stock_type in {"CLOTH", "PRINTING"}:
+            qs = qs.filter(stock_source_type=Expense.SOURCE_INVENTORY)
+            if stock_type == "CLOTH":
+                qs = qs.filter(
+                    Q(note__icontains="cloth")
+                    | Q(source_reference__icontains="cloth")
+                    | Q(batch__items__item__item_type="SHIRT")
+                )
+            else:
+                qs = qs.exclude(batch__items__item__item_type="SHIRT")
+        else:
+            qs = qs.filter(stock_source_type=stock_type)
+
+    if supplier:
+        qs = qs.filter(
+            Q(supplier_name__icontains=supplier)
+            | Q(batch__supplier__icontains=supplier)
+            | Q(batch__supplier_ref__name__icontains=supplier)
+        )
+
+    if month:
+        try:
+            year, month_no = [int(x) for x in month.split("-", 1)]
+            qs = qs.filter(
+                Q(received_date__year=year, received_date__month=month_no)
+                | Q(received_date__isnull=True, created_at__year=year, created_at__month=month_no)
+            )
+        except (TypeError, ValueError):
+            pass
+
+    allowed_sort = {
+        "date": "received_date",
+        "-date": "-received_date",
+        "supplier": "supplier_name",
+        "-supplier": "-supplier_name",
+        "amount": "amount",
+        "-amount": "-amount",
+        "status": "expense_status",
+        "-status": "-expense_status",
+    }
+    qs = qs.distinct().order_by(allowed_sort.get(sort, "-received_date"), "-id")
+
     total_expense = qs.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+    pending_count = Expense.objects.filter(
+        expense_type=Expense.TYPE_BATCH,
+        expense_status=Expense.STATUS_PENDING,
+    ).count()
+    completed_count = Expense.objects.filter(
+        expense_type=Expense.TYPE_BATCH,
+        expense_status=Expense.STATUS_COMPLETED,
+    ).count()
 
     return render(
         request,
-        "finance/expense_type_list.html",
+        "finance/batch_expense_list.html",
         {
-            "form": form,
-            "expenses": qs[:300],
+            "expenses": qs[:500],
             "total_expense": total_expense,
-            "page_title_text": "Batch Expense",
-            "page_subtitle_text": "Batch expense records linked to inventory batch",
-            "create_url_name": "create_batch_expense",
-            "create_label": "+ Create Batch Expense",
-            "can_create": request.user.has_perm("finance.add_batch_expense"),
+            "pending_count": pending_count,
+            "completed_count": completed_count,
+            "selected_status": status,
+            "selected_stock_type": stock_type,
+            "selected_supplier": supplier,
+            "selected_month": month,
+            "selected_sort": sort,
         },
     )
-
 
 @login_required
 @permission_required("finance.view_operating_expense_nav", raise_exception=True)
@@ -333,7 +402,7 @@ def create_batch_expense(request):
                 obj.amount = Decimal("0.00")
 
             obj.save()
-            messages.success(request, "Batch expense created successfully.")
+            messages.success(request, "Stock In expense created successfully.")
             return redirect("batch_expense_list")
     else:
         form = BatchExpenseForm()
@@ -342,7 +411,7 @@ def create_batch_expense(request):
         request,
         "finance/create_batch_expense.html",
         {
-            "title": "Create Batch Expense",
+            "title": "Create Stock In Expense",
             "form": form,
             "back_url": "batch_expense_list",
         },
@@ -375,6 +444,13 @@ def create_operating_expense(request):
             "back_url": "operating_expense_list",
         },
     )
+
+
+@login_required
+@permission_required("finance.view_profit_dashboard_nav", raise_exception=True)
+def revenue_dashboard(request):
+    """Owner revenue, product mix and profit report."""
+    return profit_dashboard(request)
 
 
 @login_required
@@ -424,6 +500,35 @@ def profit_dashboard(request):
     base_expense_qs = Expense.objects.filter(
         created_at__date__gte=date_from,
         created_at__date__lte=date_to,
+    )
+
+    # Sales mix for the selected period.
+    top_cloth = (
+        base_item_qs.filter(shirt_item__isnull=False)
+        .values("shirt_item__code", "shirt_item__name")
+        .annotate(qty=Sum("quantity"), revenue=Sum("line_total"))
+        .order_by("-qty", "-revenue")
+        .first()
+    )
+    top_color = (
+        base_item_qs.filter(color__isnull=False)
+        .values("color__name", "color__hex_code")
+        .annotate(qty=Sum("quantity"))
+        .order_by("-qty")
+        .first()
+    )
+    top_size = (
+        base_item_qs.filter(size__isnull=False)
+        .values("size__name")
+        .annotate(qty=Sum("quantity"))
+        .order_by("-qty")
+        .first()
+    )
+    top_customer = (
+        base_order_qs.values("customer_name")
+        .annotate(revenue=Sum("total_amount"), orders=Count("id"))
+        .order_by("-revenue", "-orders")
+        .first()
     )
 
     def get_summary(order_type=None):
@@ -806,6 +911,10 @@ def profit_dashboard(request):
             "expense_total": expense_total,
             "profit_total": profit_total,
             "total_inventory": total_inventory,
+        "top_cloth": top_cloth,
+        "top_color": top_color,
+        "top_size": top_size,
+        "top_customer": top_customer,
             "expense_by_type": expense_by_type,
             "recent_expenses": recent_expenses,
 
@@ -952,3 +1061,187 @@ def expense_summary_export_excel(request):
 
     wb.save(response)
     return response
+
+@login_required
+@permission_required("finance.add_batch_expense", raise_exception=True)
+def batch_expense_cost_edit(request, pk):
+    expense = get_object_or_404(
+        Expense.objects.select_related(
+            "batch",
+            "batch__created_by",
+            "created_by",
+        ),
+        pk=pk,
+        expense_type=Expense.TYPE_BATCH,
+    )
+
+    item_rows = []
+    total_received_qty = Decimal("0")
+    stock_recorded_by = None
+    summary_type = "Inventory"
+    summary_unit = "units"
+
+    if expense.batch_id:
+        stock_recorded_by = expense.batch.created_by
+
+        rows = expense.batch.items.select_related(
+            "item",
+            "color",
+            "size",
+        ).filter(is_active=True)
+
+        note_lower = (expense.note or "").lower()
+        if "cloth" in note_lower:
+            summary_type = "Cloth"
+            summary_unit = "shirts"
+        elif "printing" in note_lower:
+            summary_type = "Printing Material"
+            summary_unit = "units"
+        else:
+            # Detect from the first available item type.
+            first_row = rows.first()
+            if (
+                first_row
+                and first_row.item
+                and first_row.item.item_type == InventoryItem.TYPE_SHIRT
+            ):
+                summary_type = "Cloth"
+                summary_unit = "shirts"
+            else:
+                summary_type = "Printing Material"
+                summary_unit = "units"
+
+        for row in rows:
+            qty = Decimal(row.qty_received or 0)
+            total_received_qty += qty
+
+            image_url = ""
+            if row.item and getattr(row.item, "image", None):
+                try:
+                    image_url = row.item.image.url
+                except (ValueError, AttributeError):
+                    image_url = ""
+
+            item_rows.append(
+                {
+                    "item_name": row.item.name if row.item else "-",
+                    "item_code": row.item.code if row.item else "",
+                    "color_name": row.color.name if row.color else "-",
+                    "size_name": row.size.name if row.size else "-",
+                    "quantity": qty,
+                    "unit_label": (
+                        "shirt"
+                        if summary_type == "Cloth" and qty == 1
+                        else "shirts"
+                        if summary_type == "Cloth"
+                        else "unit"
+                        if qty == 1
+                        else "units"
+                    ),
+                    "image_url": image_url,
+                    "summary_type": summary_type,
+                }
+            )
+
+    elif (
+        expense.stock_source_type == Expense.SOURCE_FABRIC
+        and expense.fabric_receipt_ids
+    ):
+        summary_type = "Fabric"
+        summary_unit = "rolls"
+
+        receipts = FabricReceipt.objects.select_related(
+            "fabric_type",
+            "color",
+            "created_by",
+        ).filter(pk__in=expense.fabric_receipt_ids)
+
+        first_receipt = receipts.first()
+        stock_recorded_by = first_receipt.created_by if first_receipt else None
+
+        for receipt in receipts:
+            qty = Decimal(receipt.roll_count or 0)
+            total_received_qty += qty
+
+            image_url = ""
+            fabric_type = receipt.fabric_type if receipt.fabric_type_id else None
+            if fabric_type and getattr(fabric_type, "image", None):
+                try:
+                    image_url = fabric_type.image.url
+                except (ValueError, AttributeError):
+                    image_url = ""
+
+            item_rows.append(
+                {
+                    "item_name": (
+                        fabric_type.name
+                        if fabric_type
+                        else receipt.fabric_name
+                    ),
+                    "item_code": receipt.receipt_no,
+                    "color_name": (
+                        receipt.color.name if receipt.color_id else "-"
+                    ),
+                    "size_name": "-",
+                    "quantity": qty,
+                    "unit_label": "roll" if qty == 1 else "rolls",
+                    "image_url": image_url,
+                    "summary_type": "Fabric",
+                }
+            )
+
+    if request.method == "POST":
+        form = BatchExpenseCostForm(request.POST, instance=expense)
+
+        if form.is_valid():
+            obj = form.save(commit=False)
+            obj.amount = (
+                (obj.batch_cost or Decimal("0"))
+                + (obj.batch_delivery_fee or Decimal("0"))
+                + (obj.batch_other_fee or Decimal("0"))
+            )
+            obj.expense_status = Expense.STATUS_COMPLETED
+            obj.created_by = request.user
+            obj.save()
+
+            messages.success(
+                request,
+                "Stock In expense cost saved successfully.",
+            )
+            return redirect("batch_expense_list")
+    else:
+        form = BatchExpenseCostForm(instance=expense)
+
+    current_total = (
+        (expense.batch_cost or Decimal("0"))
+        + (expense.batch_delivery_fee or Decimal("0"))
+        + (expense.batch_other_fee or Decimal("0"))
+    )
+
+    average_cost = (
+        current_total / total_received_qty
+        if total_received_qty > 0
+        else Decimal("0")
+    )
+
+    cost_recorded_by = (
+        expense.created_by
+        if expense.expense_status == Expense.STATUS_COMPLETED
+        else None
+    )
+
+    return render(
+        request,
+        "finance/batch_expense_cost_form.html",
+        {
+            "expense": expense,
+            "form": form,
+            "item_rows": item_rows,
+            "total_received_qty": total_received_qty,
+            "average_cost": average_cost,
+            "stock_recorded_by": stock_recorded_by,
+            "cost_recorded_by": cost_recorded_by,
+            "summary_type": summary_type,
+            "summary_unit": summary_unit,
+        },
+    )

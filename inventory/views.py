@@ -1,3 +1,4 @@
+import logging
 from collections import OrderedDict, defaultdict
 from decimal import Decimal
 
@@ -5,6 +6,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
 from django.db import transaction
 from django.db.models import Q, Sum
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
@@ -12,6 +14,7 @@ from orders.models import Order, OrderItem
 from production.forms import FabricReceiptHeaderForm, fabric_receipt_line_formset
 from production.models import FabricReceipt, FabricRoll, ProductionSupplier
 from production.services import create_fabric_rolls
+from finance.models import Expense
 
 from .forms import (
     ColorForm,
@@ -40,6 +43,8 @@ from .stock_ledger import (
     log_batch_edit,
     log_stock_in,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _to_int(value):
@@ -372,16 +377,34 @@ def inventory_list(request):
             fabric["colors"][color_key] = {
                 "color": roll.receipt.color,
                 "rolls": [],
+                "full_rolls": [],
+                "partial_rolls": [],
+                "full_count": 0,
+                "partial_count": 0,
                 "roll_count": 0,
                 "remaining_total": Decimal("0"),
+                "partial_total": Decimal("0"),
             }
+
         color_group = fabric["colors"][color_key]
+        remaining = Decimal(roll.remaining_qty or 0)
+
+        if remaining <= 0:
+            continue
+
         color_group["rolls"].append(roll)
-        if Decimal(roll.remaining_qty or 0) > 0:
-            color_group["roll_count"] += 1
-            color_group["remaining_total"] += Decimal(roll.remaining_qty or 0)
-            fabric["roll_count"] += 1
-            fabric["remaining_total"] += Decimal(roll.remaining_qty or 0)
+        color_group["roll_count"] += 1
+        color_group["remaining_total"] += remaining
+        fabric["roll_count"] += 1
+        fabric["remaining_total"] += remaining
+
+        if remaining >= Decimal("1"):
+            color_group["full_rolls"].append(roll)
+            color_group["full_count"] += 1
+        else:
+            color_group["partial_rolls"].append(roll)
+            color_group["partial_count"] += 1
+            color_group["partial_total"] += remaining
 
     fabric_groups = []
     for fabric in fabric_grouped.values():
@@ -408,6 +431,121 @@ def inventory_list(request):
             }
         )
 
+
+    # Latest 5 Stock In activities across Cloth, Printing Material and Fabric.
+    recent_stock_activities = []
+
+    recent_batches = (
+        InventoryBatch.objects
+        .select_related("created_by", "supplier_ref")
+        .prefetch_related("items__item")
+        .filter(is_deleted=False)
+        .order_by("-received_date", "-created_at", "-id")[:10]
+    )
+
+    for recent_batch in recent_batches:
+        cloth_qty = Decimal("0")
+        material_qty = Decimal("0")
+        material_names = []
+
+        for row in recent_batch.items.all():
+            if not row.item:
+                continue
+
+            qty = Decimal(row.qty_received or 0)
+
+            if row.item.item_type == InventoryItem.TYPE_SHIRT:
+                cloth_qty += qty
+            else:
+                material_qty += qty
+
+                if row.item.name not in material_names:
+                    material_names.append(row.item.name)
+
+        # A mixed batch is shown as Cloth when it contains cloth.
+        if cloth_qty > 0:
+            activity_type = "Cloth"
+            quantity = cloth_qty
+            unit = "shirt" if cloth_qty == 1 else "shirts"
+            item_summary = "Cloth Stock In"
+        else:
+            activity_type = "Printing Material"
+            quantity = material_qty
+            unit = "unit" if material_qty == 1 else "units"
+            item_summary = (
+                ", ".join(material_names[:3])
+                or "Printing Material Stock In"
+            )
+
+        recent_stock_activities.append(
+            {
+                "type": activity_type,
+                "reference": recent_batch.batch_no,
+                "supplier": recent_batch.supplier_name or "-",
+                "quantity": quantity,
+                "unit": unit,
+                "summary": item_summary,
+                "received_date": recent_batch.received_date,
+                "created_at": recent_batch.created_at,
+                "created_by": (
+                    recent_batch.created_by.username
+                    if recent_batch.created_by
+                    else "-"
+                ),
+                "detail_id": recent_batch.pk,
+            }
+        )
+
+    recent_receipts = (
+        FabricReceipt.objects
+        .select_related(
+            "fabric_type",
+            "color",
+            "created_by",
+            "supplier_ref",
+        )
+        .order_by("-received_date", "-created_at", "-id")[:10]
+    )
+
+    for receipt in recent_receipts:
+        roll_count = Decimal(receipt.roll_count or 0)
+
+        recent_stock_activities.append(
+            {
+                "type": "Fabric",
+                "reference": receipt.receipt_no,
+                "supplier": receipt.supplier or "-",
+                "quantity": roll_count,
+                "unit": "roll" if roll_count == 1 else "rolls",
+                "summary": (
+                    receipt.fabric_name
+                    + (
+                        f" · {receipt.color.name}"
+                        if receipt.color_id
+                        else ""
+                    )
+                ),
+                "received_date": receipt.received_date,
+                "created_at": receipt.created_at,
+                "created_by": (
+                    receipt.created_by.username
+                    if receipt.created_by
+                    else "-"
+                ),
+                "detail_id": receipt.pk,
+            }
+        )
+
+    recent_stock_activities.sort(
+        key=lambda row: (
+            row.get("received_date") or timezone.localdate(),
+            row.get("created_at") or timezone.now(),
+        ),
+        reverse=True,
+    )
+
+    recent_stock_activities = recent_stock_activities[:5]
+
     return render(
         request,
         "inventory/inventory_list.html",
@@ -419,6 +557,7 @@ def inventory_list(request):
             "inventory_type": inventory_type,
             "q": q,
             "batches": batch_rows,
+            "recent_stock_activities": recent_stock_activities,
         },
     )
 
@@ -641,6 +780,51 @@ def inventory_supplier_ajax_create(request):
     return JsonResponse({"ok": True, "supplier": {"id": supplier.pk, "name": supplier.name}, "message": "Supplier created successfully."})
 
 
+def _create_pending_inventory_expense(batch, user):
+    expense, created = Expense.objects.get_or_create(
+        expense_type=Expense.TYPE_BATCH,
+        batch=batch,
+        defaults={
+            "created_by": user,
+            "amount": Decimal("0.00"),
+            "batch_created_at": batch.created_at,
+            "batch_total_cloth": int(batch.total_cloth or 0),
+            "batch_cost": Decimal("0.00"),
+            "batch_delivery_fee": Decimal("0.00"),
+            "batch_other_fee": Decimal("0.00"),
+            "expense_status": Expense.STATUS_PENDING,
+            "stock_source_type": Expense.SOURCE_INVENTORY,
+            "source_reference": batch.batch_no,
+            "supplier_name": batch.supplier_name,
+            "received_date": batch.received_date,
+            "note": "Auto-created from Stock In. Cost pending.",
+        },
+    )
+    return expense
+
+
+def _create_pending_fabric_expense(receipts, supplier, received_date, user):
+    if not receipts:
+        return None
+    refs = [receipt.receipt_no for receipt in receipts if receipt.receipt_no]
+    reference = refs[0] if len(refs) == 1 else f"{refs[0]} +{len(refs)-1}"
+    return Expense.objects.create(
+        expense_type=Expense.TYPE_BATCH,
+        created_by=user,
+        amount=Decimal("0.00"),
+        batch_cost=Decimal("0.00"),
+        batch_delivery_fee=Decimal("0.00"),
+        batch_other_fee=Decimal("0.00"),
+        expense_status=Expense.STATUS_PENDING,
+        stock_source_type=Expense.SOURCE_FABRIC,
+        source_reference=reference,
+        supplier_name=supplier.name if supplier else "",
+        received_date=received_date,
+        fabric_receipt_ids=[receipt.pk for receipt in receipts],
+        note="Auto-created from Fabric Stock In. Cost pending.",
+    )
+
+
 @login_required
 @permission_required("inventory.add_inventorybatch", raise_exception=True)
 @transaction.atomic
@@ -674,16 +858,18 @@ def inventory_batch_create(request):
                     data = line_form.cleaned_data
                     supplier = fabric_header_form.cleaned_data["supplier"]
 
+                    fabric_type = data["fabric_type"]
                     receipt = FabricReceipt(
                         received_date=fabric_header_form.cleaned_data["received_date"],
                         supplier_ref=supplier,
                         supplier=supplier.name,
-                        fabric_name=data["fabric_name"],
+                        fabric_type=fabric_type,
+                        fabric_name=fabric_type.name,
                         color=data["color"],
                         roll_count=data["roll_count"],
-                        total_goods_cost=data.get("total_goods_cost") or Decimal("0"),
-                        shipping_cost=data.get("shipping_cost") or Decimal("0"),
-                        extra_cost=data.get("extra_cost") or Decimal("0"),
+                        total_goods_cost=Decimal("0"),
+                        shipping_cost=Decimal("0"),
+                        extra_cost=Decimal("0"),
                         note=data.get("note") or "",
                         created_by=request.user,
                         updated_by=request.user,
@@ -695,9 +881,26 @@ def inventory_batch_create(request):
                     total_rolls += receipt.roll_count
                     saved_lines += 1
 
+                finance_warning = ""
+                try:
+                    _create_pending_fabric_expense(
+                        created_receipts,
+                        fabric_header_form.cleaned_data["supplier"],
+                        fabric_header_form.cleaned_data["received_date"],
+                        request.user,
+                    )
+                except Exception:
+                    logger.exception(
+                        "Fabric Stock In saved, but Finance expense sync failed."
+                    )
+                    finance_warning = (
+                        " Stock was saved, but Finance expense sync needs review."
+                    )
+
                 message = (
                     f"{total_rolls} fabric roll(s) across "
                     f"{saved_lines} fabric type(s) received successfully."
+                    f"{finance_warning}"
                 )
 
                 if request.headers.get("x-requested-with") == "XMLHttpRequest":
@@ -705,7 +908,11 @@ def inventory_batch_create(request):
                         {
                             "ok": True,
                             "message": message,
-                            "redirect_url": "/inventory/?type=fabric",
+                            "detail_url": (
+                                f"/production/fabric-receipts/{created_receipts[0].pk}/edit/"
+                                if created_receipts
+                                else "/inventory/?type=fabric"
+                            ),
                         }
                     )
 
@@ -778,6 +985,10 @@ def inventory_batch_create(request):
 
         if form.is_valid() and formset.is_valid():
             batch = form.save(commit=False)
+            # Warehouse staff do not enter or see purchase cost. Finance fills it later.
+            batch.total_goods_cost = Decimal("0.00")
+            batch.shipping_cost = Decimal("0.00")
+            batch.extra_cost = Decimal("0.00")
 
             if request.user.is_authenticated:
                 batch.created_by = request.user
@@ -820,13 +1031,36 @@ def inventory_batch_create(request):
                 request.user,
                 "Batch created",
             )
+            finance_warning = ""
+            try:
+                pending_expense = _create_pending_inventory_expense(
+                    batch,
+                    request.user,
+                )
+                if pending_expense:
+                    pending_expense.note = (
+                        f"Auto-created from {stock_type.title()} Stock In. "
+                        "Cost pending."
+                    )
+                    pending_expense.save(update_fields=["note"])
+            except Exception:
+                logger.exception(
+                    "%s Stock In saved, but Finance expense sync failed.",
+                    stock_type,
+                )
+                finance_warning = (
+                    " Stock was saved, but Finance expense sync needs review."
+                )
 
             if request.headers.get("x-requested-with") == "XMLHttpRequest":
                 return JsonResponse(
                     {
                         "ok": True,
-                        "message": f"Inventory batch {batch.batch_no} created successfully.",
-                        "redirect_url": f"/inventory/batches/{batch.pk}/",
+                        "message": (
+                            f"Inventory batch {batch.batch_no} created successfully."
+                            f"{finance_warning}"
+                        ),
+                        "detail_url": f"/inventory/batches/{batch.pk}/",
                     }
                 )
 

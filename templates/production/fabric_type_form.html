@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block page_title %}{{ page_title_text }}{% endblock %}
+{% block page_subtitle %}Create one reusable fabric name and use it across colours and production{% endblock %}
+{% block content %}
+<style>.ft-wrap{max-width:760px;margin:0 auto}.ft-card{background:#fff;border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);padding:20px}.ft-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.field label{display:block;margin-bottom:6px;font-size:11px;font-weight:900;text-transform:uppercase;color:var(--muted)}.full{grid-column:1/-1}.ft-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:18px}@media(max-width:650px){.ft-grid{grid-template-columns:1fr}.full{grid-column:auto}.field input,.field select,.field textarea{font-size:16px!important}.ft-actions>*{flex:1}}</style>
+<div class="ft-wrap"><div class="ft-card"><form method="post">{% csrf_token %}<div class="ft-grid">{% for field in form %}<div class="field {% if field.name == 'note' %}full{% endif %}"><label>{{ field.label }}</label>{{ field }}{% for error in field.errors %}<small style="color:#b42318">{{ error }}</small>{% endfor %}</div>{% endfor %}</div><div class="ft-actions"><a class="btn btn-light" href="{% url 'production_fabric_type_list' %}">Cancel</a><button class="btn btn-primary">{{ submit_label }}</button></div></form></div></div>
+{% endblock %}

@@ -388,6 +388,7 @@
 }
 
 @media(max-width:820px){
+  .field input,.field select,.field textarea{font-size:16px!important}
   .fabric-page{padding:0 7px}
   .fabric-main{padding:10px;border-radius:17px}
   .page-top{display:grid}
@@ -459,7 +460,7 @@
               <span class="panel-icon">▦</span>
               <div>
                 <h2>Fabric types</h2>
-                <small>Add each fabric, colour, roll count and cost in one batch</small>
+                <small>Choose each fabric master, colour, roll count and cost in one batch</small>
               </div>
             </div>
             <button type="button" class="btn-light" id="add-row">＋ Add Fabric</button>
@@ -485,8 +486,8 @@
 
               <div class="fabric-line-grid {% if not can_view_cost %}no-cost{% endif %}">
                 <div class="field">
-                  <label>Fabric Name</label>
-                  {{ line_form.fabric_name }}
+                  <label>Fabric Type</label>
+                  {{ line_form.fabric_type }}
                 </div>
 
                 <div class="field">
@@ -537,8 +538,8 @@
 
             <div class="fabric-line-grid {% if not can_view_cost %}no-cost{% endif %}">
               <div class="field">
-                <label>Fabric Name</label>
-                {{ line_formset.empty_form.fabric_name }}
+                <label>Fabric Type</label>
+                {{ line_formset.empty_form.fabric_type }}
               </div>
 
               <div class="field">

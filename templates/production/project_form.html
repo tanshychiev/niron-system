@@ -1,148 +1,229 @@
 {% extends "base.html" %}
-{% block page_title %}New Production Project{% endblock %}
-{% block page_subtitle %}Create the work plan by product, colour and selected sizes{% endblock %}
+{% block page_title %}{% if is_edit %}Edit Production Order{% else %}Create Production Order{% endif %}{% endblock %}
+{% block page_subtitle %}Choose one fabric, add colours, and enter the size plan{% endblock %}
 {% block content %}
 <style>
-.prod-wrap{max-width:920px;margin:0 auto}.prod-card{background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:18px}.prod-actions{display:flex;gap:9px;justify-content:flex-end;flex-wrap:wrap;margin-bottom:14px}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.field label{display:block;margin-bottom:6px;font-size:11px;font-weight:900;text-transform:uppercase;color:var(--muted)}.field input,.field select,.field textarea{width:100%}.full{grid-column:1/-1}.section-title{margin:22px 0 6px}.helper{color:var(--muted);margin:0 0 12px}.size-list{display:grid;gap:10px}.size-row{display:grid;grid-template-columns:minmax(180px,1fr) minmax(120px,.55fr) 44px;gap:10px;align-items:end;padding:12px;border:1px solid var(--line);border-radius:14px;background:#fff}.size-row .field{min-width:0}.trash-btn{height:44px;border:1px solid #fecdca;border-radius:12px;background:#fef3f2;color:#b42318;font-size:18px;font-weight:950;cursor:pointer}.add-size{margin-top:12px}.total-box{display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding:13px;border-radius:14px;background:#f7f7f8}.empty-size{padding:18px;border:1px dashed var(--line);border-radius:14px;text-align:center;color:var(--muted)}@media(max-width:700px){.form-grid{grid-template-columns:1fr}.full{grid-column:auto}.size-row{grid-template-columns:1fr 1fr 44px}.prod-actions>*{flex:1}}@media(max-width:520px){.size-row{grid-template-columns:1fr 90px 42px}}
+.prod-create{max-width:1280px;margin:0 auto;padding-bottom:90px}
+.prod-hero{position:relative;overflow:hidden;background:linear-gradient(135deg,#fffdf7 0%,#fff4d7 100%);border:1px solid #eadfc8;border-radius:24px;padding:24px 28px;margin-bottom:16px;box-shadow:0 12px 32px rgba(84,59,18,.05)}
+.prod-hero:after{content:"";position:absolute;width:150px;height:150px;border:18px solid rgba(240,173,0,.08);border-radius:50%;right:-48px;top:-58px}
+.prod-hero h1{margin:0;font-size:27px;line-height:1.15;letter-spacing:-.7px;color:#121826}.prod-hero p{margin:7px 0 0;color:#6b7280;font-size:13px}
+.create-layout{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:16px;align-items:start}
+.prod-card{background:#fff;border:1px solid #e9e1d3;border-radius:20px;padding:18px;box-shadow:0 8px 25px rgba(53,43,24,.04);margin-bottom:14px}
+.section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:15px}.section-title{display:flex;align-items:center;gap:10px}.section-icon{width:34px;height:34px;border-radius:11px;background:#fff3cf;color:#a86f00;display:grid;place-items:center;font-weight:900}.section-title h2{font-size:16px;margin:0;color:#171717}.section-title small{display:block;margin-top:2px;color:#8a8174;font-size:11px;font-weight:500}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.field.full{grid-column:1/-1}.field label{display:block;font-size:11px;font-weight:800;color:#4e463b;margin:0 0 7px;text-transform:uppercase;letter-spacing:.35px}.field select,.field textarea{width:100%;border:1px solid #ddd3c2;border-radius:12px;background:#fff;padding:11px 12px;outline:none;transition:.18s}.field select:focus,.field textarea:focus{border-color:#e9aa00;box-shadow:0 0 0 3px rgba(233,170,0,.12)}.field textarea{min-height:82px;resize:vertical}.field-error{font-size:12px;color:#b42318;margin-top:6px}
+
+.color-picker-launch{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 14px;border:1px dashed #d8cebf;border-radius:15px;background:#fcfaf6}.selected-colors{display:flex;flex-wrap:wrap;gap:8px;min-height:34px;align-items:center}.selected-empty{font-size:12px;color:#928778}.selected-chip{display:inline-flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid #e3d9c8;border-radius:999px;background:#fff;font-size:12px;font-weight:900;color:#322b22}.selected-chip-dot,.palette-dot{width:16px;height:16px;border-radius:50%;border:1px solid rgba(0,0,0,.16);box-shadow:inset 0 0 0 1px rgba(255,255,255,.45)}.selected-chip button{border:0;background:transparent;color:#9b8d79;font-size:17px;line-height:1;padding:0;cursor:pointer}.btn-choose-colors{display:inline-flex;align-items:center;justify-content:center;gap:7px;white-space:nowrap;min-height:40px;padding:0 14px;border:1px solid #e2aa15;border-radius:12px;background:#fff5d5;color:#765200;font-size:12px;font-weight:900;cursor:pointer}.color-count{font-size:11px;font-weight:800;color:#8a8174;background:#f8f4ec;padding:6px 9px;border-radius:999px}
+.native-color-inputs{display:none}
+.color-modal-backdrop{position:fixed;inset:0;z-index:9998;background:rgba(19,22,28,.42);backdrop-filter:blur(4px);display:none}.color-modal-backdrop.open{display:block}.color-modal{position:fixed;z-index:9999;left:50%;top:50%;transform:translate(-50%,-50%);width:min(620px,calc(100vw - 28px));max-height:min(680px,calc(100vh - 30px));display:none;flex-direction:column;background:#fff;border:1px solid #e5dac8;border-radius:22px;box-shadow:0 30px 90px rgba(23,20,15,.30);overflow:hidden}.color-modal.open{display:flex}.color-modal-head{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border-bottom:1px solid #eee6da}.color-modal-head h3{margin:0;font-size:18px;color:#171717}.color-modal-head p{margin:4px 0 0;color:#8a8174;font-size:11px}.color-modal-close{width:36px;height:36px;border:1px solid #e4dacb;border-radius:11px;background:#fff;font-size:21px;color:#62594d;cursor:pointer}.color-palette{padding:18px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;overflow:auto}.palette-card{display:flex;align-items:center;gap:11px;min-height:52px;padding:11px 12px;border:1px solid #e4dacb;border-radius:14px;background:#fff;cursor:pointer;transition:.18s;text-align:left}.palette-card:hover{border-color:#dca400;background:#fffbef;transform:translateY(-1px)}.palette-card.selected{border-color:#e2a300;background:#fff4cb;box-shadow:0 0 0 3px rgba(226,163,0,.10)}.palette-name{font-size:12px;font-weight:900;color:#322b22}.palette-check{margin-left:auto;width:20px;height:20px;border:2px solid #c9bead;border-radius:7px;display:grid;place-items:center;font-size:12px;color:transparent}.palette-card.selected .palette-check{border-color:#d49800;background:#d49800;color:#fff}.color-modal-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;border-top:1px solid #eee6da;background:#fcfaf6}.modal-selection-count{font-size:12px;font-weight:800;color:#766b5d}.modal-actions{display:flex;gap:9px}.modal-btn{min-height:40px;padding:0 15px;border-radius:11px;font-size:12px;font-weight:900;cursor:pointer}.modal-btn.secondary{border:1px solid #ddd3c2;background:#fff;color:#50483e}.modal-btn.primary{border:1px solid #efa900;background:#efa900;color:#1d1708}
+.plan-empty{padding:24px;border:1px dashed #d8cebf;border-radius:15px;text-align:center;color:#928778;background:#fcfaf6}.plan-empty strong{display:block;color:#554b3e;margin-bottom:4px;font-size:13px}
+.plan-stack{display:grid;gap:11px}.color-plan{border:1px solid #e6ddcf;border-radius:16px;overflow:hidden;background:#fff}.color-plan-head{display:flex;align-items:center;justify-content:space-between;padding:11px 13px;background:#fbf8f2;border-bottom:1px solid #ede5d8}.color-name{display:flex;align-items:center;gap:9px;font-weight:900;color:#2e2922}.color-dot{width:13px;height:13px;border-radius:50%;background:#c8c8c8;border:1px solid rgba(0,0,0,.12)}.row-total-badge{font-size:11px;font-weight:900;color:#825800;background:#fff0bd;padding:6px 9px;border-radius:999px}.size-grid{display:grid;grid-template-columns:repeat(5,minmax(72px,1fr));gap:10px;padding:13px}.size-field label{display:block;text-align:center;font-size:10px;font-weight:900;color:#7f7465;margin-bottom:6px}.qty{width:100%;height:40px;text-align:center;border:1px solid #ded4c4;border-radius:11px;background:#fff;font-weight:800;outline:none}.qty:focus{border-color:#e7a800;box-shadow:0 0 0 3px rgba(231,168,0,.12)}
+.summary-card{position:sticky;top:14px}.summary-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:15px}.summary-top h3{font-size:15px;margin:0}.summary-status{font-size:10px;font-weight:900;padding:5px 8px;border-radius:999px;background:#f3f4f6;color:#6b7280}.summary-list{display:grid;gap:10px}.summary-item{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid #eee7dc}.summary-item:last-child{border-bottom:0}.summary-label{font-size:11px;color:#857a6b}.summary-value{font-size:13px;font-weight:900;color:#28231c;text-align:right}.summary-total{margin-top:13px;padding:14px;border-radius:15px;background:linear-gradient(135deg,#fff4c9,#ffe9a0)}.summary-total span{display:block;font-size:10px;color:#856200;font-weight:800;text-transform:uppercase}.summary-total strong{display:block;font-size:27px;line-height:1.1;color:#694c00;margin-top:3px}.summary-note{margin-top:11px;font-size:11px;color:#8b806f;line-height:1.5}
+.action-bar{position:sticky;max-width:100%;box-sizing:border-box;bottom:12px;z-index:20;display:flex;justify-content:flex-end;align-items:center;gap:10px;padding:11px 12px;margin-top:8px;border:1px solid rgba(220,208,188,.95);border-radius:17px;background:rgba(255,255,255,.92);backdrop-filter:blur(12px);box-shadow:0 14px 35px rgba(47,38,23,.12)}.btn-cancel,.btn-create{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:0 17px;border-radius:12px;font-size:12px;font-weight:900;text-decoration:none;border:1px solid transparent;cursor:pointer}.btn-cancel{background:#fff;border-color:#ddd3c2;color:#50483e}.btn-create{background:#efa900;color:#1d1708;box-shadow:0 8px 18px rgba(239,169,0,.24)}.btn-create:hover{filter:brightness(.97);transform:translateY(-1px)}
+@media(max-width:1050px){.create-layout{grid-template-columns:1fr}.summary-card{position:static}.color-list ul{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:720px){.color-palette{grid-template-columns:repeat(2,minmax(0,1fr))}.color-picker-launch{align-items:stretch;flex-direction:column}.btn-choose-colors{width:100%}.prod-create{padding-bottom:70px}.prod-hero{padding:20px}.prod-hero h1{font-size:23px}.form-grid{grid-template-columns:1fr}.field.full{grid-column:auto}.color-list ul{grid-template-columns:repeat(2,minmax(0,1fr))}.size-grid{grid-template-columns:repeat(3,minmax(72px,1fr))}.prod-card{padding:14px;border-radius:16px}input,select,textarea{font-size:16px!important}.action-bar{bottom:6px}.btn-cancel,.btn-create{flex:1}}
 </style>
-<div class="prod-wrap">
-  <div class="prod-actions"><a class="btn-light" href="{% url 'production_project_list' %}">← Projects</a></div>
-  <div class="prod-card">
-    <form method="post" id="projectForm">{% csrf_token %}
-      <div class="form-grid">
-        {% for field in form %}
-          <div class="field {% if field.name == 'note' %}full{% endif %}">
-            <label>{{ field.label }}</label>{{ field }}
-            {% for error in field.errors %}<small style="color:#b42318">{{ error }}</small>{% endfor %}
+
+<div class="prod-create">
+  <div class="prod-hero">
+    <h1>{% if is_edit %}Edit {{ project.project_no }}{% else %}Create Production Order{% endif %}</h1>
+    <p>{% if is_edit %}Update product information, colours and planned size quantities.{% else %}Choose one finished item and fabric, then add every colour and size quantity in the same order.{% endif %}</p>
+  </div>
+
+  <form method="post" id="production-project-form">
+    {% csrf_token %}
+    <div class="create-layout">
+      <main>
+        <section class="prod-card">
+          <div class="section-head">
+            <div class="section-title"><span class="section-icon">1</span><div><h2>Project information</h2><small>One product and one fabric type per project</small></div></div>
           </div>
-        {% endfor %}
-      </div>
+          <div class="form-grid">
+            {% for field in form %}
+              {% if field.name != 'colors' %}
+                <div class="field {% if field.name == 'note' %}full{% endif %}">
+                  <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                  {{ field }}
+                  {% if field.help_text %}<div class="summary-note">{{ field.help_text }}</div>{% endif %}
+                  {% for e in field.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+                </div>
+              {% endif %}
+            {% endfor %}
+          </div>
+        </section>
 
-      <div style="display:flex;align-items:end;justify-content:space-between;gap:12px;flex-wrap:wrap">
-        <div>
-          <h2 class="section-title">Production Plan by Size</h2>
-          <p class="helper">Add only the sizes needed for this project. Use the trash button to remove a wrong size.</p>
-        </div>
-        <button type="button" class="btn-light add-size" id="addSizeBtn">+ Add Size</button>
-      </div>
+        <section class="prod-card">
+          <div class="section-head">
+            <div class="section-title"><span class="section-icon">2</span><div><h2>Choose colours</h2><small>Tap a colour card to include it in this project</small></div></div>
+            <span class="color-count"><span id="selected-color-count">0</span> selected</span>
+          </div>
+          <div class="native-color-inputs">{{ form.colors }}</div>
+          <div class="color-picker-launch">
+            <div class="selected-colors" id="selected-colors">
+              <span class="selected-empty">No colour selected yet</span>
+            </div>
+            <button class="btn-choose-colors" type="button" id="open-color-modal">+ Choose colours</button>
+          </div>
+          {% for e in form.colors.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+        </section>
 
-      <div id="sizeList" class="size-list"></div>
-      <div id="emptySize" class="empty-size">No size added yet. Click <strong>+ Add Size</strong>.</div>
+        <section class="prod-card">
+          <div class="section-head">
+            <div class="section-title"><span class="section-icon">3</span><div><h2>Size plan</h2><small>Only selected colours appear below</small></div></div>
+          </div>
 
-      <div class="total-box">
-        <strong>Total Planned</strong><strong id="planTotal" style="font-size:24px">0</strong>
-      </div>
-      <div class="prod-actions" style="margin-top:18px"><button class="btn-primary">Create Project</button></div>
-    </form>
+          <div id="plan-empty" class="plan-empty">
+            <strong>No colour selected</strong>
+            Choose at least one colour above to enter its size quantities.
+          </div>
+
+          <div class="plan-stack" id="plan-stack">
+            {% for row in color_matrix %}
+              <div class="color-plan color-row" data-color="{{ row.color.id }}" data-color-name="{{ row.color.name }}" style="display:none">
+                <div class="color-plan-head">
+                  <div class="color-name"><span class="color-dot" style="background:{{ row.color.hex_code|default:'#D1D5DB' }}"></span>{{ row.color.name }}</div>
+                  <span class="row-total-badge"><span class="row-total">0</span> pcs</span>
+                </div>
+                <div class="size-grid">
+                  {% for cell in row.sizes %}
+                    <div class="size-field">
+                      <label for="plan_{{ row.color.id }}_{{ cell.size.id }}">{{ cell.size.name }}</label>
+                      <input class="qty plan-input" id="plan_{{ row.color.id }}_{{ cell.size.id }}" type="number" min="0" inputmode="numeric" name="plan_{{ row.color.id }}_{{ cell.size.id }}" value="{{ cell.value }}">
+                    </div>
+                  {% endfor %}
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </section>
+      </main>
+
+      <aside>
+        <section class="prod-card summary-card">
+          <div class="summary-top"><h3>Project summary</h3><span class="summary-status" id="summary-status">Draft</span></div>
+          <div class="summary-list">
+            <div class="summary-item"><span class="summary-label">Finished item</span><span class="summary-value" id="summary-item">Not selected</span></div>
+            <div class="summary-item"><span class="summary-label">Fabric</span><span class="summary-value" id="summary-fabric">Not selected</span></div>
+            <div class="summary-item"><span class="summary-label">Colours</span><span class="summary-value" id="summary-colours">0</span></div>
+          </div>
+          <div class="summary-total"><span>Total planned quantity</span><strong><span id="grand-total">0</span> pcs</strong></div>
+          <div class="summary-note">The project will remain a draft until cutting begins. Quantities can be adjusted later before cutting is confirmed.</div>
+        </section>
+      </aside>
+    </div>
+
+    <div class="action-bar">
+      <a class="btn-cancel" href="{% url 'production_project_list' %}">Cancel</a>
+      <button class="btn-create" type="submit">{% if is_edit %}Save Changes{% else %}Create Order{% endif %}</button>
+    </div>
+  </form>
+</div>
+
+<div class="color-modal-backdrop" id="color-modal-backdrop"></div>
+<div class="color-modal" id="color-modal" role="dialog" aria-modal="true" aria-labelledby="color-modal-title">
+  <div class="color-modal-head">
+    <div><h3 id="color-modal-title">Choose colours</h3><p>Select all colours included in this production project.</p></div>
+    <button class="color-modal-close" type="button" id="close-color-modal" aria-label="Close">×</button>
+  </div>
+  <div class="color-palette" id="color-palette">
+    {% for row in color_matrix %}
+      <button class="palette-card" type="button" data-color-id="{{ row.color.id }}" data-color-name="{{ row.color.name }}" data-color-hex="{{ row.color.hex_code|default:'#D1D5DB' }}">
+        <span class="palette-dot" style="background:{{ row.color.hex_code|default:'#D1D5DB' }}"></span>
+        <span class="palette-name">{{ row.color.name }}</span>
+        <span class="palette-check">✓</span>
+      </button>
+    {% endfor %}
+  </div>
+  <div class="color-modal-foot">
+    <span class="modal-selection-count"><span id="modal-selected-count">0</span> selected</span>
+    <div class="modal-actions">
+      <button class="modal-btn secondary" type="button" id="clear-colors">Clear</button>
+      <button class="modal-btn primary" type="button" id="apply-colors">Apply colours</button>
+    </div>
   </div>
 </div>
 
-<template id="sizeRowTemplate">
-  <div class="size-row">
-    <div class="field">
-      <label>Size</label>
-      <select class="form-select size-select">
-        <option value="">Select size</option>
-        {% for row in plan_rows %}<option value="{{ row.size.id }}" data-name="{{ row.size.name|escape }}">{{ row.size.name }}</option>{% endfor %}
-      </select>
-    </div>
-    <div class="field">
-      <label>Plan Quantity</label>
-      <input class="form-control plan-input" type="number" min="1" step="1" value="1">
-    </div>
-    <button type="button" class="trash-btn" title="Remove size">×</button>
-  </div>
-</template>
-
 <script>
 (function(){
-  const list=document.getElementById('sizeList');
-  const empty=document.getElementById('emptySize');
-  const addBtn=document.getElementById('addSizeBtn');
-  const template=document.getElementById('sizeRowTemplate');
-  const total=document.getElementById('planTotal');
+  const colorInputs = [...document.querySelectorAll('input[name="colors"]')];
+  const rows = [...document.querySelectorAll('.color-row')];
+  const itemSelect = document.getElementById('id_finished_item');
+  const fabricSelect = document.getElementById('id_fabric_type');
+  const modal = document.getElementById('color-modal');
+  const backdrop = document.getElementById('color-modal-backdrop');
+  const paletteCards = [...document.querySelectorAll('.palette-card')];
+  const selectedWrap = document.getElementById('selected-colors');
+  let draftSelection = new Set();
 
-  const initialRows=[
-    {% for row in plan_rows %}{% if row.value > 0 %}{id:"{{ row.size.id }}",qty:{{ row.value }}},{% endif %}{% endfor %}
-  ];
+  function selectedIds(){ return new Set(colorInputs.filter(i => i.checked).map(i => String(i.value))); }
+  function optionText(select){ if(!select || !select.value) return 'Not selected'; return select.options[select.selectedIndex]?.text || 'Not selected'; }
+  function inputFor(id){ return colorInputs.find(i => String(i.value) === String(id)); }
+  function cardFor(id){ return paletteCards.find(c => String(c.dataset.colorId) === String(id)); }
 
-  function selectedIds(){
-    return [...list.querySelectorAll('.size-select')].map(x=>x.value).filter(Boolean);
+  function openModal(){
+    draftSelection = selectedIds();
+    syncPalette();
+    modal.classList.add('open'); backdrop.classList.add('open');
+    document.body.style.overflow = 'hidden';
   }
-
-  function refreshOptions(){
-    const used=selectedIds();
-    list.querySelectorAll('.size-select').forEach(select=>{
-      [...select.options].forEach(option=>{
-        if(!option.value) return;
-        option.disabled=used.includes(option.value) && option.value!==select.value;
-      });
+  function closeModal(){ modal.classList.remove('open'); backdrop.classList.remove('open'); document.body.style.overflow = ''; }
+  function syncPalette(){
+    paletteCards.forEach(card => card.classList.toggle('selected', draftSelection.has(String(card.dataset.colorId))));
+    document.getElementById('modal-selected-count').textContent = draftSelection.size;
+  }
+  function applyDraft(){
+    colorInputs.forEach(input => { input.checked = draftSelection.has(String(input.value)); });
+    closeModal(); refresh();
+  }
+  function renderSelectedChips(selected){
+    selectedWrap.innerHTML = '';
+    if(!selected.size){ selectedWrap.innerHTML = '<span class="selected-empty">No colour selected yet</span>'; return; }
+    selected.forEach(id => {
+      const card = cardFor(id); if(!card) return;
+      const chip = document.createElement('span'); chip.className = 'selected-chip';
+      chip.innerHTML = `<span class="selected-chip-dot" style="background:${card.dataset.colorHex || '#D1D5DB'}"></span><span>${card.dataset.colorName}</span><button type="button" aria-label="Remove ${card.dataset.colorName}" data-remove-color="${id}">×</button>`;
+      selectedWrap.appendChild(chip);
     });
   }
 
-  function updateTotal(){
-    total.textContent=[...list.querySelectorAll('.plan-input')]
-      .reduce((sum,input)=>sum+(parseInt(input.value||'0',10)||0),0);
-    empty.style.display=list.children.length?'none':'block';
-  }
-
-  function addRow(sizeId='', qty=1){
-    const node=template.content.firstElementChild.cloneNode(true);
-    const select=node.querySelector('.size-select');
-    const input=node.querySelector('.plan-input');
-    const trash=node.querySelector('.trash-btn');
-
-    if(sizeId) select.value=String(sizeId);
-    input.value=qty || 1;
-
-    function syncName(){
-      if(select.value){
-        input.name='plan_'+select.value;
-      }else{
-        input.removeAttribute('name');
-      }
-      refreshOptions();
-      updateTotal();
-    }
-
-    select.addEventListener('change', syncName);
-    input.addEventListener('input', updateTotal);
-    trash.addEventListener('click', ()=>{
-      node.remove();
-      refreshOptions();
-      updateTotal();
+  function refresh(){
+    const selected = selectedIds();
+    let grand = 0;
+    rows.forEach(row => {
+      const active = selected.has(String(row.dataset.color));
+      row.style.display = active ? 'block' : 'none';
+      let rowTotal = 0;
+      row.querySelectorAll('.plan-input').forEach(input => { rowTotal += Math.max(0, Number(input.value || 0)); });
+      row.querySelector('.row-total').textContent = rowTotal.toLocaleString();
+      if(active) grand += rowTotal;
     });
-
-    list.appendChild(node);
-    syncName();
+    renderSelectedChips(selected);
+    document.getElementById('selected-color-count').textContent = selected.size;
+    document.getElementById('summary-colours').textContent = selected.size;
+    document.getElementById('grand-total').textContent = grand.toLocaleString();
+    document.getElementById('plan-empty').style.display = selected.size ? 'none' : 'block';
+    document.getElementById('summary-item').textContent = optionText(itemSelect);
+    document.getElementById('summary-fabric').textContent = optionText(fabricSelect);
+    document.getElementById('summary-status').textContent = selected.size && grand > 0 ? 'Ready' : 'Draft';
   }
 
-  addBtn.addEventListener('click', ()=>{
-    const available=[...template.content.querySelectorAll('option[value]')]
-      .map(x=>x.value).filter(Boolean).find(id=>!selectedIds().includes(id));
-    if(!available){
-      alert('All available sizes are already added.');
-      return;
-    }
-    addRow(available,1);
+  document.getElementById('open-color-modal').addEventListener('click', openModal);
+  document.getElementById('close-color-modal').addEventListener('click', closeModal);
+  backdrop.addEventListener('click', closeModal);
+  document.getElementById('apply-colors').addEventListener('click', applyDraft);
+  document.getElementById('clear-colors').addEventListener('click', () => { draftSelection.clear(); syncPalette(); });
+  paletteCards.forEach(card => card.addEventListener('click', () => {
+    const id = String(card.dataset.colorId);
+    draftSelection.has(id) ? draftSelection.delete(id) : draftSelection.add(id);
+    syncPalette();
+  }));
+  selectedWrap.addEventListener('click', e => {
+    const button = e.target.closest('[data-remove-color]'); if(!button) return;
+    const input = inputFor(button.dataset.removeColor); if(input) input.checked = false; refresh();
   });
-
-  if(initialRows.length){
-    initialRows.forEach(row=>addRow(row.id,row.qty));
-  }else{
-    addRow('',1);
-  }
-
-  document.getElementById('projectForm').addEventListener('submit',event=>{
-    const valid=[...list.querySelectorAll('.size-select')].some(select=>{
-      const input=select.closest('.size-row').querySelector('.plan-input');
-      return select.value && (parseInt(input.value||'0',10)||0)>0;
-    });
-    if(!valid){
-      event.preventDefault();
-      alert('Add at least one size with a planned quantity.');
-    }
-  });
+  document.addEventListener('keydown', e => { if(e.key === 'Escape' && modal.classList.contains('open')) closeModal(); });
+  document.addEventListener('change', e => { if(e.target.classList.contains('plan-input') || e.target === itemSelect || e.target === fabricSelect) refresh(); });
+  document.addEventListener('input', e => { if(e.target.classList.contains('plan-input')) refresh(); });
+  refresh();
 })();
 </script>
 {% endblock %}

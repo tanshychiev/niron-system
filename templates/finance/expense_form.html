@@ -69,6 +69,13 @@
         font-weight: 700;
         margin-top: 6px;
     }
+
+    .date-help {
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.4;
+    }
 </style>
 
 <div class="form-shell">
@@ -88,6 +95,14 @@
             <div class="field-row">
                 <label class="field-label">{{ field.label }}</label>
                 {{ field }}
+
+                {% if field.name == "expense_date" %}
+                <div class="date-help">
+                    Select today or a future date within the next 30 days.
+                    Past dates are not allowed.
+                </div>
+                {% endif %}
+
                 {% if field.errors %}
                 <div class="error-text">{{ field.errors|join:", " }}</div>
                 {% endif %}

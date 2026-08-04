@@ -1,0 +1,465 @@
+{% extends "base.html" %}
+{% block page_title %}Add Stock In Cost{% endblock %}
+{% block page_subtitle %}Review the received items and enter the total purchase expense{% endblock %}
+
+{% block content %}
+<style>
+.cost-wrap{
+  max-width:980px;
+  margin:0 auto;
+}
+
+.source-card,
+.items-card,
+.cost-card{
+  margin-bottom:12px;
+  padding:18px;
+  border:1px solid var(--line);
+  border-radius:18px;
+  background:#fff;
+  box-shadow:var(--shadow);
+}
+
+.source-card{
+  background:linear-gradient(145deg,#fff,#fff5df);
+}
+
+.source-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:12px;
+}
+
+.source-item span,
+.summary-box span{
+  display:block;
+  color:var(--muted);
+  font-size:9px;
+  font-weight:900;
+  text-transform:uppercase;
+}
+
+.source-item strong,
+.summary-box strong{
+  display:block;
+  margin-top:4px;
+  font-size:13px;
+}
+
+.items-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+  margin-bottom:12px;
+}
+
+.items-head h3{
+  margin:0;
+  font-size:18px;
+}
+
+.table-wrap{
+  overflow:auto;
+  border:1px solid var(--line);
+  border-radius:14px;
+}
+
+.item-table{
+  width:100%;
+  min-width:700px;
+  border-collapse:collapse;
+}
+
+.item-table th,
+.item-table td{
+  padding:10px 12px;
+  border-bottom:1px solid var(--line);
+  text-align:left;
+  font-size:11px;
+}
+
+.item-table th{
+  color:var(--muted);
+  font-size:9px;
+  text-transform:uppercase;
+}
+
+.item-table .qty{
+  text-align:right;
+  font-weight:900;
+}
+
+.summary-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-top:12px;
+}
+
+.summary-box{
+  padding:12px;
+  border-radius:14px;
+  background:#f7f7f8;
+}
+
+.summary-box.average{
+  background:#fff3d6;
+}
+
+.cost-grid{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:12px;
+}
+
+.field label{
+  display:block;
+  margin-bottom:5px;
+  color:var(--muted);
+  font-size:10px;
+  font-weight:900;
+  text-transform:uppercase;
+}
+
+.field input,
+.field textarea{
+  width:100%;
+  font-size:16px;
+}
+
+.full{
+  grid-column:1/-1;
+}
+
+.total-preview{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-top:14px;
+}
+
+.total-box{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:13px;
+  border-radius:14px;
+  background:#f7f7f8;
+}
+
+.total-box.average{
+  background:#fff3d6;
+}
+
+.actions{
+  display:flex;
+  justify-content:flex-end;
+  gap:9px;
+  margin-top:15px;
+}
+
+@media(max-width:720px){
+  .source-grid,
+  .summary-grid,
+  .cost-grid,
+  .total-preview{
+    grid-template-columns:1fr;
+  }
+
+  .full{
+    grid-column:auto;
+  }
+
+  .actions > *{
+    flex:1;
+  }
+}
+
+.summary-type-pill{
+  display:inline-flex;
+  align-items:center;
+  padding:6px 10px;
+  border-radius:999px;
+  background:#fff3d6;
+  color:#8a5a10;
+  font-size:10px;
+  font-weight:900;
+}
+.item-summary-cell{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  min-width:220px;
+}
+.item-summary-image{
+  width:46px;
+  height:46px;
+  flex:0 0 46px;
+  border:1px solid var(--line);
+  border-radius:13px;
+  object-fit:cover;
+  background:#fff8e9;
+}
+.item-summary-placeholder{
+  display:grid;
+  place-items:center;
+  width:46px;
+  height:46px;
+  flex:0 0 46px;
+  border:1px solid var(--line);
+  border-radius:13px;
+  background:linear-gradient(145deg,#fff,#fff1ca);
+  font-size:18px;
+}
+.item-summary-meta strong,
+.item-summary-meta span{
+  display:block;
+}
+.item-summary-meta span{
+  margin-top:3px;
+  color:var(--muted);
+  font-size:9px;
+}
+@media(max-width:720px){
+  .item-table{
+    min-width:760px;
+  }
+}
+
+</style>
+
+<div class="cost-wrap">
+  <div class="source-card">
+    <div class="source-grid">
+      <div class="source-item">
+        <span>Reference</span>
+        <strong>
+          {% if expense.source_reference %}
+            {{ expense.source_reference }}
+          {% elif expense.batch %}
+            {{ expense.batch.batch_no|default:"-" }}
+          {% else %}
+            -
+          {% endif %}
+        </strong>
+      </div>
+
+      <div class="source-item">
+        <span>Supplier</span>
+        <strong>
+          {% if expense.supplier_name %}
+            {{ expense.supplier_name }}
+          {% elif expense.batch %}
+            {{ expense.batch.supplier_name|default:"-" }}
+          {% else %}
+            -
+          {% endif %}
+        </strong>
+      </div>
+
+      <div class="source-item">
+        <span>Stock Type</span>
+        <strong>{{ expense.get_stock_source_type_display|default:"Inventory Batch" }}</strong>
+      </div>
+
+      <div class="source-item">
+        <span>Received Date</span>
+        <strong>{{ expense.received_date|default:expense.created_at|date:"d M Y" }}</strong>
+      </div>
+
+      <div class="source-item">
+        <span>Stock Recorded By</span>
+        <strong>
+          {% if stock_recorded_by %}
+            {{ stock_recorded_by.get_full_name|default:stock_recorded_by.username }}
+          {% else %}
+            -
+          {% endif %}
+        </strong>
+      </div>
+
+      <div class="source-item">
+        <span>Cost Recorded By</span>
+        <strong>
+          {% if cost_recorded_by %}
+            {{ cost_recorded_by.get_full_name|default:cost_recorded_by.username }}
+          {% else %}
+            Not recorded yet
+          {% endif %}
+        </strong>
+      </div>
+    </div>
+  </div>
+
+  <div class="items-card">
+    <div class="items-head">
+      <div>
+        <h3>Received Item Summary</h3>
+        <span class="summary-type-pill">{{ summary_type }}</span>
+      </div>
+      <strong>
+        {{ total_received_qty|floatformat:-2 }}
+        {{ summary_unit }}
+      </strong>
+    </div>
+
+    <div class="table-wrap">
+      <table class="item-table">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Code / Receipt</th>
+            <th>Color</th>
+            <th>Size</th>
+            <th class="qty">Quantity</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {% for row in item_rows %}
+            <tr>
+              <td>
+                <div class="item-summary-cell">
+                  {% if row.image_url %}
+                    <img
+                      src="{{ row.image_url }}"
+                      alt="{{ row.item_name }}"
+                      class="item-summary-image"
+                    >
+                  {% else %}
+                    <div class="item-summary-placeholder">
+                      {% if row.summary_type == "Fabric" %}🧵
+                      {% elif row.summary_type == "Cloth" %}👕
+                      {% else %}📦{% endif %}
+                    </div>
+                  {% endif %}
+
+                  <div class="item-summary-meta">
+                    <strong>{{ row.item_name }}</strong>
+                    <span>{{ row.summary_type }}</span>
+                  </div>
+                </div>
+              </td>
+              <td>{{ row.item_code|default:"-" }}</td>
+              <td>{{ row.color_name }}</td>
+              <td>{{ row.size_name }}</td>
+              <td class="qty">
+                {{ row.quantity|floatformat:-2 }}
+                {{ row.unit_label }}
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="5" style="padding:24px;text-align:center;color:var(--muted)">
+                No item summary found for this Stock In record.
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="summary-grid">
+      <div class="summary-box">
+        <span>Total {{ summary_type }}</span>
+        <strong>
+          {{ total_received_qty|floatformat:-2 }}
+          {{ summary_unit }}
+        </strong>
+      </div>
+
+      <div class="summary-box average">
+        <span>Current Average Cost Per Item</span>
+        <strong>${{ average_cost|floatformat:4 }}</strong>
+      </div>
+    </div>
+  </div>
+
+  <div class="cost-card">
+    <form method="post" id="costForm">
+      {% csrf_token %}
+
+      <div class="cost-grid">
+        <div class="field">
+          <label>{{ form.batch_cost.label }}</label>
+          {{ form.batch_cost }}
+          {{ form.batch_cost.errors }}
+        </div>
+
+        <div class="field">
+          <label>{{ form.batch_delivery_fee.label }}</label>
+          {{ form.batch_delivery_fee }}
+          {{ form.batch_delivery_fee.errors }}
+        </div>
+
+        <div class="field">
+          <label>{{ form.batch_other_fee.label }}</label>
+          {{ form.batch_other_fee }}
+          {{ form.batch_other_fee.errors }}
+        </div>
+
+        <div class="field full">
+          <label>Finance Note</label>
+          {{ form.note }}
+          {{ form.note.errors }}
+        </div>
+      </div>
+
+      <div class="total-preview">
+        <div class="total-box">
+          <strong>Total Expense</strong>
+          <strong id="expenseTotal" style="font-size:22px">$0.00</strong>
+        </div>
+
+        <div class="total-box average">
+          <strong>Estimated Average Cost Per Item</strong>
+          <strong id="liveAverage" style="font-size:22px">$0.0000</strong>
+        </div>
+      </div>
+
+      <div class="actions">
+        <a class="btn-light" href="{% url 'batch_expense_list' %}">Cancel</a>
+        <button class="btn-primary">Save Stock In Cost</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function(){
+  const fields = [
+    'id_batch_cost',
+    'id_batch_delivery_fee',
+    'id_batch_other_fee'
+  ].map(id => document.getElementById(id));
+
+  const totalElement = document.getElementById('expenseTotal');
+  const averageElement = document.getElementById('liveAverage');
+  const receivedQuantity = parseFloat(
+    '{{ total_received_qty|default:0 }}'
+  ) || 0;
+
+  function updateTotals(){
+    const total = fields.reduce(
+      (sum, input) => sum + (parseFloat(input?.value || 0) || 0),
+      0
+    );
+
+    const average = receivedQuantity > 0
+      ? total / receivedQuantity
+      : 0;
+
+    totalElement.textContent = '$' + total.toFixed(2);
+    averageElement.textContent = '$' + average.toFixed(4);
+  }
+
+  fields.forEach(input => {
+    input?.addEventListener('input', updateTotals);
+  });
+
+  updateTotals();
+})();
+</script>
+{% endblock %}

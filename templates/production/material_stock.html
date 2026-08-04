@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block page_title %}Material Stock{% endblock %}
-{% block page_subtitle %}Grouped by fabric and colour; every physical roll remains separate underneath{% endblock %}
+{% block page_subtitle %}Simple fabric stock by type and colour, with full and partial roll quantities{% endblock %}
 {% block content %}
 <style>
 .prod-wrap{max-width:1450px;margin:0 auto}.prod-actions{display:flex;gap:9px;flex-wrap:wrap;justify-content:flex-end;margin-bottom:14px}.prod-card{background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:17px}.prod-grid{display:grid;gap:13px}.prod-summary{grid-template-columns:repeat(5,minmax(0,1fr));margin-bottom:16px}.prod-metric span{display:block;color:var(--muted);font-size:10px;font-weight:900;text-transform:uppercase}.prod-metric strong{display:block;margin-top:5px;font-size:27px}.num{text-align:right!important}.pill{display:inline-flex;padding:6px 9px;border-radius:999px;background:#f3f4f6;font-weight:850;font-size:11px}.pill.good{background:#eaf8ef;color:#087535}.pill.warn{background:#fff1df;color:#a95500}.pill.bad{background:#fdecec;color:#b42318}.empty{padding:28px;text-align:center;color:var(--muted)}.cost-box{background:#fff8e8;border-color:#efd49b}.group-list{display:grid;gap:12px}.stock-group{border:1px solid var(--line);border-radius:16px;overflow:hidden;background:#fff}.group-head{width:100%;border:0;background:#fff;padding:15px;display:grid;grid-template-columns:minmax(220px,1.6fr) repeat(5,minmax(90px,.7fr)) 34px;gap:12px;align-items:center;text-align:left;cursor:pointer}.group-head:hover{background:#fffdf8}.fabric-title{display:flex;align-items:center;gap:10px}.swatch{width:25px;height:25px;border-radius:50%;border:1px solid rgba(0,0,0,.2);box-shadow:inset 0 0 0 2px rgba(255,255,255,.75);flex:0 0 auto}.metric-mini span{display:block;font-size:9px;font-weight:900;text-transform:uppercase;color:var(--muted)}.metric-mini strong{display:block;margin-top:3px}.chev{font-size:18px;transition:transform .2s}.stock-group.open .chev{transform:rotate(180deg)}.children{display:none;border-top:1px solid var(--line);background:#fcfaf6}.stock-group.open .children{display:block}.child-table-wrap{overflow-x:auto}.child-table{width:100%;border-collapse:collapse;min-width:900px}.child-table th,.child-table td{padding:11px 15px;border-bottom:1px solid var(--line);text-align:left}.child-table th{font-size:10px;text-transform:uppercase;color:var(--muted)}.child-table tr:last-child td{border-bottom:0}.search-form{display:flex;gap:10px;margin-bottom:14px}.search-form input{flex:1}@media(max-width:1000px){.group-head{grid-template-columns:1fr 1fr 1fr 34px}.group-head .hide-tablet{display:none}.prod-summary{grid-template-columns:repeat(3,1fr)}}@media(max-width:650px){.prod-summary{grid-template-columns:1fr 1fr}.group-head{grid-template-columns:1fr 1fr 28px}.group-head .hide-mobile{display:none}.search-form{flex-wrap:wrap}.search-form input{flex-basis:100%}.prod-actions>*{flex:1}}
@@ -10,11 +10,11 @@
   <div class="prod-grid prod-summary">
     <div class="prod-card prod-metric"><span>Full Rolls</span><strong>{{ full_count }}</strong></div>
     <div class="prod-card prod-metric"><span>Partial Rolls</span><strong>{{ partial_count }}</strong></div>
-    <div class="prod-card prod-metric"><span>Physical Rolls</span><strong>{{ physical_count }}</strong></div>
+    <div class="prod-card prod-metric"><span>Total Roll Rows</span><strong>{{ physical_count }}</strong></div>
     <div class="prod-card prod-metric"><span>Equivalent Rolls</span><strong>{{ equivalent_total|floatformat:"-3" }}</strong></div>
     {% if can_view_cost %}<div class="prod-card prod-metric cost-box"><span>Remaining Value</span><strong>${{ remaining_value|floatformat:2 }}</strong></div>{% endif %}
   </div>
-  <form class="prod-card search-form" method="get"><input name="q" value="{{ q }}" placeholder="Roll code, fabric, colour or supplier"><button class="btn-primary">Search</button><a class="btn-light" href="{% url 'production_material_stock' %}">Reset</a></form>
+  <form class="prod-card search-form" method="get"><input name="q" value="{{ q }}" placeholder="Fabric, colour or supplier"><button class="btn-primary">Search</button><a class="btn-light" href="{% url 'production_material_stock' %}">Reset</a></form>
 
   <div class="group-list">
     {% for group in roll_groups %}
@@ -29,8 +29,18 @@
         <span class="chev">⌄</span>
       </button>
       <div class="children">
-        <div class="child-table-wrap"><table class="child-table"><thead><tr><th>Roll Code</th><th>Supplier</th><th>Received</th><th class="num">Remaining</th><th>Status</th>{% if can_view_cost %}<th class="num">Cost / Roll</th><th class="num">Remaining Value</th>{% endif %}<th></th></tr></thead><tbody>
-          {% for roll in group.rolls %}<tr><td><strong>{{ roll.roll_code }}</strong></td><td>{{ roll.receipt.supplier }}</td><td>{{ roll.receipt.received_date|date:'d M Y' }}</td><td class="num">{{ roll.remaining_qty|floatformat:"-3" }}</td><td><span class="pill {% if roll.status == 'PARTIAL' %}warn{% elif roll.status == 'USED' %}bad{% else %}good{% endif %}">{{ roll.get_status_display }}</span></td>{% if can_view_cost %}<td class="num">${{ roll.unit_cost|floatformat:2 }}</td><td class="num">${{ roll.remaining_value|floatformat:2 }}</td>{% endif %}<td>{% if perms.production.change_fabricreceipt %}<a class="btn-light" href="{% url 'production_fabric_receipt_edit' roll.receipt_id %}">Receipt</a>{% endif %}</td></tr>{% endfor %}
+        <div class="child-table-wrap"><table class="child-table"><thead><tr><th>Type</th><th>Supplier</th><th>Received</th><th class="num">Remaining</th><th>Status</th>{% if can_view_cost %}<th class="num">Cost / Roll</th><th class="num">Remaining Value</th>{% endif %}<th></th></tr></thead><tbody>
+          {% for roll in group.rolls %}
+          <tr>
+            <td><strong>{% if roll.status == 'FULL' %}Full Roll{% elif roll.status == 'PARTIAL' %}Partial Roll {{ forloop.counter }}{% else %}Used Roll{% endif %}</strong></td>
+            <td>{{ roll.receipt.supplier }}</td>
+            <td>{{ roll.receipt.received_date|date:'d M Y' }}</td>
+            <td class="num">{{ roll.remaining_qty|floatformat:"-3" }}</td>
+            <td><span class="pill {% if roll.status == 'PARTIAL' %}warn{% elif roll.status == 'USED' %}bad{% else %}good{% endif %}">{{ roll.get_status_display }}</span></td>
+            {% if can_view_cost %}<td class="num">${{ roll.unit_cost|floatformat:2 }}</td><td class="num">${{ roll.remaining_value|floatformat:2 }}</td>{% endif %}
+            <td>{% if perms.production.change_fabricreceipt %}<a class="btn-light" href="{% url 'production_fabric_receipt_edit' roll.receipt_id %}">Receipt</a>{% endif %}</td>
+          </tr>
+          {% endfor %}
         </tbody></table></div>
       </div>
     </section>

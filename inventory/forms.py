@@ -106,14 +106,36 @@ class SizeForm(forms.ModelForm):
 
 
 class InventoryBatchForm(forms.ModelForm):
+    """
+    Cloth and Printing Material Stock In form.
+
+    Warehouse staff records only:
+    - received date
+    - supplier
+    - note
+    - stock items and quantities
+
+    Purchase costs are recorded later by Finance in Stock In Expense.
+    """
+
     received_date = forms.DateField(
-        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"})
+        widget=forms.DateInput(
+            attrs={
+                "type": "date",
+                "class": "form-control",
+            }
+        )
     )
+
     supplier_ref = forms.ModelChoiceField(
         queryset=ProductionSupplier.objects.none(),
         required=True,
         empty_label="Choose supplier",
-        widget=forms.Select(attrs={"class": "form-select supplier-select"}),
+        widget=forms.Select(
+            attrs={
+                "class": "form-select supplier-select",
+            }
+        ),
         label="Supplier",
     )
 
@@ -122,71 +144,80 @@ class InventoryBatchForm(forms.ModelForm):
         fields = [
             "received_date",
             "supplier_ref",
-            "total_goods_cost",
-            "shipping_cost",
-            "extra_cost",
             "note",
         ]
         widgets = {
-            "total_goods_cost": forms.NumberInput(
-                attrs={
-                    "class": "form-control cost-input",
-                    "step": "0.01",
-                    "min": "0",
-                    "placeholder": "0.00",
-                }
-            ),
-            "shipping_cost": forms.NumberInput(
-                attrs={
-                    "class": "form-control cost-input",
-                    "step": "0.01",
-                    "min": "0",
-                    "placeholder": "0.00",
-                }
-            ),
-            "extra_cost": forms.NumberInput(
-                attrs={
-                    "class": "form-control cost-input",
-                    "step": "0.01",
-                    "min": "0",
-                    "placeholder": "0.00",
-                }
-            ),
             "note": forms.Textarea(
                 attrs={
                     "class": "form-control",
                     "rows": 3,
-                    "placeholder": "Batch note, receipt number, payment detail...",
+                    "placeholder": "Batch note or receipt number...",
                 }
             ),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["supplier_ref"].queryset = ProductionSupplier.objects.filter(
-            is_active=True
-        ).order_by("name")
-        if self.instance and self.instance.pk and not self.instance.supplier_ref_id and self.instance.supplier:
-            existing = ProductionSupplier.objects.filter(name__iexact=self.instance.supplier.strip()).first()
-            if existing:
-                self.initial["supplier_ref"] = existing.pk
+
+        self.fields["supplier_ref"].queryset = (
+            ProductionSupplier.objects
+            .filter(is_active=True)
+            .order_by("name")
+        )
+
+        if (
+            self.instance
+            and self.instance.pk
+            and not self.instance.supplier_ref_id
+            and self.instance.supplier
+        ):
+            existing_supplier = ProductionSupplier.objects.filter(
+                name__iexact=self.instance.supplier.strip()
+            ).first()
+
+            if existing_supplier:
+                self.initial["supplier_ref"] = existing_supplier.pk
 
     def save(self, commit=True):
         instance = super().save(commit=False)
         instance.status = InventoryBatch.STATUS_FINAL
+
+        # Stock In never records purchase cost.
+        # Finance completes the cost later.
+        instance.total_goods_cost = Decimal("0.00")
+        instance.shipping_cost = Decimal("0.00")
+        instance.extra_cost = Decimal("0.00")
+
         if instance.supplier_ref_id:
             instance.supplier = instance.supplier_ref.name
+
         if not instance.batch_no:
-            date_part = instance.received_date.strftime("%Y%m%d") if instance.received_date else "BATCH"
+            date_part = (
+                instance.received_date.strftime("%Y%m%d")
+                if instance.received_date
+                else "BATCH"
+            )
+
             base = f"STK-{date_part}"
-            index = InventoryBatch.objects.filter(batch_no__startswith=base).count() + 1
+            index = (
+                InventoryBatch.objects
+                .filter(batch_no__startswith=base)
+                .count()
+                + 1
+            )
             candidate = f"{base}-{index:03d}"
-            while InventoryBatch.objects.filter(batch_no=candidate).exists():
+
+            while InventoryBatch.objects.filter(
+                batch_no=candidate
+            ).exists():
                 index += 1
                 candidate = f"{base}-{index:03d}"
+
             instance.batch_no = candidate
+
         if commit:
             instance.save()
+
         return instance
 
 

@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block page_title %}Fabric Types{% endblock %}
+{% block page_subtitle %}Reusable fabric masters for receiving fabric and production projects{% endblock %}
+{% block top_actions %}{% if perms.production.add_fabrictype %}<a class="btn btn-primary" href="{% url 'production_fabric_type_create' %}">+ New Fabric Type</a>{% endif %}{% endblock %}
+{% block content %}
+<style>
+.ft-wrap{max-width:1100px;margin:0 auto}.ft-card{background:#fff;border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);padding:18px}.ft-search{display:grid;grid-template-columns:1fr auto;gap:10px;margin-bottom:16px}.ft-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.ft-item{padding:16px;border:1px solid var(--line);border-radius:16px;background:#fffdf8}.ft-name{font-size:17px;font-weight:900}.ft-meta{margin-top:7px;color:var(--muted);font-size:12px}.ft-actions{margin-top:13px}.status{display:inline-flex;margin-top:9px;padding:5px 9px;border-radius:999px;font-size:10px;font-weight:900;background:#ecfdf3;color:#067647}.status.off{background:#f3f4f6;color:#667085}@media(max-width:800px){.ft-grid{grid-template-columns:1fr 1fr}.ft-search input{font-size:16px!important}}@media(max-width:520px){.ft-grid,.ft-search{grid-template-columns:1fr}}
+</style>
+<div class="ft-wrap"><div class="ft-card">
+<form method="get" class="ft-search"><input class="form-control" name="q" value="{{ q }}" placeholder="Search fabric name or composition"><button class="btn btn-light">Search</button></form>
+<div class="ft-grid">{% for row in fabric_types %}<div class="ft-item"><div class="ft-name">{{ row.name }}</div><div class="ft-meta">{% if row.gsm %}{{ row.gsm }} GSM{% else %}GSM not set{% endif %} · {{ row.composition|default:"Composition not set" }}</div><span class="status {% if not row.is_active %}off{% endif %}">{% if row.is_active %}Active{% else %}Inactive{% endif %}</span>{% if perms.production.change_fabrictype %}<div class="ft-actions"><a class="btn btn-light" href="{% url 'production_fabric_type_edit' row.pk %}">Edit</a></div>{% endif %}</div>{% empty %}<p>No fabric types found.</p>{% endfor %}</div>
+</div></div>
+{% endblock %}
