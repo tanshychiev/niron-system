@@ -1,6 +1,7 @@
 from django import forms
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.models import Group, Permission, User
+from django.db import transaction
 
 from .models import UserProfile
 
@@ -36,33 +37,29 @@ def clear_permission_cache(user):
             delattr(user, cache_name)
 
 
+@transaction.atomic
 def sync_user_access(user, selected_group):
     """
-    Make the selected role the single source of truth for user access.
-
-    Admin roles:
-    - receive every Django permission
-    - are marked is_staff=True
-    - are marked is_superuser=True
-
-    Other roles:
-    - receive only permissions selected on their Group/Role
-    - are not staff or superusers
+    Keep the selected role as the single source of truth for access.
     """
-    user.groups.clear()
+    admin_access = is_admin_role(selected_group)
 
     if selected_group:
-        if is_admin_role(selected_group):
+        user.groups.set([selected_group.pk])
+        if admin_access:
             selected_group.permissions.set(Permission.objects.all())
+    else:
+        user.groups.clear()
 
-        user.groups.add(selected_group)
-
-    admin_access = is_admin_role(selected_group)
+    User.objects.filter(pk=user.pk).update(
+        is_staff=admin_access,
+        is_superuser=admin_access,
+    )
 
     user.is_staff = admin_access
     user.is_superuser = admin_access
-    user.save(update_fields=["is_staff", "is_superuser"])
-
+    clear_permission_cache(user)
+    user.refresh_from_db(fields=["is_staff", "is_superuser"])
     clear_permission_cache(user)
 
 

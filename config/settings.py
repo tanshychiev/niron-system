@@ -25,7 +25,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
 
-    "accounts",
+    "accounts.apps.AccountsConfig",
     "inventory.apps.InventoryConfig",
     "orders.apps.OrdersConfig",
     "finance",

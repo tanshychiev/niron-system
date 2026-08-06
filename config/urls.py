@@ -1,12 +1,28 @@
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
-from django.urls import include, path
+from django.shortcuts import redirect
+from django.urls import include, path, re_path
+
+
+def niron_home(request):
+    return redirect("inventory_list")
+
+
+def unknown_page(request, unmatched_path=None):
+    return redirect("inventory_list")
+
 
 urlpatterns = [
     path("admin/", admin.site.urls),
 
+    # Niron main page
+    path("", niron_home, name="niron_home"),
+
+    # Accounts
     path("", include("accounts.urls")),
+
+    # Modules
     path("orders/", include("orders.urls")),
     path("inventory/", include("inventory.urls")),
     path("production/", include("production.urls")),
@@ -15,4 +31,16 @@ urlpatterns = [
 ]
 
 if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    urlpatterns += static(
+        settings.MEDIA_URL,
+        document_root=settings.MEDIA_ROOT,
+    )
+
+# Keep this last. Any unknown URL goes back to Inventory.
+urlpatterns += [
+    re_path(
+        r"^(?P<unmatched_path>.*)$",
+        unknown_page,
+        name="unknown_page",
+    ),
+]

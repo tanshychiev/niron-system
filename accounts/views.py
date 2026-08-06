@@ -6,7 +6,14 @@ from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib.auth.models import Group, Permission, User
 from django.shortcuts import get_object_or_404, redirect, render
 
-from .forms import LoginForm, RoleForm, UserCreateForm, UserEditForm, UserProfileForm
+from .forms import (
+    LoginForm,
+    RoleForm,
+    UserCreateForm,
+    UserEditForm,
+    UserProfileForm,
+    sync_user_access,
+)
 from .models import UserProfile
 
 
@@ -89,9 +96,17 @@ def user_edit(request, pk):
         )
 
         if form.is_valid() and profile_form.is_valid():
-            form.save()
+            updated_user = form.save()
             profile_form.save()
-            messages.success(request, "User updated successfully.")
+
+            selected_group = form.cleaned_data.get("groups")
+            sync_user_access(updated_user, selected_group)
+
+            role_name = selected_group.name if selected_group else "No role"
+            messages.success(
+                request,
+                f"User updated successfully. Active role: {role_name}.",
+            )
             return redirect("user_list")
     else:
         form = UserEditForm(instance=user_obj)
