@@ -291,13 +291,30 @@ class CuttingRollUsageForm(forms.ModelForm):
 class SewingPartnerForm(forms.ModelForm):
     class Meta:
         model = SewingPartner
-        fields = ["name", "phone", "location", "is_active", "note"]
+        fields = [
+            "name",
+            "phone",
+            "location",
+            "is_active",
+            "is_default",
+            "note",
+        ]
         widgets = {
             "name": forms.TextInput(attrs={"class": "form-control"}),
             "phone": forms.TextInput(attrs={"class": "form-control"}),
             "location": forms.TextInput(attrs={"class": "form-control"}),
-            "is_active": forms.CheckboxInput(attrs={"class": "form-check-input"}),
-            "note": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+            "is_active": forms.CheckboxInput(
+                attrs={"class": "form-check-input"}
+            ),
+            "is_default": forms.CheckboxInput(
+                attrs={"class": "form-check-input"}
+            ),
+            "note": forms.Textarea(
+                attrs={"class": "form-control", "rows": 3}
+            ),
+        }
+        labels = {
+            "is_default": "Use as default sewer",
         }
 
 
@@ -322,6 +339,14 @@ class SewingJobForm(forms.ModelForm):
     def __init__(self, *args, user=None, project=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.project = project or getattr(self.instance, "project", None)
+
+        # Set the project on the ModelForm instance before form validation.
+        # SewingJob.clean() checks that project_color belongs to project.
+        # Without this, a new job has project_id=None during is_valid(),
+        # so the form fails with a hidden non-field validation error.
+        if self.project and getattr(self.project, "pk", None):
+            self.instance.project = self.project
+
         self.fields["partner"].queryset = SewingPartner.objects.filter(is_active=True).order_by("name")
         if self.project and getattr(self.project, "pk", None):
             self.fields["project_color"].queryset = self.project.project_colors.select_related("color").all()
@@ -363,6 +388,32 @@ class StaffPayableForm(forms.ModelForm):
             "amount": forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": 0}),
             "description": forms.TextInput(attrs={"class": "form-control", "placeholder": "Optional note"}),
         }
+
+
+class SewingReturnBulkPaymentForm(forms.Form):
+    price_per_piece = forms.DecimalField(
+        label="Price per cloth",
+        min_value=Decimal("0.0001"),
+        max_digits=12,
+        decimal_places=4,
+        widget=forms.NumberInput(
+            attrs={
+                "class": "form-control",
+                "step": "0.0001",
+                "min": "0.0001",
+                "placeholder": "0.50",
+            }
+        ),
+    )
+    payment_date = forms.DateField(
+        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"})
+    )
+    note = forms.CharField(
+        required=False,
+        widget=forms.Textarea(
+            attrs={"class": "form-control", "rows": 3, "placeholder": "Optional note"}
+        ),
+    )
 
 
 class PaymentBatchForm(forms.ModelForm):

@@ -262,10 +262,29 @@ class SewingPartner(models.Model):
     phone = models.CharField(max_length=50, blank=True, default="")
     location = models.CharField(max_length=255, blank=True, default="")
     is_active = models.BooleanField(default=True)
+    is_default = models.BooleanField(
+        default=False,
+        help_text="Automatically use this sewer for new production sewing jobs.",
+    )
     note = models.TextField(blank=True, default="")
 
     class Meta:
-        ordering = ["name"]
+        ordering = ["-is_default", "name"]
+
+    def save(self, *args, **kwargs):
+        # Only one active sewer can be the system default.
+        if self.is_default:
+            type(self).objects.exclude(pk=self.pk).filter(
+                is_default=True
+            ).update(is_default=False)
+        elif not self.pk and not type(self).objects.filter(
+            is_default=True,
+            is_active=True,
+        ).exists():
+            # The first active sewing partner becomes default automatically.
+            self.is_default = True
+
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.name
@@ -313,7 +332,18 @@ class ProductionProject(models.Model):
         help_text="Legacy first colour; new projects use project_colors.",
     )
     expected_qty = models.PositiveIntegerField(default=0)
-    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default=STATUS_DRAFT)
+    status = models.CharField(
+        max_length=30,
+        choices=STATUS_CHOICES,
+        default=STATUS_DRAFT,
+    )
+    cutting_is_complete = models.BooleanField(
+        default=False,
+        help_text=(
+            "Keep false while partial cutting is still continuing. "
+            "Set true only when no more pieces will be cut."
+        ),
+    )
     note = models.TextField(blank=True, default="")
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)

@@ -1,5 +1,1939 @@
-{% extends "base.html" %}{% block page_title %}Sewing Returns{% endblock %}{% block page_subtitle %}Every partial return is recorded separately{% endblock %}{% block content %}
+{% extends "base.html" %}
+
+{% block page_title %}Sewing Returns{% endblock %}
+{% block page_subtitle %}
+Pay the sewer only after the full production project is received
+{% endblock %}
+
+{% block content %}
 <style>
-.prod-wrap{max-width:1450px;margin:0 auto}.prod-actions{display:flex;gap:9px;flex-wrap:wrap;justify-content:flex-end;margin-bottom:14px}.prod-card{background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:17px}.prod-grid{display:grid;gap:13px}.prod-summary{grid-template-columns:repeat(5,minmax(0,1fr));margin-bottom:16px}.prod-metric span{display:block;color:var(--muted);font-size:10px;font-weight:900;text-transform:uppercase}.prod-metric strong{display:block;margin-top:5px;font-size:27px}.prod-table-wrap{overflow-x:auto}.prod-table{width:100%;border-collapse:collapse;min-width:850px}.prod-table th,.prod-table td{padding:12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}.prod-table th{font-size:10px;color:var(--muted);text-transform:uppercase}.num{text-align:right!important}.pill{display:inline-flex;padding:6px 9px;border-radius:999px;background:#f3f4f6;font-weight:850;font-size:11px}.pill.good{background:#eaf8ef;color:#087535}.pill.warn{background:#fff1df;color:#a95500}.pill.bad{background:#fdecec;color:#b42318}.section-head{display:flex;align-items:end;justify-content:space-between;gap:12px;margin-bottom:12px}.section-head h2{margin:0}.section-head p{margin:4px 0 0;color:var(--muted)}.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.field label{display:block;margin-bottom:6px;font-size:11px;font-weight:900;text-transform:uppercase;color:var(--muted)}.field input,.field select,.field textarea{width:100%}.full{grid-column:1/-1}.inline-form{display:grid;grid-template-columns:2fr 1fr 1fr 2fr auto;gap:10px;align-items:end}.empty{padding:28px;text-align:center;color:var(--muted)}.cost-box{background:#fff8e8;border-color:#efd49b}.selected-bar{position:sticky;top:88px;z-index:30;background:rgba(255,255,255,.96);backdrop-filter:blur(12px);padding:12px;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}.modal{display:none;position:fixed;inset:0;z-index:200;align-items:center;justify-content:center;padding:18px;background:rgba(20,24,31,.5)}.modal.open{display:flex}.modal-card{width:min(600px,100%);max-height:88vh;overflow:auto;background:#fff;border-radius:20px;padding:20px}.modal-actions{display:flex;gap:9px;justify-content:flex-end;margin-top:15px}@media(max-width:950px){.prod-summary{grid-template-columns:repeat(3,1fr)}.inline-form{grid-template-columns:1fr 1fr}.inline-form>*:last-child{grid-column:1/-1}.form-grid{grid-template-columns:1fr}}@media(max-width:650px){.prod-summary{grid-template-columns:1fr 1fr}.prod-actions>*{flex:1}.selected-bar{top:72px;align-items:stretch;flex-direction:column}}
+  .sew-page{
+    width:min(100%,1450px);
+    margin:0 auto;
+  }
+
+  .summary-grid{
+    display:grid;
+    grid-template-columns:repeat(5,minmax(0,1fr));
+    gap:12px;
+    margin-bottom:14px;
+  }
+
+  .summary-card{
+    min-height:92px;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    padding:14px 16px;
+    border:1px solid var(--line);
+    border-radius:17px;
+    background:#fff;
+    box-shadow:var(--shadow-soft);
+  }
+
+  .summary-card span{
+    color:var(--muted);
+    font-size:10px;
+    font-weight:900;
+    letter-spacing:.5px;
+    text-transform:uppercase;
+  }
+
+  .summary-card strong{
+    margin-top:5px;
+    font-size:27px;
+    line-height:1;
+  }
+
+  .summary-card small{
+    margin-top:5px;
+    color:var(--muted);
+    font-size:10px;
+    font-weight:700;
+  }
+
+  .summary-card.unpaid{
+    border-color:#efca78;
+    background:#fff8e5;
+  }
+
+  .summary-card.unpaid strong{
+    color:#a56600;
+  }
+
+  .filter-card{
+    margin-bottom:14px;
+    padding:13px;
+    border:1px solid var(--line);
+    border-radius:17px;
+    background:#fff;
+    box-shadow:var(--shadow-soft);
+  }
+
+  .filter-grid{
+    display:grid;
+    grid-template-columns:1.1fr 1fr 1fr auto auto;
+    gap:10px;
+    align-items:end;
+  }
+
+  .filter-field label{
+    display:block;
+    margin-bottom:5px;
+    color:var(--muted);
+    font-size:9px;
+    font-weight:900;
+    letter-spacing:.4px;
+    text-transform:uppercase;
+  }
+
+  .project-list{
+    display:grid;
+    gap:13px;
+  }
+
+  .project-card{
+    overflow:hidden;
+    border:1px solid var(--line);
+    border-radius:19px;
+    background:#fff;
+    box-shadow:var(--shadow-soft);
+    transition:
+      border-color .18s ease,
+      box-shadow .18s ease,
+      transform .18s ease;
+  }
+
+  .project-card.is-selected{
+    border-color:#44b887;
+    box-shadow:
+      0 0 0 3px rgba(14,139,104,.12),
+      var(--shadow-soft);
+    transform:translateY(-1px);
+  }
+
+  .project-card.is-locked{
+    background:#fbfaf8;
+  }
+
+  .project-head{
+    display:grid;
+    grid-template-columns:auto minmax(0,1fr) auto;
+    gap:13px;
+    align-items:center;
+    padding:15px;
+    cursor:pointer;
+  }
+
+  .project-select{
+    position:relative;
+    width:42px;
+    height:42px;
+    flex:0 0 42px;
+  }
+
+  .project-select input{
+    position:absolute;
+    opacity:0;
+    pointer-events:none;
+  }
+
+  .cool-check{
+    width:42px;
+    height:42px;
+    display:grid;
+    place-items:center;
+    border:2px solid #d8d2c7;
+    border-radius:13px;
+    background:#fff;
+    color:transparent;
+    font-size:21px;
+    font-weight:950;
+    transition:.18s ease;
+  }
+
+  .project-select input:checked + .cool-check{
+    border-color:#0e8b68;
+    background:#0e8b68;
+    color:#fff;
+    box-shadow:0 7px 17px rgba(14,139,104,.22);
+  }
+
+  .project-select input:disabled + .cool-check{
+    border-color:#e5e1da;
+    background:#f1efeb;
+    color:#b8b3aa;
+  }
+
+  .project-main{
+    min-width:0;
+  }
+
+  .project-title-line{
+    display:flex;
+    align-items:center;
+    gap:9px;
+    flex-wrap:wrap;
+  }
+
+  .project-title{
+    margin:0;
+    font-size:17px;
+    font-weight:950;
+  }
+
+  .project-title a{
+    color:inherit;
+    text-decoration:none;
+  }
+
+  .item-name{
+    color:var(--muted);
+    font-size:11px;
+    font-weight:750;
+  }
+
+  .project-meta{
+    display:flex;
+    gap:14px;
+    flex-wrap:wrap;
+    margin-top:7px;
+    color:#6d6962;
+    font-size:10px;
+    font-weight:750;
+  }
+
+  .project-meta strong{
+    color:var(--text);
+  }
+
+  .project-status{
+    min-width:132px;
+    text-align:right;
+  }
+
+  .status-pill{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-height:30px;
+    padding:6px 10px;
+    border-radius:999px;
+    font-size:10px;
+    font-weight:950;
+  }
+
+  .status-ready{
+    background:#e8f8ef;
+    color:#087545;
+  }
+
+  .status-paid{
+    background:#e8f1ff;
+    color:#245ca8;
+  }
+
+  .status-wait{
+    background:#fff1dc;
+    color:#a65a00;
+  }
+
+  .lock-reason{
+    display:block;
+    max-width:220px;
+    margin-top:5px;
+    color:#8a8175;
+    font-size:9px;
+    line-height:1.35;
+  }
+
+  .project-totals{
+    display:grid;
+    grid-template-columns:repeat(4,minmax(0,1fr));
+    border-top:1px solid var(--line);
+    border-bottom:1px solid var(--line);
+    background:#fcfaf6;
+  }
+
+  .project-total{
+    padding:11px 15px;
+    border-right:1px solid var(--line);
+  }
+
+  .project-total:last-child{
+    border-right:0;
+  }
+
+  .project-total span{
+    display:block;
+    color:var(--muted);
+    font-size:9px;
+    font-weight:900;
+    text-transform:uppercase;
+  }
+
+  .project-total strong{
+    display:block;
+    margin-top:4px;
+    font-size:20px;
+  }
+
+  .project-total.ready strong{
+    color:#087545;
+  }
+
+  .project-children-toggle{
+    width:100%;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    padding:10px 15px;
+    border:0;
+    background:#fff;
+    color:#625d55;
+    cursor:pointer;
+    font-size:10px;
+    font-weight:850;
+    text-align:left;
+  }
+
+  .toggle-arrow{
+    transition:transform .18s ease;
+  }
+
+  .project-card.children-open .toggle-arrow{
+    transform:rotate(180deg);
+  }
+
+  .project-children{
+    display:none;
+    padding:0 15px 14px;
+  }
+
+  .project-card.children-open .project-children{
+    display:block;
+  }
+
+  .child-table{
+    width:100%;
+    border-collapse:collapse;
+  }
+
+  .child-table th,
+  .child-table td{
+    padding:10px 9px;
+    border-bottom:1px solid #eee7dc;
+    text-align:left;
+    font-size:10px;
+    vertical-align:middle;
+  }
+
+  .child-table th{
+    color:var(--muted);
+    font-size:8.5px;
+    font-weight:900;
+    letter-spacing:.4px;
+    text-transform:uppercase;
+  }
+
+  .child-table tr:last-child td{
+    border-bottom:0;
+  }
+
+  .colour-chip{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:5px 8px;
+    border:1px solid #ddd5c8;
+    border-radius:999px;
+    background:#fff;
+    font-weight:850;
+  }
+
+  .colour-dot{
+    width:11px;
+    height:11px;
+    border:1px solid rgba(0,0,0,.25);
+    border-radius:50%;
+  }
+
+  .payment-bar{
+    position:sticky;
+    bottom:10px;
+    z-index:30;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    margin-top:15px;
+    padding:12px 14px;
+    border:1px solid #b8d9ca;
+    border-radius:16px;
+    background:rgba(239,251,245,.96);
+    box-shadow:0 14px 35px rgba(44,73,57,.15);
+    backdrop-filter:blur(14px);
+  }
+
+  .payment-bar strong{
+    display:block;
+    font-size:13px;
+  }
+
+  .payment-bar small{
+    display:block;
+    margin-top:3px;
+    color:#65736b;
+    font-size:10px;
+  }
+
+  .modal{
+    position:fixed;
+    inset:0;
+    z-index:300;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    padding:18px;
+    background:rgba(27,25,22,.52);
+    backdrop-filter:blur(6px);
+  }
+
+  .modal.open{
+    display:flex;
+  }
+
+  .modal-card{
+    width:min(560px,100%);
+    max-height:90vh;
+    overflow:auto;
+    padding:21px;
+    border:1px solid #ead8b5;
+    border-radius:22px;
+    background:#fffdf9;
+    box-shadow:0 25px 75px rgba(35,27,16,.28);
+  }
+
+  .modal-card h2{
+    margin:0;
+    font-size:22px;
+  }
+
+  .modal-summary{
+    display:grid;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:8px;
+    margin:15px 0;
+  }
+
+  .modal-summary > div{
+    padding:11px;
+    border:1px solid var(--line);
+    border-radius:13px;
+    background:#faf8f4;
+  }
+
+  .modal-summary span{
+    display:block;
+    color:var(--muted);
+    font-size:9px;
+    font-weight:900;
+    text-transform:uppercase;
+  }
+
+  .modal-summary strong{
+    display:block;
+    margin-top:5px;
+    font-size:18px;
+  }
+
+  .modal-form-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:11px;
+  }
+
+  .modal-field.full{
+    grid-column:1/-1;
+  }
+
+  .modal-field label{
+    display:block;
+    margin-bottom:5px;
+    color:var(--muted);
+    font-size:9px;
+    font-weight:900;
+    text-transform:uppercase;
+  }
+
+  .payment-total{
+    margin-top:12px;
+    padding:13px;
+    border:1px solid #efca78;
+    border-radius:14px;
+    background:#fff7df;
+    color:#7e5600;
+    text-align:center;
+  }
+
+  .payment-total span{
+    display:block;
+    font-size:10px;
+    font-weight:850;
+    text-transform:uppercase;
+  }
+
+  .payment-total strong{
+    display:block;
+    margin-top:5px;
+    font-size:28px;
+  }
+
+  .modal-actions{
+    display:flex;
+    justify-content:flex-end;
+    gap:9px;
+    margin-top:15px;
+  }
+
+  .empty{
+    padding:35px;
+    border:1px dashed #dcd3c5;
+    border-radius:17px;
+    color:var(--muted);
+    text-align:center;
+  }
+
+  @media(max-width:1000px){
+    .summary-grid{
+      grid-template-columns:repeat(3,minmax(0,1fr));
+    }
+
+    .filter-grid{
+      grid-template-columns:1fr 1fr;
+    }
+
+    .filter-grid .btn-primary,
+    .filter-grid .btn-light{
+      width:100%;
+    }
+  }
+
+  @media(max-width:720px){
+    .summary-grid{
+      grid-template-columns:1fr 1fr;
+    }
+
+    .project-head{
+      grid-template-columns:auto minmax(0,1fr);
+    }
+
+    .project-status{
+      grid-column:1/-1;
+      padding-left:55px;
+      text-align:left;
+    }
+
+    .project-totals{
+      grid-template-columns:1fr 1fr;
+    }
+
+    .project-total:nth-child(2){
+      border-right:0;
+    }
+
+    .project-total:nth-child(-n+2){
+      border-bottom:1px solid var(--line);
+    }
+
+    .child-table{
+      min-width:720px;
+    }
+
+    .project-children{
+      overflow-x:auto;
+    }
+
+    .payment-bar{
+      align-items:stretch;
+      flex-direction:column;
+    }
+
+    .payment-bar .btn-primary{
+      width:100%;
+    }
+
+    .modal-summary,
+    .modal-form-grid{
+      grid-template-columns:1fr;
+    }
+
+    .modal-field.full{
+      grid-column:auto;
+    }
+  }
+
+  /* Compact status-grouped project list */
+  .project-list{
+    gap:0;
+  }
+
+  .status-group{
+    margin-bottom:15px;
+  }
+
+  .status-group:last-child{
+    margin-bottom:0;
+  }
+
+  .status-group-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    margin:0 0 7px;
+    padding:0 2px;
+  }
+
+  .status-group-title{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin:0;
+    color:var(--text);
+    font-size:13px;
+    font-weight:950;
+  }
+
+  .status-group-dot{
+    width:9px;
+    height:9px;
+    border-radius:50%;
+  }
+
+  .status-group[data-status-group="ready"] .status-group-dot{
+    background:#0e8b68;
+  }
+
+  .status-group[data-status-group="waiting"] .status-group-dot{
+    background:#e39a00;
+  }
+
+  .status-group[data-status-group="paid"] .status-group-dot{
+    background:#2f6fc3;
+  }
+
+  .status-group-count{
+    min-width:25px;
+    height:25px;
+    display:grid;
+    place-items:center;
+    padding:0 7px;
+    border:1px solid var(--line);
+    border-radius:999px;
+    background:#fff;
+    color:var(--muted);
+    font-size:9px;
+    font-weight:900;
+  }
+
+  .status-group-body{
+    display:grid;
+    gap:8px;
+  }
+
+  .project-card{
+    border-radius:14px;
+  }
+
+  .project-head{
+    grid-template-columns:auto minmax(0,1fr) auto;
+    gap:9px;
+    padding:10px 11px;
+  }
+
+  .project-select,
+  .cool-check{
+    width:34px;
+    height:34px;
+  }
+
+  .cool-check{
+    border-radius:10px;
+    font-size:17px;
+  }
+
+  .project-title{
+    font-size:14px;
+  }
+
+  .item-name{
+    font-size:9px;
+  }
+
+  .project-meta{
+    gap:9px;
+    margin-top:4px;
+    font-size:8.5px;
+  }
+
+  .project-status{
+    min-width:105px;
+  }
+
+  .status-pill{
+    min-height:24px;
+    padding:4px 8px;
+    font-size:8.5px;
+  }
+
+  .lock-reason{
+    max-width:180px;
+    margin-top:3px;
+    font-size:8px;
+  }
+
+  .project-total{
+    padding:7px 11px;
+  }
+
+  .project-total span{
+    font-size:7.5px;
+  }
+
+  .project-total strong{
+    margin-top:2px;
+    font-size:16px;
+  }
+
+  .project-children-toggle{
+    padding:7px 11px;
+    font-size:8.5px;
+  }
+
+  .project-children{
+    padding:0 11px 10px;
+  }
+
+  .child-table th,
+  .child-table td{
+    padding:7px;
+    font-size:8.5px;
+  }
+
+  .child-table th{
+    font-size:7.5px;
+  }
+
+  .colour-chip{
+    padding:3px 6px;
+    font-size:8px;
+  }
+
+  .colour-dot{
+    width:9px;
+    height:9px;
+  }
+
+  .payment-bar{
+    padding:9px 11px;
+    border-radius:13px;
+  }
+
+  .payment-bar strong{
+    font-size:11px;
+  }
+
+  .payment-bar small{
+    font-size:8.5px;
+  }
+
+  .payment-bar .btn-primary{
+    min-height:38px;
+    padding:8px 14px;
+    font-size:11px;
+  }
+
+  @media(max-width:720px){
+    .project-status{
+      padding-left:43px;
+    }
+  }
+
+
+  /* Search now includes Status + Date Type + From + To */
+  .filter-grid{
+    grid-template-columns:
+      minmax(150px,.9fr)
+      minmax(150px,.9fr)
+      minmax(170px,1fr)
+      minmax(170px,1fr)
+      auto auto;
+  }
+
+  /* Payment action directly below search */
+  .filter-card + .payment-bar{
+    position:relative;
+    bottom:auto;
+    z-index:5;
+    margin:0 0 14px;
+    padding:12px 14px;
+    border:2px solid #a9d9c2;
+    background:linear-gradient(135deg,#ecfaf3,#ffffff);
+    box-shadow:0 8px 22px rgba(37,94,68,.08);
+  }
+
+  .filter-card + .payment-bar .btn-primary{
+    min-width:145px;
+    min-height:42px;
+    font-size:12px;
+  }
+
+  /* Make the money the strongest element in the payment popup */
+  .payment-total{
+    padding:17px 14px !important;
+    border-width:2px !important;
+  }
+
+  .payment-total strong{
+    margin-top:6px !important;
+    font-size:46px !important;
+    line-height:1 !important;
+    letter-spacing:-1.5px;
+  }
+
+  .payment-total span{
+    font-size:11px !important;
+  }
+
+  .payment-total small{
+    display:block;
+    margin-top:8px;
+    font-size:12px;
+    font-weight:850;
+  }
+
+  #paymentTotal{
+    font-variant-numeric:tabular-nums;
+  }
+
+  @media(max-width:1100px){
+    .filter-grid{
+      grid-template-columns:1fr 1fr 1fr;
+    }
+  }
+
+  @media(max-width:720px){
+    .filter-grid{
+      grid-template-columns:1fr;
+    }
+
+    .filter-card + .payment-bar{
+      align-items:stretch;
+      flex-direction:column;
+    }
+
+    .filter-card + .payment-bar .btn-primary{
+      width:100%;
+    }
+
+    .payment-total strong{
+      font-size:38px !important;
+    }
+  }
+
+
+  .project-card.is-selected{
+    border-color:#0e8b68 !important;
+    box-shadow:
+      0 0 0 3px rgba(14,139,104,.14),
+      0 10px 25px rgba(14,139,104,.10) !important;
+  }
+
+  .modal-card{
+    width:min(650px,100%) !important;
+  }
+
+  .modal-summary > div:first-child{
+    grid-column:span 1;
+  }
+
+  #modalProjectList{
+    display:block;
+    margin-top:5px;
+    color:#6f6a62;
+    font-size:9px;
+    line-height:1.35;
+    font-weight:700;
+  }
+
+  .payment-total{
+    position:relative;
+    overflow:hidden;
+    padding:22px 16px !important;
+    border:3px solid #f0ad12 !important;
+    background:
+      radial-gradient(circle at 50% 0,rgba(255,190,44,.26),transparent 55%),
+      linear-gradient(145deg,#fff9e4,#fff1bd) !important;
+    box-shadow:
+      0 12px 30px rgba(202,130,0,.16),
+      inset 0 1px 0 rgba(255,255,255,.9);
+  }
+
+  .payment-total::after{
+    content:"";
+    position:absolute;
+    width:120px;
+    height:120px;
+    right:-42px;
+    bottom:-55px;
+    border:18px solid rgba(235,155,0,.08);
+    border-radius:50%;
+  }
+
+  .payment-total > *{
+    position:relative;
+    z-index:1;
+  }
+
+  .payment-total > span{
+    color:#8b5b00;
+    font-size:12px !important;
+    letter-spacing:.8px;
+  }
+
+  .payment-total strong{
+    display:block;
+    margin:8px 0 4px !important;
+    color:#5f3b00;
+    font-size:64px !important;
+    line-height:.95 !important;
+    font-weight:1000 !important;
+    letter-spacing:-3px !important;
+    word-break:break-word;
+  }
+
+  .payment-total small{
+    color:#7a5a1b;
+    font-size:13px !important;
+  }
+
+  .payment-total em{
+    display:block;
+    min-height:17px;
+    margin-top:7px;
+    color:#a65b00;
+    font-size:11px;
+    font-style:normal;
+    font-weight:900;
+  }
+
+  .additional-cost-toggle{
+    width:100%;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    padding:11px 13px;
+    border:1px dashed #e0a321;
+    border-radius:13px;
+    background:#fff9e8;
+    color:#8a5a00;
+    cursor:pointer;
+    text-align:left;
+  }
+
+  .additional-cost-toggle span{
+    font-size:12px;
+    font-weight:950;
+  }
+
+  .additional-cost-toggle small{
+    color:#8d7b59;
+    font-size:9px;
+  }
+
+  .additional-cost-field{
+    margin-top:9px;
+    padding:11px;
+    border:1px solid #efcf82;
+    border-radius:13px;
+    background:#fffcf4;
+  }
+
+  .additional-cost-field input{
+    font-size:18px;
+    font-weight:900;
+  }
+
+  @media(max-width:720px){
+    .payment-total strong{
+      font-size:46px !important;
+      letter-spacing:-2px !important;
+    }
+
+    .additional-cost-toggle{
+      align-items:flex-start;
+      flex-direction:column;
+    }
+  }
+
+
+  /* Larger, easier-to-read payment popup */
+  .modal-card{
+    width:min(700px,100%) !important;
+    padding:25px !important;
+  }
+
+  .modal-card h2{
+    font-size:28px !important;
+    line-height:1.1;
+  }
+
+  .modal-card > p{
+    font-size:14px !important;
+    line-height:1.5;
+  }
+
+  .modal-summary span,
+  .modal-field label{
+    font-size:10px !important;
+  }
+
+  .modal-summary strong{
+    font-size:20px !important;
+  }
+
+  #modalProjectList{
+    font-size:11px !important;
+  }
+
+  .modal-field input,
+  .modal-field textarea{
+    font-size:17px !important;
+  }
+
+  .additional-cost-toggle span{
+    font-size:14px !important;
+  }
+
+  .additional-cost-toggle small{
+    font-size:10px !important;
+  }
+
+  .payment-total > span{
+    font-size:14px !important;
+  }
+
+  .payment-total strong{
+    font-size:74px !important;
+    letter-spacing:-4px !important;
+  }
+
+  .payment-total small{
+    font-size:15px !important;
+  }
+
+  .payment-total em{
+    font-size:13px !important;
+  }
+
+  .modal-actions .btn-light,
+  .modal-actions .btn-primary{
+    min-height:48px;
+    padding:11px 18px;
+    font-size:14px;
+  }
+
+  /* Make the whole project header row clickable */
+  .project-head[data-project-select-area]{
+    cursor:pointer;
+    user-select:none;
+  }
+
+  .project-card:not(.is-locked) .project-head[data-project-select-area]:hover{
+    background:#f4fbf7;
+  }
+
+  .project-card.is-selected .project-head[data-project-select-area]{
+    background:#ecfaf3;
+  }
+
+  @media(max-width:720px){
+    .modal-card{
+      padding:19px !important;
+    }
+
+    .modal-card h2{
+      font-size:23px !important;
+    }
+
+    .payment-total strong{
+      font-size:52px !important;
+      letter-spacing:-2px !important;
+    }
+  }
+
+
+  .currency-help{
+    display:block;
+    margin-top:5px;
+    color:#7a746c;
+    font-size:10px;
+    font-weight:750;
+  }
+
+  #paymentTotalDisplay{
+    display:flex !important;
+    align-items:baseline;
+    justify-content:center;
+    gap:8px;
+    white-space:nowrap;
+  }
+
+  #paymentTotalCurrency{
+    font-size:.52em;
+    letter-spacing:0;
+  }
+
+  .converted-total{
+    width:max-content;
+    max-width:100%;
+    margin:10px auto 0;
+    padding:8px 13px;
+    border:2px solid #c78300;
+    border-radius:999px;
+    background:#fff;
+    color:#7a4b00;
+    font-size:15px;
+    font-weight:1000;
+    box-shadow:0 5px 14px rgba(161,98,0,.12);
+  }
+
+  .payment-total{
+    animation:paymentNoticePulse 1.9s ease-in-out infinite;
+  }
+
+  @keyframes paymentNoticePulse{
+    0%,100%{
+      box-shadow:
+        0 12px 30px rgba(202,130,0,.16),
+        0 0 0 0 rgba(240,173,18,.24);
+    }
+    50%{
+      box-shadow:
+        0 16px 38px rgba(202,130,0,.22),
+        0 0 0 8px rgba(240,173,18,0);
+    }
+  }
+
+  @media(prefers-reduced-motion:reduce){
+    .payment-total{
+      animation:none;
+    }
+  }
+
 </style>
-<div class="prod-wrap"><div class="prod-card prod-table-wrap"><table class="prod-table"><thead><tr><th>Return</th><th>Date</th><th>Project</th><th>Partner</th><th class="num">Good</th><th class="num">Damaged</th><th class="num">Missing</th><th>Status</th></tr></thead><tbody>{% for ret in returns %}<tr><td><a href="{% url 'production_return_detail' ret.id %}"><strong>{{ ret.return_no }}</strong></a></td><td>{{ ret.return_date|date:'d M Y' }}</td><td>{{ ret.job.project.project_no }}</td><td>{{ ret.job.payee_name }}</td><td class="num">{{ ret.good_total }}</td><td class="num">{{ ret.damaged_total }}</td><td class="num">{{ ret.missing_total }}</td><td><span class="pill {% if ret.status == 'STOCKED' %}good{% else %}warn{% endif %}">{{ ret.get_status_display }}</span></td></tr>{% empty %}<tr><td colspan="8" class="empty">No sewing return recorded.</td></tr>{% endfor %}</tbody></table></div></div>{% endblock %}
+
+<div class="sew-page">
+  <div class="summary-grid">
+    <div class="summary-card">
+      <span>Projects</span>
+      <strong>{{ total_projects }}</strong>
+      <small>production projects</small>
+    </div>
+
+    <div class="summary-card">
+      <span>Total Sent</span>
+      <strong>{{ total_sent }}</strong>
+      <small>pcs sent to sewer</small>
+    </div>
+
+    <div class="summary-card">
+      <span>Total Received</span>
+      <strong>{{ total_received }}</strong>
+      <small>good pcs received</small>
+    </div>
+
+    <div class="summary-card">
+      <span>Still in Sewing</span>
+      <strong>{{ total_in_sewing }}</strong>
+      <small>pcs not returned</small>
+    </div>
+
+    <div class="summary-card unpaid">
+      <span>Unpaid Cloth</span>
+      <strong>{{ total_unpaid_good }}</strong>
+      <small>received pcs ready to pay</small>
+    </div>
+  </div>
+
+  <form method="get" class="filter-card">
+    <div class="filter-grid">
+      <div class="filter-field">
+        <label>Status</label>
+        <select name="status">
+          <option value="all"
+                  {% if status_filter == "all" %}selected{% endif %}>
+            All Status
+          </option>
+          <option value="unpaid"
+                  {% if status_filter == "unpaid" %}selected{% endif %}>
+            Unpaid
+          </option>
+          <option value="paid"
+                  {% if status_filter == "paid" %}selected{% endif %}>
+            Paid
+          </option>
+          <option value="sent"
+                  {% if status_filter == "sent" %}selected{% endif %}>
+            Sent / Still Sewing
+          </option>
+          <option value="received"
+                  {% if status_filter == "received" %}selected{% endif %}>
+            Fully Received
+          </option>
+        </select>
+      </div>
+
+      <div class="filter-field">
+        <label>Date type</label>
+        <select name="date_type">
+          <option value="sent"
+                  {% if date_type == "sent" %}selected{% endif %}>
+            Date Sent
+          </option>
+          <option value="received"
+                  {% if date_type == "received" %}selected{% endif %}>
+            Date Received
+          </option>
+        </select>
+      </div>
+
+      <div class="filter-field">
+        <label>From</label>
+        <input type="date"
+               name="date_from"
+               value="{{ date_from }}">
+      </div>
+
+      <div class="filter-field">
+        <label>To</label>
+        <input type="date"
+               name="date_to"
+               value="{{ date_to }}">
+      </div>
+
+      <button class="btn-primary" type="submit">Search</button>
+      <a class="btn-light"
+         href="{% url 'production_return_list' %}">
+        Reset
+      </a>
+    </div>
+  </form>
+
+  {% if perms.production.manage_production_payments %}
+  <div class="payment-bar">
+    <div>
+      <strong id="selectedProjectText">
+        No project selected
+      </strong>
+      <small id="selectedProjectSub">
+        Select one or more completed projects for the same sewer.
+      </small>
+    </div>
+
+    <button type="button"
+            class="btn-primary"
+            id="openPaymentModal"
+            disabled>
+      Pay Selected Project
+    </button>
+  </div>
+
+  {% endif %}
+
+  <div class="project-list">
+    {% for row in project_rows %}
+    <article class="project-card {% if not row.can_pay %}is-locked{% endif %}"
+             data-project-card
+             data-project-status="{% if row.is_paid %}paid{% elif row.can_pay %}ready{% else %}waiting{% endif %}"
+             data-project-id="{{ row.project.id }}"
+             data-project-no="{{ row.project.project_no }}"
+             data-payee="{{ row.payee_name }}"
+             data-unpaid-good="{{ row.unpaid_good }}"
+             data-can-pay="{% if row.can_pay %}1{% else %}0{% endif %}">
+
+      <div class="project-head"
+           data-project-select-area>
+        <label class="project-select"
+               title="{% if row.can_pay %}Select this project for payment{% else %}{{ row.payment_lock_reason }}{% endif %}">
+          <input type="checkbox"
+                 class="project-pay-check"
+                 value="{{ row.project.id }}"
+                 {% if not row.can_pay %}disabled{% endif %}>
+          <span class="cool-check">✓</span>
+        </label>
+
+        <div class="project-main">
+          <div class="project-title-line">
+            <h3 class="project-title">
+              <a href="{% url 'production_project_detail' row.project.id %}">
+                {{ row.project.project_no }}
+              </a>
+            </h3>
+
+            <span class="item-name">
+              {{ row.project.finished_item.name }}
+            </span>
+          </div>
+
+          <div class="project-meta">
+            <span>Sewer: <strong>{{ row.payee_name }}</strong></span>
+            <span>{{ row.children|length }} colour batch{{ row.children|length|pluralize }}</span>
+            {% if row.latest_received %}
+            <span>Last received:
+              <strong>{{ row.latest_received|date:"d M Y" }}</strong>
+            </span>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="project-status">
+          {% if row.is_paid %}
+            <span class="status-pill status-paid">✓ Paid</span>
+          {% elif row.can_pay %}
+            <span class="status-pill status-ready">Ready to Pay</span>
+          {% else %}
+            <span class="status-pill status-wait">Not Ready</span>
+            <small class="lock-reason">
+              {{ row.payment_lock_reason }}
+            </small>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="project-totals">
+        <div class="project-total">
+          <span>Sent</span>
+          <strong>{{ row.sent_total }}</strong>
+        </div>
+
+        <div class="project-total">
+          <span>Received</span>
+          <strong>{{ row.received_total }}</strong>
+        </div>
+
+        <div class="project-total">
+          <span>Remaining</span>
+          <strong>{{ row.remaining_total }}</strong>
+        </div>
+
+        <div class="project-total ready">
+          <span>Unpaid Cloth</span>
+          <strong>{{ row.unpaid_good }}</strong>
+        </div>
+      </div>
+
+      <button type="button"
+              class="project-children-toggle"
+              data-children-toggle>
+        <span>
+          View {{ row.children|length }} sewing colour record{{ row.children|length|pluralize }}
+        </span>
+        <span class="toggle-arrow">⌄</span>
+      </button>
+
+      <div class="project-children">
+        <table class="child-table">
+          <thead>
+            <tr>
+              <th>Sewing No.</th>
+              <th>Colour</th>
+              <th>Date Sent</th>
+              <th>Date Received</th>
+              <th>Sewer</th>
+              <th>Sent</th>
+              <th>Received</th>
+              <th>Remaining</th>
+              <th>Payment</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for child in row.children %}
+            <tr>
+              <td><strong>{{ child.job.job_no }}</strong></td>
+              <td>
+                {% if child.color %}
+                <span class="colour-chip">
+                  <i class="colour-dot"
+                     style="background:{{ child.color.hex_code }}"></i>
+                  {{ child.color.name }}
+                </span>
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+              <td>{{ child.job.sent_date|date:"d M Y" }}</td>
+              <td>
+                {{ child.latest_received|date:"d M Y"|default:"-" }}
+              </td>
+              <td>{{ child.job.payee_name }}</td>
+              <td>{{ child.sent_total }}</td>
+              <td>{{ child.received_total }}</td>
+              <td>{{ child.remaining }}</td>
+              <td>
+                {% if child.is_paid %}
+                  <span class="status-pill status-paid">Paid</span>
+                {% elif child.has_unpaid %}
+                  <span class="status-pill status-wait">
+                    Unpaid · {{ child.unpaid_good }} pcs
+                  </span>
+                {% else %}
+                  <span class="status-pill status-wait">Waiting</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </article>
+    {% empty %}
+      <div class="empty">No sewing project found.</div>
+    {% endfor %}
+  </div>
+
+  {% if perms.production.manage_production_payments %}
+  <div class="modal"
+       id="paymentModal"
+       aria-hidden="true">
+    <div class="modal-card">
+      <h2>Pay Selected Sewing Projects</h2>
+      <p style="color:var(--muted);margin:6px 0 0">
+        Pay multiple completed projects together when they use the same sewer.
+      </p>
+
+      <form method="post"
+            action="{% url 'production_return_bulk_pay' %}"
+            id="projectPaymentForm">
+        {% csrf_token %}
+        <div id="selectedProjectInputs"></div>
+
+        <div class="modal-summary">
+          <div>
+            <span>Projects</span>
+            <strong id="modalProjectNo">0 selected</strong>
+            <small id="modalProjectList">-</small>
+          </div>
+          <div>
+            <span>Sewer</span>
+            <strong id="modalPayee">-</strong>
+          </div>
+          <div>
+            <span>Received to Pay</span>
+            <strong><span id="modalQty">0</span> pcs</strong>
+          </div>
+        </div>
+
+        <div class="modal-form-grid">
+          <div class="modal-field">
+            <label>Currency</label>
+            <select name="payment_currency"
+                    id="paymentCurrency">
+              <option value="USD">USD ($)</option>
+              <option value="KHR">KHR (៛)</option>
+            </select>
+          </div>
+
+          <div class="modal-field">
+            <label id="pricePerClothLabel">Price per cloth (USD)</label>
+            {{ payment_form.price_per_piece }}
+            <small class="currency-help"
+                   id="currencyHelp">
+              Saved in USD
+            </small>
+          </div>
+
+          <div class="modal-field full">
+            <label>Payment date</label>
+            {{ payment_form.payment_date }}
+          </div>
+
+          <div class="modal-field full additional-cost-wrap">
+            <button type="button"
+                    class="additional-cost-toggle"
+                    id="toggleAdditionalCost">
+              <span>＋ Add Additional Cost</span>
+              <small>Optional transport, rush fee, or other sewing cost</small>
+            </button>
+
+            <div class="additional-cost-field"
+                 id="additionalCostField"
+                 hidden>
+              <label>Additional cost</label>
+              <input type="number"
+                     name="additional_cost"
+                     id="additionalCostInput"
+                     min="0"
+                     step="0.01"
+                     value="0"
+                     inputmode="decimal">
+            </div>
+          </div>
+
+          <div class="modal-field full">
+            <label>Note</label>
+            {{ payment_form.note }}
+          </div>
+        </div>
+
+        <div class="payment-total">
+          <span>TOTAL AMOUNT TO PAY</span>
+          <strong id="paymentTotalDisplay">
+            <span id="paymentTotalCurrency">$</span>
+            <span id="paymentTotal">0.00</span>
+          </strong>
+          <small id="paymentFormula">0 pcs × 0.00</small>
+          <div class="converted-total"
+               id="convertedTotal">
+            Saved as USD: $0.00
+          </div>
+          <em id="additionalCostSummary"></em>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button"
+                  class="btn-light"
+                  id="closePaymentModal">
+            Cancel
+          </button>
+          <button type="submit"
+                  class="btn-primary"
+                  id="confirmProjectPayment">
+            Confirm Paid
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+(function(){
+  const cards = Array.from(
+    document.querySelectorAll('[data-project-card]')
+  );
+  const checks = Array.from(
+    document.querySelectorAll('.project-pay-check')
+  );
+
+  const openButton = document.getElementById('openPaymentModal');
+  const modal = document.getElementById('paymentModal');
+  const closeButton = document.getElementById('closePaymentModal');
+  const selectedText = document.getElementById('selectedProjectText');
+  const selectedSub = document.getElementById('selectedProjectSub');
+
+  const selectedInputs = document.getElementById('selectedProjectInputs');
+  const modalProjectNo = document.getElementById('modalProjectNo');
+  const modalProjectList = document.getElementById('modalProjectList');
+  const modalPayee = document.getElementById('modalPayee');
+  const modalQty = document.getElementById('modalQty');
+
+  const priceInput = document.getElementById('id_price_per_piece');
+  const currencyInput = document.getElementById('paymentCurrency');
+  const priceLabel = document.getElementById('pricePerClothLabel');
+  const currencyHelp = document.getElementById('currencyHelp');
+  const paymentTotalCurrency = document.getElementById('paymentTotalCurrency');
+  const convertedTotal = document.getElementById('convertedTotal');
+  const additionalInput = document.getElementById('additionalCostInput');
+  const additionalField = document.getElementById('additionalCostField');
+  const additionalToggle = document.getElementById('toggleAdditionalCost');
+  const additionalSummary = document.getElementById('additionalCostSummary');
+
+  const paymentTotal = document.getElementById('paymentTotal');
+  const paymentFormula = document.getElementById('paymentFormula');
+  const confirmButton = document.getElementById('confirmProjectPayment');
+
+  function money(value){
+    const number = Number(value || 0);
+    return number.toLocaleString(undefined,{
+      minimumFractionDigits:2,
+      maximumFractionDigits:2
+    });
+  }
+
+  function selectedCards(){
+    return checks
+      .filter(function(check){ return check.checked; })
+      .map(function(check){
+        return check.closest('[data-project-card]');
+      })
+      .filter(Boolean);
+  }
+
+  function selectedQuantity(){
+    return selectedCards().reduce(function(total,card){
+      return total + Number(card.dataset.unpaidGood || 0);
+    },0);
+  }
+
+  function selectedPayee(){
+    const selected = selectedCards();
+    return selected.length ? (selected[0].dataset.payee || '') : '';
+  }
+
+  function refreshSelection(){
+    const selected = selectedCards();
+    const qty = selectedQuantity();
+    const payee = selectedPayee();
+
+    cards.forEach(function(card){
+      card.classList.toggle(
+        'is-selected',
+        selected.includes(card)
+      );
+    });
+
+    if(!selected.length){
+      if(selectedText) selectedText.textContent = 'No project selected';
+      if(selectedSub){
+        selectedSub.textContent =
+          'Select one or more completed projects for the same sewer.';
+      }
+      if(openButton) openButton.disabled = true;
+      return;
+    }
+
+    if(selectedText){
+      selectedText.textContent =
+        selected.length + ' project' +
+        (selected.length === 1 ? '' : 's') +
+        ' selected';
+    }
+
+    if(selectedSub){
+      selectedSub.textContent =
+        qty.toLocaleString() +
+        ' received pcs for ' + payee;
+    }
+
+    if(openButton) openButton.disabled = false;
+  }
+
+  checks.forEach(function(check){
+    check.addEventListener('change',function(){
+      if(check.checked){
+        const card = check.closest('[data-project-card]');
+        const newPayee = card ? (card.dataset.payee || '') : '';
+        const existing = selectedCards().filter(function(item){
+          return item !== card;
+        });
+
+        const differentSewer = existing.some(function(item){
+          return (item.dataset.payee || '') !== newPayee;
+        });
+
+        if(differentSewer){
+          check.checked = false;
+          window.alert(
+            'Select projects for only one sewer at a time.'
+          );
+        }
+      }
+
+      refreshSelection();
+    });
+  });
+
+  document.querySelectorAll('[data-project-select-area]').forEach(function(row){
+    row.addEventListener('click',function(event){
+      if(
+        event.target.closest('a, button, input, select, textarea, label')
+      ){
+        return;
+      }
+
+      const card = row.closest('[data-project-card]');
+      const check = card
+        ? card.querySelector('.project-pay-check')
+        : null;
+
+      if(!check || check.disabled){
+        return;
+      }
+
+      check.checked = !check.checked;
+      check.dispatchEvent(
+        new Event('change',{bubbles:true})
+      );
+    });
+  });
+
+  document.querySelectorAll('[data-children-toggle]').forEach(function(button){
+    button.addEventListener('click',function(){
+      const card = button.closest('[data-project-card]');
+      if(card) card.classList.toggle('children-open');
+    });
+  });
+
+  function updateCurrencyUI(){
+    const currency = currencyInput
+      ? currencyInput.value
+      : 'USD';
+
+    if(priceLabel){
+      priceLabel.textContent =
+        'Price per cloth (' + currency + ')';
+    }
+
+    if(currencyHelp){
+      currencyHelp.textContent = currency === 'KHR'
+        ? '1 USD = 4,000 KHR · Saved automatically in USD'
+        : 'Saved in USD';
+    }
+
+    if(paymentTotalCurrency){
+      paymentTotalCurrency.textContent =
+        currency === 'KHR' ? '៛' : '$';
+    }
+
+    if(additionalInput){
+      additionalInput.placeholder =
+        currency === 'KHR'
+          ? 'Additional cost in KHR'
+          : 'Additional cost in USD';
+    }
+  }
+
+  function updateTotal(){
+    const qty = Number(
+      modalQty ? modalQty.textContent || 0 : 0
+    );
+    const price = Number(
+      priceInput ? priceInput.value || 0 : 0
+    );
+    const additional = Number(
+      additionalInput ? additionalInput.value || 0 : 0
+    );
+    const currency = currencyInput
+      ? currencyInput.value
+      : 'USD';
+
+    const sewingAmount = qty * price;
+    const total = sewingAmount + additional;
+    const usdTotal = currency === 'KHR'
+      ? total / 4000
+      : total;
+
+    if(paymentTotal){
+      paymentTotal.textContent =
+        currency === 'KHR'
+          ? Math.round(total).toLocaleString()
+          : money(total);
+    }
+
+    if(paymentFormula){
+      paymentFormula.textContent =
+        qty.toLocaleString() +
+        ' pcs × ' +
+        (currency === 'KHR'
+          ? Math.round(price).toLocaleString() + '៛'
+          : '$' + money(price)) +
+        ' = ' +
+        (currency === 'KHR'
+          ? Math.round(sewingAmount).toLocaleString() + '៛'
+          : '$' + money(sewingAmount));
+    }
+
+    if(convertedTotal){
+      convertedTotal.textContent =
+        'Saved as USD: $' + money(usdTotal) +
+        (currency === 'KHR'
+          ? '  ·  Rate 1$ = 4,000៛'
+          : '');
+    }
+
+    if(additionalSummary){
+      additionalSummary.textContent = additional > 0
+        ? '+ Additional cost ' +
+          (currency === 'KHR'
+            ? Math.round(additional).toLocaleString() + '៛'
+            : '$' + money(additional))
+        : '';
+    }
+
+    updateCurrencyUI();
+  }
+
+  function buildSelectedInputs(selected){
+    if(!selectedInputs) return;
+    selectedInputs.innerHTML = '';
+
+    selected.forEach(function(card){
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'selected_projects';
+      input.value = card.dataset.projectId || '';
+      selectedInputs.appendChild(input);
+    });
+  }
+
+  function openModal(){
+    const selected = selectedCards();
+    if(!selected.length || !modal) return;
+
+    const qty = selectedQuantity();
+    const payee = selectedPayee();
+    const projectNumbers = selected.map(function(card){
+      return card.dataset.projectNo || '-';
+    });
+
+    buildSelectedInputs(selected);
+
+    if(modalProjectNo){
+      modalProjectNo.textContent =
+        selected.length + ' selected';
+    }
+    if(modalProjectList){
+      modalProjectList.textContent =
+        projectNumbers.join(', ');
+    }
+    if(modalPayee) modalPayee.textContent = payee;
+    if(modalQty) modalQty.textContent = String(qty);
+
+    modal.classList.add('open');
+    modal.setAttribute('aria-hidden','false');
+    document.body.style.overflow = 'hidden';
+    updateTotal();
+
+    window.setTimeout(function(){
+      if(priceInput) priceInput.focus();
+    },0);
+  }
+
+  function closeModal(){
+    if(!modal) return;
+    modal.classList.remove('open');
+    modal.setAttribute('aria-hidden','true');
+    document.body.style.overflow = '';
+  }
+
+  if(additionalToggle){
+    additionalToggle.addEventListener('click',function(){
+      const willShow = additionalField.hasAttribute('hidden');
+      additionalField.toggleAttribute('hidden',!willShow);
+
+      if(willShow && additionalInput){
+        window.setTimeout(function(){
+          additionalInput.focus();
+        },0);
+      }
+    });
+  }
+
+  if(openButton){
+    openButton.addEventListener('click',openModal);
+  }
+
+  if(closeButton){
+    closeButton.addEventListener('click',closeModal);
+  }
+
+  if(modal){
+    modal.addEventListener('click',function(event){
+      if(event.target === modal) closeModal();
+    });
+  }
+
+  [priceInput,additionalInput,currencyInput].forEach(function(input){
+    if(!input) return;
+    input.addEventListener('input',updateTotal);
+    input.addEventListener('change',updateTotal);
+  });
+
+  if(confirmButton){
+    confirmButton.addEventListener('click',function(){
+      window.setTimeout(function(){
+        confirmButton.disabled = true;
+        confirmButton.textContent = 'Paying...';
+      },0);
+    });
+  }
+
+  function groupProjectsByStatus(){
+    const projectList = document.querySelector('.project-list');
+    if(!projectList) return;
+
+    const projectCards = Array.from(
+      projectList.querySelectorAll(':scope > [data-project-card]')
+    );
+    if(!projectCards.length) return;
+
+    const definitions = [
+      {key:'ready',label:'Ready to Pay'},
+      {key:'waiting',label:'Not Ready'},
+      {key:'paid',label:'Paid'}
+    ];
+
+    const fragment = document.createDocumentFragment();
+
+    definitions.forEach(function(definition){
+      const matching = projectCards.filter(function(card){
+        return card.dataset.projectStatus === definition.key;
+      });
+
+      if(!matching.length) return;
+
+      const section = document.createElement('section');
+      section.className = 'status-group';
+      section.dataset.statusGroup = definition.key;
+
+      const heading = document.createElement('div');
+      heading.className = 'status-group-head';
+
+      const title = document.createElement('h2');
+      title.className = 'status-group-title';
+
+      const dot = document.createElement('span');
+      dot.className = 'status-group-dot';
+
+      const titleText = document.createElement('span');
+      titleText.textContent = definition.label;
+
+      const count = document.createElement('span');
+      count.className = 'status-group-count';
+      count.textContent = String(matching.length);
+
+      title.appendChild(dot);
+      title.appendChild(titleText);
+      heading.appendChild(title);
+      heading.appendChild(count);
+
+      const body = document.createElement('div');
+      body.className = 'status-group-body';
+
+      matching.forEach(function(card){
+        body.appendChild(card);
+      });
+
+      section.appendChild(heading);
+      section.appendChild(body);
+      fragment.appendChild(section);
+    });
+
+    projectList.replaceChildren(fragment);
+  }
+
+  document.addEventListener('keydown',function(event){
+    if(event.key === 'Escape') closeModal();
+  });
+
+  groupProjectsByStatus();
+  updateCurrencyUI();
+  refreshSelection();
+})();
+</script>
+{% endblock %}

@@ -1262,7 +1262,53 @@
                 scroll-behavior: auto !important;
             }
         }
-    </style>
+    
+        /* Sidebar interaction fix: nav scrolls, profile never overlays links */
+        .sidebar {
+            min-height: 100vh;
+            height: 100dvh;
+        }
+
+        .sidebar-scroll {
+            flex: 1 1 auto;
+            min-height: 0;
+            padding-bottom: 28px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            scroll-padding-bottom: 28px;
+        }
+
+        .sidebar-footer {
+            position: relative;
+            z-index: 3;
+            flex: 0 0 auto;
+            margin-top: 0;
+            padding: 11px 2px 0;
+            background: var(--sidebar);
+            box-shadow: 0 -10px 20px rgba(251,244,232,.92);
+        }
+
+        .nav-submenu.show {
+            max-height: 1400px;
+            overflow: visible;
+        }
+
+        .nav-link {
+            position: relative;
+            z-index: 1;
+            pointer-events: auto;
+        }
+
+        @media (max-width:1080px) {
+            .sidebar {
+                height: 100dvh;
+            }
+            .sidebar-scroll {
+                padding-bottom: 36px;
+            }
+        }
+
+</style>
 
     {% block extra_css %}{% endblock %}
 </head>
@@ -1406,7 +1452,7 @@
                                     <path d="M12 8v8M8 12h8"/>
                                 </svg>
                             </span>
-                            <span>Create Order</span>
+                            <span>Create Production</span>
                         </a>
                         {% endif %}
 
@@ -1417,7 +1463,7 @@
                                     <path d="M5 4h14v16H5zM8 8h8M8 12h8M8 16h5"/>
                                 </svg>
                             </span>
-                            <span>Order List</span>
+                            <span>Production List</span>
                         </a>
                         {% endif %}
 

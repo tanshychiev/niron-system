@@ -11,6 +11,8 @@ from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 
+from production.models import FabricRoll
+
 from .models import InventoryBatchItem, InventoryItem, StockLedger
 
 
@@ -268,6 +270,227 @@ def _collect_stock_data():
     return shirt_groups, material_rows, variants
 
 
+def _fabric_group_key(fabric_name, color_id):
+    safe_name = (fabric_name or "Fabric").strip().lower()
+    return f"FG:{safe_name}:{color_id or 0}"
+
+
+def _fabric_roll_key(roll_id):
+    return f"F:{roll_id}"
+
+
+def _collect_fabric_data():
+    """Build fabric stock exactly in the grouped shape used by the template.
+
+    - One parent row per fabric type + colour for complete rolls.
+    - One child row per incomplete/partial roll.
+    - Used/zero rolls are excluded from the visible stock count.
+    """
+    grouped = {}
+    fabric_variants = {}
+
+    rolls = (
+        FabricRoll.objects
+        .select_related("receipt", "receipt__color", "receipt__fabric_type")
+        .all()
+        .order_by(
+            "receipt__fabric_name",
+            "receipt__color__name",
+            "status",
+            "roll_code",
+        )
+    )
+
+    for roll in rolls:
+        remaining = Decimal(roll.remaining_qty or 0)
+        original = Decimal(roll.original_qty or 0)
+
+        # Stock Check should show current inventory only.
+        if remaining <= 0:
+            continue
+
+        color = getattr(roll.receipt, "color", None)
+        fabric_type = getattr(roll.receipt, "fabric_type", None)
+        fabric_name = (
+            getattr(fabric_type, "name", "")
+            or roll.receipt.fabric_name
+            or "Fabric"
+        )
+        color_id = getattr(color, "id", None)
+        color_name = color.name if color else "-"
+        color_hex = getattr(color, "hex_code", "#D1D5DB") if color else "#D1D5DB"
+
+        group_key = _fabric_group_key(fabric_name, color_id)
+        field_key = group_key.replace(":", "_").replace(" ", "_")
+
+        group = grouped.setdefault(
+            group_key,
+            {
+                "key": group_key,
+                "field_key": field_key,
+                "fabric_name": fabric_name,
+                "color_id": color_id or 0,
+                "color_name": color_name,
+                "color_hex": color_hex,
+                "full_roll_count": 0,
+                "full_roll_ids": [],
+                "partial_rows": [],
+                "partial_count": 0,
+                "has_full_rolls": False,
+            },
+        )
+
+        is_full = (
+            roll.status == FabricRoll.STATUS_FULL
+            or (original > 0 and remaining >= original)
+        )
+
+        if is_full:
+            group["full_roll_count"] += 1
+            group["full_roll_ids"].append(roll.pk)
+            group["has_full_rolls"] = True
+            continue
+
+        row_key = _fabric_roll_key(roll.pk)
+        row = {
+            "kind": "fabric",
+            "key": row_key,
+            "field_key": row_key.replace(":", "_"),
+            "roll_id": roll.pk,
+            "fabric_code": roll.roll_code,
+            "item_code": roll.roll_code,
+            "fabric_name": fabric_name,
+            "item_name": fabric_name,
+            "color_name": color_name,
+            "color_hex": color_hex,
+            "unit": "roll",
+            "current_qty": remaining,
+            "original_qty": original,
+            "status": roll.status,
+            "is_partial": True,
+            "parent_roll_label": roll.roll_code,
+            "image_url": "",
+            "last_confirmed_at": None,
+            "last_confirmed_by": None,
+            "last_confirmed_qty": None,
+            "input_step": "0.001",
+        }
+        group["partial_rows"].append(row)
+        group["partial_count"] += 1
+        fabric_variants[row_key] = row
+
+    fabric_groups = list(grouped.values())
+    fabric_groups.sort(
+        key=lambda group: (
+            group["fabric_name"].lower(),
+            group["color_name"].lower(),
+        )
+    )
+
+    for group in fabric_groups:
+        group["partial_rows"].sort(key=lambda row: row["fabric_code"])
+
+        if group["has_full_rolls"]:
+            fabric_variants[group["key"]] = {
+                "kind": "fabric_group",
+                "key": group["key"],
+                "field_key": group["field_key"],
+                "fabric_name": group["fabric_name"],
+                "item_name": group["fabric_name"],
+                "color_name": group["color_name"],
+                "current_qty": Decimal(group["full_roll_count"]),
+                "full_roll_ids": list(group["full_roll_ids"]),
+                "input_step": "1",
+            }
+
+    return fabric_groups, fabric_variants
+
+
+def _confirm_fabric(*, roll_id, real_qty, user, note=""):
+    real_qty = Decimal(real_qty)
+    roll = (
+        FabricRoll.objects
+        .select_for_update()
+        .select_related("receipt", "receipt__color")
+        .get(pk=roll_id)
+    )
+
+    original = Decimal(roll.original_qty or 0)
+    before = Decimal(roll.remaining_qty or 0)
+
+    if real_qty < 0:
+        raise ValueError("Fabric real quantity cannot be below 0.")
+    if real_qty > original:
+        raise ValueError(
+            f"{roll.roll_code}: real quantity cannot exceed original quantity "
+            f"({_decimal_text(original)})."
+        )
+
+    roll.remaining_qty = real_qty
+    if real_qty <= 0:
+        roll.status = FabricRoll.STATUS_USED
+    elif real_qty < original:
+        roll.status = FabricRoll.STATUS_PARTIAL
+    else:
+        roll.status = FabricRoll.STATUS_FULL
+
+    clean_note = (note or "").strip()
+    if clean_note:
+        roll.note = clean_note[:255]
+
+    roll.full_clean()
+    update_fields = ["remaining_qty", "status"]
+    if clean_note:
+        update_fields.append("note")
+    roll.save(update_fields=update_fields)
+
+    return before, real_qty
+
+
+def _confirm_fabric_group(*, roll_ids, real_qty, user, note=""):
+    """Confirm the physical count of complete rolls in one fabric/colour group."""
+    try:
+        requested_count = int(Decimal(real_qty))
+    except (InvalidOperation, TypeError, ValueError):
+        raise ValueError("Enter a valid full roll count.")
+
+    if Decimal(real_qty) != Decimal(requested_count):
+        raise ValueError("Full roll count must be a whole number.")
+    if requested_count < 0:
+        raise ValueError("Full roll count cannot be below 0.")
+
+    rolls = list(
+        FabricRoll.objects
+        .select_for_update()
+        .filter(pk__in=roll_ids)
+        .order_by("roll_code")
+    )
+    before_count = len(rolls)
+
+    if requested_count > before_count:
+        raise ValueError(
+            "Real full roll count cannot exceed the full rolls currently recorded. "
+            "Add missing rolls through Stock In first."
+        )
+
+    clean_note = (note or "").strip()
+    rolls_to_use = rolls[requested_count:]
+
+    for roll in rolls_to_use:
+        roll.remaining_qty = Decimal("0")
+        roll.status = FabricRoll.STATUS_USED
+        if clean_note:
+            roll.note = clean_note[:255]
+
+    if rolls_to_use:
+        fields = ["remaining_qty", "status"]
+        if clean_note:
+            fields.append("note")
+        FabricRoll.objects.bulk_update(rolls_to_use, fields)
+
+    return Decimal(before_count), Decimal(requested_count)
+
+
 def _confirm_variant(
     *,
     item_id,
@@ -367,6 +590,18 @@ def _decimal_text(value):
 
 
 def _variant_label(variant):
+    if variant.get("kind") in {"fabric", "fabric_group"}:
+        parts = [variant.get("fabric_name") or variant.get("item_name") or "Fabric"]
+        if variant.get("color_name"):
+            parts.append(variant["color_name"])
+        if variant.get("kind") == "fabric_group":
+            parts.append("Full rolls")
+        else:
+            parts.append(variant.get("fabric_code") or "")
+            if variant.get("is_partial"):
+                parts.append("Partial")
+        return " / ".join(part for part in parts if part)
+
     parts = [variant["item_name"]]
     if not variant["is_material"]:
         parts.extend([variant["color_name"], variant["size_name"]])
@@ -409,7 +644,11 @@ def _store_confirmation_report(request, results):
 @permission_required("inventory.add_stockledger", raise_exception=True)
 @transaction.atomic
 def stock_confirm(request):
-    shirt_groups, material_rows, variants = _collect_stock_data()
+    shirt_groups, material_rows, inventory_variants = _collect_stock_data()
+    fabric_groups, fabric_variants = _collect_fabric_data()
+
+    variants = dict(inventory_variants)
+    variants.update(fabric_variants)
 
     if request.method == "POST":
         action = (request.POST.get("action") or "").strip()
@@ -434,15 +673,31 @@ def stock_confirm(request):
                 )
                 note = _posted_variant_note(request, variant)
 
-                before, after = _confirm_variant(
-                    item_id=variant["item_id"],
-                    color_id=variant["color_id"],
-                    size_id=variant["size_id"],
-                    is_material=variant["is_material"],
-                    real_qty=real_qty,
-                    user=request.user,
-                    note=note,
-                )
+                if variant.get("kind") == "fabric":
+                    before, after = _confirm_fabric(
+                        roll_id=variant["roll_id"],
+                        real_qty=real_qty,
+                        user=request.user,
+                        note=note,
+                    )
+                elif variant.get("kind") == "fabric_group":
+                    before, after = _confirm_fabric_group(
+                        roll_ids=variant["full_roll_ids"],
+                        real_qty=real_qty,
+                        user=request.user,
+                        note=note,
+                    )
+                else:
+                    before, after = _confirm_variant(
+                        item_id=variant["item_id"],
+                        color_id=variant["color_id"],
+                        size_id=variant["size_id"],
+                        is_material=variant["is_material"],
+                        real_qty=real_qty,
+                        user=request.user,
+                        note=note,
+                    )
+
                 results.append(
                     {
                         "label": _variant_label(variant),
@@ -464,24 +719,22 @@ def stock_confirm(request):
                             seen.add(key)
 
                 if not selected_keys:
-                    messages.error(request, "Tick at least one size or material first.")
+                    messages.error(
+                        request,
+                        "Tick at least one cloth size, fabric, or material first.",
+                    )
                     return redirect("stock_confirm")
 
-                selected_variants = []
-                for key in selected_keys:
-                    variant = variants.get(key)
-                    if variant:
-                        selected_variants.append(variant)
+                selected_variants = [
+                    variants[key] for key in selected_keys if key in variants
+                ]
 
                 if not selected_variants:
                     messages.error(request, "The ticked stock rows were not found.")
                     return redirect("stock_confirm")
 
-                # Validate all selected values first. This prevents a partial
-                # update when several sizes are submitted together and one
-                # entered quantity is invalid.
+                # Validate all posted quantities before changing any stock.
                 prepared_updates = []
-
                 for variant in selected_variants:
                     prepared_updates.append(
                         {
@@ -494,15 +747,31 @@ def stock_confirm(request):
                 for prepared in prepared_updates:
                     variant = prepared["variant"]
 
-                    before, after = _confirm_variant(
-                        item_id=variant["item_id"],
-                        color_id=variant["color_id"],
-                        size_id=variant["size_id"],
-                        is_material=variant["is_material"],
-                        real_qty=prepared["real_qty"],
-                        user=request.user,
-                        note=prepared["note"],
-                    )
+                    if variant.get("kind") == "fabric":
+                        before, after = _confirm_fabric(
+                            roll_id=variant["roll_id"],
+                            real_qty=prepared["real_qty"],
+                            user=request.user,
+                            note=prepared["note"],
+                        )
+                    elif variant.get("kind") == "fabric_group":
+                        before, after = _confirm_fabric_group(
+                            roll_ids=variant["full_roll_ids"],
+                            real_qty=prepared["real_qty"],
+                            user=request.user,
+                            note=prepared["note"],
+                        )
+                    else:
+                        before, after = _confirm_variant(
+                            item_id=variant["item_id"],
+                            color_id=variant["color_id"],
+                            size_id=variant["size_id"],
+                            is_material=variant["is_material"],
+                            real_qty=prepared["real_qty"],
+                            user=request.user,
+                            note=prepared["note"],
+                        )
+
                     results.append(
                         {
                             "label": _variant_label(variant),
@@ -523,10 +792,12 @@ def stock_confirm(request):
                 request,
                 (
                     f"{len(results)} item(s) checked: "
-                    f"{correct_count} correct and {wrong_count} wrong."
+                    f"{correct_count} correct and {wrong_count} updated."
                 ),
             )
 
+        except FabricRoll.DoesNotExist:
+            messages.error(request, "The selected fabric roll no longer exists.")
         except (ValueError, InvalidOperation) as exc:
             messages.error(request, str(exc))
 
@@ -537,10 +808,12 @@ def stock_confirm(request):
         "inventory/stock_confirm.html",
         {
             "shirt_groups": shirt_groups,
+            "fabric_groups": fabric_groups,
             "material_rows": material_rows,
             "variant_count": len(variants),
-            "product_count": len(shirt_groups) + len(material_rows),
+            "product_count": len(shirt_groups) + len(material_rows) + len(fabric_groups),
             "shirt_count": sum(len(group["rows"]) for group in shirt_groups),
+            "fabric_count": len(fabric_groups),
             "material_count": len(material_rows),
             "last_report": request.session.pop("stock_confirm_last_report", None),
         },

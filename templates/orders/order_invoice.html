@@ -311,6 +311,34 @@ html, body {
     color: var(--brand);
 }
 
+
+.invoice-note {
+    margin-top: 12px;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 10px;
+    line-height: 1.5;
+    color: #444;
+    background: #fafafa;
+    page-break-inside: avoid;
+}
+
+.invoice-note strong {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--brand);
+}
+
+.invoice-note ul {
+    margin: 0;
+    padding-left: 16px;
+}
+
+.invoice-note li {
+    margin: 2px 0;
+}
+
 @media print {
     html, body {
         width: 210mm;
@@ -595,6 +623,16 @@ html, body {
             </div>
         </div>
 
+    </div>
+
+    <!-- PRINTING SERVICE NOTE -->
+    <div class="invoice-note">
+        <strong>Note</strong>
+        <ul>
+            <li>Printing quantity may vary by ±8–10%.</li>
+            <li>All project information has been confirmed by the customer before payment.</li>
+            <li>No refunds after payment confirmation.</li>
+        </ul>
     </div>
 
 </div>

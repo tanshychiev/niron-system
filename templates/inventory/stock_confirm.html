@@ -63,6 +63,7 @@ Tick only the sizes you checked. Leave unticked sizes for later. Change Real Qty
       <span><strong>{{ product_count }}</strong> products</span>
       <span><strong>{{ shirt_count }}</strong> cloth sizes</span>
       <span><strong>{{ material_count }}</strong> materials</span>
+      <span><strong>{{ fabric_count|default:0 }}</strong> fabrics</span>
     </div>
 
     <div class="toolbar-actions">
@@ -89,6 +90,7 @@ Tick only the sizes you checked. Leave unticked sizes for later. Change Real Qty
   <div class="confirm-help">
     <span><strong>Correct:</strong> leave Real Qty unchanged, then tick the size.</span>
     <span><strong>Wrong:</strong> enter the real quantity, then tick the size.</span>
+    <span><strong>Fabric:</strong> confirm full rolls and partial fabric separately.</span>
   </div>
 
   <div class="section-heading">
@@ -218,6 +220,177 @@ Tick only the sizes you checked. Leave unticked sizes for later. Change Real Qty
   {% empty %}
   <div class="empty-card">No active cloth stock was found.</div>
   {% endfor %}
+
+
+  <div class="section-heading fabric-heading">
+    <div>
+      <h2>Fabric Stock</h2>
+      <p>Each fabric/color is one row. Full rolls are counted together; only incomplete rolls appear as children.</p>
+    </div>
+  </div>
+
+  <div class="fabric-group-list">
+    {% for group in fabric_groups %}
+    <section class="fabric-summary-group">
+      {% if group.has_full_rolls %}
+      <div class="fabric-card material-card fabric-parent-card" data-row="{{ group.field_key }}">
+        <div class="material-top">
+          <div class="material-picture fabric-picture">
+            <div class="fabric-placeholder">FABRIC</div>
+          </div>
+
+          <div class="material-title">
+            <span>Full Rolls</span>
+            <h3>{{ group.fabric_name }}</h3>
+            <p>
+              <span class="color-dot" style="background:{{ group.color_hex }}"></span>
+              {{ group.color_name }} · {{ group.full_roll_count }} complete roll{{ group.full_roll_count|pluralize }}
+            </p>
+          </div>
+
+          <label class="row-select material-row-select" title="Tick this fabric roll group">
+            <input
+              type="checkbox"
+              name="selected_keys"
+              value="{{ group.key }}"
+              class="row-checkbox"
+              data-field="{{ group.field_key }}"
+              data-label="{{ group.fabric_name }} / {{ group.color_name }} / Full rolls"
+            >
+            <span class="row-check-box">✓</span>
+            <span class="tick-label">Tick</span>
+          </label>
+        </div>
+
+        <div class="material-metrics">
+          <div class="material-system-box">
+            <span>System Roll Count</span>
+            <strong>{{ group.full_roll_count }}</strong>
+            <small class="qty-state" data-state-for="{{ group.field_key }}">Not selected</small>
+          </div>
+
+          <div>
+            <span>Physical Rows</span>
+            <strong>{{ group.full_roll_count }} full roll{{ group.full_roll_count|pluralize }}</strong>
+            <small>{% if group.partial_count %}+ {{ group.partial_count }} partial child{% endif %}</small>
+          </div>
+        </div>
+
+        <div class="material-fields">
+          <div>
+            <label for="fabric-group-qty-{{ group.field_key }}">Real Full Roll Count</label>
+            <input
+              id="fabric-group-qty-{{ group.field_key }}"
+              type="number"
+              min="0"
+              step="1"
+              name="real_qty_{{ group.field_key }}"
+              value="{{ group.full_roll_count }}"
+              data-system-qty="{{ group.full_roll_count }}"
+              data-field="{{ group.field_key }}"
+              class="real-qty-input"
+            >
+            <small class="qty-difference" data-difference-for="{{ group.field_key }}"></small>
+          </div>
+
+          <div>
+            <label for="fabric-group-note-{{ group.field_key }}">Note</label>
+            <input
+              id="fabric-group-note-{{ group.field_key }}"
+              type="text"
+              name="note_{{ group.field_key }}"
+              placeholder="Optional note for this roll count"
+            >
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      {% if group.partial_rows %}
+      <div class="partial-children">
+        <div class="partial-children-title">
+          <strong>Incomplete Roll{{ group.partial_count|pluralize }}</strong>
+          <span>{{ group.partial_count }} child row{{ group.partial_count|pluralize }}</span>
+        </div>
+
+        <div class="fabric-grid partial-fabric-grid">
+          {% for row in group.partial_rows %}
+          <div class="fabric-card material-card partial-fabric-card" data-row="{{ row.field_key }}">
+            <div class="material-top">
+              <div class="material-picture fabric-picture">
+                <div class="fabric-placeholder">PARTIAL</div>
+              </div>
+
+              <div class="material-title">
+                <span>Incomplete Roll</span>
+                <h3>{{ row.fabric_code }}</h3>
+                <p>{{ group.fabric_name }} · {{ group.color_name }}</p>
+              </div>
+
+              <label class="row-select material-row-select" title="Tick this partial fabric">
+                <input
+                  type="checkbox"
+                  name="selected_keys"
+                  value="{{ row.key }}"
+                  class="row-checkbox"
+                  data-field="{{ row.field_key }}"
+                  data-label="{{ group.fabric_name }} / {{ group.color_name }} / {{ row.fabric_code }} / Partial"
+                >
+                <span class="row-check-box">✓</span>
+                <span class="tick-label">Tick</span>
+              </label>
+            </div>
+
+            <div class="material-metrics">
+              <div class="material-system-box">
+                <span>Remaining Qty</span>
+                <strong>{{ row.current_qty|floatformat:"-3" }}</strong>
+                <small class="qty-state" data-state-for="{{ row.field_key }}">Not selected</small>
+              </div>
+              <div>
+                <span>Original Roll Qty</span>
+                <strong>{{ row.original_qty|floatformat:"-3" }}</strong>
+                <small>Incomplete physical roll</small>
+              </div>
+            </div>
+
+            <div class="material-fields">
+              <div>
+                <label for="fabric-qty-{{ row.field_key }}">Real Remaining Qty</label>
+                <input
+                  id="fabric-qty-{{ row.field_key }}"
+                  type="number"
+                  min="0"
+                  step="{{ row.input_step|default:'0.001' }}"
+                  name="real_qty_{{ row.field_key }}"
+                  value="{{ row.current_qty|floatformat:'-3' }}"
+                  data-system-qty="{{ row.current_qty|floatformat:'-3' }}"
+                  data-field="{{ row.field_key }}"
+                  class="real-qty-input"
+                >
+                <small class="qty-difference" data-difference-for="{{ row.field_key }}"></small>
+              </div>
+
+              <div>
+                <label for="fabric-note-{{ row.field_key }}">Note</label>
+                <input
+                  id="fabric-note-{{ row.field_key }}"
+                  type="text"
+                  name="note_{{ row.field_key }}"
+                  placeholder="Optional partial-roll note"
+                >
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </section>
+    {% empty %}
+    <div class="empty-card">No active fabric stock was found.</div>
+    {% endfor %}
+  </div>
 
   <div class="section-heading material-heading">
     <div>
@@ -418,7 +591,7 @@ document.addEventListener("DOMContentLoaded", function () {
   function updateRowVisual(input) {
     const field = input.dataset.field;
     const checkbox = rowCheckboxes.find((item) => item.dataset.field === field);
-    const row = input.closest(".stock-row, .material-card");
+    const row = input.closest(".stock-row, .material-card, .fabric-card");
     const state = document.querySelector(`[data-state-for="${field}"]`);
     const differenceText = document.querySelector(`[data-difference-for="${field}"]`);
 
@@ -479,7 +652,7 @@ document.addEventListener("DOMContentLoaded", function () {
     submitButton.classList.toggle("has-updates", updatedCount > 0);
 
     rowCheckboxes.forEach((checkbox) => {
-      const card = checkbox.closest(".stock-row, .material-card");
+      const card = checkbox.closest(".stock-row, .material-card, .fabric-card");
 
       if (card) {
         card.classList.toggle("is-selected", checkbox.checked);
@@ -634,7 +807,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const selected = rowCheckboxes.filter((checkbox) => checkbox.checked);
 
     if (!selected.length) {
-      alert("Tick at least one size or material first.");
+      alert("Tick at least one cloth size, fabric, or material first.");
       return;
     }
 
@@ -1252,7 +1425,41 @@ document.addEventListener("DOMContentLoaded", function () {
     box-shadow: 0 0 0 3px rgba(230,126,0,.10);
   }
 
+  .fabric-heading,
   .material-heading { margin-top: 38px; }
+
+  .fabric-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill,minmax(360px,1fr));
+    gap: 18px;
+  }
+
+  .fabric-card {
+    border-color: #d9c7a6;
+    background: linear-gradient(145deg,#fffdf8,#fffaf0);
+  }
+
+  .fabric-picture {
+    background: repeating-linear-gradient(135deg,#f4ead8 0 10px,#eadbc2 10px 20px);
+  }
+
+  .fabric-placeholder {
+    height: 100%;
+    display: grid;
+    place-items: center;
+    color: #7b5b2e;
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: .8px;
+  }
+
+  .fabric-parent {
+    display: block;
+    margin-top: 5px;
+    color: #8a6a3b;
+    font-size: 11px;
+    font-weight: 800;
+  }
 
   .material-grid {
     display: grid;
@@ -1675,5 +1882,318 @@ document.addEventListener("DOMContentLoaded", function () {
       min-height: 48px;
     }
   }
+  .fabric-group-list {
+    display: grid;
+    gap: 18px;
+  }
+
+  .fabric-summary-group {
+    display: grid;
+    gap: 10px;
+  }
+
+  .fabric-parent-card {
+    width: 100%;
+  }
+
+  .fabric-parent-card .material-top {
+    margin-bottom: 12px;
+  }
+
+  .material-title p .color-dot {
+    display: inline-block;
+    vertical-align: -3px;
+    margin-right: 5px;
+  }
+
+  .partial-children {
+    margin-left: 34px;
+    padding: 12px 0 0 18px;
+    border-left: 3px solid #e8c98f;
+  }
+
+  .partial-children-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+    color: #825b1e;
+  }
+
+  .partial-children-title span {
+    font-size: 11px;
+    font-weight: 800;
+  }
+
+  .partial-fabric-card {
+    background: #fffaf0;
+    border-color: #e8c98f;
+  }
+
+  @media (max-width: 760px) {
+    .partial-children {
+      margin-left: 10px;
+      padding-left: 10px;
+    }
+  }
+
+
+  /* ===== Compact fabric layout: one fabric item per row ===== */
+  .fabric-group-list {
+    display: block !important;
+  }
+
+  .fabric-summary-group {
+    width: 100%;
+    margin-bottom: 14px;
+  }
+
+  .fabric-parent-card {
+    display: grid !important;
+    grid-template-columns:
+      minmax(280px, 0.9fr)
+      minmax(230px, 0.65fr)
+      minmax(420px, 1.45fr);
+    align-items: center;
+    gap: 14px;
+    padding: 14px 16px !important;
+  }
+
+  .fabric-parent-card .material-top {
+    margin: 0 !important;
+    min-width: 0;
+  }
+
+  .fabric-parent-card .material-picture {
+    width: 54px;
+    height: 54px;
+    border-radius: 13px;
+  }
+
+  .fabric-parent-card .material-title h3 {
+    margin: 4px 0 5px;
+    font-size: 17px;
+  }
+
+  .fabric-parent-card .material-title p {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin: 0;
+    font-size: 14px;
+    font-weight: 900;
+    color: #263244;
+  }
+
+  .fabric-parent-card .color-dot {
+    width: 27px;
+    height: 27px;
+    border-width: 3px;
+    box-shadow: 0 0 0 2px #cfd4dc;
+  }
+
+  .fabric-parent-card .material-row-select {
+    padding: 5px 7px;
+  }
+
+  .fabric-parent-card .material-metrics {
+    grid-template-columns: 92px minmax(110px, 1fr);
+    gap: 8px;
+    padding: 8px;
+    margin: 0;
+  }
+
+  .fabric-parent-card .material-metrics > div {
+    min-width: 0;
+  }
+
+  .fabric-parent-card .material-metrics span {
+    margin-bottom: 3px;
+    font-size: 9px;
+  }
+
+  .fabric-parent-card .material-metrics strong {
+    font-size: 16px;
+  }
+
+  .fabric-parent-card .material-system-box {
+    padding: 7px 9px;
+  }
+
+  .fabric-parent-card .material-system-box strong {
+    font-size: 21px;
+  }
+
+  .fabric-parent-card .material-metrics small {
+    margin-top: 2px;
+    font-size: 10px;
+  }
+
+  .fabric-parent-card .material-fields {
+    grid-template-columns: 155px minmax(220px, 1fr);
+    gap: 10px;
+    margin: 0;
+    align-items: end;
+  }
+
+  .fabric-parent-card .material-fields > div:first-child {
+    padding: 6px 8px;
+  }
+
+  .fabric-parent-card .material-fields label {
+    margin-bottom: 3px;
+    font-size: 9px;
+  }
+
+  .fabric-parent-card .material-fields input {
+    height: 35px;
+    padding: 7px 10px;
+  }
+
+  .fabric-parent-card .qty-difference {
+    min-height: 12px;
+    margin-top: 2px;
+    font-size: 9px;
+  }
+
+  /* Partial rolls stay under their parent, one compact row per roll. */
+  .partial-children {
+    margin-top: 7px;
+    margin-left: 24px;
+    padding: 10px 0 0 14px;
+  }
+
+  .partial-children-title {
+    margin-bottom: 7px;
+  }
+
+  .partial-fabric-grid {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 8px !important;
+  }
+
+  .partial-fabric-card {
+    display: grid !important;
+    grid-template-columns:
+      minmax(300px, 0.95fr)
+      minmax(230px, 0.65fr)
+      minmax(390px, 1.4fr);
+    align-items: center;
+    gap: 12px;
+    padding: 11px 13px !important;
+  }
+
+  .partial-fabric-card .material-top {
+    margin: 0 !important;
+  }
+
+  .partial-fabric-card .material-picture {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+  }
+
+  .partial-fabric-card .material-title h3 {
+    margin: 3px 0;
+    font-size: 14px;
+  }
+
+  .partial-fabric-card .material-title p {
+    font-size: 11px;
+  }
+
+  .partial-fabric-card .material-metrics {
+    grid-template-columns: 100px minmax(110px, 1fr);
+    gap: 8px;
+    padding: 8px;
+    margin: 0;
+  }
+
+  .partial-fabric-card .material-metrics span {
+    margin-bottom: 3px;
+    font-size: 9px;
+  }
+
+  .partial-fabric-card .material-metrics strong {
+    font-size: 15px;
+  }
+
+  .partial-fabric-card .material-system-box {
+    padding: 7px 8px;
+  }
+
+  .partial-fabric-card .material-system-box strong {
+    font-size: 20px;
+  }
+
+  .partial-fabric-card .material-fields {
+    grid-template-columns: 145px minmax(210px, 1fr);
+    gap: 9px;
+    margin: 0;
+    align-items: end;
+  }
+
+  .partial-fabric-card .material-fields > div:first-child {
+    padding: 6px 7px;
+  }
+
+  .partial-fabric-card .material-fields label {
+    margin-bottom: 3px;
+    font-size: 9px;
+  }
+
+  .partial-fabric-card .material-fields input {
+    height: 34px;
+    padding: 7px 9px;
+  }
+
+  .partial-fabric-card .qty-difference {
+    min-height: 11px;
+    margin-top: 2px;
+    font-size: 9px;
+  }
+
+  @media (max-width: 1180px) {
+    .fabric-parent-card,
+    .partial-fabric-card {
+      grid-template-columns: minmax(260px, 0.9fr) minmax(210px, 0.7fr);
+    }
+
+    .fabric-parent-card .material-fields,
+    .partial-fabric-card .material-fields {
+      grid-column: 1 / -1;
+    }
+  }
+
+  @media (max-width: 760px) {
+    .fabric-parent-card,
+    .partial-fabric-card {
+      display: block !important;
+      padding: 12px !important;
+    }
+
+    .fabric-parent-card .material-top,
+    .partial-fabric-card .material-top {
+      margin-bottom: 10px !important;
+    }
+
+    .fabric-parent-card .material-metrics,
+    .partial-fabric-card .material-metrics {
+      margin-bottom: 9px;
+    }
+
+    .fabric-parent-card .material-fields,
+    .partial-fabric-card .material-fields {
+      grid-template-columns: 120px minmax(0, 1fr);
+    }
+
+    .partial-children {
+      margin-left: 8px;
+      padding-left: 8px;
+    }
+  }
+
 </style>
 {% endblock %}
