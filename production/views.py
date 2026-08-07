@@ -2153,70 +2153,109 @@ def sewing_return_create(request, job_id):
 @login_required
 @permission_required("production.view_sewingreturn", raise_exception=True)
 def sewing_return_list(request):
+    status_filter = (request.GET.get("status") or "all").strip().lower()
     date_type = (request.GET.get("date_type") or "sent").strip()
     date_from = (request.GET.get("date_from") or "").strip()
     date_to = (request.GET.get("date_to") or "").strip()
 
-    jobs = (
+    if status_filter not in {"all", "unpaid", "paid", "sent", "received"}:
+        status_filter = "all"
+
+    # First decide which projects match the date search.
+    filtered_jobs = (
         SewingJob.objects
         .exclude(status=SewingJob.STATUS_CANCELLED)
-        .select_related("project", "project_color__color", "partner")
-        .prefetch_related("lines", "returns__lines", "returns__sewing_payable")
+        .select_related("project")
     )
 
     if date_type == "received":
         if date_from:
-            jobs = jobs.filter(returns__return_date__gte=date_from)
+            filtered_jobs = filtered_jobs.filter(returns__return_date__gte=date_from)
         if date_to:
-            jobs = jobs.filter(returns__return_date__lte=date_to)
-        jobs = jobs.distinct()
+            filtered_jobs = filtered_jobs.filter(returns__return_date__lte=date_to)
+        filtered_jobs = filtered_jobs.distinct()
     else:
         date_type = "sent"
         if date_from:
-            jobs = jobs.filter(sent_date__gte=date_from)
+            filtered_jobs = filtered_jobs.filter(sent_date__gte=date_from)
         if date_to:
-            jobs = jobs.filter(sent_date__lte=date_to)
+            filtered_jobs = filtered_jobs.filter(sent_date__lte=date_to)
 
-    rows = []
+    project_ids = list(filtered_jobs.values_list("project_id", flat=True).distinct())
+
+    # IMPORTANT: after a project matches the date filter, load ALL of its sewing
+    # colour batches. Otherwise a completed project can incorrectly disappear.
+    jobs = (
+        SewingJob.objects
+        .filter(project_id__in=project_ids)
+        .exclude(status=SewingJob.STATUS_CANCELLED)
+        .select_related(
+            "project",
+            "project__finished_item",
+            "project_color__color",
+            "partner",
+        )
+        .prefetch_related(
+            "lines",
+            "returns__lines",
+            "returns__sewing_payable",
+        )
+        .order_by("project_id", "sent_date", "id")
+    )
+
+    grouped = OrderedDict()
     total_sent = 0
     total_received = 0
     total_in_sewing = 0
-    total_unpaid = Decimal("0")
-    total_paid = Decimal("0")
+    total_unpaid_good = 0
 
-    for job in jobs.order_by("-sent_date", "-id"):
+    for job in jobs:
         stocked_returns = [
             item for item in job.returns.all()
             if item.status == SewingReturn.STATUS_STOCKED
         ]
+
+        sent_total = int(job.sent_total or 0)
         received_total = sum(int(item.good_total or 0) for item in stocked_returns)
-        latest_received = max((item.return_date for item in stocked_returns), default=None)
+        remaining = int(job.pending_total or 0)
+        latest_received = max(
+            (item.return_date for item in stocked_returns),
+            default=None,
+        )
 
         unpaid_good = 0
         unpaid_amount = Decimal("0")
         paid_amount = Decimal("0")
         has_unpaid = False
+        has_missing_payable = False
+        has_any_payment = False
 
         for sewing_return in stocked_returns:
             payable = getattr(sewing_return, "sewing_payable", None)
+
+            # A received/stocked return must NEVER disappear just because its
+            # payable record is missing. Treat it as unpaid so staff can see it.
             if payable is None:
+                has_unpaid = True
+                has_missing_payable = True
+                unpaid_good += int(sewing_return.good_total or 0)
                 continue
-            paid_amount += Decimal(payable.paid_amount or 0)
-            if payable.balance > 0:
+
+            balance = Decimal(payable.balance or 0)
+            paid = Decimal(payable.paid_amount or 0)
+            paid_amount += paid
+            has_any_payment = has_any_payment or paid > 0
+
+            if balance > 0:
                 has_unpaid = True
                 unpaid_good += int(sewing_return.good_total or 0)
-                unpaid_amount += Decimal(payable.balance or 0)
+                unpaid_amount += balance
 
-        sent_total = int(job.sent_total or 0)
-        remaining = int(job.pending_total or 0)
-        total_sent += sent_total
-        total_received += received_total
-        total_in_sewing += remaining
-        total_unpaid += unpaid_amount
-        total_paid += paid_amount
+        child_is_paid = bool(stocked_returns) and not has_unpaid and has_any_payment
 
-        rows.append({
+        child = {
             "job": job,
+            "color": job.project_color.color if job.project_color_id else None,
             "latest_received": latest_received,
             "sent_total": sent_total,
             "received_total": received_total,
@@ -2225,20 +2264,141 @@ def sewing_return_list(request):
             "unpaid_amount": unpaid_amount,
             "paid_amount": paid_amount,
             "has_unpaid": has_unpaid,
-            "is_paid": bool(stocked_returns) and not has_unpaid,
+            "has_missing_payable": has_missing_payable,
+            "is_paid": child_is_paid,
+        }
+
+        group = grouped.setdefault(job.project_id, {
+            "project": job.project,
+            "children": [],
+            "sent_total": 0,
+            "received_total": 0,
+            "remaining_total": 0,
+            "unpaid_good": 0,
+            "unpaid_amount": Decimal("0"),
+            "paid_amount": Decimal("0"),
+            "latest_received": None,
+            "payees": set(),
+            "has_unpaid": False,
+            "has_missing_payable": False,
+            "has_any_payment": False,
         })
 
+        group["children"].append(child)
+        group["sent_total"] += sent_total
+        group["received_total"] += received_total
+        group["remaining_total"] += remaining
+        group["unpaid_good"] += unpaid_good
+        group["unpaid_amount"] += unpaid_amount
+        group["paid_amount"] += paid_amount
+        group["payees"].add(job.payee_name)
+        group["has_unpaid"] = group["has_unpaid"] or has_unpaid
+        group["has_missing_payable"] = (
+            group["has_missing_payable"] or has_missing_payable
+        )
+        group["has_any_payment"] = (
+            group["has_any_payment"] or has_any_payment
+        )
+
+        if latest_received and (
+            group["latest_received"] is None
+            or latest_received > group["latest_received"]
+        ):
+            group["latest_received"] = latest_received
+
+    project_rows = []
+
+    for group in grouped.values():
+        fully_received = (
+            group["sent_total"] > 0
+            and group["remaining_total"] <= 0
+        )
+        one_payee = len(group["payees"]) == 1
+        payee_name = next(iter(group["payees"]), "-")
+
+        # Fully received + unpaid = Ready to Pay.
+        # If an old return is missing its payable record, keep it visible but
+        # lock payment so the accounting record is not guessed silently.
+        can_pay = (
+            fully_received
+            and group["has_unpaid"]
+            and one_payee
+            and not group["has_missing_payable"]
+        )
+
+        is_paid = (
+            fully_received
+            and not group["has_unpaid"]
+            and group["has_any_payment"]
+        )
+
+        if not fully_received:
+            payment_lock_reason = "Receive the full project before payment."
+        elif not one_payee:
+            payment_lock_reason = "This project contains more than one sewer."
+        elif group["has_missing_payable"]:
+            payment_lock_reason = (
+                "Received but payment record is missing. Open the project and "
+                "re-save/confirm the sewing receive before paying."
+            )
+        elif is_paid:
+            payment_lock_reason = "This project is already paid."
+        elif not group["has_unpaid"]:
+            payment_lock_reason = "No unpaid sewing amount remains."
+        else:
+            payment_lock_reason = ""
+
+        row = {
+            **group,
+            "payee_name": payee_name,
+            "fully_received": fully_received,
+            "can_pay": can_pay,
+            "is_paid": is_paid,
+            "payment_lock_reason": payment_lock_reason,
+        }
+
+        include = True
+        if status_filter == "unpaid":
+            include = fully_received and group["has_unpaid"]
+        elif status_filter == "paid":
+            include = is_paid
+        elif status_filter == "sent":
+            include = group["remaining_total"] > 0
+        elif status_filter == "received":
+            include = fully_received
+
+        if include:
+            project_rows.append(row)
+
+        # Summary stays based on all projects matching the date range, not only
+        # the selected status tab.
+        total_sent += group["sent_total"]
+        total_received += group["received_total"]
+        total_in_sewing += group["remaining_total"]
+        total_unpaid_good += group["unpaid_good"]
+
+    project_rows.sort(
+        key=lambda row: (
+            row["latest_received"] or date.min,
+            row["project"].id,
+        ),
+        reverse=True,
+    )
+
     return render(request, "production/sewing_return_list.html", {
-        "rows": rows,
+        "project_rows": project_rows,
+        "total_projects": len(grouped),
         "total_sent": total_sent,
         "total_received": total_received,
         "total_in_sewing": total_in_sewing,
-        "total_unpaid": total_unpaid,
-        "total_paid": total_paid,
+        "total_unpaid_good": total_unpaid_good,
+        "status_filter": status_filter,
         "date_type": date_type,
         "date_from": date_from,
         "date_to": date_to,
-        "payment_form": SewingReturnBulkPaymentForm(initial={"payment_date": timezone.localdate()}),
+        "payment_form": SewingReturnBulkPaymentForm(
+            initial={"payment_date": timezone.localdate()}
+        ),
     })
 
 
@@ -2249,16 +2409,52 @@ def sewing_return_bulk_pay(request):
         return redirect("production_return_list")
 
     form = SewingReturnBulkPaymentForm(request.POST)
-    selected_job_ids = [
-        int(value) for value in request.POST.getlist("selected_jobs")
+    selected_project_ids = [
+        int(value)
+        for value in request.POST.getlist("selected_projects")
         if str(value).isdigit()
     ]
+
+    if not selected_project_ids:
+        messages.error(request, "Select at least one project to pay.")
+        return redirect("production_return_list")
 
     if not form.is_valid():
         for errors in form.errors.values():
             for error in errors:
                 messages.error(request, error)
         return redirect("production_return_list")
+
+    # The page selects whole production projects, while the existing payment
+    # service pays sewing jobs. Convert the selected projects to their jobs.
+    selected_jobs = list(
+        SewingJob.objects
+        .filter(project_id__in=selected_project_ids)
+        .exclude(status=SewingJob.STATUS_CANCELLED)
+        .select_related("project", "partner")
+        .prefetch_related("returns__sewing_payable")
+        .order_by("project_id", "id")
+    )
+
+    if not selected_jobs:
+        messages.error(request, "No sewing jobs were found for the selected project.")
+        return redirect("production_return_list")
+
+    payees = {job.payee_name for job in selected_jobs}
+    if len(payees) != 1:
+        messages.error(request, "Selected projects must use the same sewer.")
+        return redirect("production_return_list")
+
+    not_complete = [job.job_no for job in selected_jobs if int(job.pending_total or 0) > 0]
+    if not_complete:
+        messages.error(
+            request,
+            "Receive the full project before payment. Still pending: "
+            + ", ".join(not_complete),
+        )
+        return redirect("production_return_list")
+
+    selected_job_ids = [job.id for job in selected_jobs]
 
     try:
         batch = pay_selected_sewing_jobs(

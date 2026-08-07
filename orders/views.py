@@ -339,7 +339,11 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
 
         kept_design_ids.add(str(design.pk))
         next_sort_order += 1
-        has_item_or_file = False
+
+        # Existing uploaded images must count too.
+        # Without this check, editing an order can delete a design that still
+        # has previously uploaded images but no newly uploaded files.
+        has_item_or_file = design.files.exists()
 
         for item_data in design_data["items"]:
             item_id = item_data["id"]
