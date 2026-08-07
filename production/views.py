@@ -2241,12 +2241,19 @@ def sewing_return_list(request):
                 unpaid_good += int(sewing_return.good_total or 0)
                 continue
 
+            amount = Decimal(payable.amount or 0)
             balance = Decimal(payable.balance or 0)
             paid = Decimal(payable.paid_amount or 0)
             paid_amount += paid
             has_any_payment = has_any_payment or paid > 0
 
-            if balance > 0:
+            # A zero-value payable means the sewing price has not been entered
+            # yet. The payment modal asks for price per piece, so keep these
+            # received pieces selectable instead of treating them as finished.
+            if amount <= 0 and paid <= 0:
+                has_unpaid = True
+                unpaid_good += int(sewing_return.good_total or 0)
+            elif balance > 0:
                 has_unpaid = True
                 unpaid_good += int(sewing_return.good_total or 0)
                 unpaid_amount += balance
