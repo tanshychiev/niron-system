@@ -816,7 +816,7 @@ function changeRollCount(button, delta){
       <div>
         <h2>Choose fabric</h2>
         <div class="sub">
-          Enter only how many rolls will be used for each colour.
+          Choose fabric for each colour. Each click adds one available roll.
         </div>
       </div>
     </div>
@@ -865,46 +865,25 @@ function changeRollCount(button, delta){
       </div>
 
       {% if not project.cutting_is_complete and project.status != 'COMPLETED' and project.status != 'CANCELLED' %}
-      <form class="simple-roll-form"
+      <form class="simple-roll-form simple-one-button-form"
             method="post"
             action="{% url 'production_project_add_roll' project.id %}">
         {% csrf_token %}
         <input type="hidden"
                name="project_color_id"
                value="{{ row.pc.id }}">
+        <input type="hidden" name="roll_count" value="1">
+        <input type="hidden" name="selection_order" value="FULL_FIRST">
 
-        <div class="simple-roll-main">
-          <div class="field">
-            <label>Rolls to use</label>
-            <div class="roll-stepper">
-              <button type="button"
-                      onclick="changeRollCount(this,-1)">−</button>
-              <input type="number"
-                     min="1"
-                     max="{{ row.available_count }}"
-                     name="roll_count"
-                     value="1"
-                     required>
-              <button type="button"
-                      onclick="changeRollCount(this,1)">+</button>
-            </div>
-          </div>
-
-          <button class="btn btn-primary simple-select-btn">
-            {% if row.reserved_count %}Add Rolls{% else %}Select Rolls{% endif %}
-          </button>
-        </div>
-
-        <details class="simple-advanced">
-          <summary>Advanced options</summary>
-          <div class="field">
-            <label>Select order</label>
-            <select name="selection_order">
-              <option value="FULL_FIRST">Full rolls first</option>
-              <option value="PARTIAL_FIRST">Partial rolls first</option>
-            </select>
-          </div>
-        </details>
+        <button class="btn btn-primary simple-choose-fabric-btn"
+                type="submit"
+                {% if row.available_count <= 0 %}disabled{% endif %}>
+          {% if row.reserved_count %}
+            + Add Fabric
+          {% else %}
+            Choose Fabric
+          {% endif %}
+        </button>
       </form>
       {% else %}
       <div class="simple-confirmed-label">Fabric confirmed</div>
@@ -3898,5 +3877,44 @@ function changeRollCount(button, delta){
   }
 })();
 </script>
+
+
+<style>
+/* Step 1: one-button fabric control */
+.simple-fabric-row{
+  grid-template-columns:minmax(0,1fr) 190px!important;
+}
+
+.simple-one-button-form{
+  padding:0!important;
+  border:0!important;
+  background:transparent!important;
+}
+
+.simple-choose-fabric-btn{
+  width:100%;
+  min-height:48px!important;
+  padding:10px 16px!important;
+  border-radius:13px!important;
+  font-size:13px!important;
+  font-weight:950!important;
+  white-space:nowrap;
+}
+
+.simple-choose-fabric-btn:disabled{
+  opacity:.45;
+  cursor:not-allowed;
+  box-shadow:none!important;
+}
+
+@media(max-width:850px){
+  .simple-fabric-row{
+    grid-template-columns:1fr!important;
+  }
+  .simple-one-button-form{
+    width:100%;
+  }
+}
+</style>
 
 {% endblock %}
