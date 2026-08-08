@@ -10,7 +10,11 @@ from .models import Order, OrderDesign, OrderItem
 def decimal2(value):
     if value in [None, ""]:
         return Decimal("0.00")
-    return Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    return Decimal(str(value)).quantize(
+        Decimal("0.01"),
+        rounding=ROUND_HALF_UP,
+    )
 
 
 class MultipleFileInput(forms.ClearableFileInput):
@@ -23,25 +27,37 @@ class MultipleFileField(forms.FileField):
     def clean(self, data, initial=None):
         if not data:
             return []
+
         if not isinstance(data, (list, tuple)):
             data = [data]
 
         cleaned = []
+
         for item in data:
             cleaned.append(super().clean(item, initial))
+
         return cleaned
 
 
 class OrderForm(forms.ModelForm):
     deadline = forms.DateField(
-        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"})
+        widget=forms.DateInput(
+            attrs={
+                "type": "date",
+                "class": "form-control",
+            }
+        )
     )
 
     shipping_fee = forms.DecimalField(
         required=False,
         initial=0,
         widget=forms.NumberInput(
-            attrs={"class": "form-control", "step": "0.01", "placeholder": "0.00"}
+            attrs={
+                "class": "form-control",
+                "step": "0.01",
+                "placeholder": "0.00",
+            }
         ),
     )
 
@@ -49,7 +65,11 @@ class OrderForm(forms.ModelForm):
         required=False,
         initial=0,
         widget=forms.NumberInput(
-            attrs={"class": "form-control", "step": "0.01", "placeholder": "0.00"}
+            attrs={
+                "class": "form-control",
+                "step": "0.01",
+                "placeholder": "0.00",
+            }
         ),
     )
 
@@ -67,21 +87,38 @@ class OrderForm(forms.ModelForm):
             "shipping_fee",
         ]
         widgets = {
-            "order_type": forms.Select(attrs={"class": "form-select"}),
+            "order_type": forms.Select(
+                attrs={"class": "form-select"}
+            ),
             "service_type": forms.Select(
-                attrs={"class": "form-select", "id": "id_service_type"}
+                attrs={
+                    "class": "form-select",
+                    "id": "id_service_type",
+                }
             ),
             "customer_name": forms.TextInput(
-                attrs={"class": "form-control", "placeholder": "Customer name"}
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "Customer name",
+                }
             ),
             "phone": forms.TextInput(
-                attrs={"class": "form-control", "placeholder": "Phone"}
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "Phone",
+                }
             ),
             "customer_location": forms.TextInput(
-                attrs={"class": "form-control", "placeholder": "Location"}
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "Location",
+                }
             ),
             "remark": forms.TextInput(
-                attrs={"class": "form-control", "placeholder": "Remark"}
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "Remark",
+                }
             ),
         }
 
@@ -103,19 +140,31 @@ class OrderDesignForm(forms.ModelForm):
     design_files = MultipleFileField(
         required=False,
         widget=MultipleFileInput(
-            attrs={"accept": "image/*", "class": "form-control"}
+            attrs={
+                "accept": "image/*",
+                "class": "form-control",
+            }
         ),
     )
 
     class Meta:
         model = OrderDesign
-        fields = ["name", "remark"]
+        fields = [
+            "name",
+            "remark",
+        ]
         widgets = {
             "name": forms.TextInput(
-                attrs={"class": "form-control", "placeholder": "Design name"}
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "Design name",
+                }
             ),
             "remark": forms.TextInput(
-                attrs={"class": "form-control", "placeholder": "Design remark"}
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "Design remark",
+                }
             ),
         }
 
@@ -124,7 +173,10 @@ class OrderItemForm(forms.ModelForm):
     description = forms.CharField(
         required=False,
         widget=forms.TextInput(
-            attrs={"class": "form-control", "placeholder": "Description"}
+            attrs={
+                "class": "form-control",
+                "placeholder": "Description",
+            }
         ),
     )
 
@@ -141,10 +193,26 @@ class OrderItemForm(forms.ModelForm):
             "unit_price",
         ]
         widgets = {
-            "shirt_item": forms.Select(attrs={"class": "form-select shirt-select"}),
-            "color": forms.Select(attrs={"class": "form-select color-select"}),
-            "size": forms.Select(attrs={"class": "form-select size-select"}),
-            "film_item": forms.Select(attrs={"class": "form-select film-select"}),
+            "shirt_item": forms.Select(
+                attrs={
+                    "class": "form-select shirt-select",
+                }
+            ),
+            "color": forms.Select(
+                attrs={
+                    "class": "form-select color-select",
+                }
+            ),
+            "size": forms.Select(
+                attrs={
+                    "class": "form-select size-select",
+                }
+            ),
+            "film_item": forms.Select(
+                attrs={
+                    "class": "form-select film-select",
+                }
+            ),
             "film_meter": forms.NumberInput(
                 attrs={
                     "class": "form-control film-meter-input",
@@ -175,23 +243,33 @@ class OrderItemForm(forms.ModelForm):
         self.order = kwargs.pop("order", None)
         super().__init__(*args, **kwargs)
 
-        self.fields["shirt_item"].queryset = InventoryItem.objects.filter(
-            item_type=InventoryItem.TYPE_SHIRT,
-            is_active=True,
-        ).order_by("code", "name")
+        # Only active shirt items appear in Create/Edit Order.
+        self.fields["shirt_item"].queryset = (
+            InventoryItem.objects.filter(
+                item_type=InventoryItem.TYPE_SHIRT,
+                is_active=True,
+            )
+            .order_by("code", "name")
+        )
 
-        self.fields["film_item"].queryset = InventoryItem.objects.filter(
-            item_type=InventoryItem.TYPE_FILM,
-            is_active=True,
-        ).order_by("code", "name")
+        # Only active printing-film items appear in Create/Edit Order.
+        self.fields["film_item"].queryset = (
+            InventoryItem.objects.filter(
+                item_type=InventoryItem.TYPE_FILM,
+                is_active=True,
+            )
+            .order_by("code", "name")
+        )
 
-        self.fields["color"].queryset = Color.objects.filter(
-            is_active=True
-        ).order_by("name")
+        self.fields["color"].queryset = (
+            Color.objects.filter(is_active=True)
+            .order_by("name")
+        )
 
-        self.fields["size"].queryset = Size.objects.filter(
-            is_active=True
-        ).order_by("sort_order", "id")
+        self.fields["size"].queryset = (
+            Size.objects.filter(is_active=True)
+            .order_by("sort_order", "id")
+        )
 
         for name in [
             "shirt_item",
@@ -214,6 +292,7 @@ class OrderItemForm(forms.ModelForm):
         cleaned = super().clean()
 
         service_type = None
+
         if self.order:
             service_type = self.order.service_type
         elif self.instance and self.instance.order_id:
@@ -227,28 +306,60 @@ class OrderItemForm(forms.ModelForm):
 
         if service_type == Order.SERVICE_FULL:
             if not shirt_item:
-                self.add_error("shirt_item", "Please choose shirt item.")
+                self.add_error(
+                    "shirt_item",
+                    "Please choose shirt item.",
+                )
+
             if not color:
-                self.add_error("color", "Please choose color.")
+                self.add_error(
+                    "color",
+                    "Please choose color.",
+                )
+
             if not size:
-                self.add_error("size", "Please choose size.")
+                self.add_error(
+                    "size",
+                    "Please choose size.",
+                )
 
         elif service_type == Order.SERVICE_PRINT_HEATPRESS:
-            description = (cleaned.get("description") or "").strip()
+            description = (
+                cleaned.get("description") or ""
+            ).strip()
             quantity = cleaned.get("quantity") or 0
             unit_price = cleaned.get("unit_price") or 0
+
             if not description:
-                self.add_error("description", "Enter customer cloth type, color, and size.")
+                self.add_error(
+                    "description",
+                    "Enter customer cloth type, color, and size.",
+                )
+
             if quantity <= 0:
-                self.add_error("quantity", "Please enter quantity.")
+                self.add_error(
+                    "quantity",
+                    "Please enter quantity.",
+                )
+
             if unit_price <= 0:
-                self.add_error("unit_price", "Please enter unit price.")
+                self.add_error(
+                    "unit_price",
+                    "Please enter unit price.",
+                )
 
         elif service_type == Order.SERVICE_FILM_ONLY:
             if not film_item:
-                self.add_error("film_item", "Please choose film item.")
+                self.add_error(
+                    "film_item",
+                    "Please choose film item.",
+                )
+
             if not film_meter or film_meter <= 0:
-                self.add_error("film_meter", "Please enter film meter.")
+                self.add_error(
+                    "film_meter",
+                    "Please enter film meter.",
+                )
 
         return cleaned
 
@@ -287,10 +398,44 @@ class ProductionFilterForm(forms.Form):
         (SORT_CREATED_ASC, "Created oldest first"),
     ]
 
-    q = forms.CharField(required=False)
-    status = forms.ChoiceField(required=False, initial=STATUS_ACTIVE, choices=STATUS_CHOICES)
+    q = forms.CharField(
+        required=False,
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": "Customer name or order no",
+            }
+        ),
+    )
+
+    status = forms.ChoiceField(
+        required=False,
+        initial=STATUS_ACTIVE,
+        choices=STATUS_CHOICES,
+        widget=forms.Select(
+            attrs={
+                "class": "form-select",
+            }
+        ),
+    )
+
     deadline = forms.DateField(
         required=False,
-        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
+        widget=forms.DateInput(
+            attrs={
+                "type": "date",
+                "class": "form-control",
+            }
+        ),
     )
-    sort = forms.ChoiceField(required=False, initial=SORT_DEADLINE_ASC, choices=SORT_CHOICES)
+
+    sort = forms.ChoiceField(
+        required=False,
+        initial=SORT_DEADLINE_ASC,
+        choices=SORT_CHOICES,
+        widget=forms.Select(
+            attrs={
+                "class": "form-select",
+            }
+        ),
+    )

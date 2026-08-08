@@ -142,7 +142,7 @@ def inventory_list(request):
         inventory_type = "all"
 
     q = (request.GET.get("q") or "").strip()
-    items = InventoryItem.objects.all().order_by("code", "name")
+    items = InventoryItem.objects.filter(is_active=True).order_by("code", "name")
     batches = InventoryBatch.objects.filter(is_deleted=False).order_by("-received_date", "-id")
 
     active_statuses = [
@@ -172,6 +172,7 @@ def inventory_list(request):
         InventoryBatchItem.objects.select_related("item", "color", "size", "batch")
         .filter(
             is_active=True,
+            item__is_active=True,
             item__item_type=InventoryItem.TYPE_SHIRT,
             batch__is_deleted=False,
         )
@@ -222,6 +223,7 @@ def inventory_list(request):
         OrderItem.objects.select_related("shirt_item", "color", "size", "order")
         .filter(
             shirt_item__isnull=False,
+            shirt_item__is_active=True,
             order__status__in=active_statuses,
             order__is_deleted=False,
         )
@@ -565,7 +567,7 @@ def inventory_list(request):
 @login_required
 @permission_required("inventory.view_inventoryitem", raise_exception=True)
 def inventory_item_list(request):
-    items = InventoryItem.objects.all().order_by("code", "name")
+    items = InventoryItem.objects.filter(is_active=True).order_by("code", "name")
     return render(request, "inventory/inventory_item_list.html", {"items": items})
 
 

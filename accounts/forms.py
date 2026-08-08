@@ -51,13 +51,16 @@ def sync_user_access(user, selected_group):
     else:
         user.groups.clear()
 
+    # Admin role receives every Django permission through its Group.
+    # Do not turn ordinary Admin-role users into superusers.
+    # Existing manually-created superusers remain superusers.
+    staff_access = bool(user.is_superuser or admin_access)
+
     User.objects.filter(pk=user.pk).update(
-        is_staff=admin_access,
-        is_superuser=admin_access,
+        is_staff=staff_access,
     )
 
-    user.is_staff = admin_access
-    user.is_superuser = admin_access
+    user.is_staff = staff_access
     clear_permission_cache(user)
     user.refresh_from_db(fields=["is_staff", "is_superuser"])
     clear_permission_cache(user)

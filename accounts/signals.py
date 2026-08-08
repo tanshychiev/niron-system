@@ -27,10 +27,15 @@ def _sync_flags(user):
     if admin_access:
         selected_group.permissions.set(Permission.objects.all())
 
+    # Admin-role users receive all permissions from the Group.
+    # Keep is_superuser unchanged; only real superusers should bypass permissions.
+    staff_access = bool(user.is_superuser or admin_access)
+
     User.objects.filter(pk=user.pk).update(
-        is_staff=admin_access,
-        is_superuser=admin_access,
+        is_staff=staff_access,
     )
+
+    user.is_staff = staff_access
 
     for cache_name in (
         "_perm_cache",
