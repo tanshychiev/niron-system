@@ -201,7 +201,7 @@ def other_expense_list(request):
             "page_subtitle_text": "Other expense records",
             "create_url_name": "create_other_expense",
             "create_label": "+ Create Other Expense",
-            "can_create": request.user.has_perm("finance.add_other_expense"),
+            "can_create": request.user.has_perm("finance.add_expense"),
         },
     )
 
@@ -318,13 +318,13 @@ def operating_expense_list(request):
             "page_subtitle_text": "Salary, commission, boosting, rent and other operating expense",
             "create_url_name": "create_operating_expense",
             "create_label": "+ Create Operating Expense",
-            "can_create": request.user.has_perm("finance.add_operating_expense"),
+            "can_create": request.user.has_perm("finance.add_expense"),
         },
     )
 
 
 @login_required
-@permission_required("finance.add_other_expense", raise_exception=True)
+@permission_required("finance.add_expense", raise_exception=True)
 def create_other_expense(request):
     if request.method == "POST":
         form = OtherExpenseForm(request.POST)
@@ -352,7 +352,7 @@ def create_other_expense(request):
 
 
 @login_required
-@permission_required("finance.add_batch_expense", raise_exception=True)
+@permission_required("finance.add_expense", raise_exception=True)
 def create_batch_expense(request):
     if request.method == "POST":
         form = BatchExpenseForm(request.POST)
@@ -419,7 +419,7 @@ def create_batch_expense(request):
 
 
 @login_required
-@permission_required("finance.add_operating_expense", raise_exception=True)
+@permission_required("finance.add_expense", raise_exception=True)
 def create_operating_expense(request):
     if request.method == "POST":
         form = OperatingExpenseForm(request.POST)
@@ -949,7 +949,7 @@ def profit_dashboard(request):
         },
     )
 @login_required
-@permission_required("finance.add_batch_expense", raise_exception=True)
+@permission_required("finance.add_expense", raise_exception=True)
 def batch_expense_preview(request):
     batch_id = request.GET.get("batch_id")
 
@@ -1063,7 +1063,7 @@ def expense_summary_export_excel(request):
     return response
 
 @login_required
-@permission_required("finance.add_batch_expense", raise_exception=True)
+@permission_required("finance.add_expense", raise_exception=True)
 def batch_expense_cost_edit(request, pk):
     expense = get_object_or_404(
         Expense.objects.select_related(
