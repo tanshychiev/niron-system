@@ -13,8 +13,22 @@
 {% block content %}
 <style>
     .orders-shell {
-        max-width: 1550px;
-        margin: 0 auto;
+        width: 100%;
+        max-width: none;
+        margin: 0;
+    }
+
+    /* Use the full available page width on the Orders screen */
+    .content-wrap {
+        width: 100%;
+        max-width: none;
+    }
+
+    .orders-shell,
+    .summary-grid,
+    .filter-card,
+    .table-card {
+        min-width: 0;
     }
 
     .summary-grid {
@@ -108,6 +122,7 @@
     }
 
     .table-card {
+        width: 100%;
         background: rgba(255,255,255,.94);
         border: 1px solid var(--line);
         border-radius: 22px;
@@ -115,14 +130,36 @@
         overflow: hidden;
     }
 
-    .table-wrap {
+    .table-scroll-top {
+        width: 100%;
         overflow-x: auto;
+        overflow-y: hidden;
+        height: 18px;
+        border-bottom: 1px solid var(--line);
+        background: #faf8f2;
+        scrollbar-gutter: stable;
+    }
+
+    .table-scroll-top-inner {
+        height: 1px;
+    }
+
+    .table-wrap {
+        width: 100%;
+        overflow-x: auto;
+        overflow-y: visible;
+        scrollbar-gutter: stable;
+    }
+
+    .table-scroll-top::-webkit-scrollbar,
+    .table-wrap::-webkit-scrollbar {
+        height: 12px;
     }
 
     .orders-table {
         width: 100%;
         border-collapse: collapse;
-        min-width: 1320px;
+        min-width: 1280px;
     }
 
     .orders-table th,
@@ -431,8 +468,12 @@
     </div>
 
     <div class="table-card">
-        <div class="table-wrap">
-            <table class="orders-table">
+        <div class="table-scroll-top" id="ordersTopScroll" aria-label="Horizontal table scroll">
+            <div class="table-scroll-top-inner" id="ordersTopScrollInner"></div>
+        </div>
+
+        <div class="table-wrap" id="ordersTableWrap">
+            <table class="orders-table" id="ordersTable">
                 <thead>
                     <tr>
                         <th>Order No</th>
@@ -758,6 +799,60 @@
                 }
             });
         });
+
+        const topScroll = document.getElementById("ordersTopScroll");
+        const topInner = document.getElementById("ordersTopScrollInner");
+        const tableWrap = document.getElementById("ordersTableWrap");
+        const table = document.getElementById("ordersTable");
+
+        if (topScroll && topInner && tableWrap && table) {
+            let syncingTop = false;
+            let syncingBottom = false;
+
+            function refreshTopScrollbar() {
+                topInner.style.width = table.scrollWidth + "px";
+
+                if (table.scrollWidth <= tableWrap.clientWidth + 1) {
+                    topScroll.style.display = "none";
+                } else {
+                    topScroll.style.display = "block";
+                }
+
+                topScroll.scrollLeft = tableWrap.scrollLeft;
+            }
+
+            topScroll.addEventListener("scroll", function () {
+                if (syncingBottom) return;
+
+                syncingTop = true;
+                tableWrap.scrollLeft = topScroll.scrollLeft;
+
+                requestAnimationFrame(function () {
+                    syncingTop = false;
+                });
+            });
+
+            tableWrap.addEventListener("scroll", function () {
+                if (syncingTop) return;
+
+                syncingBottom = true;
+                topScroll.scrollLeft = tableWrap.scrollLeft;
+
+                requestAnimationFrame(function () {
+                    syncingBottom = false;
+                });
+            });
+
+            window.addEventListener("resize", refreshTopScrollbar);
+
+            if ("ResizeObserver" in window) {
+                const resizeObserver = new ResizeObserver(refreshTopScrollbar);
+                resizeObserver.observe(table);
+                resizeObserver.observe(tableWrap);
+            }
+
+            refreshTopScrollbar();
+        }
     });
 </script>
 {% endblock %}
