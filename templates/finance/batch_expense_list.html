@@ -12,9 +12,34 @@
 .stock-table th,.stock-table td{padding:11px 12px;border-bottom:1px solid var(--line);font-size:12px;text-align:left;vertical-align:middle}.stock-table th{color:var(--muted);font-size:9px;text-transform:uppercase}
 .badge{display:inline-flex;padding:5px 9px;border-radius:999px;font-size:9px;font-weight:950}.pending{background:#fff1d5;color:#8a5a10}.done{background:#eaf8f1;color:#14704e}.type{background:#eef2ff;color:#4338ca}
 .money{text-align:right!important;font-weight:900;white-space:nowrap}.muted{color:var(--muted);font-size:10px}.empty{padding:34px!important;text-align:center!important;color:var(--muted)}
-@media(max-width:900px){.stock-exp-stats{grid-template-columns:1fr 1fr}.filters{grid-template-columns:1fr 1fr}}
-@media(max-width:520px){.stock-exp-stats,.filters{grid-template-columns:1fr}}
+
+.detail-link{border:0;background:transparent;padding:0;color:inherit;font:inherit;font-weight:900;cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px}
+.detail-link:hover{color:#9a6500}
+.qty-link{display:inline-flex;align-items:center;gap:5px;border:1px solid #ead7aa;background:#fff8e8;color:#7a5100;border-radius:10px;padding:6px 9px;font-size:11px;font-weight:950;cursor:pointer}
+.qty-link:hover{background:#ffefc7}
+.detail-modal{display:none;position:fixed;inset:0;z-index:350;background:rgba(18,22,28,.55);align-items:center;justify-content:center;padding:18px}
+.detail-modal.open{display:flex}
+.detail-card{width:min(860px,100%);max-height:90vh;overflow:auto;background:#fff;border-radius:20px;box-shadow:0 25px 80px rgba(0,0,0,.22);padding:20px}
+.detail-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:14px}
+.detail-head h2{margin:0;font-size:20px}.detail-head p{margin:4px 0 0;color:var(--muted);font-size:11px}
+.detail-close{border:0;background:#f2f3f5;border-radius:10px;width:35px;height:35px;cursor:pointer;font-size:18px}
+.detail-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin-bottom:14px}
+.detail-box{border:1px solid var(--line);background:#fffdf9;border-radius:13px;padding:11px}
+.detail-box span{display:block;color:var(--muted);font-size:9px;font-weight:900;text-transform:uppercase}
+.detail-box strong{display:block;margin-top:4px;font-size:13px;word-break:break-word}
+.detail-table-wrap{overflow:auto;border:1px solid var(--line);border-radius:14px}
+.detail-table{width:100%;min-width:660px;border-collapse:collapse}
+.detail-table th,.detail-table td{padding:10px 11px;border-bottom:1px solid var(--line);font-size:11px;text-align:left}
+.detail-table th{font-size:9px;color:var(--muted);text-transform:uppercase}
+.detail-total{display:flex;justify-content:flex-end;gap:20px;padding:13px 4px 0;font-weight:950}
+.detail-costs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin-top:14px}
+.loading{padding:35px;text-align:center;color:var(--muted)}
+.error-box{padding:16px;border:1px solid #f1c6c6;background:#fff2f2;color:#9d1c1c;border-radius:12px}
+
+@media(max-width:900px){.stock-exp-stats{grid-template-columns:1fr 1fr}.filters{grid-template-columns:1fr 1fr}.detail-summary,.detail-costs{grid-template-columns:1fr 1fr}}
+@media(max-width:520px){.stock-exp-stats,.filters,.detail-summary,.detail-costs{grid-template-columns:1fr}}
 </style>
+
 <div class="stock-exp-wrap">
   <div class="stock-exp-head">
     <div class="stock-exp-stats">
@@ -30,14 +55,17 @@
       <option value="PENDING" {% if selected_status == "PENDING" %}selected{% endif %}>Waiting for Cost</option>
       <option value="COMPLETED" {% if selected_status == "COMPLETED" %}selected{% endif %}>Cost Added</option>
     </select></div>
+
     <div><label>Item Type</label><select name="stock_type">
       <option value="">All Types</option>
       <option value="FABRIC" {% if selected_stock_type == "FABRIC" %}selected{% endif %}>Fabric</option>
       <option value="CLOTH" {% if selected_stock_type == "CLOTH" %}selected{% endif %}>Cloth</option>
       <option value="PRINTING" {% if selected_stock_type == "PRINTING" %}selected{% endif %}>Printing Material</option>
     </select></div>
+
     <div><label>Supplier</label><input name="supplier" value="{{ selected_supplier }}" placeholder="Supplier name"></div>
     <div><label>Month</label><input type="month" name="month" value="{{ selected_month }}"></div>
+
     <div><label>Sort By</label><select name="sort">
       <option value="-date" {% if selected_sort == "-date" %}selected{% endif %}>Newest</option>
       <option value="date" {% if selected_sort == "date" %}selected{% endif %}>Oldest</option>
@@ -45,18 +73,40 @@
       <option value="-amount" {% if selected_sort == "-amount" %}selected{% endif %}>Highest Cost</option>
       <option value="status" {% if selected_sort == "status" %}selected{% endif %}>Status</option>
     </select></div>
+
     <div style="align-self:end"><button class="btn-primary" style="width:100%">Apply</button></div>
   </form>
 
   <div class="table-card">
     <table class="stock-table">
-      <thead><tr><th>Date</th><th>Reference</th><th>Item Type</th><th>Supplier</th><th>Total Quantity</th><th>Recorded By</th><th>Status</th><th class="money">Goods Cost</th><th class="money">Delivery</th><th class="money">Extra</th><th class="money">Total</th><th>Action</th></tr></thead>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Reference</th>
+          <th>Item Type</th>
+          <th>Supplier</th>
+          <th>Total Quantity</th>
+          <th>Recorded By</th>
+          <th>Status</th>
+          <th class="money">Goods Cost</th>
+          <th class="money">Delivery</th>
+          <th class="money">Extra</th>
+          <th class="money">Total</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+
       <tbody>
       {% for expense in expenses %}
         <tr>
           <td>{{ expense.received_date|default:expense.created_at|date:"d M Y" }}</td>
+
           <td>
-            <strong>
+            <button
+              type="button"
+              class="detail-link js-stock-detail"
+              data-expense-id="{{ expense.id }}"
+            >
               {% if expense.source_reference %}
                 {{ expense.source_reference }}
               {% elif expense.batch %}
@@ -64,7 +114,8 @@
               {% else %}
                 -
               {% endif %}
-            </strong>
+            </button>
+
             <div class="muted">
               By
               {% if expense.batch and expense.batch.created_by %}
@@ -76,22 +127,43 @@
               {% endif %}
             </div>
           </td>
-          <td><span class="badge type">
-            {% if expense.stock_source_type == "FABRIC" %}Fabric
-            {% elif "printing" in expense.note|lower %}Printing Material
-            {% elif "cloth" in expense.note|lower %}Cloth
-            {% else %}Inventory{% endif %}
-          </span></td>
+
+          <td>
+            <span class="badge type">
+              {% if expense.stock_source_type == "FABRIC" %}
+                Fabric
+              {% elif "printing" in expense.note|lower %}
+                Printing Material
+              {% elif "cloth" in expense.note|lower %}
+                Cloth
+              {% else %}
+                Inventory
+              {% endif %}
+            </span>
+          </td>
+
           <td>
             {% if expense.supplier_name %}
               {{ expense.supplier_name }}
             {% elif expense.batch %}
-              {{ expense.batch.supplier_name|default:"-" }}
+              {{ expense.batch.supplier_name|default:expense.batch.supplier|default:"-" }}
             {% else %}
               -
             {% endif %}
           </td>
-          <td><strong>{{ expense.total_received_label }}</strong></td>
+
+          <td>
+            <button
+              type="button"
+              class="qty-link js-stock-detail"
+              data-expense-id="{{ expense.id }}"
+              title="Click to view stock-in detail"
+            >
+              {{ expense.total_received_label }}
+              <span>›</span>
+            </button>
+          </td>
+
           <td>
             {% if expense.batch and expense.batch.created_by %}
               {{ expense.batch.created_by.get_full_name|default:expense.batch.created_by.username }}
@@ -101,20 +173,236 @@
               -
             {% endif %}
           </td>
-          <td><span class="badge {% if expense.expense_status == "COMPLETED" %}done{% else %}pending{% endif %}">
-            {% if expense.expense_status == "COMPLETED" %}Cost Added{% else %}Waiting for Cost{% endif %}
-          </span></td>
+
+          <td>
+            <span class="badge {% if expense.expense_status == "COMPLETED" %}done{% else %}pending{% endif %}">
+              {% if expense.expense_status == "COMPLETED" %}Cost Added{% else %}Waiting for Cost{% endif %}
+            </span>
+          </td>
+
           <td class="money">${{ expense.batch_cost|floatformat:2 }}</td>
           <td class="money">${{ expense.batch_delivery_fee|floatformat:2 }}</td>
           <td class="money">${{ expense.batch_other_fee|floatformat:2 }}</td>
           <td class="money">${{ expense.amount|floatformat:2 }}</td>
-          <td><a class="btn-light" href="{% url 'batch_expense_cost_edit' expense.id %}">{% if expense.expense_status == "PENDING" %}Add Cost{% else %}Edit Cost{% endif %}</a></td>
+
+          <td>
+            <a class="btn-light" href="{% url 'batch_expense_cost_edit' expense.id %}">
+              {% if expense.expense_status == "PENDING" %}Add Cost{% else %}Edit Cost{% endif %}
+            </a>
+          </td>
         </tr>
+
       {% empty %}
-        <tr><td colspan="12" class="empty">No Stock In Expense found.</td></tr>
+        <tr>
+          <td colspan="12" class="empty">No Stock In Expense found.</td>
+        </tr>
       {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
+
+
+<div class="detail-modal" id="stockDetailModal">
+  <div class="detail-card">
+    <div class="detail-head">
+      <div>
+        <h2 id="detailTitle">Stock In Detail</h2>
+        <p id="detailSubtitle">Loading...</p>
+      </div>
+
+      <button type="button" class="detail-close" id="closeStockDetail">×</button>
+    </div>
+
+    <div id="detailBody">
+      <div class="loading">Loading stock detail...</div>
+    </div>
+  </div>
+</div>
+
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const modal = document.getElementById("stockDetailModal");
+  const body = document.getElementById("detailBody");
+  const title = document.getElementById("detailTitle");
+  const subtitle = document.getElementById("detailSubtitle");
+  const closeButton = document.getElementById("closeStockDetail");
+
+  const previewUrl = "{% url 'batch_expense_preview' %}";
+
+  function escapeHtml(value) {
+    return String(value == null ? "" : value)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function closeModal() {
+    modal.classList.remove("open");
+  }
+
+  function renderDetail(data) {
+    const rows = Array.isArray(data.rows) ? data.rows : [];
+
+    const rowsHtml = rows.length
+      ? rows.map(function (row) {
+          return `
+            <tr>
+              <td>
+                <strong>${escapeHtml(row.item_name || "-")}</strong>
+                <div class="muted">${escapeHtml(row.item_code || "-")}</div>
+              </td>
+              <td>${escapeHtml(row.color || "-")}</td>
+              <td>${escapeHtml(row.size || "-")}</td>
+              <td class="money">${escapeHtml(row.qty || "0")} ${escapeHtml(row.unit || "")}</td>
+            </tr>
+          `;
+        }).join("")
+      : `
+          <tr>
+            <td colspan="4" class="empty">No detail rows found.</td>
+          </tr>
+        `;
+
+    title.textContent = data.reference || "Stock In Detail";
+    subtitle.textContent =
+      (data.source_type || "Stock In") +
+      " · " +
+      (data.received_date || "-");
+
+    body.innerHTML = `
+      <div class="detail-summary">
+        <div class="detail-box">
+          <span>Reference</span>
+          <strong>${escapeHtml(data.reference || "-")}</strong>
+        </div>
+
+        <div class="detail-box">
+          <span>Item Type</span>
+          <strong>${escapeHtml(data.source_type || "-")}</strong>
+        </div>
+
+        <div class="detail-box">
+          <span>Supplier</span>
+          <strong>${escapeHtml(data.supplier || "-")}</strong>
+        </div>
+
+        <div class="detail-box">
+          <span>Total Quantity</span>
+          <strong>${escapeHtml(data.total_label || "-")}</strong>
+        </div>
+
+        <div class="detail-box">
+          <span>Received Date</span>
+          <strong>${escapeHtml(data.received_date || "-")}</strong>
+        </div>
+
+        <div class="detail-box">
+          <span>Recorded By</span>
+          <strong>${escapeHtml(data.recorded_by || "-")}</strong>
+        </div>
+      </div>
+
+      <div class="detail-table-wrap">
+        <table class="detail-table">
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>Color</th>
+              <th>Size</th>
+              <th class="money">Quantity</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="detail-total">
+        <span>Total Quantity</span>
+        <strong>${escapeHtml(data.total_label || "-")}</strong>
+      </div>
+
+      <div class="detail-costs">
+        <div class="detail-box">
+          <span>Goods Cost</span>
+          <strong>$${escapeHtml(data.goods_cost || "0.00")}</strong>
+        </div>
+
+        <div class="detail-box">
+          <span>Delivery</span>
+          <strong>$${escapeHtml(data.delivery_fee || "0.00")}</strong>
+        </div>
+
+        <div class="detail-box">
+          <span>Extra</span>
+          <strong>$${escapeHtml(data.other_fee || "0.00")}</strong>
+        </div>
+
+        <div class="detail-box">
+          <span>Total Cost</span>
+          <strong>$${escapeHtml(data.amount || "0.00")}</strong>
+        </div>
+      </div>
+    `;
+  }
+
+  async function openDetail(expenseId) {
+    modal.classList.add("open");
+    title.textContent = "Stock In Detail";
+    subtitle.textContent = "Loading...";
+    body.innerHTML = `<div class="loading">Loading stock detail...</div>`;
+
+    try {
+      const response = await fetch(
+        previewUrl + "?expense_id=" + encodeURIComponent(expenseId),
+        {
+          headers: {
+            "X-Requested-With": "XMLHttpRequest"
+          }
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Unable to load stock detail.");
+      }
+
+      renderDetail(data);
+    } catch (error) {
+      subtitle.textContent = "Could not load detail";
+      body.innerHTML = `
+        <div class="error-box">
+          ${escapeHtml(error.message || "Unable to load stock detail.")}
+        </div>
+      `;
+    }
+  }
+
+  document.querySelectorAll(".js-stock-detail").forEach(function (button) {
+    button.addEventListener("click", function () {
+      openDetail(button.dataset.expenseId);
+    });
+  });
+
+  closeButton.addEventListener("click", closeModal);
+
+  modal.addEventListener("click", function (event) {
+    if (event.target === modal) {
+      closeModal();
+    }
+  });
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape") {
+      closeModal();
+    }
+  });
+});
+</script>
 {% endblock %}

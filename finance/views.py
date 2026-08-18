@@ -210,7 +210,11 @@ def other_expense_list(request):
 @permission_required("finance.view_batch_expense_nav", raise_exception=True)
 def batch_expense_list(request):
     """Stock In Expense list synced from cloth, printing material and fabric Stock In."""
-    qs = Expense.objects.select_related("created_by", "batch").filter(
+    qs = Expense.objects.select_related(
+        "created_by",
+        "batch",
+        "batch__created_by",
+    ).filter(
         expense_type=Expense.TYPE_BATCH
     ).filter(
         Q(batch__isnull=True) | Q(batch__is_deleted=False)
@@ -231,9 +235,11 @@ def batch_expense_list(request):
         "CLOTH",
         "PRINTING",
     }
+
     if stock_type in valid_sources:
         if stock_type in {"CLOTH", "PRINTING"}:
             qs = qs.filter(stock_source_type=Expense.SOURCE_INVENTORY)
+
             if stock_type == "CLOTH":
                 qs = qs.filter(
                     Q(note__icontains="cloth")
@@ -241,7 +247,9 @@ def batch_expense_list(request):
                     | Q(batch__items__item__item_type="SHIRT")
                 )
             else:
-                qs = qs.exclude(batch__items__item__item_type="SHIRT")
+                qs = qs.exclude(
+                    batch__items__item__item_type="SHIRT"
+                )
         else:
             qs = qs.filter(stock_source_type=stock_type)
 
@@ -257,7 +265,11 @@ def batch_expense_list(request):
             year, month_no = [int(x) for x in month.split("-", 1)]
             qs = qs.filter(
                 Q(received_date__year=year, received_date__month=month_no)
-                | Q(received_date__isnull=True, created_at__year=year, created_at__month=month_no)
+                | Q(
+                    received_date__isnull=True,
+                    created_at__year=year,
+                    created_at__month=month_no,
+                )
             )
         except (TypeError, ValueError):
             pass
@@ -272,27 +284,121 @@ def batch_expense_list(request):
         "status": "expense_status",
         "-status": "-expense_status",
     }
-    qs = qs.distinct().order_by(allowed_sort.get(sort, "-received_date"), "-id")
 
-    total_expense = qs.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
-    pending_count = Expense.objects.filter(
-        expense_type=Expense.TYPE_BATCH,
-        expense_status=Expense.STATUS_PENDING,
-    ).filter(
-        Q(batch__isnull=True) | Q(batch__is_deleted=False)
-    ).count()
-    completed_count = Expense.objects.filter(
-        expense_type=Expense.TYPE_BATCH,
-        expense_status=Expense.STATUS_COMPLETED,
-    ).filter(
-        Q(batch__isnull=True) | Q(batch__is_deleted=False)
-    ).count()
+    qs = qs.distinct().order_by(
+        allowed_sort.get(sort, "-received_date"),
+        "-id",
+    )
+
+    total_expense = (
+        qs.aggregate(total=Sum("amount"))["total"]
+        or Decimal("0.00")
+    )
+
+    active_batch_filter = (
+        Q(batch__isnull=True)
+        | Q(batch__is_deleted=False)
+    )
+
+    pending_count = (
+        Expense.objects.filter(
+            expense_type=Expense.TYPE_BATCH,
+            expense_status=Expense.STATUS_PENDING,
+        )
+        .filter(active_batch_filter)
+        .count()
+    )
+
+    completed_count = (
+        Expense.objects.filter(
+            expense_type=Expense.TYPE_BATCH,
+            expense_status=Expense.STATUS_COMPLETED,
+        )
+        .filter(active_batch_filter)
+        .count()
+    )
+
+    # Materialize the visible rows so we can attach a display quantity.
+    expenses = list(qs[:500])
+
+    fabric_ids = set()
+    for expense in expenses:
+        if (
+            expense.stock_source_type == Expense.SOURCE_FABRIC
+            and expense.fabric_receipt_ids
+        ):
+            fabric_ids.update(
+                int(value)
+                for value in expense.fabric_receipt_ids
+                if str(value).isdigit()
+            )
+
+    fabric_receipts = {
+        receipt.id: receipt
+        for receipt in FabricReceipt.objects.select_related(
+            "fabric_type",
+            "color",
+            "supplier_ref",
+            "created_by",
+        ).filter(pk__in=fabric_ids)
+    }
+
+    for expense in expenses:
+        total_qty = Decimal("0")
+        unit_label = "units"
+
+        if (
+            expense.stock_source_type == Expense.SOURCE_FABRIC
+            and expense.fabric_receipt_ids
+        ):
+            receipts = [
+                fabric_receipts.get(int(receipt_id))
+                for receipt_id in expense.fabric_receipt_ids
+                if str(receipt_id).isdigit()
+            ]
+            receipts = [receipt for receipt in receipts if receipt]
+
+            total_qty = sum(
+                (Decimal(receipt.roll_count or 0) for receipt in receipts),
+                Decimal("0"),
+            )
+            unit_label = "roll" if total_qty == 1 else "rolls"
+
+        elif expense.batch_id and expense.batch:
+            rows = expense.batch.items.filter(is_active=True)
+            total_qty = (
+                rows.aggregate(total=Sum("qty_received"))["total"]
+                or Decimal("0")
+            )
+
+            first_row = rows.select_related("item").first()
+            is_cloth = bool(
+                first_row
+                and first_row.item
+                and first_row.item.item_type == "SHIRT"
+            )
+
+            if is_cloth:
+                unit_label = "pc" if total_qty == 1 else "pcs"
+            else:
+                unit_label = "unit" if total_qty == 1 else "units"
+
+        elif expense.batch_total_cloth:
+            total_qty = Decimal(expense.batch_total_cloth or 0)
+            unit_label = "pc" if total_qty == 1 else "pcs"
+
+        expense.total_received_qty = total_qty
+        expense.total_received_label = (
+            f"{_format_qty(total_qty)} {unit_label}"
+            if total_qty > 0
+            else "-"
+        )
 
     return render(
         request,
         "finance/batch_expense_list.html",
         {
-            "expenses": qs[:500],
+            "expenses": expenses,
             "total_expense": total_expense,
             "pending_count": pending_count,
             "completed_count": completed_count,
@@ -955,69 +1061,306 @@ def profit_dashboard(request):
         },
     )
 @login_required
-@permission_required("finance.add_expense", raise_exception=True)
+@permission_required("finance.view_batch_expense_nav", raise_exception=True)
 def batch_expense_preview(request):
+    """
+    Return Stock In detail for the list-page popup.
+
+    Preferred input:
+        ?expense_id=<finance expense id>
+
+    Backward compatible input:
+        ?batch_id=<inventory batch id>
+    """
+    expense_id = request.GET.get("expense_id")
     batch_id = request.GET.get("batch_id")
 
-    if not batch_id:
-        return JsonResponse({"error": "Missing batch_id"}, status=400)
+    if expense_id:
+        expense = get_object_or_404(
+            Expense.objects.select_related(
+                "batch",
+                "batch__created_by",
+                "created_by",
+            ),
+            pk=expense_id,
+            expense_type=Expense.TYPE_BATCH,
+        )
 
-    from inventory.models import InventoryBatch, InventoryItem
+        # Do not expose a soft-deleted inventory batch from Finance.
+        if (
+            expense.batch_id
+            and expense.batch
+            and expense.batch.is_deleted
+        ):
+            return JsonResponse(
+                {"error": "This stock-in batch was deleted."},
+                status=404,
+            )
 
-    try:
-        batch = InventoryBatch.objects.prefetch_related(
-            "items__item",
-            "items__color",
-            "items__size",
-        ).get(pk=batch_id, is_deleted=False)
-    except InventoryBatch.DoesNotExist:
-        return JsonResponse({"error": "Batch not found"}, status=404)
+        rows_data = []
+        total_qty = Decimal("0")
+        summary_type = "Inventory"
+        unit_label = "units"
+        recorded_by = "-"
+        supplier = expense.supplier_name or "-"
+        reference = (
+            expense.source_reference
+            or (
+                expense.batch.batch_no
+                if expense.batch_id and expense.batch
+                else "-"
+            )
+        )
 
-    data = _get_batch_expense_data(batch)
-    rows = _get_batch_rows(batch)
+        if expense.batch_id and expense.batch:
+            from inventory.models import InventoryItem
 
-    rows_data = []
-    color_map = {}
+            batch = expense.batch
+            supplier = (
+                expense.supplier_name
+                or getattr(batch, "supplier_name", "")
+                or getattr(batch, "supplier", "")
+                or "-"
+            )
 
-    for row in rows:
-        if not row.item or row.item.item_type != InventoryItem.TYPE_SHIRT:
-            continue
+            if batch.created_by:
+                recorded_by = (
+                    batch.created_by.get_full_name()
+                    or batch.created_by.username
+                )
+            elif expense.created_by:
+                recorded_by = (
+                    expense.created_by.get_full_name()
+                    or expense.created_by.username
+                )
 
-        qty_received = _get_row_qty_received(row)
-        color_name = _get_row_color_name(row) or "-"
+            rows = batch.items.select_related(
+                "item",
+                "color",
+                "size",
+            ).filter(is_active=True)
 
-        rows_data.append(
+            first_row = rows.first()
+            is_cloth = bool(
+                first_row
+                and first_row.item
+                and first_row.item.item_type == InventoryItem.TYPE_SHIRT
+            )
+
+            if is_cloth:
+                summary_type = "Cloth"
+                unit_label = "pcs"
+            else:
+                summary_type = "Printing Material"
+                unit_label = "units"
+
+            for row in rows:
+                qty = _get_row_qty_received(row)
+                total_qty += qty
+
+                rows_data.append(
+                    {
+                        "item_code": _get_row_item_code(row) or "-",
+                        "item_name": _get_row_item_name(row) or "-",
+                        "color": _get_row_color_name(row) or "-",
+                        "size": _get_row_size_name(row) or "-",
+                        "qty": _format_qty(qty),
+                        "unit": (
+                            "pc"
+                            if is_cloth and qty == 1
+                            else "pcs"
+                            if is_cloth
+                            else "unit"
+                            if qty == 1
+                            else "units"
+                        ),
+                    }
+                )
+
+        elif (
+            expense.stock_source_type == Expense.SOURCE_FABRIC
+            and expense.fabric_receipt_ids
+        ):
+            summary_type = "Fabric"
+            unit_label = "rolls"
+
+            receipt_ids = [
+                int(value)
+                for value in expense.fabric_receipt_ids
+                if str(value).isdigit()
+            ]
+
+            receipts = (
+                FabricReceipt.objects.select_related(
+                    "fabric_type",
+                    "color",
+                    "supplier_ref",
+                    "created_by",
+                )
+                .filter(pk__in=receipt_ids)
+                .order_by("id")
+            )
+
+            first_receipt = receipts.first()
+
+            if first_receipt:
+                if first_receipt.created_by:
+                    recorded_by = (
+                        first_receipt.created_by.get_full_name()
+                        or first_receipt.created_by.username
+                    )
+
+                if not expense.supplier_name:
+                    supplier = (
+                        first_receipt.supplier_ref.name
+                        if first_receipt.supplier_ref_id
+                        else first_receipt.supplier
+                        or "-"
+                    )
+
+            for receipt in receipts:
+                qty = Decimal(receipt.roll_count or 0)
+                total_qty += qty
+
+                fabric_type = (
+                    receipt.fabric_type.name
+                    if receipt.fabric_type_id
+                    else receipt.fabric_name
+                    or "-"
+                )
+
+                rows_data.append(
+                    {
+                        "item_code": receipt.receipt_no or "-",
+                        "item_name": fabric_type,
+                        "color": (
+                            receipt.color.name
+                            if receipt.color_id
+                            else "-"
+                        ),
+                        "size": "-",
+                        "qty": _format_qty(qty),
+                        "unit": "roll" if qty == 1 else "rolls",
+                    }
+                )
+
+        else:
+            if expense.created_by:
+                recorded_by = (
+                    expense.created_by.get_full_name()
+                    or expense.created_by.username
+                )
+
+        return JsonResponse(
             {
-                "item_code": _get_row_item_code(row) or "-",
-                "item_name": _get_row_item_name(row) or "-",
-                "color": color_name,
-                "size": _get_row_size_name(row) or "-",
-                "qty_received": _format_qty(qty_received),
+                "expense_id": expense.id,
+                "reference": reference,
+                "source_type": summary_type,
+                "supplier": supplier,
+                "received_date": (
+                    expense.received_date.strftime("%d %b %Y")
+                    if expense.received_date
+                    else expense.created_at.strftime("%d %b %Y")
+                    if expense.created_at
+                    else ""
+                ),
+                "recorded_by": recorded_by,
+                "total_qty": _format_qty(total_qty),
+                "total_label": (
+                    f"{_format_qty(total_qty)} "
+                    f"{'roll' if summary_type == 'Fabric' and total_qty == 1 else 'rolls' if summary_type == 'Fabric' else 'pc' if summary_type == 'Cloth' and total_qty == 1 else 'pcs' if summary_type == 'Cloth' else 'unit' if total_qty == 1 else 'units'}"
+                    if total_qty > 0
+                    else "-"
+                ),
+                "goods_cost": f"{Decimal(expense.batch_cost or 0):.2f}",
+                "delivery_fee": f"{Decimal(expense.batch_delivery_fee or 0):.2f}",
+                "other_fee": f"{Decimal(expense.batch_other_fee or 0):.2f}",
+                "amount": f"{Decimal(expense.amount or 0):.2f}",
+                "rows": rows_data,
             }
         )
 
-        color_map[color_name] = color_map.get(color_name, Decimal("0")) + qty_received
+    # Backward compatibility with the older batch-only preview.
+    if batch_id:
+        from inventory.models import InventoryBatch, InventoryItem
 
-    color_summary = [
-        {"color": color, "qty": _format_qty(qty)}
-        for color, qty in color_map.items()
-    ]
+        try:
+            batch = InventoryBatch.objects.prefetch_related(
+                "items__item",
+                "items__color",
+                "items__size",
+            ).get(
+                pk=batch_id,
+                is_deleted=False,
+            )
+        except InventoryBatch.DoesNotExist:
+            return JsonResponse(
+                {"error": "Batch not found"},
+                status=404,
+            )
+
+        data = _get_batch_expense_data(batch)
+        rows = _get_batch_rows(batch)
+
+        rows_data = []
+        color_map = {}
+
+        for row in rows:
+            if (
+                not row.item
+                or row.item.item_type != InventoryItem.TYPE_SHIRT
+            ):
+                continue
+
+            qty_received = _get_row_qty_received(row)
+            color_name = _get_row_color_name(row) or "-"
+
+            rows_data.append(
+                {
+                    "item_code": _get_row_item_code(row) or "-",
+                    "item_name": _get_row_item_name(row) or "-",
+                    "color": color_name,
+                    "size": _get_row_size_name(row) or "-",
+                    "qty_received": _format_qty(qty_received),
+                }
+            )
+
+            color_map[color_name] = (
+                color_map.get(color_name, Decimal("0"))
+                + qty_received
+            )
+
+        color_summary = [
+            {
+                "color": color,
+                "qty": _format_qty(qty),
+            }
+            for color, qty in color_map.items()
+        ]
+
+        return JsonResponse(
+            {
+                "batch_name": batch.batch_no,
+                "created_at": (
+                    data["created_at"].strftime("%d/%m/%Y")
+                    if data["created_at"]
+                    else ""
+                ),
+                "total_cloth": _format_qty(data["total_cloth"]),
+                "cost": f"{data['cost']:.2f}",
+                "delivery_fee": f"{data['delivery_fee']:.2f}",
+                "other_fee": f"{data['other_fee']:.2f}",
+                "amount": f"{data['amount']:.2f}",
+                "rows": rows_data,
+                "color_summary": color_summary,
+                "color_count": len(color_summary),
+            }
+        )
 
     return JsonResponse(
-        {
-            "batch_name": batch.batch_no,
-            "created_at": data["created_at"].strftime("%d/%m/%Y") if data["created_at"] else "",
-            "total_cloth": _format_qty(data["total_cloth"]),
-            "cost": f"{data['cost']:.2f}",
-            "delivery_fee": f"{data['delivery_fee']:.2f}",
-            "other_fee": f"{data['other_fee']:.2f}",
-            "amount": f"{data['amount']:.2f}",
-            "rows": rows_data,
-            "color_summary": color_summary,
-            "color_count": len(color_summary),
-        }
+        {"error": "Missing expense_id or batch_id"},
+        status=400,
     )
-
 
 @login_required
 @permission_required("finance.view_expense_summary_nav", raise_exception=True)
