@@ -1383,7 +1383,7 @@
                 {% url 'production_payment_list' 'sewer' as production_sewer_payment_url %}
                 {% url 'production_payment_list' 'staff' as production_staff_payment_url %}
 
-                {% if perms.orders.view_order or perms.orders.add_order %}
+                {% if perms.orders.view_order or perms.orders.add_order or perms.orders.change_order %}
                 <div class="nav-group">
                     <button class="nav-toggle" type="button" data-target="menu-orders" aria-expanded="false">
                         <span class="nav-main-icon icon-orders" aria-hidden="true">
@@ -1426,10 +1426,12 @@
                         </a>
                         {% endif %}
 
+                        {% if perms.orders.change_order %}
                         <a class="nav-link" href="/orders/customer-payments/">
                             <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18M7 15h3"/></svg></span>
                             <span>Customer Payments</span>
                         </a>
+                        {% endif %}
                     </div>
                 </div>
                 {% endif %}
@@ -1548,22 +1550,30 @@
                     </button>
 
                     <div class="nav-submenu" id="menu-finance">
+                        {% if perms.finance.view_expense_summary_nav %}
                         <a class="nav-link" href="/finance/expenses/">
                             <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M5 4h14v16H5zM8 8h8M8 12h5M8 16h8"/></svg></span>
                             <span>Expense Summary</span>
                         </a>
+                        {% endif %}
+                        {% if perms.finance.view_other_expense_nav %}
                         <a class="nav-link" href="/finance/expenses/other/">
                             <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg></span>
                             <span>Other Expense</span>
                         </a>
+                        {% endif %}
+                        {% if perms.finance.view_batch_expense_nav %}
                         <a class="nav-link" href="/finance/expenses/batch/">
                             <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M4 7h16v13H4zM7 4h10v3M8 11h8M8 15h8"/></svg></span>
                             <span>Stock In Expense</span>
                         </a>
+                        {% endif %}
+                        {% if perms.finance.view_operating_expense_nav %}
                         <a class="nav-link" href="/finance/expenses/operating/">
                             <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21h-4v-.1A1.7 1.7 0 0 0 8.5 19.4a1.7 1.7 0 0 0-1.9.3l-.1.1L3.7 17l.1-.1A1.7 1.7 0 0 0 4.1 15a1.7 1.7 0 0 0-.6-1A1.7 1.7 0 0 0 2.4 13H2V9h.4A1.7 1.7 0 0 0 4.1 8a1.7 1.7 0 0 0-.3-1.9L3.7 6 6.5 3.2l.1.1A1.7 1.7 0 0 0 8.5 3a1.7 1.7 0 0 0 1-.6A1.7 1.7 0 0 0 9.9 1H14v.1A1.7 1.7 0 0 0 15 3a1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 5.4l-.1.1A1.7 1.7 0 0 0 19.4 7a1.7 1.7 0 0 0 .6 1 1.7 1.7 0 0 0 1.1.4H22v4h-.9a1.7 1.7 0 0 0-1.7 2.6Z"/></svg></span>
                             <span>Operating Expense</span>
                         </a>
+                        {% endif %}
                         {% if perms.production.view_productionexpense and production_expense_list_url %}
                         <a class="nav-link" href="{{ production_expense_list_url }}">
                             <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 9h18M8 14h4M16 13v3M14.5 14.5h3"/></svg></span>
@@ -1582,10 +1592,12 @@
                             <span>Staff Salary & Commission</span>
                         </a>
                         {% endif %}
+                        {% if perms.finance.view_profit_dashboard_nav %}
                         <a class="nav-link" href="/finance/profit-dashboard/">
                             <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/><path d="m4 7 5-4 5 5 6-5"/></svg></span>
                             <span>Revenue & Profit</span>
                         </a>
+                        {% endif %}
                     </div>
                 </div>
                 {% endif %}
@@ -1649,18 +1661,24 @@
                     </button>
 
                     <div class="nav-submenu" id="menu-setup">
+                        {% if perms.inventory.view_inventoryitem %}
                         <a class="nav-link" href="/inventory/items/">
                             <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M4 7.5 12 3l8 4.5-8 4.5-8-4.5Z"/><path d="M4 7.5v9L12 21l8-4.5v-9M12 12v9"/></svg></span>
                             <span>Item List</span>
                         </a>
+                        {% endif %}
+                        {% if perms.inventory.view_color %}
                         <a class="nav-link" href="/inventory/colors/">
                             <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18c1.7 0 2.4-1.3 1.8-2.2-.6-.9-.1-2.1 1.1-2.1H17a4 4 0 0 0 4-4C21 7.3 17 3 12 3Z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7.5" r="1"/><circle cx="14" cy="7" r="1"/><circle cx="17" cy="10" r="1"/></svg></span>
                             <span>Color List</span>
                         </a>
+                        {% endif %}
+                        {% if perms.inventory.view_size %}
                         <a class="nav-link" href="/inventory/sizes/">
                             <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4zM4 9h5V4M15 20v-5h5"/><path d="M9 15 15 9"/></svg></span>
                             <span>Size List</span>
                         </a>
+                        {% endif %}
                         {% if perms.production.view_fabrictype %}
                         <a class="nav-link" href="{% url 'production_fabric_type_list' %}">
                             <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M4 6h16v12H4zM7 9h10M7 13h7"/></svg></span>
@@ -1671,7 +1689,7 @@
                 </div>
                 {% endif %}
 
-                {% if perms.auth.view_user or perms.auth.view_group %}
+                {% if perms.auth.view_user or perms.auth.view_group or perms.auth.view_permission %}
                 <div class="nav-group">
                     <button class="nav-toggle" type="button" data-target="menu-users" aria-expanded="false">
                         <span class="nav-main-icon icon-users" aria-hidden="true">
@@ -1688,18 +1706,24 @@
                     </button>
 
                     <div class="nav-submenu" id="menu-users">
+                        {% if perms.auth.view_user %}
                         <a class="nav-link" href="/users/">
                             <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"/><path d="M3 20v-1a5 5 0 0 1 5-5h1a5 5 0 0 1 5 5v1M16 8h5M18.5 5.5v5"/></svg></span>
                             <span>User List</span>
                         </a>
+                        {% endif %}
+                        {% if perms.auth.view_group %}
                         <a class="nav-link" href="/users/roles/">
                             <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.8 3 8 7 10 4-2 7-5.2 7-10V6l-7-3Z"/><path d="m9 12 2 2 4-4"/></svg></span>
                             <span>Roles</span>
                         </a>
+                        {% endif %}
+                        {% if perms.auth.view_permission %}
                         <a class="nav-link" href="/users/permissions/">
                             <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><circle cx="8" cy="12" r="4"/><path d="M12 12h9M18 12v3M15 12v2"/></svg></span>
                             <span>Permissions</span>
                         </a>
+                        {% endif %}
                     </div>
                 </div>
                 {% endif %}
@@ -1814,10 +1838,15 @@
         </a>
         {% endif %}
 
-        {% if perms.orders.view_order or perms.orders.add_order %}
+        {% if perms.orders.view_order %}
         <a class="mobile-nav-item" href="/orders/" data-mobile-section="orders">
             <svg viewBox="0 0 24 24"><path d="M7 3.5h10v4H7z"/><path d="M5 5.5H4a1 1 0 0 0-1 1v13a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1v-13a1 1 0 0 0-1-1h-1"/><path d="M7 12h10M7 16h7"/></svg>
             <span>Orders</span>
+        </a>
+        {% elif perms.orders.add_order %}
+        <a class="mobile-nav-item" href="/orders/new/" data-mobile-section="orders">
+            <svg viewBox="0 0 24 24"><path d="M5 4h14v16H5z"/><path d="M12 8v8M8 12h8"/></svg>
+            <span>New Order</span>
         </a>
         {% endif %}
 

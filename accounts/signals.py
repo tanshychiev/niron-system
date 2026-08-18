@@ -20,23 +20,7 @@ def _is_admin_role(group):
     return _normalized_role_name(group) in ADMIN_GROUP_NAMES
 
 
-def _sync_flags(user):
-    selected_group = user.groups.order_by("name").first()
-    admin_access = _is_admin_role(selected_group)
-
-    if admin_access:
-        selected_group.permissions.set(Permission.objects.all())
-
-    # Admin-role users receive all permissions from the Group.
-    # Keep is_superuser unchanged; only real superusers should bypass permissions.
-    staff_access = bool(user.is_superuser or admin_access)
-
-    User.objects.filter(pk=user.pk).update(
-        is_staff=staff_access,
-    )
-
-    user.is_staff = staff_access
-
+def _clear_permission_cache(user):
     for cache_name in (
         "_perm_cache",
         "_user_perm_cache",
@@ -44,6 +28,30 @@ def _sync_flags(user):
     ):
         if hasattr(user, cache_name):
             delattr(user, cache_name)
+
+
+def _sync_flags(user):
+    """
+    Keep role/group permissions as the normal source of access.
+
+    The explicit form sync performs the final role transition (including
+    superuser demotion for limited roles). This signal keeps group-driven
+    staff flags and permission caches in sync when membership changes.
+    """
+    selected_group = user.groups.order_by("name").first()
+    admin_access = _is_admin_role(selected_group)
+
+    # Never allow stale direct permissions to accumulate on role-managed users.
+    user.user_permissions.clear()
+
+    if selected_group and admin_access:
+        selected_group.permissions.set(Permission.objects.all())
+
+    staff_access = bool(user.is_superuser or admin_access)
+
+    User.objects.filter(pk=user.pk).update(is_staff=staff_access)
+    user.is_staff = staff_access
+    _clear_permission_cache(user)
 
 
 @receiver(m2m_changed, sender=User.groups.through)

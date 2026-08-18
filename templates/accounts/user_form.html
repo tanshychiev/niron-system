@@ -1,228 +1,735 @@
 {% extends "base.html" %}
 
-{% block title %}{{ page_title }}{% endblock %}
+{% block title %}{{ page_title }} | Niron System{% endblock %}
 {% block page_title %}{{ page_title }}{% endblock %}
-{% block page_subtitle %}Manage user account and permissions{% endblock %}
+{% block page_subtitle %}Manage account details, role and signature{% endblock %}
 
 {% block extra_css %}
 <style>
-    .user-form-wrap { max-width: 900px; margin: 0 auto; }
-    .user-form-card {
-        background: rgba(255,255,255,.9);
-        border: 1px solid var(--line);
-        border-radius: 26px;
-        padding: 28px;
-        box-shadow: var(--shadow);
-    }
-    .section-title { font-size: 18px; font-weight: 800; margin-bottom: 6px; }
-    .section-subtitle { font-size: 13px; color: var(--muted); margin-bottom: 18px; }
-    .grid-2 {
+    .user-editor {
+        width: min(100%, 840px);
+        margin: 0 auto;
         display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 16px;
-        margin-bottom: 18px;
+        gap: 18px;
     }
-    .field { margin-bottom: 16px; }
-    .field label { font-size: 13px; font-weight: 700; margin-bottom: 6px; display: block; }
-    .roles-panel, .status-panel, .signature-panel {
-        background: var(--bg-soft);
+
+    .user-section {
+        padding: 22px;
         border: 1px solid var(--line);
-        border-radius: 18px;
-        padding: 18px;
-        margin-bottom: 20px;
+        border-radius: 20px;
+        background: rgba(255,255,255,.92);
+        box-shadow: var(--shadow-soft);
     }
-    .form-select {
-        width: 100%;
-        padding: 12px;
-        border-radius: 12px;
-        border: 1px solid var(--line);
-        font-size: 14px;
+
+    .user-section-title {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 900;
+        color: var(--text);
+    }
+
+    .user-section-subtitle {
+        margin: 5px 0 17px;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.45;
         font-weight: 600;
     }
-    .form-select:focus {
+
+    .field-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+    }
+
+    .field-full {
+        grid-column: 1 / -1;
+    }
+
+    .field-label {
+        display: block;
+        margin: 0 0 7px;
+        font-size: 12px;
+        font-weight: 850;
+        color: #4B443B;
+    }
+
+    .field-help {
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.45;
+    }
+
+    .field-error {
+        margin-top: 6px;
+        color: var(--danger);
+        font-size: 11px;
+        font-weight: 750;
+    }
+
+    .signature-zone {
+        position: relative;
+        min-height: 220px;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 220px;
+        gap: 18px;
+        align-items: stretch;
+        padding: 15px;
+        border: 2px dashed #D9C7A8;
+        border-radius: 18px;
+        background: #FFFCF6;
+        transition: border-color .18s ease, background .18s ease, transform .18s ease;
+        outline: none;
+    }
+
+    .signature-zone.is-dragging,
+    .signature-zone:focus {
         border-color: var(--accent);
-        box-shadow: 0 0 0 4px rgba(232,155,20,.12);
+        background: #FFF8E7;
+        box-shadow: 0 0 0 4px rgba(245,168,0,.10);
     }
-    .status-switch {
+
+    .signature-actions {
+        min-width: 0;
         display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 10px;
+    }
+
+    .signature-actions strong {
+        font-size: 14px;
+    }
+
+    .signature-actions p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 11.5px;
+        line-height: 1.5;
+    }
+
+    .signature-button-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .sig-btn {
+        min-height: 39px;
+        display: inline-flex;
         align-items: center;
-        gap: 12px;
-        background: white;
+        justify-content: center;
+        gap: 6px;
+        padding: 8px 12px;
         border: 1px solid var(--line);
-        border-radius: 14px;
-        padding: 14px;
+        border-radius: 11px;
+        background: #FFFFFF;
+        color: var(--text);
+        font-size: 11.5px;
+        font-weight: 850;
+        cursor: pointer;
+        text-decoration: none;
     }
-    .status-switch input { width: 18px; height: 18px; }
+
+    .sig-btn:hover {
+        border-color: #E5C273;
+        background: #FFF8E9;
+    }
+
+    .sig-btn-primary {
+        border-color: #E5B64D;
+        background: var(--accent-soft);
+        color: #805000;
+    }
+
+    .signature-preview-wrap {
+        position: relative;
+        min-height: 185px;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 15px;
+        background:
+            linear-gradient(45deg, #F3F0EA 25%, transparent 25%),
+            linear-gradient(-45deg, #F3F0EA 25%, transparent 25%),
+            linear-gradient(45deg, transparent 75%, #F3F0EA 75%),
+            linear-gradient(-45deg, transparent 75%, #F3F0EA 75%),
+            #FFFFFF;
+        background-size: 18px 18px;
+        background-position: 0 0, 0 9px, 9px -9px, -9px 0;
+    }
+
     .signature-preview {
-        margin-top: 12px;
-        background: white;
-        border: 1px dashed var(--line);
-        border-radius: 14px;
-        padding: 14px;
-        width: fit-content;
-    }
-    .signature-preview img {
-        max-width: 240px;
-        max-height: 90px;
+        display: none;
+        max-width: 92%;
+        max-height: 170px;
         object-fit: contain;
+        filter: drop-shadow(0 5px 10px rgba(0,0,0,.08));
+    }
+
+    .signature-preview.is-visible {
         display: block;
     }
-    .error-text { color: #B42318; font-size: 12px; font-weight: 700; margin-top: 6px; }
-    .actions {
+
+    .signature-empty {
+        max-width: 150px;
+        color: #948878;
+        text-align: center;
+        font-size: 11px;
+        line-height: 1.45;
+        font-weight: 700;
+    }
+
+    .signature-remove {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        width: 32px;
+        height: 32px;
+        display: none;
+        place-items: center;
+        border: 1px solid #F0BCC5;
+        border-radius: 10px;
+        background: rgba(255,255,255,.94);
+        color: #C5374D;
+        font-size: 20px;
+        line-height: 1;
+        font-weight: 800;
+        cursor: pointer;
+        box-shadow: 0 5px 14px rgba(70,35,35,.10);
+    }
+
+    .signature-remove.is-visible {
+        display: grid;
+    }
+
+    .signature-file-input {
+        position: absolute !important;
+        width: 1px !important;
+        height: 1px !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+    }
+
+    .role-current {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        margin-bottom: 10px;
+        padding: 6px 9px;
+        border: 1px solid #DCE8DF;
+        border-radius: 999px;
+        background: #F3FBF5;
+        color: #26734B;
+        font-size: 11px;
+        font-weight: 850;
+    }
+
+    .active-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 13px 14px;
+        border: 1px solid var(--line);
+        border-radius: 13px;
+        background: #FFFDF9;
+    }
+
+    .active-row input {
+        width: 18px;
+        min-height: 18px;
+        height: 18px;
+        margin: 0;
+    }
+
+    .active-copy strong {
+        display: block;
+        font-size: 12px;
+    }
+
+    .active-copy span {
+        display: block;
+        margin-top: 3px;
+        color: var(--muted);
+        font-size: 10.5px;
+    }
+
+    .form-actions-sticky {
+        position: sticky;
+        bottom: 12px;
+        z-index: 10;
         display: flex;
         justify-content: flex-end;
         gap: 10px;
-        margin-top: 10px;
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: rgba(255,252,247,.94);
+        box-shadow: 0 12px 32px rgba(79,58,26,.12);
+        backdrop-filter: blur(14px);
     }
-    @media (max-width: 768px) {
-        .grid-2 { grid-template-columns: 1fr; }
+
+    .error-summary {
+        padding: 14px 16px;
+        border: 1px solid #F1BCC5;
+        border-radius: 14px;
+        background: #FFF0F2;
+        color: #A3293D;
+        font-size: 12px;
+        line-height: 1.55;
+        font-weight: 750;
+    }
+
+    .error-summary strong {
+        display: block;
+        margin-bottom: 5px;
+    }
+
+    @media (max-width: 720px) {
+        .field-grid,
+        .signature-zone {
+            grid-template-columns: 1fr;
+        }
+
+        .signature-preview-wrap {
+            min-height: 160px;
+        }
+
+        .form-actions-sticky {
+            bottom: calc(var(--mobile-nav-height) + 8px);
+        }
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="user-form-wrap">
-    <div class="user-form-card">
-        <form method="post" enctype="multipart/form-data">
-            {% csrf_token %}
+<form method="post" enctype="multipart/form-data" id="userEditForm" class="user-editor" novalidate>
+    {% csrf_token %}
 
-            {% if form.non_field_errors %}
-                <div class="alert alert-danger">
-                    {{ form.non_field_errors }}
-                </div>
-            {% endif %}
+    {% if form_error_messages %}
+    <div class="error-summary" id="errorSummary">
+        <strong>Could not save. Please fix:</strong>
+        {% for error in form_error_messages %}
+            <div>• {{ error }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
 
-            <div class="section-title">Basic Information</div>
-            <div class="section-subtitle">User account details</div>
+    <section class="user-section">
+        <h2 class="user-section-title">Basic Information</h2>
+        <p class="user-section-subtitle">User account details</p>
 
-            <div class="grid-2">
-                <div class="field">
-                    <label for="{{ form.username.id_for_label }}">Username</label>
-                    {{ form.username }}
-                    {% if form.username.errors %}
-                        <div class="error-text">{{ form.username.errors|join:", " }}</div>
-                    {% endif %}
-                </div>
-
-                <div class="field">
-                    <label for="{{ form.email.id_for_label }}">Email</label>
-                    {{ form.email }}
-                    {% if form.email.errors %}
-                        <div class="error-text">{{ form.email.errors|join:", " }}</div>
-                    {% endif %}
-                </div>
-
-                <div class="field">
-                    <label for="{{ form.first_name.id_for_label }}">First Name</label>
-                    {{ form.first_name }}
-                    {% if form.first_name.errors %}
-                        <div class="error-text">{{ form.first_name.errors|join:", " }}</div>
-                    {% endif %}
-                </div>
-
-                <div class="field">
-                    <label for="{{ form.last_name.id_for_label }}">Last Name</label>
-                    {{ form.last_name }}
-                    {% if form.last_name.errors %}
-                        <div class="error-text">{{ form.last_name.errors|join:", " }}</div>
-                    {% endif %}
-                </div>
+        <div class="field-grid">
+            <div>
+                <label class="field-label" for="{{ form.username.id_for_label }}">Username</label>
+                {{ form.username }}
+                {% for error in form.username.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
             </div>
 
-            <div class="section-title">Security</div>
-            <div class="section-subtitle">Set or update password</div>
+            <div>
+                <label class="field-label" for="{{ form.email.id_for_label }}">Email</label>
+                {{ form.email }}
+                {% for error in form.email.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+            </div>
 
-            {% if form.password %}
-                <div class="grid-2">
-                    <div class="field">
-                        <label for="{{ form.password.id_for_label }}">Password</label>
-                        {{ form.password }}
-                        {% if form.password.errors %}
-                            <div class="error-text">{{ form.password.errors|join:", " }}</div>
-                        {% endif %}
-                    </div>
+            <div>
+                <label class="field-label" for="{{ form.first_name.id_for_label }}">First Name</label>
+                {{ form.first_name }}
+                {% for error in form.first_name.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+            </div>
 
-                    <div class="field">
-                        <label for="{{ form.confirm_password.id_for_label }}">Confirm Password</label>
-                        {{ form.confirm_password }}
-                        {% if form.confirm_password.errors %}
-                            <div class="error-text">{{ form.confirm_password.errors|join:", " }}</div>
-                        {% endif %}
-                    </div>
+            <div>
+                <label class="field-label" for="{{ form.last_name.id_for_label }}">Last Name</label>
+                {{ form.last_name }}
+                {% for error in form.last_name.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+            </div>
+        </div>
+    </section>
+
+    <section class="user-section">
+        <h2 class="user-section-title">Security</h2>
+        <p class="user-section-subtitle">{% if user_obj %}Leave blank to keep the current password{% else %}Set a password for the new user{% endif %}</p>
+
+        <div class="field-grid">
+            {% if user_obj %}
+                <div>
+                    <label class="field-label" for="{{ form.new_password.id_for_label }}">New Password</label>
+                    {{ form.new_password }}
+                    {% for error in form.new_password.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+                </div>
+                <div>
+                    <label class="field-label" for="{{ form.confirm_password.id_for_label }}">Confirm New Password</label>
+                    {{ form.confirm_password }}
+                    {% for error in form.confirm_password.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
                 </div>
             {% else %}
-                <div class="grid-2">
-                    <div class="field">
-                        <label for="{{ form.new_password.id_for_label }}">New Password</label>
-                        {{ form.new_password }}
-                        {% if form.new_password.errors %}
-                            <div class="error-text">{{ form.new_password.errors|join:", " }}</div>
-                        {% endif %}
-                    </div>
-
-                    <div class="field">
-                        <label for="{{ form.confirm_password.id_for_label }}">Confirm New Password</label>
-                        {{ form.confirm_password }}
-                        {% if form.confirm_password.errors %}
-                            <div class="error-text">{{ form.confirm_password.errors|join:", " }}</div>
-                        {% endif %}
-                    </div>
+                <div>
+                    <label class="field-label" for="{{ form.password.id_for_label }}">Password</label>
+                    {{ form.password }}
+                    {% for error in form.password.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+                </div>
+                <div>
+                    <label class="field-label" for="{{ form.confirm_password.id_for_label }}">Confirm Password</label>
+                    {{ form.confirm_password }}
+                    {% for error in form.confirm_password.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
                 </div>
             {% endif %}
+        </div>
+    </section>
 
-            <div class="signature-panel">
-                <div class="section-title">Signature</div>
-                <div class="section-subtitle">Upload this user's invoice signature</div>
+    <section class="user-section">
+        <h2 class="user-section-title">Signature</h2>
+        <p class="user-section-subtitle">Drag an image here, choose a file, or paste with Ctrl+V. The preview is saved with the user.</p>
 
-                <div class="field">
-                    {{ profile_form.signature }}
-                    {% if profile_form.signature.errors %}
-                        <div class="error-text">{{ profile_form.signature.errors|join:", " }}</div>
-                    {% endif %}
+        {{ profile_form.signature_data }}
+        {{ profile_form.signature }}
+        <input type="hidden" name="remove_signature" id="removeSignature" value="0">
+
+        <div class="signature-zone" id="signatureZone" tabindex="0" aria-label="Signature upload area">
+            <div class="signature-actions">
+                <strong>Drop or paste signature</strong>
+                <p>PNG, JPG or WEBP. You can drag from your desktop, paste a copied image with <b>Ctrl+V</b>, or choose a file.</p>
+
+                <div class="signature-button-row">
+                    <button class="sig-btn sig-btn-primary" type="button" id="chooseSignatureBtn">Choose Image</button>
+                    <button class="sig-btn" type="button" id="pasteSignatureBtn">Paste Image</button>
+                    <button class="sig-btn" type="button" id="copySignatureBtn">Copy Image</button>
+                    <a class="sig-btn" id="saveSignatureBtn" href="#" download="signature.png">Save Image</a>
                 </div>
 
-                {% if user_obj and user_obj.profile.signature %}
-                    <div class="signature-preview">
-                        <img src="{{ user_obj.profile.signature.url }}" alt="Current signature">
-                    </div>
-                {% endif %}
+                <p id="signatureStatus">Click this area then press Ctrl+V to paste.</p>
+                {% for error in profile_form.signature.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+                {% for error in profile_form.signature_data.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
             </div>
 
-            <div class="roles-panel">
-                <div class="section-title">Role</div>
-                <div class="section-subtitle">Select one role for this user</div>
-
-                <div class="field">
-                    {{ form.groups }}
-                    {% if form.groups.errors %}
-                        <div class="error-text">{{ form.groups.errors|join:", " }}</div>
-                    {% endif %}
-                </div>
+            <div class="signature-preview-wrap">
+                <img id="signaturePreview" class="signature-preview" alt="Signature preview">
+                <div class="signature-empty" id="signatureEmpty">No signature image yet</div>
+                <button type="button" class="signature-remove" id="removeSignatureBtn" aria-label="Remove signature" title="Remove signature">×</button>
             </div>
+        </div>
+    </section>
 
-            <div class="status-panel">
-                <div class="section-title">Status</div>
+    <section class="user-section">
+        <h2 class="user-section-title">Role</h2>
+        <p class="user-section-subtitle">The current role stays selected when you edit this user.</p>
 
-                <label class="status-switch">
-                    {{ form.is_active }}
-                    <div>
-                        <strong>Active user</strong><br>
-                        <span style="font-size:12px;color:var(--muted)">
-                            User can login and access system
-                        </span>
-                    </div>
-                </label>
+        {% if user_obj and user_obj.groups.first %}
+        <div class="role-current">Current role: {{ user_obj.groups.first.name }}</div>
+        {% endif %}
 
-                {% if form.is_active.errors %}
-                    <div class="error-text">{{ form.is_active.errors|join:", " }}</div>
-                {% endif %}
-            </div>
+        <label class="field-label" for="{{ form.role.id_for_label }}">Role</label>
+        {{ form.role }}
+        {% for error in form.role.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+    </section>
 
-            <div class="actions">
-                <button type="submit" class="btn-primary">{{ submit_label }}</button>
-                <a href="{% url 'user_list' %}" class="btn-secondary">Back to List</a>
-            </div>
-        </form>
+    <section class="user-section">
+        <h2 class="user-section-title">Status</h2>
+        <p class="user-section-subtitle">Control whether this account can sign in.</p>
+
+        <label class="active-row" for="{{ form.is_active.id_for_label }}">
+            {{ form.is_active }}
+            <span class="active-copy">
+                <strong>Active user</strong>
+                <span>User can login and access the system</span>
+            </span>
+        </label>
+        {% for error in form.is_active.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+    </section>
+
+    {% for error in form.non_field_errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+    {% for error in profile_form.non_field_errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+
+    <div class="form-actions-sticky">
+        <a href="{% url 'user_list' %}" class="btn-light">Back to List</a>
+        <button type="submit" class="btn-primary" id="saveUserBtn">{{ submit_label }}</button>
     </div>
-</div>
+</form>
+
+{% if signature_preview %}
+{{ signature_preview|json_script:"existing-signature-data" }}
+{% endif %}
+
+{% if page_alert %}
+{{ page_alert|json_script:"page-alert-data" }}
+{% endif %}
+
+{% if form_error_messages %}
+{{ form_error_messages|json_script:"form-errors-data" }}
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    "use strict";
+
+    const form = document.getElementById("userEditForm");
+    const zone = document.getElementById("signatureZone");
+    const fileInput = document.querySelector('input[name="signature"]');
+    const signatureData = document.querySelector('input[name="signature_data"]');
+    const removeInput = document.getElementById("removeSignature");
+    const preview = document.getElementById("signaturePreview");
+    const empty = document.getElementById("signatureEmpty");
+    const removeBtn = document.getElementById("removeSignatureBtn");
+    const chooseBtn = document.getElementById("chooseSignatureBtn");
+    const pasteBtn = document.getElementById("pasteSignatureBtn");
+    const copyBtn = document.getElementById("copySignatureBtn");
+    const saveBtn = document.getElementById("saveSignatureBtn");
+    const status = document.getElementById("signatureStatus");
+    const saveUserBtn = document.getElementById("saveUserBtn");
+
+    let currentDataUrl = "";
+
+    function setStatus(text, isError) {
+        if (!status) return;
+        status.textContent = text;
+        status.style.color = isError ? "#C5374D" : "";
+        status.style.fontWeight = isError ? "800" : "";
+    }
+
+    function updatePreview(dataUrl, message) {
+        currentDataUrl = dataUrl || "";
+
+        if (currentDataUrl) {
+            preview.src = currentDataUrl;
+            preview.classList.add("is-visible");
+            empty.style.display = "none";
+            removeBtn.classList.add("is-visible");
+            saveBtn.href = currentDataUrl;
+            saveBtn.style.display = "inline-flex";
+        } else {
+            preview.removeAttribute("src");
+            preview.classList.remove("is-visible");
+            empty.style.display = "block";
+            removeBtn.classList.remove("is-visible");
+            saveBtn.removeAttribute("href");
+            saveBtn.style.display = "none";
+        }
+
+        if (message) setStatus(message, false);
+    }
+
+    function dataUrlSize(dataUrl) {
+        if (!dataUrl || dataUrl.indexOf(",") === -1) return 0;
+        const payload = dataUrl.split(",", 2)[1];
+        return Math.ceil(payload.length * 0.75);
+    }
+
+    function loadImageFile(file) {
+        if (!file) return;
+
+        if (!/^image\/(png|jpeg|webp)$/i.test(file.type || "")) {
+            setStatus("Only PNG, JPG/JPEG or WEBP images are allowed.", true);
+            window.alert("Signature error: Only PNG, JPG/JPEG or WEBP images are allowed.");
+            return;
+        }
+
+        if (file.size > 8 * 1024 * 1024) {
+            setStatus("Image is too large. Choose an image under 8 MB.", true);
+            window.alert("Signature error: Image is too large. Choose an image under 8 MB.");
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function () {
+            const original = String(reader.result || "");
+            const image = new Image();
+
+            image.onload = function () {
+                const maxDimension = 1400;
+                let width = image.naturalWidth || image.width;
+                let height = image.naturalHeight || image.height;
+
+                if (width > maxDimension || height > maxDimension) {
+                    const ratio = Math.min(maxDimension / width, maxDimension / height);
+                    width = Math.max(1, Math.round(width * ratio));
+                    height = Math.max(1, Math.round(height * ratio));
+                }
+
+                const canvas = document.createElement("canvas");
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext("2d");
+                ctx.drawImage(image, 0, 0, width, height);
+
+                const isPng = (file.type || "").toLowerCase() === "image/png";
+                let output = canvas.toDataURL(isPng ? "image/png" : "image/jpeg", 0.88);
+
+                if (dataUrlSize(output) > 2.2 * 1024 * 1024 && !isPng) {
+                    output = canvas.toDataURL("image/jpeg", 0.72);
+                }
+
+                if (dataUrlSize(output) > 4.8 * 1024 * 1024) {
+                    setStatus("Signature is still too large after resizing.", true);
+                    window.alert("Signature error: Image is too large after resizing.");
+                    return;
+                }
+
+                signatureData.value = output;
+                removeInput.value = "0";
+                updatePreview(output, "New signature ready to save.");
+            };
+
+            image.onerror = function () {
+                setStatus("Could not read this image.", true);
+                window.alert("Signature error: Could not read this image.");
+            };
+
+            image.src = original;
+        };
+
+        reader.onerror = function () {
+            setStatus("Could not read this file.", true);
+            window.alert("Signature error: Could not read this file.");
+        };
+
+        reader.readAsDataURL(file);
+    }
+
+    function findImageFromClipboard(event) {
+        const items = event.clipboardData && event.clipboardData.items;
+        if (!items) return null;
+
+        for (const item of items) {
+            if (item.type && item.type.startsWith("image/")) {
+                return item.getAsFile();
+            }
+        }
+        return null;
+    }
+
+    chooseBtn.addEventListener("click", function () {
+        fileInput.click();
+    });
+
+    fileInput.addEventListener("change", function () {
+        if (fileInput.files && fileInput.files[0]) {
+            loadImageFile(fileInput.files[0]);
+        }
+    });
+
+    ["dragenter", "dragover"].forEach(function (name) {
+        zone.addEventListener(name, function (event) {
+            event.preventDefault();
+            zone.classList.add("is-dragging");
+        });
+    });
+
+    ["dragleave", "drop"].forEach(function (name) {
+        zone.addEventListener(name, function (event) {
+            event.preventDefault();
+            zone.classList.remove("is-dragging");
+        });
+    });
+
+    zone.addEventListener("drop", function (event) {
+        const files = event.dataTransfer && event.dataTransfer.files;
+        if (files && files[0]) loadImageFile(files[0]);
+    });
+
+    function handlePaste(event) {
+        const imageFile = findImageFromClipboard(event);
+        if (!imageFile) return;
+        event.preventDefault();
+        loadImageFile(imageFile);
+    }
+
+    zone.addEventListener("paste", handlePaste);
+    document.addEventListener("paste", function (event) {
+        if (document.activeElement === zone || zone.contains(document.activeElement)) {
+            handlePaste(event);
+        }
+    });
+
+    pasteBtn.addEventListener("click", async function () {
+        zone.focus();
+
+        if (!navigator.clipboard || !navigator.clipboard.read) {
+            setStatus("Press Ctrl+V now to paste the copied image.", false);
+            return;
+        }
+
+        try {
+            const clipboardItems = await navigator.clipboard.read();
+            for (const clipboardItem of clipboardItems) {
+                const imageType = clipboardItem.types.find(function (type) {
+                    return type.startsWith("image/");
+                });
+                if (imageType) {
+                    const blob = await clipboardItem.getType(imageType);
+                    loadImageFile(new File([blob], "pasted-signature", { type: imageType }));
+                    return;
+                }
+            }
+            setStatus("Clipboard does not contain an image. Copy an image, then press Ctrl+V.", true);
+        } catch (error) {
+            setStatus("Browser blocked clipboard access. Click this area and press Ctrl+V.", false);
+        }
+    });
+
+    removeBtn.addEventListener("click", function () {
+        signatureData.value = "";
+        fileInput.value = "";
+        removeInput.value = "1";
+        updatePreview("", "Signature will be removed when you click Update User.");
+    });
+
+    copyBtn.addEventListener("click", async function () {
+        if (!currentDataUrl) {
+            window.alert("No signature image to copy.");
+            return;
+        }
+
+        try {
+            const blob = await (await fetch(currentDataUrl)).blob();
+            if (!navigator.clipboard || !window.ClipboardItem) throw new Error("Clipboard unavailable");
+            await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
+            setStatus("Signature copied to clipboard.", false);
+        } catch (error) {
+            window.alert("Your browser blocked Copy Image. You can use Save Image instead, or right-click the preview.");
+        }
+    });
+
+    form.addEventListener("submit", function () {
+        saveUserBtn.disabled = true;
+        saveUserBtn.textContent = "Saving...";
+    });
+
+    // Prefer the posted hidden image after a validation error, otherwise show
+    // the existing saved image from the server.
+    const postedData = (signatureData && signatureData.value || "").trim();
+    if (postedData) {
+        updatePreview(postedData, "Signature ready to save.");
+    } else {
+        const existingNode = document.getElementById("existing-signature-data");
+        if (existingNode) {
+            try {
+                const existing = JSON.parse(existingNode.textContent || '""');
+                if (existing) updatePreview(existing, "Current saved signature.");
+            } catch (error) {}
+        }
+    }
+
+    const alertNode = document.getElementById("page-alert-data");
+    if (alertNode) {
+        try {
+            const message = JSON.parse(alertNode.textContent || '""');
+            if (message) window.alert(message);
+        } catch (error) {}
+    }
+
+    const errorNode = document.getElementById("form-errors-data");
+    if (errorNode) {
+        try {
+            const errors = JSON.parse(errorNode.textContent || "[]");
+            if (errors.length) {
+                window.alert("Could not save:\n\n" + errors.join("\n"));
+            }
+        } catch (error) {}
+    }
+})();
+</script>
 {% endblock %}

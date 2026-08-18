@@ -24,10 +24,6 @@ def is_admin_role(group):
 
 
 def clear_permission_cache(user):
-    """
-    Remove Django's cached permission values from the current User object.
-    This makes a changed role take effect immediately in the current process.
-    """
     for cache_name in (
         "_perm_cache",
         "_user_perm_cache",
@@ -40,9 +36,18 @@ def clear_permission_cache(user):
 @transaction.atomic
 def sync_user_access(user, selected_group):
     """
-    Keep the selected role as the single source of truth for access.
+    Role/Group is the single source of truth for access.
+
+    - One role per user.
+    - Old direct user permissions are removed.
+    - Admin roles receive every Django permission through the Group.
+    - Limited roles receive only permissions checked on their Group.
+    - A user moved out of an admin role cannot keep superuser bypass access.
     """
     admin_access = is_admin_role(selected_group)
+
+    # Prevent old individually assigned permissions from surviving a role change.
+    user.user_permissions.clear()
 
     if selected_group:
         user.groups.set([selected_group.pk])
@@ -51,16 +56,17 @@ def sync_user_access(user, selected_group):
     else:
         user.groups.clear()
 
-    # Admin role receives every Django permission through its Group.
-    # Do not turn ordinary Admin-role users into superusers.
-    # Existing manually-created superusers remain superusers.
-    staff_access = bool(user.is_superuser or admin_access)
+    keep_superuser = bool(user.is_superuser and admin_access)
+    staff_access = bool(admin_access or keep_superuser)
 
     User.objects.filter(pk=user.pk).update(
         is_staff=staff_access,
+        is_superuser=keep_superuser,
     )
 
     user.is_staff = staff_access
+    user.is_superuser = keep_superuser
+
     clear_permission_cache(user)
     user.refresh_from_db(fields=["is_staff", "is_superuser"])
     clear_permission_cache(user)
@@ -79,7 +85,7 @@ class LoginForm(AuthenticationForm):
         widget=forms.PasswordInput(
             attrs={
                 "class": "form-control",
-                "placeholder": "Enter password",
+                "placeholder": "Password",
             }
         )
     )
@@ -102,12 +108,18 @@ class UserCreateForm(forms.ModelForm):
             }
         )
     )
-    groups = forms.ModelChoiceField(
+
+    # Use a separate "role" field instead of binding the ModelForm directly
+    # to User.groups. This makes the current role reliably selected on Edit.
+    role = forms.ModelChoiceField(
         queryset=Group.objects.all().order_by("name"),
-        required=False,
+        required=True,
         empty_label="Select role",
         widget=forms.Select(attrs={"class": "form-select"}),
         label="Role",
+        error_messages={
+            "required": "Please select a role for this user.",
+        },
     )
 
     class Meta:
@@ -118,7 +130,6 @@ class UserCreateForm(forms.ModelForm):
             "last_name",
             "email",
             "is_active",
-            "groups",
         ]
         widgets = {
             "username": forms.TextInput(
@@ -156,8 +167,9 @@ class UserCreateForm(forms.ModelForm):
         confirm_password = cleaned_data.get("confirm_password")
 
         if password != confirm_password:
-            raise forms.ValidationError(
-                "Password and confirm password do not match."
+            self.add_error(
+                "confirm_password",
+                "Password and confirm password do not match.",
             )
 
         return cleaned_data
@@ -168,10 +180,7 @@ class UserCreateForm(forms.ModelForm):
 
         if commit:
             user.save()
-
-            selected_group = self.cleaned_data.get("groups")
-            sync_user_access(user, selected_group)
-
+            sync_user_access(user, self.cleaned_data.get("role"))
             UserProfile.objects.get_or_create(user=user)
 
         return user
@@ -184,6 +193,7 @@ class UserEditForm(forms.ModelForm):
             attrs={
                 "class": "form-control",
                 "placeholder": "New Password",
+                "autocomplete": "new-password",
             }
         ),
     )
@@ -193,15 +203,19 @@ class UserEditForm(forms.ModelForm):
             attrs={
                 "class": "form-control",
                 "placeholder": "Confirm New Password",
+                "autocomplete": "new-password",
             }
         ),
     )
-    groups = forms.ModelChoiceField(
+    role = forms.ModelChoiceField(
         queryset=Group.objects.all().order_by("name"),
-        required=False,
+        required=True,
         empty_label="Select role",
         widget=forms.Select(attrs={"class": "form-select"}),
         label="Role",
+        error_messages={
+            "required": "Please select a role for this user.",
+        },
     )
 
     class Meta:
@@ -212,7 +226,6 @@ class UserEditForm(forms.ModelForm):
             "last_name",
             "email",
             "is_active",
-            "groups",
         ]
         widgets = {
             "username": forms.TextInput(
@@ -247,10 +260,12 @@ class UserEditForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        if self.instance and self.instance.pk:
-            first_group = self.instance.groups.order_by("name").first()
-            if first_group:
-                self.fields["groups"].initial = first_group
+        # IMPORTANT: only set initial on an unbound GET form.
+        # On POST, Django must keep the user's submitted value when there is an error.
+        if not self.is_bound and self.instance and self.instance.pk:
+            current_group = self.instance.groups.order_by("name").first()
+            if current_group:
+                self.fields["role"].initial = current_group.pk
 
     def clean(self):
         cleaned_data = super().clean()
@@ -259,8 +274,9 @@ class UserEditForm(forms.ModelForm):
 
         if new_password or confirm_password:
             if new_password != confirm_password:
-                raise forms.ValidationError(
-                    "New password and confirm password do not match."
+                self.add_error(
+                    "confirm_password",
+                    "New password and confirm password do not match.",
                 )
 
         return cleaned_data
@@ -274,24 +290,28 @@ class UserEditForm(forms.ModelForm):
 
         if commit:
             user.save()
-
-            selected_group = self.cleaned_data.get("groups")
-            sync_user_access(user, selected_group)
-
+            sync_user_access(user, self.cleaned_data.get("role"))
             UserProfile.objects.get_or_create(user=user)
 
         return user
 
 
 class UserProfileForm(forms.ModelForm):
+    # JS stores drag/drop/paste/select image here as a data URL so that the
+    # signature preview and selection survive other validation errors.
+    signature_data = forms.CharField(
+        required=False,
+        widget=forms.HiddenInput(),
+    )
+
     class Meta:
         model = UserProfile
         fields = ["signature"]
         widgets = {
-            "signature": forms.ClearableFileInput(
+            "signature": forms.FileInput(
                 attrs={
-                    "class": "form-control",
-                    "accept": "image/*",
+                    "class": "signature-file-input",
+                    "accept": "image/png,image/jpeg,image/webp",
                 }
             )
         }
@@ -325,13 +345,9 @@ class RoleForm(forms.ModelForm):
         if not commit:
             return role
 
-        # Admin roles always have full permission without requiring every
-        # checkbox to be selected manually.
         if is_admin_role(role):
             role.permissions.set(Permission.objects.all())
 
-        # Re-sync all existing users of this role after role name or
-        # permissions are changed.
         for user in role.user_set.all():
             sync_user_access(user, role)
 
