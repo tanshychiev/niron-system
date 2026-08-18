@@ -1,27 +1,41 @@
 from django.urls import path
-from .views import (
-    login_view,
-    logout_view,
-    user_list,
-    user_create,
-    user_edit,
-    role_list,
-    role_create,
-    role_edit,
-    permission_list,
-)
+
+from . import views
+
 
 urlpatterns = [
-    path("login/", login_view, name="login"),
-    path("logout/", logout_view, name="logout"),
+    path("login/", views.login_view, name="login"),
+    path("logout/", views.logout_view, name="logout"),
 
-    path("users/", user_list, name="user_list"),
-    path("users/new/", user_create, name="user_create"),
-    path("users/<int:pk>/edit/", user_edit, name="user_edit"),
+    path("users/", views.user_list, name="user_list"),
+    path("users/new/", views.user_create, name="user_create"),
+    path("users/<int:pk>/edit/", views.user_edit, name="user_edit"),
 
-    path("users/roles/", role_list, name="role_list"),
-    path("users/roles/create/", role_create, name="role_create"),
-    path("users/roles/<int:pk>/edit/", role_edit, name="role_edit"),
+    path("roles/", views.role_list, name="role_list"),
+    path("roles/new/", views.role_create, name="role_create"),
+    path("roles/<int:pk>/edit/", views.role_edit, name="role_edit"),
 
-    path("users/permissions/", permission_list, name="permission_list"),
+    path("permissions/", views.permission_list, name="permission_list"),
+
+    # Canonical staff payroll routes
+    path(
+        "staff-payroll/",
+        views.staff_payroll,
+        name="staff_payroll",
+    ),
+    path(
+        "staff-payroll/<int:staff_id>/salary/",
+        views.staff_salary_add,
+        name="staff_salary_add",
+    ),
+    path(
+        "staff-payroll/<int:staff_id>/first-payment/",
+        views.staff_first_payment,
+        name="staff_first_payment",
+    ),
+    path(
+        "staff-payroll/<int:staff_id>/final-payment/",
+        views.staff_final_payment,
+        name="staff_final_payment",
+    ),
 ]

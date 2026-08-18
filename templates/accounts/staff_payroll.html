@@ -1,0 +1,686 @@
+{% extends "base.html" %}
+
+{% block page_title %}Staff Salary & Commission{% endblock %}
+{% block page_subtitle %}Monthly salary, manual first payment, salary history and final payment{% endblock %}
+
+{% block content %}
+<style>
+.payroll-wrap{max-width:1500px;margin:0 auto;display:grid;gap:15px}
+.payroll-card{background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:17px}
+.month-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.month-nav{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.month-title{font-size:20px;font-weight:950}
+.month-form{display:flex;gap:8px;align-items:end;flex-wrap:wrap}
+.month-form select,.month-form input{min-width:120px}
+.summary-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.metric{padding:14px;border:1px solid var(--line);border-radius:15px;background:#fffdf9}
+.metric span{display:block;color:var(--muted);font-size:10px;font-weight:900;text-transform:uppercase}
+.metric strong{display:block;margin-top:6px;font-size:25px}
+.table-wrap{overflow-x:auto}
+.payroll-table{width:100%;border-collapse:collapse;min-width:1180px}
+.payroll-table th,.payroll-table td{padding:12px 10px;border-bottom:1px solid var(--line);vertical-align:middle;text-align:left}
+.payroll-table th{font-size:10px;color:var(--muted);text-transform:uppercase}
+.num{text-align:right!important;white-space:nowrap}
+.staff-name{font-weight:900}
+.small{font-size:11px;color:var(--muted)}
+.pill{display:inline-flex;padding:6px 9px;border-radius:999px;font-size:10px;font-weight:900;white-space:nowrap}
+.pill.open{background:#f2f3f5;color:#555}
+.pill.first{background:#fff2d8;color:#9a5b00}
+.pill.done{background:#e9f8ee;color:#087535}
+.actions{display:flex;gap:6px;flex-wrap:wrap}
+.action-btn{border:1px solid var(--line);background:#fff;border-radius:10px;padding:7px 9px;font-size:10px;font-weight:850;cursor:pointer}
+.action-btn:hover{background:#fff8e9}
+.action-btn.primary{background:var(--accent-soft);border-color:#e5c273;color:#805000}
+.action-btn:disabled{opacity:.45;cursor:not-allowed}
+.empty{padding:28px;text-align:center;color:var(--muted)}
+.modal{display:none;position:fixed;inset:0;z-index:300;align-items:center;justify-content:center;padding:18px;background:rgba(20,24,31,.52)}
+.modal.open{display:flex}
+.modal-card{width:min(620px,100%);max-height:90vh;overflow:auto;background:#fff;border-radius:20px;padding:20px;box-shadow:0 25px 80px rgba(0,0,0,.18)}
+.modal-head{display:flex;justify-content:space-between;align-items:start;gap:10px;margin-bottom:15px}
+.modal-head h2{margin:0;font-size:19px}
+.modal-head p{margin:4px 0 0;color:var(--muted);font-size:11px}
+.close-btn{border:0;background:#f3f4f6;border-radius:10px;width:34px;height:34px;cursor:pointer}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+.field.full{grid-column:1/-1}
+.field label{display:block;margin-bottom:6px;font-size:10px;font-weight:900;text-transform:uppercase;color:var(--muted)}
+.field input,.field select,.field textarea{width:100%}
+.calc-box{margin-top:13px;padding:13px;border:1px solid #eadcb8;border-radius:13px;background:#fff9eb}
+.calc-row{display:flex;justify-content:space-between;gap:14px;padding:4px 0}
+.calc-row.total{margin-top:5px;padding-top:9px;border-top:1px dashed #dbc89c;font-weight:950}
+.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:15px}
+.history-list{display:grid;gap:8px;margin-top:10px}
+.history-item{display:flex;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:11px}
+.history-item strong{white-space:nowrap}
+@media(max-width:850px){.summary-grid{grid-template-columns:1fr 1fr}.form-grid{grid-template-columns:1fr}}
+@media(max-width:560px){.summary-grid{grid-template-columns:1fr}.month-bar{align-items:stretch}.month-form{display:grid;grid-template-columns:1fr 1fr}.month-form button{grid-column:1/-1}}
+</style>
+
+<div class="payroll-wrap">
+
+    <div class="payroll-card month-bar">
+        <div>
+            <div class="small">Payroll Month</div>
+            <div class="month-title">{{ month_name }} {{ year }}</div>
+        </div>
+
+        <div class="month-nav">
+            <a class="btn-light" href="?year={{ previous_year }}&month={{ previous_month }}">← Previous</a>
+
+            <form method="get" class="month-form">
+                <div>
+                    <label class="small">Month</label>
+                    <select name="month" class="form-select">
+                        {% for value,label in month_choices %}
+                            <option value="{{ value }}" {% if value == month %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label class="small">Year</label>
+                    <input class="form-control" type="number" name="year" value="{{ year }}" min="2000" max="2100">
+                </div>
+
+                <button class="btn-primary">Open Month</button>
+            </form>
+
+            <a class="btn-light" href="?year={{ next_year }}&month={{ next_month }}">Next →</a>
+        </div>
+    </div>
+
+    <div class="summary-grid">
+        <div class="metric">
+            <span>Base Salary</span>
+            <strong>${{ total_base|floatformat:2 }}</strong>
+        </div>
+        <div class="metric">
+            <span>First Paid</span>
+            <strong>${{ total_first|floatformat:2 }}</strong>
+        </div>
+        <div class="metric">
+            <span>Base Remaining</span>
+            <strong>${{ total_remaining|floatformat:2 }}</strong>
+        </div>
+        <div class="metric">
+            <span>Manual Commission</span>
+            <strong>${{ total_commission|floatformat:2 }}</strong>
+        </div>
+    </div>
+
+    <div class="payroll-card table-wrap">
+        <table class="payroll-table">
+            <thead>
+                <tr>
+                    <th>Staff</th>
+                    <th>Join Date</th>
+                    <th class="num">Base Salary</th>
+                    <th class="num">First Paid</th>
+                    <th class="num">Remaining</th>
+                    <th class="num">Commission</th>
+                    <th class="num">Final Due</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for row in rows %}
+                <tr>
+                    <td>
+                        <div class="staff-name">{{ row.profile.staff_name }}</div>
+                        <div class="small">{{ row.profile.user.username }}</div>
+                    </td>
+
+                    <td>
+                        {% if row.profile.join_date %}
+                            {{ row.profile.join_date|date:"d M Y" }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+
+                    <td class="num">
+                        {% if row.salary_record or row.payroll %}
+                            <strong>${{ row.base_salary|floatformat:2 }}</strong>
+                            {% if row.salary_record %}
+                                <div class="small">From {{ row.salary_record.effective_date|date:"d M Y" }}</div>
+                            {% endif %}
+                        {% else %}
+                            <span class="pill open">Not Set</span>
+                        {% endif %}
+                    </td>
+
+                    <td class="num">${{ row.first_payment|floatformat:2 }}</td>
+                    <td class="num"><strong>${{ row.remaining_salary|floatformat:2 }}</strong></td>
+                    <td class="num">${{ row.commission|floatformat:2 }}</td>
+                    <td class="num"><strong>${{ row.final_due|floatformat:2 }}</strong></td>
+
+                    <td>
+                        {% if row.status == "COMPLETED" %}
+                            <span class="pill done">Completed</span>
+                        {% elif row.status == "FIRST_PAID" %}
+                            <span class="pill first">First Paid</span>
+                        {% else %}
+                            <span class="pill open">Open</span>
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        <div class="actions">
+                            <button
+                                type="button"
+                                class="action-btn salary-btn"
+                                data-staff-id="{{ row.profile.id }}"
+                                data-staff-name="{{ row.profile.staff_name }}"
+                            >
+                                Set / Upgrade Salary
+                            </button>
+
+                            <button
+                                type="button"
+                                class="action-btn history-btn"
+                                data-history-target="salary-history-{{ row.profile.id }}"
+                            >
+                                Salary History
+                            </button>
+
+                            <button
+                                type="button"
+                                class="action-btn primary first-btn"
+                                data-staff-id="{{ row.profile.id }}"
+                                data-staff-name="{{ row.profile.staff_name }}"
+                                data-base="{{ row.base_salary }}"
+                                data-first="{{ row.first_payment }}"
+                                {% if not row.salary_record and not row.payroll %}disabled{% endif %}
+                                {% if row.status == "FIRST_PAID" or row.status == "COMPLETED" %}disabled{% endif %}
+                            >
+                                Pay First
+                            </button>
+
+                            <button
+                                type="button"
+                                class="action-btn primary final-btn"
+                                data-staff-id="{{ row.profile.id }}"
+                                data-staff-name="{{ row.profile.staff_name }}"
+                                data-base="{{ row.base_salary }}"
+                                data-first="{{ row.first_payment }}"
+                                data-remaining="{{ row.remaining_salary }}"
+                                {% if row.status != "FIRST_PAID" %}disabled{% endif %}
+                            >
+                                Final Payment
+                            </button>
+                        </div>
+
+                        <div id="salary-history-{{ row.profile.id }}" hidden>
+                            {% for item in row.salary_history %}
+                                <div class="history-item">
+                                    <div>
+                                        <strong>{{ item.effective_date|date:"d M Y" }}</strong>
+                                        <div class="small">{{ item.note|default:"Salary record" }}</div>
+                                    </div>
+                                    <strong>${{ item.salary|floatformat:2 }}</strong>
+                                </div>
+                            {% empty %}
+                                <div class="empty">No salary history yet.</div>
+                            {% endfor %}
+                        </div>
+                    </td>
+                </tr>
+
+                {% empty %}
+                <tr>
+                    <td colspan="9" class="empty">
+                        No payroll staff for this month.
+                        Edit a user and enable “Include in Staff Payroll”.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="payroll-card table-wrap">
+        <div style="margin-bottom:12px">
+            <strong style="font-size:18px">Payment History</strong>
+            <div class="small">{{ month_name }} {{ year }}</div>
+        </div>
+
+        <table class="payroll-table" style="min-width:850px">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Staff</th>
+                    <th>Payment</th>
+                    <th>Method</th>
+                    <th>Reference</th>
+                    <th class="num">Amount</th>
+                    <th>Finance Expense</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for payment in history %}
+                <tr>
+                    <td>{{ payment.payment_date|date:"d M Y" }}</td>
+                    <td><strong>{{ payment.payroll.staff.staff_name }}</strong></td>
+                    <td>{{ payment.get_payment_type_display }}</td>
+                    <td>{{ payment.get_payment_method_display }}</td>
+                    <td>{{ payment.reference|default:"-" }}</td>
+                    <td class="num"><strong>${{ payment.amount|floatformat:2 }}</strong></td>
+                    <td>{{ payment.finance_expense_id|default:"-" }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="empty">No salary payments for this month yet.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+
+<!-- SALARY MODAL -->
+<div class="modal" id="salaryModal">
+    <div class="modal-card">
+        <div class="modal-head">
+            <div>
+                <h2>Set / Upgrade Salary</h2>
+                <p id="salaryStaffName"></p>
+            </div>
+            <button type="button" class="close-btn modal-close">×</button>
+        </div>
+
+        <form method="post" id="salaryForm">
+            {% csrf_token %}
+            <input type="hidden" name="year" value="{{ year }}">
+            <input type="hidden" name="month" value="{{ month }}">
+
+            <div class="form-grid">
+                <div class="field">
+                    <label>Base Salary</label>
+                    <input class="form-control" type="number" name="salary" min="0" step="0.01" placeholder="250.00" required>
+                </div>
+
+                <div class="field">
+                    <label>Effective Date</label>
+                    <input class="form-control" type="date" name="effective_date" value="{{ year }}-{% if month < 10 %}0{% endif %}{{ month }}-01" required>
+                </div>
+
+                <div class="field full">
+                    <label>Note</label>
+                    <input class="form-control" type="text" name="note" placeholder="Starting salary / salary upgrade">
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button type="button" class="btn-light modal-close">Cancel</button>
+                <button class="btn-primary">Save Salary</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+<!-- FIRST PAYMENT MODAL -->
+<div class="modal" id="firstModal">
+    <div class="modal-card">
+        <div class="modal-head">
+            <div>
+                <h2>First Salary Payment</h2>
+                <p id="firstStaffName"></p>
+            </div>
+            <button type="button" class="close-btn modal-close">×</button>
+        </div>
+
+        <form method="post" id="firstForm">
+            {% csrf_token %}
+            <input type="hidden" name="year" value="{{ year }}">
+            <input type="hidden" name="month" value="{{ month }}">
+
+            <div class="form-grid">
+                <div class="field">
+                    <label>First Payment Amount</label>
+                    <input class="form-control" type="number" name="amount" id="firstAmount" min="0.01" step="0.01" placeholder="130.00" required>
+                </div>
+
+                <div class="field">
+                    <label>Payment Date</label>
+                    <input class="form-control" type="date" name="payment_date" value="{{ today|date:'Y-m-d' }}" required>
+                </div>
+
+                <div class="field">
+                    <label>Payment Method</label>
+                    <select class="form-select" name="payment_method">
+                        <option value="CASH">Cash</option>
+                        <option value="ABA">ABA</option>
+                        <option value="BANK">Bank Transfer</option>
+                        <option value="OTHER">Other</option>
+                    </select>
+                </div>
+
+                <div class="field">
+                    <label>Reference</label>
+                    <input class="form-control" type="text" name="reference" placeholder="ABA / bank reference">
+                </div>
+
+                <div class="field full">
+                    <label>Note</label>
+                    <textarea class="form-control" name="note" rows="3" placeholder="Optional note"></textarea>
+                </div>
+            </div>
+
+            <div class="calc-box">
+                <div class="calc-row">
+                    <span>Base Salary</span>
+                    <strong id="firstBase">$0.00</strong>
+                </div>
+                <div class="calc-row">
+                    <span>Manual First Payment</span>
+                    <strong id="firstEntered">$0.00</strong>
+                </div>
+                <div class="calc-row total">
+                    <span>Remaining = Base - First</span>
+                    <strong id="firstRemaining">$0.00</strong>
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button type="button" class="btn-light modal-close">Cancel</button>
+                <button class="btn-primary">Confirm First Payment</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+<!-- FINAL PAYMENT MODAL -->
+<div class="modal" id="finalModal">
+    <div class="modal-card">
+        <div class="modal-head">
+            <div>
+                <h2>Final Salary Payment</h2>
+                <p id="finalStaffName"></p>
+            </div>
+            <button type="button" class="close-btn modal-close">×</button>
+        </div>
+
+        <form method="post" id="finalForm">
+            {% csrf_token %}
+            <input type="hidden" name="year" value="{{ year }}">
+            <input type="hidden" name="month" value="{{ month }}">
+
+            <div class="form-grid">
+                <div class="field">
+                    <label>Commission — Manual</label>
+                    <input class="form-control final-calc" type="number" name="commission" id="commissionInput" min="0" step="0.01" value="0.00">
+                </div>
+
+                <div class="field">
+                    <label>Bonus — Manual</label>
+                    <input class="form-control final-calc" type="number" name="bonus" id="bonusInput" min="0" step="0.01" value="0.00">
+                </div>
+
+                <div class="field">
+                    <label>Deduction — Manual</label>
+                    <input class="form-control final-calc" type="number" name="deduction" id="deductionInput" min="0" step="0.01" value="0.00">
+                </div>
+
+                <div class="field">
+                    <label>Payment Date</label>
+                    <input class="form-control" type="date" name="payment_date" value="{{ today|date:'Y-m-d' }}" required>
+                </div>
+
+                <div class="field">
+                    <label>Payment Method</label>
+                    <select class="form-select" name="payment_method">
+                        <option value="CASH">Cash</option>
+                        <option value="ABA">ABA</option>
+                        <option value="BANK">Bank Transfer</option>
+                        <option value="OTHER">Other</option>
+                    </select>
+                </div>
+
+                <div class="field">
+                    <label>Reference</label>
+                    <input class="form-control" type="text" name="reference" placeholder="ABA / bank reference">
+                </div>
+
+                <div class="field full">
+                    <label>Note</label>
+                    <textarea class="form-control" name="note" rows="3" placeholder="Optional note"></textarea>
+                </div>
+            </div>
+
+            <div class="calc-box">
+                <div class="calc-row">
+                    <span>Base Salary</span>
+                    <strong id="finalBase">$0.00</strong>
+                </div>
+                <div class="calc-row">
+                    <span>First Paid</span>
+                    <strong id="finalFirst">$0.00</strong>
+                </div>
+                <div class="calc-row">
+                    <span>Remaining Base Salary</span>
+                    <strong id="finalRemaining">$0.00</strong>
+                </div>
+                <div class="calc-row">
+                    <span>Commission</span>
+                    <strong id="finalCommission">$0.00</strong>
+                </div>
+                <div class="calc-row">
+                    <span>Bonus</span>
+                    <strong id="finalBonus">$0.00</strong>
+                </div>
+                <div class="calc-row">
+                    <span>Deduction</span>
+                    <strong id="finalDeduction">-$0.00</strong>
+                </div>
+                <div class="calc-row total">
+                    <span>Final Due</span>
+                    <strong id="finalDue">$0.00</strong>
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button type="button" class="btn-light modal-close">Cancel</button>
+                <button class="btn-primary">Confirm Final Payment</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+<!-- SALARY HISTORY MODAL -->
+<div class="modal" id="historyModal">
+    <div class="modal-card">
+        <div class="modal-head">
+            <div>
+                <h2>Salary History</h2>
+                <p>Old salary records are kept permanently.</p>
+            </div>
+            <button type="button" class="close-btn modal-close">×</button>
+        </div>
+
+        <div id="historyContent"></div>
+
+        <div class="modal-actions">
+            <button type="button" class="btn-light modal-close">Close</button>
+        </div>
+    </div>
+</div>
+
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const salaryModal = document.getElementById("salaryModal");
+    const firstModal = document.getElementById("firstModal");
+    const finalModal = document.getElementById("finalModal");
+    const historyModal = document.getElementById("historyModal");
+
+    function openModal(modal) {
+        if (modal) modal.classList.add("open");
+    }
+
+    function closeModals() {
+        document.querySelectorAll(".modal.open").forEach(function (modal) {
+            modal.classList.remove("open");
+        });
+    }
+
+    document.querySelectorAll(".modal-close").forEach(function (button) {
+        button.addEventListener("click", closeModals);
+    });
+
+    document.querySelectorAll(".modal").forEach(function (modal) {
+        modal.addEventListener("click", function (event) {
+            if (event.target === modal) closeModals();
+        });
+    });
+
+    document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape") closeModals();
+    });
+
+    document.querySelectorAll(".salary-btn").forEach(function (button) {
+        button.addEventListener("click", function () {
+            const staffId = button.dataset.staffId;
+            const staffName = button.dataset.staffName;
+
+            document.getElementById("salaryStaffName").textContent = staffName;
+            document.getElementById("salaryForm").action =
+                "/staff-payroll/" + staffId + "/salary/";
+
+            openModal(salaryModal);
+        });
+    });
+
+    let firstBaseValue = 0;
+
+    function refreshFirstCalculation() {
+        const entered = Number(document.getElementById("firstAmount").value || 0);
+        const remaining = Math.max(firstBaseValue - entered, 0);
+
+        document.getElementById("firstBase").textContent =
+            "$" + firstBaseValue.toFixed(2);
+
+        document.getElementById("firstEntered").textContent =
+            "$" + entered.toFixed(2);
+
+        document.getElementById("firstRemaining").textContent =
+            "$" + remaining.toFixed(2);
+    }
+
+    document.getElementById("firstAmount").addEventListener(
+        "input",
+        refreshFirstCalculation
+    );
+
+    document.querySelectorAll(".first-btn").forEach(function (button) {
+        button.addEventListener("click", function () {
+            if (button.disabled) return;
+
+            const staffId = button.dataset.staffId;
+            const staffName = button.dataset.staffName;
+
+            firstBaseValue = Number(button.dataset.base || 0);
+
+            document.getElementById("firstStaffName").textContent =
+                staffName + " · {{ month_name }} {{ year }}";
+
+            document.getElementById("firstForm").action =
+                "/staff-payroll/" + staffId + "/first-payment/";
+
+            document.getElementById("firstAmount").value = "";
+
+            refreshFirstCalculation();
+            openModal(firstModal);
+        });
+    });
+
+    let finalBaseValue = 0;
+    let finalFirstValue = 0;
+    let finalRemainingValue = 0;
+
+    function numberValue(id) {
+        return Number(document.getElementById(id).value || 0);
+    }
+
+    function refreshFinalCalculation() {
+        const commission = numberValue("commissionInput");
+        const bonus = numberValue("bonusInput");
+        const deduction = numberValue("deductionInput");
+
+        const due = Math.max(
+            finalRemainingValue + commission + bonus - deduction,
+            0
+        );
+
+        document.getElementById("finalBase").textContent =
+            "$" + finalBaseValue.toFixed(2);
+
+        document.getElementById("finalFirst").textContent =
+            "$" + finalFirstValue.toFixed(2);
+
+        document.getElementById("finalRemaining").textContent =
+            "$" + finalRemainingValue.toFixed(2);
+
+        document.getElementById("finalCommission").textContent =
+            "$" + commission.toFixed(2);
+
+        document.getElementById("finalBonus").textContent =
+            "$" + bonus.toFixed(2);
+
+        document.getElementById("finalDeduction").textContent =
+            "-$" + deduction.toFixed(2);
+
+        document.getElementById("finalDue").textContent =
+            "$" + due.toFixed(2);
+    }
+
+    document.querySelectorAll(".final-calc").forEach(function (input) {
+        input.addEventListener("input", refreshFinalCalculation);
+    });
+
+    document.querySelectorAll(".final-btn").forEach(function (button) {
+        button.addEventListener("click", function () {
+            if (button.disabled) return;
+
+            const staffId = button.dataset.staffId;
+            const staffName = button.dataset.staffName;
+
+            finalBaseValue = Number(button.dataset.base || 0);
+            finalFirstValue = Number(button.dataset.first || 0);
+            finalRemainingValue = Number(button.dataset.remaining || 0);
+
+            document.getElementById("finalStaffName").textContent =
+                staffName + " · {{ month_name }} {{ year }}";
+
+            document.getElementById("finalForm").action =
+                "/staff-payroll/" + staffId + "/final-payment/";
+
+            document.getElementById("commissionInput").value = "0.00";
+            document.getElementById("bonusInput").value = "0.00";
+            document.getElementById("deductionInput").value = "0.00";
+
+            refreshFinalCalculation();
+            openModal(finalModal);
+        });
+    });
+
+    document.querySelectorAll(".history-btn").forEach(function (button) {
+        button.addEventListener("click", function () {
+            const source = document.getElementById(
+                button.dataset.historyTarget
+            );
+
+            document.getElementById("historyContent").innerHTML =
+                source ? source.innerHTML : "<div class='empty'>No salary history.</div>";
+
+            openModal(historyModal);
+        });
+    });
+});
+</script>
+{% endblock %}

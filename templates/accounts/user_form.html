@@ -2,7 +2,7 @@
 
 {% block title %}{{ page_title }} | Niron System{% endblock %}
 {% block page_title %}{{ page_title }}{% endblock %}
-{% block page_subtitle %}Manage account details, role and signature{% endblock %}
+{% block page_subtitle %}Manage account details, staff information, role and signature{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -287,6 +287,31 @@
         margin-bottom: 5px;
     }
 
+
+    .staff-toggle {
+        margin-bottom: 17px;
+    }
+
+    .staff-fields {
+        transition: opacity .18s ease;
+    }
+
+    .staff-fields.is-disabled {
+        opacity: .42;
+    }
+
+    .staff-info-banner {
+        margin-top: 16px;
+        padding: 12px 14px;
+        border: 1px solid #E8DFC9;
+        border-radius: 13px;
+        background: #FFF9EB;
+        color: #6D5A31;
+        font-size: 11px;
+        font-weight: 650;
+        line-height: 1.5;
+    }
+
     @media (max-width: 720px) {
         .field-grid,
         .signature-zone {
@@ -345,6 +370,59 @@
                 {{ form.last_name }}
                 {% for error in form.last_name.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
             </div>
+        </div>
+    </section>
+
+
+    <section class="user-section">
+        <h2 class="user-section-title">Staff Information</h2>
+        <p class="user-section-subtitle">Employee information used for monthly salary and payroll.</p>
+
+        <div class="staff-toggle">
+            <label class="active-row" for="{{ profile_form.is_staff_employee.id_for_label }}">
+                {{ profile_form.is_staff_employee }}
+                <span class="active-copy">
+                    <strong>Include in Staff Payroll</strong>
+                    <span>Enable monthly salary management for this user.</span>
+                </span>
+            </label>
+            {% for error in profile_form.is_staff_employee.errors %}
+                <div class="field-error">{{ error }}</div>
+            {% endfor %}
+        </div>
+
+        <div class="field-grid staff-fields" id="staffPayrollFields">
+            <div>
+                <label class="field-label" for="{{ profile_form.join_date.id_for_label }}">Join Date</label>
+                {{ profile_form.join_date }}
+                <div class="field-help">Date this staff member started working in the office.</div>
+                {% for error in profile_form.join_date.errors %}
+                    <div class="field-error">{{ error }}</div>
+                {% endfor %}
+            </div>
+
+            <div>
+                <label class="field-label" for="{{ profile_form.left_date.id_for_label }}">Left Date</label>
+                {{ profile_form.left_date }}
+                <div class="field-help">Leave empty while this staff member is still working.</div>
+                {% for error in profile_form.left_date.errors %}
+                    <div class="field-error">{{ error }}</div>
+                {% endfor %}
+            </div>
+
+            <div class="field-full">
+                <label class="field-label" for="{{ profile_form.staff_note.id_for_label }}">Staff Note</label>
+                {{ profile_form.staff_note }}
+                <div class="field-help">Optional internal note about this employee.</div>
+                {% for error in profile_form.staff_note.errors %}
+                    <div class="field-error">{{ error }}</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="staff-info-banner">
+            <strong>Salary is managed from Staff Salary &amp; Commission.</strong>
+            Salary upgrades are kept as history and do not overwrite old payroll.
         </div>
     </section>
 
@@ -465,6 +543,29 @@
 <script>
 (function () {
     "use strict";
+
+
+    const staffPayrollCheckbox =
+        document.querySelector('input[name="is_staff_employee"]');
+    const staffPayrollFields =
+        document.getElementById("staffPayrollFields");
+
+    function refreshStaffPayrollFields() {
+        if (!staffPayrollCheckbox || !staffPayrollFields) return;
+        staffPayrollFields.classList.toggle(
+            "is-disabled",
+            !staffPayrollCheckbox.checked
+        );
+    }
+
+    if (staffPayrollCheckbox) {
+        staffPayrollCheckbox.addEventListener(
+            "change",
+            refreshStaffPayrollFields
+        );
+        refreshStaffPayrollFields();
+    }
+
 
     const form = document.getElementById("userEditForm");
     const zone = document.getElementById("signatureZone");

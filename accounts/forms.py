@@ -1,9 +1,15 @@
+from decimal import Decimal
+
 from django import forms
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.models import Group, Permission, User
 from django.db import transaction
 
-from .models import UserProfile
+from .models import (
+    UserProfile,
+    StaffSalaryHistory,
+    StaffPayrollPayment,
+)
 
 
 ADMIN_GROUP_NAMES = {
@@ -46,7 +52,6 @@ def sync_user_access(user, selected_group):
     """
     admin_access = is_admin_role(selected_group)
 
-    # Prevent old individually assigned permissions from surviving a role change.
     user.user_permissions.clear()
 
     if selected_group:
@@ -108,9 +113,6 @@ class UserCreateForm(forms.ModelForm):
             }
         )
     )
-
-    # Use a separate "role" field instead of binding the ModelForm directly
-    # to User.groups. This makes the current role reliably selected on Edit.
     role = forms.ModelChoiceField(
         queryset=Group.objects.all().order_by("name"),
         required=True,
@@ -133,28 +135,16 @@ class UserCreateForm(forms.ModelForm):
         ]
         widgets = {
             "username": forms.TextInput(
-                attrs={
-                    "class": "form-control",
-                    "placeholder": "Username",
-                }
+                attrs={"class": "form-control", "placeholder": "Username"}
             ),
             "first_name": forms.TextInput(
-                attrs={
-                    "class": "form-control",
-                    "placeholder": "First name",
-                }
+                attrs={"class": "form-control", "placeholder": "First name"}
             ),
             "last_name": forms.TextInput(
-                attrs={
-                    "class": "form-control",
-                    "placeholder": "Last name",
-                }
+                attrs={"class": "form-control", "placeholder": "Last name"}
             ),
             "email": forms.EmailInput(
-                attrs={
-                    "class": "form-control",
-                    "placeholder": "Email",
-                }
+                attrs={"class": "form-control", "placeholder": "Email"}
             ),
             "is_active": forms.CheckboxInput(
                 attrs={"class": "form-check-input"}
@@ -163,15 +153,11 @@ class UserCreateForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
-        password = cleaned_data.get("password")
-        confirm_password = cleaned_data.get("confirm_password")
-
-        if password != confirm_password:
+        if cleaned_data.get("password") != cleaned_data.get("confirm_password"):
             self.add_error(
                 "confirm_password",
                 "Password and confirm password do not match.",
             )
-
         return cleaned_data
 
     def save(self, commit=True):
@@ -229,28 +215,16 @@ class UserEditForm(forms.ModelForm):
         ]
         widgets = {
             "username": forms.TextInput(
-                attrs={
-                    "class": "form-control",
-                    "placeholder": "Username",
-                }
+                attrs={"class": "form-control", "placeholder": "Username"}
             ),
             "first_name": forms.TextInput(
-                attrs={
-                    "class": "form-control",
-                    "placeholder": "First name",
-                }
+                attrs={"class": "form-control", "placeholder": "First name"}
             ),
             "last_name": forms.TextInput(
-                attrs={
-                    "class": "form-control",
-                    "placeholder": "Last name",
-                }
+                attrs={"class": "form-control", "placeholder": "Last name"}
             ),
             "email": forms.EmailInput(
-                attrs={
-                    "class": "form-control",
-                    "placeholder": "Email",
-                }
+                attrs={"class": "form-control", "placeholder": "Email"}
             ),
             "is_active": forms.CheckboxInput(
                 attrs={"class": "form-check-input"}
@@ -260,8 +234,6 @@ class UserEditForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # IMPORTANT: only set initial on an unbound GET form.
-        # On POST, Django must keep the user's submitted value when there is an error.
         if not self.is_bound and self.instance and self.instance.pk:
             current_group = self.instance.groups.order_by("name").first()
             if current_group:
@@ -278,7 +250,6 @@ class UserEditForm(forms.ModelForm):
                     "confirm_password",
                     "New password and confirm password do not match.",
                 )
-
         return cleaned_data
 
     def save(self, commit=True):
@@ -297,8 +268,6 @@ class UserEditForm(forms.ModelForm):
 
 
 class UserProfileForm(forms.ModelForm):
-    # JS stores drag/drop/paste/select image here as a data URL so that the
-    # signature preview and selection survive other validation errors.
     signature_data = forms.CharField(
         required=False,
         widget=forms.HiddenInput(),
@@ -306,15 +275,235 @@ class UserProfileForm(forms.ModelForm):
 
     class Meta:
         model = UserProfile
-        fields = ["signature"]
+        fields = [
+            "signature",
+            "is_staff_employee",
+            "join_date",
+            "left_date",
+            "staff_note",
+        ]
         widgets = {
             "signature": forms.FileInput(
                 attrs={
                     "class": "signature-file-input",
                     "accept": "image/png,image/jpeg,image/webp",
                 }
-            )
+            ),
+            "is_staff_employee": forms.CheckboxInput(
+                attrs={"class": "form-check-input"}
+            ),
+            "join_date": forms.DateInput(
+                attrs={"type": "date", "class": "form-control"}
+            ),
+            "left_date": forms.DateInput(
+                attrs={"type": "date", "class": "form-control"}
+            ),
+            "staff_note": forms.Textarea(
+                attrs={
+                    "class": "form-control",
+                    "rows": 3,
+                    "placeholder": "Optional staff note",
+                }
+            ),
         }
+        labels = {
+            "signature": "Signature",
+            "is_staff_employee": "Include in Staff Payroll",
+            "join_date": "Join Date",
+            "left_date": "Left Date",
+            "staff_note": "Staff Note",
+        }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        is_staff_employee = cleaned_data.get("is_staff_employee")
+        join_date = cleaned_data.get("join_date")
+        left_date = cleaned_data.get("left_date")
+
+        if is_staff_employee and not join_date:
+            self.add_error(
+                "join_date",
+                "Join date is required for staff payroll.",
+            )
+
+        if join_date and left_date and left_date < join_date:
+            self.add_error(
+                "left_date",
+                "Left date cannot be earlier than join date.",
+            )
+
+        return cleaned_data
+
+
+class StaffSalaryHistoryForm(forms.ModelForm):
+    class Meta:
+        model = StaffSalaryHistory
+        fields = ["salary", "effective_date", "note"]
+        widgets = {
+            "salary": forms.NumberInput(
+                attrs={
+                    "class": "form-control",
+                    "step": "0.01",
+                    "min": "0",
+                    "placeholder": "250.00",
+                }
+            ),
+            "effective_date": forms.DateInput(
+                attrs={"type": "date", "class": "form-control"}
+            ),
+            "note": forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "Starting salary / salary upgrade",
+                }
+            ),
+        }
+        labels = {
+            "salary": "Base Salary",
+            "effective_date": "Effective Date",
+            "note": "Note",
+        }
+
+
+class StaffFirstPaymentForm(forms.Form):
+    amount = forms.DecimalField(
+        label="First Payment Amount",
+        min_value=Decimal("0.01"),
+        max_digits=12,
+        decimal_places=2,
+        widget=forms.NumberInput(
+            attrs={
+                "class": "form-control",
+                "step": "0.01",
+                "min": "0.01",
+                "placeholder": "130.00",
+            }
+        ),
+    )
+    payment_date = forms.DateField(
+        label="Payment Date",
+        widget=forms.DateInput(
+            attrs={"type": "date", "class": "form-control"}
+        ),
+    )
+    payment_method = forms.ChoiceField(
+        label="Payment Method",
+        choices=StaffPayrollPayment.METHOD_CHOICES,
+        initial=StaffPayrollPayment.METHOD_CASH,
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    reference = forms.CharField(
+        label="Reference",
+        required=False,
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": "ABA / bank reference",
+            }
+        ),
+    )
+    note = forms.CharField(
+        label="Note",
+        required=False,
+        widget=forms.Textarea(
+            attrs={
+                "class": "form-control",
+                "rows": 3,
+                "placeholder": "Optional note",
+            }
+        ),
+    )
+
+
+class StaffFinalPaymentForm(forms.Form):
+    commission = forms.DecimalField(
+        label="Commission",
+        required=False,
+        min_value=Decimal("0.00"),
+        max_digits=12,
+        decimal_places=2,
+        initial=Decimal("0.00"),
+        widget=forms.NumberInput(
+            attrs={
+                "class": "form-control",
+                "step": "0.01",
+                "min": "0",
+                "placeholder": "0.00",
+            }
+        ),
+    )
+    bonus = forms.DecimalField(
+        label="Bonus",
+        required=False,
+        min_value=Decimal("0.00"),
+        max_digits=12,
+        decimal_places=2,
+        initial=Decimal("0.00"),
+        widget=forms.NumberInput(
+            attrs={
+                "class": "form-control",
+                "step": "0.01",
+                "min": "0",
+                "placeholder": "0.00",
+            }
+        ),
+    )
+    deduction = forms.DecimalField(
+        label="Deduction",
+        required=False,
+        min_value=Decimal("0.00"),
+        max_digits=12,
+        decimal_places=2,
+        initial=Decimal("0.00"),
+        widget=forms.NumberInput(
+            attrs={
+                "class": "form-control",
+                "step": "0.01",
+                "min": "0",
+                "placeholder": "0.00",
+            }
+        ),
+    )
+    payment_date = forms.DateField(
+        label="Payment Date",
+        widget=forms.DateInput(
+            attrs={"type": "date", "class": "form-control"}
+        ),
+    )
+    payment_method = forms.ChoiceField(
+        label="Payment Method",
+        choices=StaffPayrollPayment.METHOD_CHOICES,
+        initial=StaffPayrollPayment.METHOD_CASH,
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    reference = forms.CharField(
+        label="Reference",
+        required=False,
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": "ABA / bank reference",
+            }
+        ),
+    )
+    note = forms.CharField(
+        label="Note",
+        required=False,
+        widget=forms.Textarea(
+            attrs={
+                "class": "form-control",
+                "rows": 3,
+                "placeholder": "Optional note",
+            }
+        ),
+    )
+
+    def clean(self):
+        cleaned = super().clean()
+        cleaned["commission"] = cleaned.get("commission") or Decimal("0.00")
+        cleaned["bonus"] = cleaned.get("bonus") or Decimal("0.00")
+        cleaned["deduction"] = cleaned.get("deduction") or Decimal("0.00")
+        return cleaned
 
 
 class RoleForm(forms.ModelForm):

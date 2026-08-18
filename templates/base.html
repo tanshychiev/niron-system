@@ -1381,7 +1381,7 @@
                 {% url 'production_supplier_list' as production_supplier_list_url %}
                 {% url 'production_expense_list' as production_expense_list_url %}
                 {% url 'production_payment_list' 'sewer' as production_sewer_payment_url %}
-                {% url 'production_payment_list' 'staff' as production_staff_payment_url %}
+                {% url 'production_staff_payroll' as production_staff_payment_url %}
 
                 {% if perms.orders.view_order or perms.orders.add_order or perms.orders.change_order %}
                 <div class="nav-group">
