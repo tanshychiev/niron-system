@@ -212,6 +212,8 @@ def batch_expense_list(request):
     """Stock In Expense list synced from cloth, printing material and fabric Stock In."""
     qs = Expense.objects.select_related("created_by", "batch").filter(
         expense_type=Expense.TYPE_BATCH
+    ).filter(
+        Q(batch__isnull=True) | Q(batch__is_deleted=False)
     )
 
     status = (request.GET.get("status") or "").strip().upper()
@@ -276,10 +278,14 @@ def batch_expense_list(request):
     pending_count = Expense.objects.filter(
         expense_type=Expense.TYPE_BATCH,
         expense_status=Expense.STATUS_PENDING,
+    ).filter(
+        Q(batch__isnull=True) | Q(batch__is_deleted=False)
     ).count()
     completed_count = Expense.objects.filter(
         expense_type=Expense.TYPE_BATCH,
         expense_status=Expense.STATUS_COMPLETED,
+    ).filter(
+        Q(batch__isnull=True) | Q(batch__is_deleted=False)
     ).count()
 
     return render(
