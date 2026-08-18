@@ -93,14 +93,17 @@
             <span>Base Salary</span>
             <strong>${{ total_base|floatformat:2 }}</strong>
         </div>
+
         <div class="metric">
             <span>First Paid</span>
             <strong>${{ total_first|floatformat:2 }}</strong>
         </div>
+
         <div class="metric">
             <span>Base Remaining</span>
             <strong>${{ total_remaining|floatformat:2 }}</strong>
         </div>
+
         <div class="metric">
             <span>Manual Commission</span>
             <strong>${{ total_commission|floatformat:2 }}</strong>
@@ -142,8 +145,11 @@
                     <td class="num">
                         {% if row.salary_record or row.payroll %}
                             <strong>${{ row.base_salary|floatformat:2 }}</strong>
+
                             {% if row.salary_record %}
-                                <div class="small">From {{ row.salary_record.effective_date|date:"d M Y" }}</div>
+                                <div class="small">
+                                    From {{ row.salary_record.effective_date|date:"d M Y" }}
+                                </div>
                             {% endif %}
                         {% else %}
                             <span class="pill open">Not Set</span>
@@ -167,6 +173,7 @@
 
                     <td>
                         <div class="actions">
+
                             <button
                                 type="button"
                                 class="action-btn salary-btn"
@@ -209,6 +216,7 @@
                             >
                                 Final Payment
                             </button>
+
                         </div>
 
                         <div id="salary-history-{{ row.profile.id }}" hidden>
@@ -218,6 +226,7 @@
                                         <strong>{{ item.effective_date|date:"d M Y" }}</strong>
                                         <div class="small">{{ item.note|default:"Salary record" }}</div>
                                     </div>
+
                                     <strong>${{ item.salary|floatformat:2 }}</strong>
                                 </div>
                             {% empty %}
@@ -269,91 +278,200 @@
                     <td class="num"><strong>${{ payment.amount|floatformat:2 }}</strong></td>
                     <td>{{ payment.finance_expense_id|default:"-" }}</td>
                 </tr>
+
                 {% empty %}
                 <tr>
-                    <td colspan="7" class="empty">No salary payments for this month yet.</td>
+                    <td colspan="7" class="empty">
+                        No salary payments for this month yet.
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
+
 </div>
 
 
-<!-- SALARY MODAL -->
+<!-- =========================================================
+     SALARY MODAL
+========================================================== -->
+
 <div class="modal" id="salaryModal">
     <div class="modal-card">
+
         <div class="modal-head">
             <div>
                 <h2>Set / Upgrade Salary</h2>
                 <p id="salaryStaffName"></p>
             </div>
-            <button type="button" class="close-btn modal-close">×</button>
+
+            <button
+                type="button"
+                class="close-btn modal-close"
+            >
+                ×
+            </button>
         </div>
 
         <form method="post" id="salaryForm">
             {% csrf_token %}
-            <input type="hidden" name="year" value="{{ year }}">
-            <input type="hidden" name="month" value="{{ month }}">
+
+            <input
+                type="hidden"
+                name="year"
+                value="{{ year }}"
+            >
+
+            <input
+                type="hidden"
+                name="month"
+                value="{{ month }}"
+            >
 
             <div class="form-grid">
+
                 <div class="field">
                     <label>Base Salary</label>
-                    <input class="form-control" type="number" name="salary" min="0" step="0.01" placeholder="250.00" required>
+
+                    <input
+                        class="form-control"
+                        type="number"
+                        name="salary"
+                        min="0"
+                        step="0.01"
+                        placeholder="250.00"
+                        required
+                    >
                 </div>
 
                 <div class="field">
                     <label>Effective Date</label>
-                    <input class="form-control" type="date" name="effective_date" value="{{ year }}-{% if month < 10 %}0{% endif %}{{ month }}-01" required>
+
+                    <input
+                        class="form-control"
+                        type="date"
+                        name="effective_date"
+                        value="{{ year }}-{% if month < 10 %}0{% endif %}{{ month }}-01"
+                        required
+                    >
                 </div>
 
                 <div class="field full">
                     <label>Note</label>
-                    <input class="form-control" type="text" name="note" placeholder="Starting salary / salary upgrade">
+
+                    <input
+                        class="form-control"
+                        type="text"
+                        name="note"
+                        placeholder="Starting salary / salary upgrade"
+                    >
                 </div>
+
             </div>
 
             <div class="modal-actions">
-                <button type="button" class="btn-light modal-close">Cancel</button>
-                <button class="btn-primary">Save Salary</button>
+                <button
+                    type="button"
+                    class="btn-light modal-close"
+                >
+                    Cancel
+                </button>
+
+                <button class="btn-primary">
+                    Save Salary
+                </button>
             </div>
         </form>
+
     </div>
 </div>
 
 
-<!-- FIRST PAYMENT MODAL -->
+<!-- =========================================================
+     FIRST PAYMENT MODAL
+========================================================== -->
+
 <div class="modal" id="firstModal">
     <div class="modal-card">
+
         <div class="modal-head">
             <div>
                 <h2>First Salary Payment</h2>
                 <p id="firstStaffName"></p>
             </div>
-            <button type="button" class="close-btn modal-close">×</button>
+
+            <button
+                type="button"
+                class="close-btn modal-close"
+            >
+                ×
+            </button>
         </div>
 
         <form method="post" id="firstForm">
             {% csrf_token %}
-            <input type="hidden" name="year" value="{{ year }}">
-            <input type="hidden" name="month" value="{{ month }}">
+
+            <input
+                type="hidden"
+                name="year"
+                value="{{ year }}"
+            >
+
+            <input
+                type="hidden"
+                name="month"
+                value="{{ month }}"
+            >
 
             <div class="form-grid">
+
                 <div class="field">
                     <label>First Payment Amount</label>
-                    <input class="form-control" type="number" name="amount" id="firstAmount" min="0.01" step="0.01" placeholder="130.00" required>
+
+                    <input
+                        class="form-control"
+                        type="number"
+                        name="amount"
+                        id="firstAmount"
+                        min="0.01"
+                        step="0.01"
+                        placeholder="0.00"
+                        required
+                    >
+
+                    <div class="small" style="margin-top:5px">
+                        Default = Base Salary ÷ 2. You can change it manually.
+                    </div>
                 </div>
 
                 <div class="field">
                     <label>Payment Date</label>
-                    <input class="form-control" type="date" name="payment_date" value="{{ today|date:'Y-m-d' }}" required>
+
+                    <input
+                        class="form-control"
+                        type="date"
+                        name="payment_date"
+                        id="firstPaymentDate"
+                        value="{{ year }}-{% if month < 10 %}0{% endif %}{{ month }}-15"
+                        required
+                    >
+
+                    <div class="small" style="margin-top:5px">
+                        Default = 15th of this payroll month. Editable.
+                    </div>
                 </div>
 
                 <div class="field">
                     <label>Payment Method</label>
-                    <select class="form-select" name="payment_method">
+
+                    <select
+                        class="form-select"
+                        name="payment_method"
+                        id="firstPaymentMethod"
+                    >
                         <option value="CASH">Cash</option>
-                        <option value="ABA">ABA</option>
+                        <option value="ABA" selected>ABA</option>
                         <option value="BANK">Bank Transfer</option>
                         <option value="OTHER">Other</option>
                     </select>
@@ -361,81 +479,166 @@
 
                 <div class="field">
                     <label>Reference</label>
-                    <input class="form-control" type="text" name="reference" placeholder="ABA / bank reference">
+
+                    <input
+                        class="form-control"
+                        type="text"
+                        name="reference"
+                        placeholder="ABA / bank reference"
+                    >
                 </div>
 
                 <div class="field full">
                     <label>Note</label>
-                    <textarea class="form-control" name="note" rows="3" placeholder="Optional note"></textarea>
+
+                    <textarea
+                        class="form-control"
+                        name="note"
+                        rows="3"
+                        placeholder="Optional note"
+                    ></textarea>
                 </div>
+
             </div>
 
             <div class="calc-box">
+
                 <div class="calc-row">
                     <span>Base Salary</span>
                     <strong id="firstBase">$0.00</strong>
                 </div>
+
                 <div class="calc-row">
-                    <span>Manual First Payment</span>
+                    <span>First Payment</span>
                     <strong id="firstEntered">$0.00</strong>
                 </div>
+
                 <div class="calc-row total">
                     <span>Remaining = Base - First</span>
                     <strong id="firstRemaining">$0.00</strong>
                 </div>
+
             </div>
 
             <div class="modal-actions">
-                <button type="button" class="btn-light modal-close">Cancel</button>
-                <button class="btn-primary">Confirm First Payment</button>
+                <button
+                    type="button"
+                    class="btn-light modal-close"
+                >
+                    Cancel
+                </button>
+
+                <button class="btn-primary">
+                    Confirm First Payment
+                </button>
             </div>
         </form>
+
     </div>
 </div>
 
 
-<!-- FINAL PAYMENT MODAL -->
+<!-- =========================================================
+     FINAL PAYMENT MODAL
+========================================================== -->
+
 <div class="modal" id="finalModal">
     <div class="modal-card">
+
         <div class="modal-head">
             <div>
                 <h2>Final Salary Payment</h2>
                 <p id="finalStaffName"></p>
             </div>
-            <button type="button" class="close-btn modal-close">×</button>
+
+            <button
+                type="button"
+                class="close-btn modal-close"
+            >
+                ×
+            </button>
         </div>
 
         <form method="post" id="finalForm">
             {% csrf_token %}
-            <input type="hidden" name="year" value="{{ year }}">
-            <input type="hidden" name="month" value="{{ month }}">
+
+            <input
+                type="hidden"
+                name="year"
+                value="{{ year }}"
+            >
+
+            <input
+                type="hidden"
+                name="month"
+                value="{{ month }}"
+            >
 
             <div class="form-grid">
+
                 <div class="field">
                     <label>Commission — Manual</label>
-                    <input class="form-control final-calc" type="number" name="commission" id="commissionInput" min="0" step="0.01" value="0.00">
+
+                    <input
+                        class="form-control final-calc"
+                        type="number"
+                        name="commission"
+                        id="commissionInput"
+                        min="0"
+                        step="0.01"
+                        value="0.00"
+                    >
                 </div>
 
                 <div class="field">
                     <label>Bonus — Manual</label>
-                    <input class="form-control final-calc" type="number" name="bonus" id="bonusInput" min="0" step="0.01" value="0.00">
+
+                    <input
+                        class="form-control final-calc"
+                        type="number"
+                        name="bonus"
+                        id="bonusInput"
+                        min="0"
+                        step="0.01"
+                        value="0.00"
+                    >
                 </div>
 
                 <div class="field">
                     <label>Deduction — Manual</label>
-                    <input class="form-control final-calc" type="number" name="deduction" id="deductionInput" min="0" step="0.01" value="0.00">
+
+                    <input
+                        class="form-control final-calc"
+                        type="number"
+                        name="deduction"
+                        id="deductionInput"
+                        min="0"
+                        step="0.01"
+                        value="0.00"
+                    >
                 </div>
 
                 <div class="field">
                     <label>Payment Date</label>
-                    <input class="form-control" type="date" name="payment_date" value="{{ today|date:'Y-m-d' }}" required>
+
+                    <input
+                        class="form-control"
+                        type="date"
+                        name="payment_date"
+                        value="{{ today|date:'Y-m-d' }}"
+                        required
+                    >
                 </div>
 
                 <div class="field">
                     <label>Payment Method</label>
-                    <select class="form-select" name="payment_method">
+
+                    <select
+                        class="form-select"
+                        name="payment_method"
+                    >
                         <option value="CASH">Cash</option>
-                        <option value="ABA">ABA</option>
+                        <option value="ABA" selected>ABA</option>
                         <option value="BANK">Bank Transfer</option>
                         <option value="OTHER">Other</option>
                     </select>
@@ -443,244 +646,567 @@
 
                 <div class="field">
                     <label>Reference</label>
-                    <input class="form-control" type="text" name="reference" placeholder="ABA / bank reference">
+
+                    <input
+                        class="form-control"
+                        type="text"
+                        name="reference"
+                        placeholder="ABA / bank reference"
+                    >
                 </div>
 
                 <div class="field full">
                     <label>Note</label>
-                    <textarea class="form-control" name="note" rows="3" placeholder="Optional note"></textarea>
+
+                    <textarea
+                        class="form-control"
+                        name="note"
+                        rows="3"
+                        placeholder="Optional note"
+                    ></textarea>
                 </div>
+
             </div>
 
             <div class="calc-box">
+
                 <div class="calc-row">
                     <span>Base Salary</span>
                     <strong id="finalBase">$0.00</strong>
                 </div>
+
                 <div class="calc-row">
                     <span>First Paid</span>
                     <strong id="finalFirst">$0.00</strong>
                 </div>
+
                 <div class="calc-row">
                     <span>Remaining Base Salary</span>
                     <strong id="finalRemaining">$0.00</strong>
                 </div>
+
                 <div class="calc-row">
                     <span>Commission</span>
                     <strong id="finalCommission">$0.00</strong>
                 </div>
+
                 <div class="calc-row">
                     <span>Bonus</span>
                     <strong id="finalBonus">$0.00</strong>
                 </div>
+
                 <div class="calc-row">
                     <span>Deduction</span>
                     <strong id="finalDeduction">-$0.00</strong>
                 </div>
+
                 <div class="calc-row total">
                     <span>Final Due</span>
                     <strong id="finalDue">$0.00</strong>
                 </div>
+
             </div>
 
             <div class="modal-actions">
-                <button type="button" class="btn-light modal-close">Cancel</button>
-                <button class="btn-primary">Confirm Final Payment</button>
+
+                <button
+                    type="button"
+                    class="btn-light modal-close"
+                >
+                    Cancel
+                </button>
+
+                <button class="btn-primary">
+                    Confirm Final Payment
+                </button>
+
             </div>
         </form>
+
     </div>
 </div>
 
 
-<!-- SALARY HISTORY MODAL -->
+<!-- =========================================================
+     SALARY HISTORY MODAL
+========================================================== -->
+
 <div class="modal" id="historyModal">
     <div class="modal-card">
+
         <div class="modal-head">
             <div>
                 <h2>Salary History</h2>
                 <p>Old salary records are kept permanently.</p>
             </div>
-            <button type="button" class="close-btn modal-close">×</button>
+
+            <button
+                type="button"
+                class="close-btn modal-close"
+            >
+                ×
+            </button>
         </div>
 
         <div id="historyContent"></div>
 
         <div class="modal-actions">
-            <button type="button" class="btn-light modal-close">Close</button>
+            <button
+                type="button"
+                class="btn-light modal-close"
+            >
+                Close
+            </button>
         </div>
+
     </div>
 </div>
 
 
 <script>
 document.addEventListener("DOMContentLoaded", function () {
-    const salaryModal = document.getElementById("salaryModal");
-    const firstModal = document.getElementById("firstModal");
-    const finalModal = document.getElementById("finalModal");
-    const historyModal = document.getElementById("historyModal");
+
+    const salaryModal =
+        document.getElementById("salaryModal");
+
+    const firstModal =
+        document.getElementById("firstModal");
+
+    const finalModal =
+        document.getElementById("finalModal");
+
+    const historyModal =
+        document.getElementById("historyModal");
+
 
     function openModal(modal) {
-        if (modal) modal.classList.add("open");
+        if (modal) {
+            modal.classList.add("open");
+        }
     }
+
 
     function closeModals() {
-        document.querySelectorAll(".modal.open").forEach(function (modal) {
-            modal.classList.remove("open");
-        });
+        document
+            .querySelectorAll(".modal.open")
+            .forEach(function (modal) {
+                modal.classList.remove("open");
+            });
     }
 
-    document.querySelectorAll(".modal-close").forEach(function (button) {
-        button.addEventListener("click", closeModals);
-    });
 
-    document.querySelectorAll(".modal").forEach(function (modal) {
-        modal.addEventListener("click", function (event) {
-            if (event.target === modal) closeModals();
+    document
+        .querySelectorAll(".modal-close")
+        .forEach(function (button) {
+
+            button.addEventListener(
+                "click",
+                closeModals
+            );
+
         });
-    });
 
-    document.addEventListener("keydown", function (event) {
-        if (event.key === "Escape") closeModals();
-    });
 
-    document.querySelectorAll(".salary-btn").forEach(function (button) {
-        button.addEventListener("click", function () {
-            const staffId = button.dataset.staffId;
-            const staffName = button.dataset.staffName;
+    document
+        .querySelectorAll(".modal")
+        .forEach(function (modal) {
 
-            document.getElementById("salaryStaffName").textContent = staffName;
-            document.getElementById("salaryForm").action =
-                "/staff-payroll/" + staffId + "/salary/";
+            modal.addEventListener(
+                "click",
+                function (event) {
 
-            openModal(salaryModal);
+                    if (event.target === modal) {
+                        closeModals();
+                    }
+
+                }
+            );
+
         });
-    });
+
+
+    document.addEventListener(
+        "keydown",
+        function (event) {
+
+            if (event.key === "Escape") {
+                closeModals();
+            }
+
+        }
+    );
+
+
+    /* =========================================================
+       SET / UPGRADE SALARY
+    ========================================================== */
+
+    document
+        .querySelectorAll(".salary-btn")
+        .forEach(function (button) {
+
+            button.addEventListener(
+                "click",
+                function () {
+
+                    const staffId =
+                        button.dataset.staffId;
+
+                    const staffName =
+                        button.dataset.staffName;
+
+                    document
+                        .getElementById("salaryStaffName")
+                        .textContent = staffName;
+
+                    document
+                        .getElementById("salaryForm")
+                        .action =
+                            "/staff-payroll/" +
+                            staffId +
+                            "/salary/";
+
+                    openModal(
+                        salaryModal
+                    );
+                }
+            );
+
+        });
+
+
+    /* =========================================================
+       FIRST PAYMENT
+    ========================================================== */
 
     let firstBaseValue = 0;
 
+
     function refreshFirstCalculation() {
-        const entered = Number(document.getElementById("firstAmount").value || 0);
-        const remaining = Math.max(firstBaseValue - entered, 0);
 
-        document.getElementById("firstBase").textContent =
-            "$" + firstBaseValue.toFixed(2);
+        const entered =
+            Number(
+                document
+                    .getElementById("firstAmount")
+                    .value || 0
+            );
 
-        document.getElementById("firstEntered").textContent =
-            "$" + entered.toFixed(2);
+        const remaining =
+            Math.max(
+                firstBaseValue - entered,
+                0
+            );
 
-        document.getElementById("firstRemaining").textContent =
-            "$" + remaining.toFixed(2);
+        document
+            .getElementById("firstBase")
+            .textContent =
+                "$" +
+                firstBaseValue.toFixed(2);
+
+        document
+            .getElementById("firstEntered")
+            .textContent =
+                "$" +
+                entered.toFixed(2);
+
+        document
+            .getElementById("firstRemaining")
+            .textContent =
+                "$" +
+                remaining.toFixed(2);
     }
 
-    document.getElementById("firstAmount").addEventListener(
-        "input",
-        refreshFirstCalculation
-    );
 
-    document.querySelectorAll(".first-btn").forEach(function (button) {
-        button.addEventListener("click", function () {
-            if (button.disabled) return;
+    document
+        .getElementById("firstAmount")
+        .addEventListener(
+            "input",
+            refreshFirstCalculation
+        );
 
-            const staffId = button.dataset.staffId;
-            const staffName = button.dataset.staffName;
 
-            firstBaseValue = Number(button.dataset.base || 0);
+    document
+        .querySelectorAll(".first-btn")
+        .forEach(function (button) {
 
-            document.getElementById("firstStaffName").textContent =
-                staffName + " · {{ month_name }} {{ year }}";
+            button.addEventListener(
+                "click",
+                function () {
 
-            document.getElementById("firstForm").action =
-                "/staff-payroll/" + staffId + "/first-payment/";
+                    if (button.disabled) {
+                        return;
+                    }
 
-            document.getElementById("firstAmount").value = "";
+                    const staffId =
+                        button.dataset.staffId;
 
-            refreshFirstCalculation();
-            openModal(firstModal);
+                    const staffName =
+                        button.dataset.staffName;
+
+                    firstBaseValue =
+                        Number(
+                            button.dataset.base || 0
+                        );
+
+                    document
+                        .getElementById("firstStaffName")
+                        .textContent =
+                            staffName +
+                            " · {{ month_name }} {{ year }}";
+
+                    document
+                        .getElementById("firstForm")
+                        .action =
+                            "/staff-payroll/" +
+                            staffId +
+                            "/first-payment/";
+
+                    /*
+                     * DEFAULT FIRST PAYMENT
+                     *
+                     * Base Salary / 2
+                     *
+                     * Example:
+                     * $250 / 2 = $125
+                     *
+                     * This is only a default.
+                     * The user can still type another amount.
+                     */
+                    document
+                        .getElementById("firstAmount")
+                        .value =
+                            (
+                                firstBaseValue / 2
+                            ).toFixed(2);
+
+                    /*
+                     * Reset the default method to ABA each time
+                     * the Pay First modal opens.
+                     *
+                     * Still editable by the user.
+                     */
+                    document
+                        .getElementById("firstPaymentMethod")
+                        .value = "ABA";
+
+                    refreshFirstCalculation();
+
+                    openModal(
+                        firstModal
+                    );
+                }
+            );
+
         });
-    });
+
+
+    /* =========================================================
+       FINAL PAYMENT
+    ========================================================== */
 
     let finalBaseValue = 0;
     let finalFirstValue = 0;
     let finalRemainingValue = 0;
 
+
     function numberValue(id) {
-        return Number(document.getElementById(id).value || 0);
-    }
 
-    function refreshFinalCalculation() {
-        const commission = numberValue("commissionInput");
-        const bonus = numberValue("bonusInput");
-        const deduction = numberValue("deductionInput");
-
-        const due = Math.max(
-            finalRemainingValue + commission + bonus - deduction,
-            0
+        return Number(
+            document
+                .getElementById(id)
+                .value || 0
         );
 
-        document.getElementById("finalBase").textContent =
-            "$" + finalBaseValue.toFixed(2);
-
-        document.getElementById("finalFirst").textContent =
-            "$" + finalFirstValue.toFixed(2);
-
-        document.getElementById("finalRemaining").textContent =
-            "$" + finalRemainingValue.toFixed(2);
-
-        document.getElementById("finalCommission").textContent =
-            "$" + commission.toFixed(2);
-
-        document.getElementById("finalBonus").textContent =
-            "$" + bonus.toFixed(2);
-
-        document.getElementById("finalDeduction").textContent =
-            "-$" + deduction.toFixed(2);
-
-        document.getElementById("finalDue").textContent =
-            "$" + due.toFixed(2);
     }
 
-    document.querySelectorAll(".final-calc").forEach(function (input) {
-        input.addEventListener("input", refreshFinalCalculation);
-    });
 
-    document.querySelectorAll(".final-btn").forEach(function (button) {
-        button.addEventListener("click", function () {
-            if (button.disabled) return;
+    function refreshFinalCalculation() {
 
-            const staffId = button.dataset.staffId;
-            const staffName = button.dataset.staffName;
-
-            finalBaseValue = Number(button.dataset.base || 0);
-            finalFirstValue = Number(button.dataset.first || 0);
-            finalRemainingValue = Number(button.dataset.remaining || 0);
-
-            document.getElementById("finalStaffName").textContent =
-                staffName + " · {{ month_name }} {{ year }}";
-
-            document.getElementById("finalForm").action =
-                "/staff-payroll/" + staffId + "/final-payment/";
-
-            document.getElementById("commissionInput").value = "0.00";
-            document.getElementById("bonusInput").value = "0.00";
-            document.getElementById("deductionInput").value = "0.00";
-
-            refreshFinalCalculation();
-            openModal(finalModal);
-        });
-    });
-
-    document.querySelectorAll(".history-btn").forEach(function (button) {
-        button.addEventListener("click", function () {
-            const source = document.getElementById(
-                button.dataset.historyTarget
+        const commission =
+            numberValue(
+                "commissionInput"
             );
 
-            document.getElementById("historyContent").innerHTML =
-                source ? source.innerHTML : "<div class='empty'>No salary history.</div>";
+        const bonus =
+            numberValue(
+                "bonusInput"
+            );
 
-            openModal(historyModal);
+        const deduction =
+            numberValue(
+                "deductionInput"
+            );
+
+        const due =
+            Math.max(
+                finalRemainingValue +
+                commission +
+                bonus -
+                deduction,
+                0
+            );
+
+        document
+            .getElementById("finalBase")
+            .textContent =
+                "$" +
+                finalBaseValue.toFixed(2);
+
+        document
+            .getElementById("finalFirst")
+            .textContent =
+                "$" +
+                finalFirstValue.toFixed(2);
+
+        document
+            .getElementById("finalRemaining")
+            .textContent =
+                "$" +
+                finalRemainingValue.toFixed(2);
+
+        document
+            .getElementById("finalCommission")
+            .textContent =
+                "$" +
+                commission.toFixed(2);
+
+        document
+            .getElementById("finalBonus")
+            .textContent =
+                "$" +
+                bonus.toFixed(2);
+
+        document
+            .getElementById("finalDeduction")
+            .textContent =
+                "-$" +
+                deduction.toFixed(2);
+
+        document
+            .getElementById("finalDue")
+            .textContent =
+                "$" +
+                due.toFixed(2);
+
+    }
+
+
+    document
+        .querySelectorAll(".final-calc")
+        .forEach(function (input) {
+
+            input.addEventListener(
+                "input",
+                refreshFinalCalculation
+            );
+
         });
-    });
+
+
+    document
+        .querySelectorAll(".final-btn")
+        .forEach(function (button) {
+
+            button.addEventListener(
+                "click",
+                function () {
+
+                    if (button.disabled) {
+                        return;
+                    }
+
+                    const staffId =
+                        button.dataset.staffId;
+
+                    const staffName =
+                        button.dataset.staffName;
+
+                    finalBaseValue =
+                        Number(
+                            button.dataset.base || 0
+                        );
+
+                    finalFirstValue =
+                        Number(
+                            button.dataset.first || 0
+                        );
+
+                    finalRemainingValue =
+                        Number(
+                            button.dataset.remaining || 0
+                        );
+
+                    document
+                        .getElementById("finalStaffName")
+                        .textContent =
+                            staffName +
+                            " · {{ month_name }} {{ year }}";
+
+                    document
+                        .getElementById("finalForm")
+                        .action =
+                            "/staff-payroll/" +
+                            staffId +
+                            "/final-payment/";
+
+                    document
+                        .getElementById("commissionInput")
+                        .value = "0.00";
+
+                    document
+                        .getElementById("bonusInput")
+                        .value = "0.00";
+
+                    document
+                        .getElementById("deductionInput")
+                        .value = "0.00";
+
+                    refreshFinalCalculation();
+
+                    openModal(
+                        finalModal
+                    );
+
+                }
+            );
+
+        });
+
+
+    /* =========================================================
+       SALARY HISTORY
+    ========================================================== */
+
+    document
+        .querySelectorAll(".history-btn")
+        .forEach(function (button) {
+
+            button.addEventListener(
+                "click",
+                function () {
+
+                    const source =
+                        document.getElementById(
+                            button.dataset.historyTarget
+                        );
+
+                    document
+                        .getElementById("historyContent")
+                        .innerHTML =
+                            source
+                                ? source.innerHTML
+                                : "<div class='empty'>No salary history.</div>";
+
+                    openModal(
+                        historyModal
+                    );
+
+                }
+            );
+
+        });
+
 });
 </script>
+
 {% endblock %}
