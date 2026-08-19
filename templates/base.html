@@ -1707,19 +1707,19 @@
 
                     <div class="nav-submenu" id="menu-users">
                         {% if perms.auth.view_user %}
-                        <a class="nav-link" href="/users/">
+                        <a class="nav-link" href="{% url 'user_list' %}">
                             <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"/><path d="M3 20v-1a5 5 0 0 1 5-5h1a5 5 0 0 1 5 5v1M16 8h5M18.5 5.5v5"/></svg></span>
                             <span>User List</span>
                         </a>
                         {% endif %}
                         {% if perms.auth.view_group %}
-                        <a class="nav-link" href="/users/roles/">
+                        <a class="nav-link" href="{% url 'role_list' %}">
                             <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.8 3 8 7 10 4-2 7-5.2 7-10V6l-7-3Z"/><path d="m9 12 2 2 4-4"/></svg></span>
                             <span>Roles</span>
                         </a>
                         {% endif %}
                         {% if perms.auth.view_permission %}
-                        <a class="nav-link" href="/users/permissions/">
+                        <a class="nav-link" href="{% url 'permission_list' %}">
                             <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><circle cx="8" cy="12" r="4"/><path d="M12 12h9M18 12v3M15 12v2"/></svg></span>
                             <span>Permissions</span>
                         </a>
