@@ -1,5 +1,5 @@
 {% load static %}
-{% static 'img/niron-logo.png' as niron_logo_url %}
+{% static 'img/niron-app-icon-512.png' as niron_logo_url %}
 {% static 'img/niron-app-icon-180.png' as niron_icon_180_url %}
 {% static 'img/niron-app-icon-192.png' as niron_icon_192_url %}
 {% static 'img/niron-app-icon-512.png' as niron_icon_512_url %}
@@ -1586,7 +1586,7 @@
                             <span>Sewing Partner Payments</span>
                         </a>
                         {% endif %}
-                        {% if perms.production.manage_production_payments and production_staff_payment_url %}
+                        {% if user.is_superuser and production_staff_payment_url %}
                         <a class="nav-link" href="{{ production_staff_payment_url }}">
                             <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"/><path d="M3 20v-1a5 5 0 0 1 10 0v1M16 9h5M18 6l3 3-3 3"/></svg></span>
                             <span>Staff Salary & Commission</span>
