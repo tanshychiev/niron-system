@@ -30,13 +30,22 @@ urlpatterns = [
     path("customers/", include("customers.urls")),
 ]
 
+
+# Serve static + media files while DEBUG=True
 if settings.DEBUG:
+    urlpatterns += static(
+        settings.STATIC_URL,
+        document_root=settings.STATIC_ROOT,
+    )
+
     urlpatterns += static(
         settings.MEDIA_URL,
         document_root=settings.MEDIA_ROOT,
     )
 
-# Keep this last. Any unknown URL goes back to Inventory.
+
+# Keep this LAST.
+# Any unknown URL goes back to Inventory.
 urlpatterns += [
     re_path(
         r"^(?P<unmatched_path>.*)$",
