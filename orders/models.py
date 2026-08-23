@@ -114,6 +114,23 @@ class Order(models.Model):
     total_pcs = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     done_pcs = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
+    # Internal film usage for COS/profit reporting.
+    # This is NEVER customer-facing and is separate from OrderItem.film_meter,
+    # which is the sold quantity for Film Only orders.
+    production_film_meter = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal("0.00"),
+    )
+    production_film_recorded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="orders_film_meter_recorded",
+    )
+    production_film_recorded_at = models.DateTimeField(null=True, blank=True)
+
     # ===== TRASH SYSTEM =====
     is_deleted = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
@@ -161,6 +178,20 @@ class Order(models.Model):
     @property
     def remaining_pcs(self):
         return (self.total_pcs or Decimal("0")) - (self.done_pcs or Decimal("0"))
+
+    @property
+    def requires_production_film_meter(self):
+        return self.service_type in {
+            self.SERVICE_FULL,
+            self.SERVICE_PRINT_HEATPRESS,
+        }
+
+    @property
+    def production_film_missing(self):
+        return (
+            self.requires_production_film_meter
+            and Decimal(self.production_film_meter or 0) <= 0
+        )
 
     @staticmethod
     def generate_order_no():

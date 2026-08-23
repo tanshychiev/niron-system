@@ -47,6 +47,60 @@ from .stock_ledger import (
 logger = logging.getLogger(__name__)
 
 
+def _can_view_stock_cost(user):
+    """Only users with Finance expense view permission see actual cost amounts."""
+    return bool(
+        user
+        and user.is_authenticated
+        and (user.is_superuser or user.has_perm("finance.view_expense"))
+    )
+
+
+def _sync_inventory_batch_expense(batch, user):
+    """One Finance Expense per InventoryBatch; update it instead of duplicating."""
+    expense, _ = Expense.objects.get_or_create(
+        expense_type=Expense.TYPE_BATCH,
+        batch=batch,
+        defaults={
+            "created_by": user,
+            "batch_created_at": batch.created_at,
+            "stock_source_type": Expense.SOURCE_INVENTORY,
+            "source_reference": batch.batch_no,
+        },
+    )
+    expense.batch_created_at = batch.created_at
+    expense.batch_total_cloth = int(batch.total_cloth or 0)
+    expense.batch_cost = batch.total_goods_cost or Decimal("0.00")
+    expense.batch_delivery_fee = batch.shipping_cost or Decimal("0.00")
+    expense.batch_other_fee = batch.extra_cost or Decimal("0.00")
+    expense.amount = expense.batch_cost + expense.batch_delivery_fee + expense.batch_other_fee
+    expense.stock_source_type = Expense.SOURCE_INVENTORY
+    expense.source_reference = batch.batch_no
+    expense.supplier_name = batch.supplier_name
+    expense.received_date = batch.received_date if batch.status == InventoryBatch.STATUS_RECEIVED else None
+    expense.expense_status = (
+        Expense.STATUS_COMPLETED if batch.cost_is_added else Expense.STATUS_PENDING
+    )
+    expense.note = (
+        f"Cost added from Stock In {batch.batch_no}."
+        if batch.cost_is_added
+        else f"Auto-created from Stock In {batch.batch_no}. Cost pending."
+    )
+    expense.save()
+    return expense
+
+
+def _apply_batch_cost_from_post(batch, request):
+    """Save a cost entered by staff/admin. The template controls later visibility."""
+    batch.total_goods_cost = Decimal(request.POST.get("total_goods_cost") or "0")
+    batch.shipping_cost = Decimal(request.POST.get("shipping_cost") or "0")
+    batch.extra_cost = Decimal(request.POST.get("extra_cost") or "0")
+    batch.cost_is_added = True
+    batch.cost_added_at = timezone.now()
+    batch.cost_added_by = request.user
+
+
+
 def _to_int(value):
     if value is None:
         return 0
@@ -835,31 +889,21 @@ def inventory_batch_create(request):
     if stock_type not in {"cloth", "printing", "fabric"}:
         stock_type = "cloth"
 
-    # ---------------------------------------------------------
-    # FABRIC: save through the existing Production receipt/roll
-    # models so no duplicate fabric stock system is created.
-    # ---------------------------------------------------------
+    # Fabric keeps the existing direct Stock In flow. Purchase/Coming Soon is only
+    # for InventoryBatch purchases (Cloth / Printing Material), as requested.
     if stock_type == "fabric":
         if request.method == "POST":
             fabric_header_form = FabricReceiptHeaderForm(request.POST)
-            fabric_formset = fabric_receipt_line_formset(
-                data=request.POST,
-                user=request.user,
-                prefix="fabric_items",
-            )
-
+            fabric_formset = fabric_receipt_line_formset(data=request.POST, user=request.user, prefix="fabric_items")
             if fabric_header_form.is_valid() and fabric_formset.is_valid():
                 total_rolls = 0
                 saved_lines = 0
                 created_receipts = []
-
                 for line_form in fabric_formset:
                     if not line_form.cleaned_data or line_form.cleaned_data.get("DELETE"):
                         continue
-
                     data = line_form.cleaned_data
                     supplier = fabric_header_form.cleaned_data["supplier"]
-
                     fabric_type = data["fabric_type"]
                     receipt = FabricReceipt(
                         received_date=fabric_header_form.cleaned_data["received_date"],
@@ -878,12 +922,9 @@ def inventory_batch_create(request):
                     )
                     receipt.save()
                     create_fabric_rolls(receipt)
-
                     created_receipts.append(receipt)
                     total_rolls += receipt.roll_count
                     saved_lines += 1
-
-                finance_warning = ""
                 try:
                     _create_pending_fabric_expense(
                         created_receipts,
@@ -892,301 +933,380 @@ def inventory_batch_create(request):
                         request.user,
                     )
                 except Exception:
-                    logger.exception(
-                        "Fabric Stock In saved, but Finance expense sync failed."
-                    )
-                    finance_warning = (
-                        " Stock was saved, but Finance expense sync needs review."
-                    )
-
-                message = (
-                    f"{total_rolls} fabric roll(s) across "
-                    f"{saved_lines} fabric type(s) received successfully."
-                    f"{finance_warning}"
-                )
-
+                    logger.exception("Fabric Stock In saved, but Finance expense sync failed.")
+                message = f"{total_rolls} fabric roll(s) across {saved_lines} fabric type(s) received successfully."
                 if request.headers.get("x-requested-with") == "XMLHttpRequest":
-                    return JsonResponse(
-                        {
-                            "ok": True,
-                            "message": message,
-                            "detail_url": (
-                                f"/production/fabric-receipts/{created_receipts[0].pk}/edit/"
-                                if created_receipts
-                                else "/inventory/?type=fabric"
-                            ),
-                        }
-                    )
-
+                    return JsonResponse({
+                        "ok": True,
+                        "message": message,
+                        "detail_url": f"/production/fabric-receipts/{created_receipts[0].pk}/edit/" if created_receipts else "/inventory/?type=fabric",
+                    })
                 messages.success(request, message)
                 return redirect("/inventory/?type=fabric")
 
             if request.headers.get("x-requested-with") == "XMLHttpRequest":
                 transaction.set_rollback(True)
-
-                field_errors = {}
-                for name, errors in fabric_header_form.errors.items():
-                    field_errors[f"id_{name}"] = [str(error) for error in errors]
-
+                field_errors = {f"id_{name}": [str(e) for e in errors] for name, errors in fabric_header_form.errors.items()}
                 row_errors = {}
                 for index, row_form in enumerate(fabric_formset.forms):
                     for name, errors in row_form.errors.items():
-                        row_errors[f"id_fabric_items-{index}-{name}"] = [
-                            str(error) for error in errors
-                        ]
-
-                first = (
-                    next(iter(field_errors.values()), None)
-                    or next(iter(row_errors.values()), None)
-                )
+                        row_errors[f"id_fabric_items-{index}-{name}"] = [str(e) for e in errors]
+                first = next(iter(field_errors.values()), None) or next(iter(row_errors.values()), None)
                 message = first[0] if first else "Please check the highlighted fields."
-
-                return JsonResponse(
-                    {
-                        "ok": False,
-                        "message": f"Failed: {message}",
-                        "field_errors": field_errors,
-                        "row_errors": row_errors,
-                    },
-                    status=400,
-                )
+                return JsonResponse({"ok": False, "message": f"Failed: {message}", "field_errors": field_errors, "row_errors": row_errors}, status=400)
         else:
-            fabric_header_form = FabricReceiptHeaderForm(
-                initial={"received_date": timezone.localdate()}
-            )
-            fabric_formset = fabric_receipt_line_formset(
-                user=request.user,
-                prefix="fabric_items",
-            )
+            fabric_header_form = FabricReceiptHeaderForm(initial={"received_date": timezone.localdate()})
+            fabric_formset = fabric_receipt_line_formset(user=request.user, prefix="fabric_items")
 
-        # Keep the ordinary forms available because the template contains both modes.
         form = InventoryBatchForm(initial={"received_date": timezone.localdate()})
         formset = InventoryBatchItemFormSet(prefix="items")
+        return render(request, "inventory/inventory_batch_form.html", {
+            "form": form,
+            "formset": formset,
+            "fabric_header_form": fabric_header_form,
+            "fabric_formset": fabric_formset,
+            "stock_type": "fabric",
+            "page_title": "Stock In",
+            "submit_label": "Save Fabric Batch",
+            "items": InventoryItem.objects.filter(is_active=True).order_by("code", "name"),
+            "can_view_stock_cost": _can_view_stock_cost(request.user),
+        })
 
-        return render(
-            request,
-            "inventory/inventory_batch_form.html",
-            {
-                "form": form,
-                "formset": formset,
-                "fabric_header_form": fabric_header_form,
-                "fabric_formset": fabric_formset,
-                "stock_type": "fabric",
-                "page_title": "Stock In",
-                "submit_label": "Save Fabric Batch",
-                "items": InventoryItem.objects.filter(is_active=True).order_by("code", "name"),
-            },
-        )
-
-    # ---------------------------------------------------------
-    # CLOTH / PRINTING MATERIAL: existing inventory batch logic.
-    # ---------------------------------------------------------
+    # Cloth / Printing Material
     if request.method == "POST":
         form = InventoryBatchForm(request.POST)
         formset = InventoryBatchItemFormSet(request.POST, prefix="items")
-
         if form.is_valid() and formset.is_valid():
+            submit_action = (request.POST.get("submit_action") or "stock_in_now").strip()
+            is_purchase = submit_action == "save_purchase"
+
             batch = form.save(commit=False)
-            # Warehouse staff do not enter or see purchase cost. Finance fills it later.
-            batch.total_goods_cost = Decimal("0.00")
-            batch.shipping_cost = Decimal("0.00")
-            batch.extra_cost = Decimal("0.00")
+            batch.status = InventoryBatch.STATUS_COMING_SOON if is_purchase else InventoryBatch.STATUS_RECEIVED
+            batch.expected_date = form.cleaned_data.get("received_date") if is_purchase else None
+            batch.received_at = None if is_purchase else timezone.now()
+            batch.received_by = None if is_purchase else request.user
 
-            if request.user.is_authenticated:
-                batch.created_by = request.user
-                batch.updated_by = request.user
+            # Cost entry is optional at creation. If Add Cost was not opened, keep Pending Cost.
+            cost_was_added = request.POST.get("cost_is_added") == "1"
+            if cost_was_added:
+                batch.cost_is_added = True
+                batch.cost_added_at = timezone.now()
+                batch.cost_added_by = request.user
+            else:
+                batch.total_goods_cost = Decimal("0.00")
+                batch.shipping_cost = Decimal("0.00")
+                batch.extra_cost = Decimal("0.00")
+                batch.cost_is_added = False
+                batch.cost_added_at = None
+                batch.cost_added_by = None
 
+            batch.created_by = request.user
+            batch.updated_by = request.user
             batch.save()
 
             formset.instance = batch
             items = formset.save(commit=False)
-
             for obj in formset.deleted_objects:
                 obj.delete()
 
             for item in items:
                 if not item.item:
                     continue
-
                 item.batch = batch
-                item.base_unit_cost = 0
-                item.final_unit_cost = 0
+                item.base_unit_cost = Decimal("0")
+                item.final_unit_cost = Decimal("0")
                 item.is_active = True
-
-                if not item.qty_remaining:
-                    item.qty_remaining = item.qty_received
-
+                # Coming Soon quantity exists as purchase qty, but available stock must remain zero.
+                item.qty_remaining = Decimal("0") if is_purchase else item.qty_received
                 item.save()
-
-                log_stock_in(
-                    batch_item=item,
-                    qty_before=Decimal("0"),
-                    qty_after=item.qty_remaining,
-                    batch=batch,
-                    user=request.user,
-                    remark=f"Stock in from batch {batch.batch_no}",
-                )
+                if not is_purchase:
+                    log_stock_in(
+                        batch_item=item,
+                        qty_before=Decimal("0"),
+                        qty_after=item.qty_remaining,
+                        batch=batch,
+                        user=request.user,
+                        remark=f"Stock in from batch {batch.batch_no}",
+                    )
 
             _log_batch_history(
                 batch,
                 InventoryBatchHistory.ACTION_CREATE,
                 request.user,
-                "Batch created",
+                "Purchase saved - waiting to receive" if is_purchase else "Stock In received",
             )
-            finance_warning = ""
             try:
-                pending_expense = _create_pending_inventory_expense(
-                    batch,
-                    request.user,
-                )
-                if pending_expense:
-                    pending_expense.note = (
-                        f"Auto-created from {stock_type.title()} Stock In. "
-                        "Cost pending."
-                    )
-                    pending_expense.save(update_fields=["note"])
+                _sync_inventory_batch_expense(batch, request.user)
             except Exception:
-                logger.exception(
-                    "%s Stock In saved, but Finance expense sync failed.",
-                    stock_type,
-                )
-                finance_warning = (
-                    " Stock was saved, but Finance expense sync needs review."
-                )
+                logger.exception("Stock In saved, but Finance expense sync failed.")
+
+            if is_purchase:
+                message = f"Purchase {batch.batch_no} saved as Coming Soon. Stock has not increased."
+            else:
+                message = f"Inventory batch {batch.batch_no} received and stock added successfully."
 
             if request.headers.get("x-requested-with") == "XMLHttpRequest":
-                return JsonResponse(
-                    {
-                        "ok": True,
-                        "message": (
-                            f"Inventory batch {batch.batch_no} created successfully."
-                            f"{finance_warning}"
-                        ),
-                        "detail_url": f"/inventory/batches/{batch.pk}/",
-                    }
-                )
-
-            messages.success(request, f"Inventory batch {batch.batch_no} created.")
+                return JsonResponse({"ok": True, "message": message, "detail_url": f"/inventory/batches/{batch.pk}/"})
+            messages.success(request, message)
             return redirect("inventory_batch_detail", pk=batch.pk)
 
         if request.headers.get("x-requested-with") == "XMLHttpRequest":
             transaction.set_rollback(True)
-            return JsonResponse(_form_error_payload(form, formset), status=400)
+            field_errors = {f"id_{name}": [str(e) for e in errors] for name, errors in form.errors.items()}
+            row_errors = {}
+            for index, row_form in enumerate(formset.forms):
+                for name, errors in row_form.errors.items():
+                    row_errors[f"id_items-{index}-{name}"] = [str(e) for e in errors]
+            first = next(iter(field_errors.values()), None) or next(iter(row_errors.values()), None)
+            message = first[0] if first else "Please check the highlighted fields."
+            return JsonResponse({"ok": False, "message": f"Failed: {message}", "field_errors": field_errors, "row_errors": row_errors}, status=400)
     else:
         form = InventoryBatchForm(initial={"received_date": timezone.localdate()})
         formset = InventoryBatchItemFormSet(prefix="items")
 
-    fabric_header_form = FabricReceiptHeaderForm(
-        initial={"received_date": timezone.localdate()}
-    )
-    fabric_formset = fabric_receipt_line_formset(
-        user=request.user,
-        prefix="fabric_items",
-    )
+    fabric_header_form = FabricReceiptHeaderForm(initial={"received_date": timezone.localdate()})
+    fabric_formset = fabric_receipt_line_formset(user=request.user, prefix="fabric_items")
+    return render(request, "inventory/inventory_batch_form.html", {
+        "form": form,
+        "formset": formset,
+        "fabric_header_form": fabric_header_form,
+        "fabric_formset": fabric_formset,
+        "stock_type": stock_type,
+        "page_title": "Stock In",
+        "submit_label": "Stock In Now",
+        "items": InventoryItem.objects.filter(is_active=True).order_by("code", "name"),
+        "can_view_stock_cost": _can_view_stock_cost(request.user),
+    })
 
-    return render(
-        request,
-        "inventory/inventory_batch_form.html",
-        {
-            "form": form,
-            "formset": formset,
-            "fabric_header_form": fabric_header_form,
-            "fabric_formset": fabric_formset,
-            "stock_type": stock_type,
-            "page_title": "Stock In",
-            "submit_label": "Save Batch",
-            "items": InventoryItem.objects.filter(is_active=True).order_by("code", "name"),
-        },
-    )
+
+@login_required
+@permission_required("inventory.view_inventorybatch", raise_exception=True)
+def inventory_stock_in_list(request):
+    status = (request.GET.get("status") or "all").strip().upper()
+    q = (request.GET.get("q") or "").strip()
+    batches = InventoryBatch.objects.filter(is_deleted=False).select_related(
+        "supplier_ref", "created_by", "received_by", "cost_added_by"
+    ).prefetch_related("items__item", "items__color", "items__size")
+    if status in {InventoryBatch.STATUS_COMING_SOON, InventoryBatch.STATUS_RECEIVED}:
+        batches = batches.filter(status=status)
+    if q:
+        batches = batches.filter(
+            Q(batch_no__icontains=q) |
+            Q(supplier__icontains=q) |
+            Q(supplier_ref__name__icontains=q) |
+            Q(items__item__name__icontains=q) |
+            Q(items__item__code__icontains=q)
+        ).distinct()
+    batches = batches.order_by("-created_at", "-id")
+    return render(request, "inventory/stock_in_list.html", {
+        "batches": batches[:500],
+        "status_filter": status,
+        "q": q,
+        "can_view_stock_cost": _can_view_stock_cost(request.user),
+    })
+
+
+@login_required
+@permission_required("inventory.change_inventorybatch", raise_exception=True)
+@transaction.atomic
+def inventory_batch_confirm_received(request, pk):
+    batch = get_object_or_404(InventoryBatch.objects.select_for_update(), pk=pk, is_deleted=False)
+    if request.method != "POST":
+        return redirect("inventory_stock_in_list")
+    if batch.status != InventoryBatch.STATUS_COMING_SOON:
+        messages.info(request, "This batch is already received.")
+        return redirect("inventory_stock_in_list")
+
+    rows = list(batch.items.select_for_update().filter(is_active=True))
+    for row in rows:
+        before = Decimal(row.qty_remaining or 0)
+        row.qty_remaining = Decimal(row.qty_received or 0)
+        row.save(update_fields=["qty_remaining"])
+        log_stock_in(
+            batch_item=row,
+            qty_before=before,
+            qty_after=row.qty_remaining,
+            batch=batch,
+            user=request.user,
+            remark=f"Confirmed received from purchase {batch.batch_no}",
+        )
+
+    batch.status = InventoryBatch.STATUS_RECEIVED
+    batch.received_date = timezone.localdate()
+    batch.received_at = timezone.now()
+    batch.received_by = request.user
+    batch.updated_by = request.user
+    batch.save(update_fields=["status", "received_date", "received_at", "received_by", "updated_by", "updated_at"])
+    _log_batch_history(batch, InventoryBatchHistory.ACTION_UPDATE, request.user, "Coming Soon purchase confirmed received")
+    try:
+        _sync_inventory_batch_expense(batch, request.user)
+    except Exception:
+        logger.exception("Confirm Received succeeded, Finance sync failed for %s", batch.batch_no)
+
+    messages.success(request, f"{batch.batch_no} confirmed received. Stock has been added.")
+    return redirect("inventory_stock_in_list")
+
+
+@login_required
+@permission_required("inventory.add_inventorybatch", raise_exception=True)
+@transaction.atomic
+def inventory_batch_add_cost(request, pk):
+    """Staff can add cost once; Finance viewers/admin can also edit an existing cost."""
+    batch = get_object_or_404(InventoryBatch.objects.select_for_update(), pk=pk, is_deleted=False)
+    can_view_cost = _can_view_stock_cost(request.user)
+    if request.method != "POST":
+        return redirect("inventory_stock_in_list")
+    if batch.cost_is_added and not can_view_cost:
+        messages.error(request, "Cost is already added. Please ask Admin if it needs correction.")
+        return redirect("inventory_stock_in_list")
+
+    try:
+        _apply_batch_cost_from_post(batch, request)
+    except Exception:
+        messages.error(request, "Invalid cost amount. Please enter numbers 0 or greater.")
+        return redirect("inventory_stock_in_list")
+
+    batch.updated_by = request.user
+    batch.save(update_fields=[
+        "total_goods_cost", "shipping_cost", "extra_cost", "cost_is_added",
+        "cost_added_at", "cost_added_by", "updated_by", "updated_at"
+    ])
+    _sync_inventory_batch_expense(batch, request.user)
+    _log_batch_history(batch, InventoryBatchHistory.ACTION_UPDATE, request.user, "Cost added/updated")
+    messages.success(request, f"Cost saved for {batch.batch_no}.")
+    return redirect("inventory_stock_in_list")
 
 
 @login_required
 @permission_required("inventory.change_inventorybatch", raise_exception=True)
 @transaction.atomic
 def inventory_batch_edit(request, pk):
-    batch = get_object_or_404(InventoryBatch, pk=pk, is_deleted=False)
+    """
+    Safely edit an existing InventoryBatch.
+
+    Important:
+    - Never hard-deletes the batch.
+    - Keeps qty_remaining consistent when qty_received is edited.
+    - Does not reset existing stock usage.
+    - Keeps Finance Stock In expense synced.
+    """
+    batch = get_object_or_404(
+        InventoryBatch.objects.select_for_update(),
+        pk=pk,
+        is_deleted=False,
+    )
+
+    existing_rows = {
+        row.pk: row
+        for row in batch.items.select_for_update().all()
+    }
 
     if request.method == "POST":
         form = InventoryBatchForm(request.POST, instance=batch)
-        formset = InventoryBatchItemFormSet(request.POST, instance=batch)
+        formset = InventoryBatchItemFormSet(
+            request.POST,
+            instance=batch,
+            prefix="items",
+        )
 
         if form.is_valid() and formset.is_valid():
-            batch = form.save(commit=False)
-            if request.user.is_authenticated:
-                batch.updated_by = request.user
-            batch.save()
+            before_snapshot = _batch_snapshot(batch)
 
-            items = formset.save(commit=False)
+            batch_obj = form.save(commit=False)
+            batch_obj.updated_by = request.user
+            batch_obj.save()
 
+            # Validate deletions before applying any of them.
             for obj in formset.deleted_objects:
-                if obj.qty_used != 0:
-                    messages.error(request, "Cannot delete a row that already has stock used.")
+                old_row = existing_rows.get(obj.pk)
+                if not old_row:
+                    continue
+
+                qty_received = Decimal(old_row.qty_received or 0)
+                qty_remaining = Decimal(old_row.qty_remaining or 0)
+                qty_used = qty_received - qty_remaining
+
+                if qty_used != 0:
+                    messages.error(
+                        request,
+                        "Cannot delete a stock row that already has stock used.",
+                    )
+                    transaction.set_rollback(True)
                     return redirect("inventory_batch_edit", pk=batch.pk)
 
-                old_qty = Decimal(obj.qty_remaining or 0)
+            changed_items = formset.save(commit=False)
 
-                log_batch_delete(
-                    batch_item=obj,
-                    qty_before=old_qty,
-                    qty_after=Decimal("0"),
-                    batch=batch,
-                    user=request.user,
-                    remark=f"Batch row removed from active stock in {batch.batch_no}",
-                )
+            # Apply deletions only after validation.
+            for obj in formset.deleted_objects:
+                obj.delete()
 
-                obj.qty_remaining = Decimal("0")
-                obj.is_active = False
-                obj.save(update_fields=["qty_remaining", "is_active"])
-
-            for item in items:
+            for item in changed_items:
                 if not item.item:
                     continue
 
-                is_new = item.pk is None
-                old_qty = Decimal("0")
+                old_row = existing_rows.get(item.pk)
 
-                if not is_new:
-                    old_obj = InventoryBatchItem.objects.get(pk=item.pk)
-                    old_qty = Decimal(old_obj.qty_remaining or 0)
+                if old_row:
+                    old_received = Decimal(old_row.qty_received or 0)
+                    old_remaining = Decimal(old_row.qty_remaining or 0)
+                    used_qty = old_received - old_remaining
+                    new_received = Decimal(item.qty_received or 0)
 
-                item.batch = batch
-                item.base_unit_cost = 0
-                item.final_unit_cost = 0
+                    if new_received < used_qty:
+                        messages.error(
+                            request,
+                            (
+                                f"Cannot reduce {item.item} received quantity below "
+                                f"the quantity already used ({used_qty})."
+                            ),
+                        )
+                        transaction.set_rollback(True)
+                        return redirect("inventory_batch_edit", pk=batch.pk)
+
+                    # Preserve already-used stock and adjust only what remains.
+                    item.qty_remaining = new_received - used_qty
+                else:
+                    # New row added while editing.
+                    if batch.status == InventoryBatch.STATUS_RECEIVED:
+                        item.qty_remaining = Decimal(item.qty_received or 0)
+                    else:
+                        item.qty_remaining = Decimal("0")
+
+                item.batch = batch_obj
+                item.base_unit_cost = Decimal(item.base_unit_cost or 0)
+                item.final_unit_cost = Decimal(item.final_unit_cost or 0)
                 item.is_active = True
                 item.save()
 
-                new_qty = Decimal(item.qty_remaining or 0)
+            formset.save_m2m()
 
-                if is_new:
-                    log_stock_in(
-                        batch_item=item,
-                        qty_before=Decimal("0"),
-                        qty_after=new_qty,
-                        batch=batch,
-                        user=request.user,
-                        remark=f"New stock row added in batch {batch.batch_no}",
-                    )
-                elif new_qty != old_qty:
-                    log_batch_edit(
-                        batch_item=item,
-                        qty_before=old_qty,
-                        qty_after=new_qty,
-                        batch=batch,
-                        user=request.user,
-                        remark=f"Batch edited: {batch.batch_no}",
-                    )
+            _log_batch_history(
+                batch_obj,
+                InventoryBatchHistory.ACTION_UPDATE,
+                request.user,
+                "Batch updated",
+            )
 
-            _log_batch_history(batch, InventoryBatchHistory.ACTION_UPDATE, request.user, "Batch updated")
-            if request.headers.get("x-requested-with") == "XMLHttpRequest":
-                return JsonResponse({"ok": True, "message": f"Batch {batch.batch_no} updated successfully.", "redirect_url": f"/inventory/batches/{batch.pk}/"})
-            messages.success(request, f"Batch {batch.batch_no} updated.")
-            return redirect("inventory_batch_detail", pk=batch.pk)
-        if request.headers.get("x-requested-with") == "XMLHttpRequest":
-            transaction.set_rollback(True)
-            return JsonResponse(_form_error_payload(form, formset), status=400)
+            try:
+                _sync_inventory_batch_expense(batch_obj, request.user)
+            except Exception:
+                logger.exception(
+                    "Inventory batch updated, but Finance expense sync failed for %s",
+                    batch_obj.batch_no,
+                )
+
+            messages.success(
+                request,
+                f"Batch {batch_obj.batch_no} updated successfully.",
+            )
+            return redirect("inventory_batch_detail", pk=batch_obj.pk)
+
     else:
         form = InventoryBatchForm(instance=batch)
-        formset = InventoryBatchItemFormSet(instance=batch)
+        formset = InventoryBatchItemFormSet(
+            instance=batch,
+            prefix="items",
+        )
 
     return render(
         request,
@@ -1195,8 +1315,14 @@ def inventory_batch_edit(request, pk):
             "form": form,
             "formset": formset,
             "batch": batch,
+            "stock_type": "printing"
+            if batch.items.filter(item__item_type=InventoryItem.TYPE_FILM).exists()
+            and not batch.items.filter(item__item_type=InventoryItem.TYPE_SHIRT).exists()
+            else "cloth",
             "page_title": f"Edit Batch {batch.batch_no}",
             "submit_label": "Update Batch",
+            "items": InventoryItem.objects.filter(is_active=True).order_by("code", "name"),
+            "can_view_stock_cost": _can_view_stock_cost(request.user),
         },
     )
 
@@ -1205,37 +1331,65 @@ def inventory_batch_edit(request, pk):
 @permission_required("inventory.delete_inventorybatch", raise_exception=True)
 @transaction.atomic
 def inventory_batch_delete(request, pk):
+    """
+    Soft-delete a stock-in batch.
+
+    This does NOT remove database rows, so history/data is preserved.
+    """
     batch = get_object_or_404(
-        InventoryBatch.objects.prefetch_related("items"),
+        InventoryBatch.objects.select_for_update(),
         pk=pk,
         is_deleted=False,
     )
 
     if request.method == "POST":
-        for row in batch.items.filter(is_active=True):
-            old_qty = Decimal(row.qty_remaining or 0)
+        # Do not allow deleting a batch after any stock from it has been used.
+        used_rows = []
+        for row in batch.items.select_for_update().all():
+            qty_received = Decimal(row.qty_received or 0)
+            qty_remaining = Decimal(row.qty_remaining or 0)
+            if qty_received - qty_remaining != 0:
+                used_rows.append(row)
 
-            log_batch_delete(
-                batch_item=row,
-                qty_before=old_qty,
-                qty_after=Decimal("0"),
-                batch=batch,
-                user=request.user,
-                remark=f"Batch soft deleted: {batch.batch_no}",
+        if used_rows:
+            messages.error(
+                request,
+                "Cannot delete this batch because some stock has already been used.",
             )
+            return redirect("inventory_batch_detail", pk=batch.pk)
 
         batch.is_deleted = True
         batch.deleted_at = timezone.now()
-        if request.user.is_authenticated:
-            batch.deleted_by = request.user
-            batch.updated_by = request.user
-        batch.save(update_fields=["is_deleted", "deleted_at", "deleted_by", "updated_by", "updated_at"])
+        batch.deleted_by = request.user
+        batch.updated_by = request.user
+        batch.save(
+            update_fields=[
+                "is_deleted",
+                "deleted_at",
+                "deleted_by",
+                "updated_by",
+                "updated_at",
+            ]
+        )
 
-        _log_batch_history(batch, InventoryBatchHistory.ACTION_DELETE, request.user, "Batch soft deleted")
-        messages.success(request, f"Batch {batch.batch_no} deleted.")
-        return redirect("inventory_list")
+        _log_batch_history(
+            batch,
+            InventoryBatchHistory.ACTION_DELETE,
+            request.user,
+            "Batch soft deleted",
+        )
 
-    return render(request, "inventory/inventory_batch_delete.html", {"batch": batch})
+        messages.success(
+            request,
+            f"Batch {batch.batch_no} deleted safely.",
+        )
+        return redirect("inventory_stock_in_list")
+
+    return render(
+        request,
+        "inventory/inventory_batch_delete.html",
+        {"batch": batch},
+    )
 
 
 @login_required

@@ -678,7 +678,7 @@
       <div class="top-row">
         <div class="title">
           <h1>Stock In</h1>
-          <p>One page for Cloth, Printing Material and Fabric.</p><div class="stock-cost-later-note">No cost is needed here. Finance will add it later in Stock In Expense.</div>
+          <p>Receive stock now, or save a purchase and confirm it when the goods arrive.</p><div class="stock-cost-later-note">Cost is optional now. Staff can add it now or later; only Admin/Finance viewers can see saved amounts.</div>
         </div>
 
         <div class="type-tabs" role="tablist">
@@ -709,7 +709,7 @@
 
           <div class="header-grid">
             <div class="field">
-              <label>Received Date</label>
+              <label>Received / Expected Date</label>
               {{ form.received_date }}
             </div>
 
@@ -729,6 +729,28 @@
         </section>
 
         
+
+        <section class="panel" id="inventoryCostPanel">
+          <div class="panel-head">
+            <div class="panel-title">
+              <span class="panel-icon">$</span>
+              <div>
+                <h2>Purchase cost</h2>
+                <small>Add now or leave it for later</small>
+              </div>
+            </div>
+            <button type="button" class="btn-light" id="toggleInventoryCost">＋ Add Cost</button>
+          </div>
+          <input type="hidden" name="cost_is_added" id="costIsAddedInput" value="0">
+          <div id="inventoryCostFields" hidden>
+            <div class="cost-grid">
+              <div class="field"><label>Goods Cost</label><div class="money-wrap"><span class="money-prefix">$</span>{{ form.total_goods_cost }}</div></div>
+              <div class="field"><label>Delivery Fee</label><div class="money-wrap"><span class="money-prefix">$</span>{{ form.shipping_cost }}</div></div>
+              <div class="field"><label>Other Fee</label><div class="money-wrap"><span class="money-prefix">$</span>{{ form.extra_cost }}</div></div>
+            </div>
+            <div class="stock-cost-later-note">After staff saves a cost, staff will only see “Cost Already Added”. Admin/Finance viewers can see the amount.</div>
+          </div>
+        </section>
 
         <section class="panel">
           <div class="panel-head">
@@ -791,11 +813,11 @@
         <div class="form-actions">
           <div class="action-group">
             <button type="button" class="btn-light addInventoryRow">＋ Add Row</button>
-            <a href="{% url 'inventory_list' %}" class="btn-light">Cancel</a>
           </div>
           <div class="action-group">
             <span style="font-size:10px;color:var(--stock-muted)"><strong id="inventoryRowCount">0</strong> active rows</span>
-            <button type="submit" class="btn-primary" id="inventorySaveBtn">{{ submit_label|default:"Save Batch" }}</button>
+            <button type="submit" name="submit_action" value="save_purchase" class="btn-light" id="inventoryPurchaseBtn">Save Purchase</button>
+            <button type="submit" name="submit_action" value="stock_in_now" class="btn-primary" id="inventorySaveBtn">Stock In Now</button>
           </div>
         </div>
       </form>
@@ -1611,13 +1633,17 @@
     };
 
     try{
+      const formData=new FormData(form);
+      if(button?.name && button?.value){
+        formData.set(button.name,button.value);
+      }
       const response=await fetch(location.href,{
         method:'POST',
         headers:{
           'X-Requested-With':'XMLHttpRequest',
           'Accept':'application/json'
         },
-        body:new FormData(form),
+        body:formData,
         credentials:'same-origin',
         redirect:'follow'
       });
@@ -1690,9 +1716,28 @@
     }
   }
 
+  const toggleInventoryCost=document.getElementById('toggleInventoryCost');
+  const inventoryCostFields=document.getElementById('inventoryCostFields');
+  const costIsAddedInput=document.getElementById('costIsAddedInput');
+  toggleInventoryCost?.addEventListener('click',()=>{
+    const willOpen=inventoryCostFields.hasAttribute('hidden');
+    if(willOpen){
+      inventoryCostFields.removeAttribute('hidden');
+      costIsAddedInput.value='1';
+      toggleInventoryCost.textContent='Cost Added to This Save';
+      inventoryCostFields.querySelector('input')?.focus();
+    }else{
+      inventoryCostFields.setAttribute('hidden','');
+      costIsAddedInput.value='0';
+      toggleInventoryCost.textContent='＋ Add Cost';
+      inventoryCostFields.querySelectorAll('input').forEach(input=>input.value='');
+    }
+    updateAllSummary();
+  });
+
   inventoryForm.addEventListener('submit',event=>{
     event.preventDefault();
-    ajaxSubmit(inventoryForm,document.getElementById('inventorySaveBtn'));
+    ajaxSubmit(inventoryForm,event.submitter||document.getElementById('inventorySaveBtn'));
   });
 
   fabricForm.addEventListener('submit',event=>{
@@ -7176,27 +7221,12 @@
 </script>
 
 
-<style id="niron-hide-stock-costs">
-/* Warehouse Stock In: cost is entered later by Finance -> Batch Expense. */
-.cost-grid,.cost-total,.cost-status,.cost-field,
-.field:has(#id_total_goods_cost),
-.field:has(#id_shipping_cost),
-.field:has(#id_extra_cost),
-.side-line:has(#summaryCostStatus){display:none!important}
-.fabric-line-grid{grid-template-columns:minmax(220px,1.5fr) minmax(150px,1fr) 100px minmax(160px,1fr)!important}
+<style id="niron-stock-cost-visibility">
+/* Fabric cost stays in its current Finance flow. Cloth/Printing can add cost here. */
+#fabricStockForm .cost-field,
+#fabricStockForm .cost-grid,
+#fabricStockForm .cost-total,
+#fabricStockForm .cost-status{display:none!important}
 .stock-cost-later-note{margin:7px 0 0;color:#856b4c;font-size:10px;font-weight:750}
-@media(max-width:820px){.fabric-line-grid{grid-template-columns:1fr 1fr!important}}
-@media(max-width:520px){.fabric-line-grid{grid-template-columns:1fr!important}}
-
-/* Cloth and Printing Material Stock In: cost is recorded later by Finance. */
-#id_total_goods_cost,
-#id_shipping_cost,
-#id_extra_cost,
-.cost-grid,
-.cost-field,
-#inventoryCostStatus{
-  display:none!important;
-}
-
 </style>
 {% endblock %}

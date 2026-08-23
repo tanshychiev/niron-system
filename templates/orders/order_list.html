@@ -27,6 +27,16 @@
     .orders-shell,
     .summary-grid,
     .filter-card,
+
+    .film-cos-cell { min-width: 190px; }
+    .film-status { display:inline-flex; align-items:center; gap:6px; padding:5px 9px; border-radius:999px; font-size:11px; font-weight:900; }
+    .film-status-missing { background:#fff1f2; color:#be123c; border:1px solid #fecdd3; }
+    .film-status-added { background:#ecfdf5; color:#047857; border:1px solid #a7f3d0; }
+    .film-status-na { color:var(--muted); font-weight:800; }
+    .film-inline-form { display:flex; align-items:center; gap:6px; margin-top:7px; }
+    .film-inline-form input { width:82px; height:30px; border:1px solid var(--line); border-radius:9px; padding:0 8px; font-size:12px; font-weight:800; }
+    .film-save-btn { height:30px; border:0; border-radius:9px; padding:0 9px; background:#111827; color:#fff; font-size:11px; font-weight:900; cursor:pointer; }
+
     .table-card {
         min-width: 0;
     }
@@ -437,6 +447,15 @@
                 </div>
 
                 <div class="field">
+                    <label>Film COS Status</label>
+                    <select name="film_status">
+                        <option value="">All</option>
+                        <option value="MISSING" {% if film_status == "MISSING" %}selected{% endif %}>Not Added</option>
+                        <option value="ADDED" {% if film_status == "ADDED" %}selected{% endif %}>Added</option>
+                    </select>
+                </div>
+
+                <div class="field">
                     <label>Created From</label>
                     <input
                         type="date"
@@ -484,7 +503,7 @@
                         <th>Service</th>
                         <th>Status</th>
                         <th>Cloth (PCS)</th>
-                        <th>Film (Meter)</th>
+                        <th>Film / COS Meter</th>
                         <th>Total</th>
                         <th>Balance</th>
                         <th>Deadline</th>
@@ -539,7 +558,36 @@
 
                         <td>{{ row.cloth_qty }}</td>
 
-                        <td>{{ row.film_meter|floatformat:2 }}</td>
+                        <td class="film-cos-cell">
+                            {% if row.requires_film_meter %}
+                                {% if row.film_meter_missing %}
+                                    <span class="film-status film-status-missing">⚠ Film Not Added</span>
+                                {% else %}
+                                    <span class="film-status film-status-added">✓ {{ row.production_film_meter|floatformat:2 }} m Added</span>
+                                {% endif %}
+
+                                {% if perms.orders.change_order and not show_trash %}
+                                <form method="post" action="{% url 'order_film_meter_update' row.obj.pk %}" class="film-inline-form">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                    <input
+                                        type="number"
+                                        name="production_film_meter"
+                                        value="{% if row.production_film_meter > 0 %}{{ row.production_film_meter }}{% endif %}"
+                                        step="0.01"
+                                        min="0"
+                                        placeholder="Meter"
+                                        aria-label="Internal film meter for {{ row.obj.order_no }}"
+                                    >
+                                    <button type="submit" class="film-save-btn">{% if row.film_meter_missing %}Add{% else %}Edit{% endif %}</button>
+                                </form>
+                                {% endif %}
+                            {% elif row.obj.service_type == "FILM_ONLY" %}
+                                <span title="Customer film quantity">{{ row.film_meter|floatformat:2 }} m sold</span>
+                            {% else %}
+                                <span class="film-status-na">—</span>
+                            {% endif %}
+                        </td>
 
                         <td class="{% if show_money_totals %}money-cell{% else %}money-hidden-cell{% endif %}">
                             {% if show_money_totals %}

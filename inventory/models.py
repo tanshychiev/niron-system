@@ -182,12 +182,17 @@ class InventoryItem(models.Model):
 
 
 class InventoryBatch(models.Model):
-    STATUS_DRAFT = "DRAFT"
-    STATUS_FINAL = "FINAL"
+    # Purchase / receiving workflow.
+    STATUS_COMING_SOON = "COMING_SOON"
+    STATUS_RECEIVED = "RECEIVED"
+
+    # Legacy aliases kept so older code does not break while migrating.
+    STATUS_DRAFT = STATUS_COMING_SOON
+    STATUS_FINAL = STATUS_RECEIVED
 
     STATUS_CHOICES = [
-        (STATUS_DRAFT, "Draft"),
-        (STATUS_FINAL, "Final"),
+        (STATUS_COMING_SOON, "Coming Soon"),
+        (STATUS_RECEIVED, "Received"),
     ]
 
     batch_no = models.CharField(max_length=50, unique=True)
@@ -200,11 +205,32 @@ class InventoryBatch(models.Model):
         blank=True,
         related_name="inventory_batches",
     )
+    # For COMING_SOON this temporarily holds the expected date; when received it
+    # becomes the actual received date. expected_date keeps the original plan.
     received_date = models.DateField()
+    expected_date = models.DateField(null=True, blank=True)
+    received_at = models.DateTimeField(null=True, blank=True)
+    received_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="inventory_batches_received",
+    )
+
     total_goods_cost = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     shipping_cost = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     extra_cost = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_DRAFT)
+    cost_is_added = models.BooleanField(default=False)
+    cost_added_at = models.DateTimeField(null=True, blank=True)
+    cost_added_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="inventory_batch_costs_added",
+    )
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_RECEIVED)
     note = models.TextField(blank=True, default="")
 
     created_at = models.DateTimeField(default=timezone.now)
@@ -259,11 +285,24 @@ class InventoryBatch(models.Model):
         )
 
     @property
+    def is_coming_soon(self):
+        return self.status == self.STATUS_COMING_SOON
+
+    @property
+    def is_received(self):
+        return self.status == self.STATUS_RECEIVED
+
+    @property
     def total_cloth(self):
         result = self.items.filter(
             is_active=True,
             item__item_type=InventoryItem.TYPE_SHIRT,
         ).aggregate(total=Sum("qty_received"))
+        return result["total"] or Decimal("0")
+
+    @property
+    def total_qty(self):
+        result = self.items.filter(is_active=True).aggregate(total=Sum("qty_received"))
         return result["total"] or Decimal("0")
 
 

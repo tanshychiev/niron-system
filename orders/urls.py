@@ -24,6 +24,7 @@ urlpatterns = [
 
     # ===== ORDER ACTION =====
     path("<int:pk>/edit/", views.order_edit, name="order_edit"),
+    path("<int:pk>/film-meter/", views.order_film_meter_update, name="order_film_meter_update"),
     path("<int:pk>/trash/", views.order_trash, name="order_trash"),
     path("<int:pk>/restore/", views.order_restore, name="order_restore"),
 

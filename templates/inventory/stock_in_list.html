@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block page_title %}Stock In List{% endblock %}
+{% block page_subtitle %}Purchases waiting to arrive and received Stock In batches{% endblock %}
+
+{% block content %}
+<style>
+.stock-list-wrap{max-width:1450px;margin:0 auto}.stock-list-head{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px}.filter-card,.list-card{background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow)}.filter-card{padding:12px;margin-bottom:12px}.filter-row{display:flex;gap:8px;flex-wrap:wrap}.filter-row input,.filter-row select{min-height:40px;border:1px solid var(--line);border-radius:10px;padding:8px 10px}.list-card{overflow:hidden}.stock-table{width:100%;border-collapse:collapse;min-width:1050px}.stock-table th,.stock-table td{padding:12px 13px;border-bottom:1px solid var(--line);text-align:left;font-size:12px;vertical-align:middle}.stock-table th{font-size:9px;text-transform:uppercase;color:var(--muted);background:#fcfbf8}.badge{display:inline-flex;padding:6px 9px;border-radius:999px;font-size:10px;font-weight:900}.badge-coming{background:#fff0cc;color:#8b5a10}.badge-received{background:#eaf8f1;color:#08724f}.badge-cost-none{background:#fff0f0;color:#a73540}.badge-cost-ok{background:#eaf8f1;color:#08724f}.actions{display:flex;gap:6px;flex-wrap:wrap}.btn-mini{display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:7px 10px;border:1px solid var(--line);border-radius:9px;background:#fff;text-decoration:none;font-size:10px;font-weight:900;cursor:pointer}.btn-receive{background:#1f6f52;color:#fff;border-color:#1f6f52}.cost-form{display:none;margin-top:8px;padding:10px;border:1px solid var(--line);border-radius:12px;background:#fffaf0}.cost-form.open{display:block}.cost-form-grid{display:grid;grid-template-columns:repeat(3,minmax(90px,1fr));gap:7px}.cost-form input{width:100%;min-height:36px;border:1px solid var(--line);border-radius:8px;padding:7px}.table-wrap{overflow:auto}@media(max-width:760px){.cost-form-grid{grid-template-columns:1fr}.filter-row>*{width:100%}}
+</style>
+<div class="stock-list-wrap">
+  <div class="stock-list-head">
+    <div><h1 style="margin:0">Stock In List</h1><p style="margin:5px 0 0;color:var(--muted)">Coming Soon does not increase stock until Confirm Received.</p></div>
+    {% if perms.inventory.add_inventorybatch %}<a href="{% url 'inventory_batch_create' %}" class="btn btn-primary">＋ Create Stock In</a>{% endif %}
+  </div>
+  <form class="filter-card" method="get">
+    <div class="filter-row">
+      <select name="status">
+        <option value="all" {% if status_filter == 'ALL' %}selected{% endif %}>All Status</option>
+        <option value="COMING_SOON" {% if status_filter == 'COMING_SOON' %}selected{% endif %}>Coming Soon</option>
+        <option value="RECEIVED" {% if status_filter == 'RECEIVED' %}selected{% endif %}>Received</option>
+      </select>
+      <input type="search" name="q" value="{{ q }}" placeholder="Batch, supplier or item">
+      <button class="btn-mini" type="submit">Search</button>
+    </div>
+  </form>
+  <div class="list-card"><div class="table-wrap"><table class="stock-table">
+    <thead><tr><th>Date</th><th>Batch</th><th>Supplier</th><th>Qty</th><th>Status</th><th>Cost</th><th>Created By</th><th>Received By</th><th>Action</th></tr></thead>
+    <tbody>
+    {% for batch in batches %}
+      <tr>
+        <td>{% if batch.status == 'COMING_SOON' %}Expected {{ batch.expected_date|default:batch.received_date }}{% else %}{{ batch.received_date }}{% endif %}</td>
+        <td><a href="{% url 'inventory_batch_detail' batch.pk %}"><strong>{{ batch.batch_no }}</strong></a></td>
+        <td>{{ batch.supplier_name|default:"-" }}</td>
+        <td>{{ batch.total_qty }}</td>
+        <td>{% if batch.status == 'COMING_SOON' %}<span class="badge badge-coming">Coming Soon</span>{% else %}<span class="badge badge-received">Received</span>{% endif %}</td>
+        <td>
+          {% if batch.cost_is_added %}
+            <span class="badge badge-cost-ok">Cost Already Added</span>
+            {% if can_view_stock_cost %}<div style="margin-top:5px;font-weight:800">${{ batch.total_expense|floatformat:2 }}</div>{% endif %}
+          {% else %}<span class="badge badge-cost-none">No Cost Added</span>{% endif %}
+        </td>
+        <td>{{ batch.created_by.username|default:"-" }}</td>
+        <td>{{ batch.received_by.username|default:"-" }}</td>
+        <td>
+          <div class="actions">
+            {% if batch.status == 'COMING_SOON' and perms.inventory.change_inventorybatch %}
+            <form method="post" action="{% url 'inventory_batch_confirm_received' batch.pk %}" onsubmit="return confirm('Confirm these goods physically arrived? This will add the quantity to stock.');">{% csrf_token %}<button class="btn-mini btn-receive" type="submit">✓ Confirm Received</button></form>
+            {% endif %}
+            {% if perms.inventory.add_inventorybatch %}
+              {% if not batch.cost_is_added or can_view_stock_cost %}
+              <button type="button" class="btn-mini cost-toggle" data-target="cost-{{ batch.pk }}">{% if batch.cost_is_added %}Edit Cost{% else %}+ Add Cost{% endif %}</button>
+              {% endif %}
+            {% endif %}
+          </div>
+          {% if perms.inventory.add_inventorybatch %}{% if not batch.cost_is_added or can_view_stock_cost %}
+          <form id="cost-{{ batch.pk }}" class="cost-form" method="post" action="{% url 'inventory_batch_add_cost' batch.pk %}">
+            {% csrf_token %}
+            <div class="cost-form-grid">
+              <div><small>Goods Cost</small><input name="total_goods_cost" type="number" min="0" step="0.01" {% if can_view_stock_cost %}value="{{ batch.total_goods_cost }}"{% endif %} required></div>
+              <div><small>Delivery Fee</small><input name="shipping_cost" type="number" min="0" step="0.01" {% if can_view_stock_cost %}value="{{ batch.shipping_cost }}"{% endif %}></div>
+              <div><small>Other Fee</small><input name="extra_cost" type="number" min="0" step="0.01" {% if can_view_stock_cost %}value="{{ batch.extra_cost }}"{% endif %}></div>
+            </div>
+            <button type="submit" class="btn-mini" style="margin-top:8px">Save Cost</button>
+          </form>
+          {% endif %}{% endif %}
+        </td>
+      </tr>
+    {% empty %}<tr><td colspan="9" style="padding:30px;text-align:center;color:var(--muted)">No Stock In records found.</td></tr>{% endfor %}
+    </tbody>
+  </table></div></div>
+</div>
+<script>document.querySelectorAll('.cost-toggle').forEach(btn=>btn.addEventListener('click',()=>document.getElementById(btn.dataset.target)?.classList.toggle('open')));</script>
+{% endblock %}

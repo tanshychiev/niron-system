@@ -115,7 +115,8 @@ class InventoryBatchForm(forms.ModelForm):
     - note
     - stock items and quantities
 
-    Purchase costs are recorded later by Finance in Stock In Expense.
+    Cost can be entered now or later. Staff may enter it, while actual cost
+    visibility is controlled in the views/templates.
     """
 
     received_date = forms.DateField(
@@ -125,6 +126,22 @@ class InventoryBatchForm(forms.ModelForm):
                 "class": "form-control",
             }
         )
+    )
+
+    total_goods_cost = forms.DecimalField(
+        required=False, max_digits=12, decimal_places=2, min_value=0,
+        widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0", "placeholder": "0.00"}),
+        label="Goods Cost",
+    )
+    shipping_cost = forms.DecimalField(
+        required=False, max_digits=12, decimal_places=2, min_value=0,
+        widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0", "placeholder": "0.00"}),
+        label="Delivery Fee",
+    )
+    extra_cost = forms.DecimalField(
+        required=False, max_digits=12, decimal_places=2, min_value=0,
+        widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0", "placeholder": "0.00"}),
+        label="Other Fee",
     )
 
     supplier_ref = forms.ModelChoiceField(
@@ -144,6 +161,9 @@ class InventoryBatchForm(forms.ModelForm):
         fields = [
             "received_date",
             "supplier_ref",
+            "total_goods_cost",
+            "shipping_cost",
+            "extra_cost",
             "note",
         ]
         widgets = {
@@ -180,13 +200,10 @@ class InventoryBatchForm(forms.ModelForm):
 
     def save(self, commit=True):
         instance = super().save(commit=False)
-        instance.status = InventoryBatch.STATUS_FINAL
-
-        # Stock In never records purchase cost.
-        # Finance completes the cost later.
-        instance.total_goods_cost = Decimal("0.00")
-        instance.shipping_cost = Decimal("0.00")
-        instance.extra_cost = Decimal("0.00")
+        # The view decides whether this is COMING_SOON or RECEIVED.
+        instance.total_goods_cost = self.cleaned_data.get("total_goods_cost") or Decimal("0.00")
+        instance.shipping_cost = self.cleaned_data.get("shipping_cost") or Decimal("0.00")
+        instance.extra_cost = self.cleaned_data.get("extra_cost") or Decimal("0.00")
 
         if instance.supplier_ref_id:
             instance.supplier = instance.supplier_ref.name

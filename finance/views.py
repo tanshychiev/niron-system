@@ -664,6 +664,10 @@ def profit_dashboard(request):
         film_sold = film_qs.aggregate(total=Sum("film_meter"))["total"] or Decimal("0")
         film_revenue = film_qs.aggregate(total=Sum("line_total"))["total"] or Decimal("0")
 
+        production_film_meter = order_qs.filter(
+            service_type__in=[Order.SERVICE_FULL, Order.SERVICE_PRINT_HEATPRESS],
+        ).aggregate(total=Sum("production_film_meter"))["total"] or Decimal("0")
+
         return {
             "total_amount": total_amount,
             "deposit": deposit,
@@ -673,6 +677,7 @@ def profit_dashboard(request):
             "cloth_revenue": cloth_revenue,
             "film_sold": film_sold,
             "film_revenue": film_revenue,
+            "production_film_meter": production_film_meter,
         }
 
     niron = get_summary("NIRON")
@@ -857,6 +862,9 @@ def profit_dashboard(request):
         kampu_orders = month_orders.filter(order_type=Order.TYPE_KAMPU)
         niron_revenue = niron_orders.aggregate(total=Sum("total_amount"))["total"] or Decimal("0.00")
         kampu_revenue = kampu_orders.aggregate(total=Sum("total_amount"))["total"] or Decimal("0.00")
+        niron_film_printed = niron_orders.filter(
+            service_type__in=[Order.SERVICE_FULL, Order.SERVICE_PRINT_HEATPRESS],
+        ).aggregate(total=Sum("production_film_meter"))["total"] or Decimal("0")
 
         cloth_items = month_items.filter(shirt_item__isnull=False)
         film_items = month_items.filter(film_item__isnull=False)
@@ -899,6 +907,7 @@ def profit_dashboard(request):
             "kampu_projects": kampu_orders.count(),
             "niron_revenue": niron_revenue,
             "kampu_revenue": kampu_revenue,
+            "niron_film_printed": niron_film_printed,
             "niron_average": (niron_revenue / niron_orders.count()) if niron_orders.exists() else Decimal("0.00"),
             "kampu_average": (kampu_revenue / kampu_orders.count()) if kampu_orders.exists() else Decimal("0.00"),
             "cloth_sold": cloth_sold,
@@ -920,7 +929,7 @@ def profit_dashboard(request):
     growth_metrics = [
         "revenue", "expense", "profit", "orders",
         "niron_projects", "kampu_projects",
-        "niron_revenue", "kampu_revenue",
+        "niron_revenue", "kampu_revenue", "niron_film_printed",
         "cloth_sold", "cloth_revenue",
         "film_sold", "film_revenue", "paid", "receivable",
     ]

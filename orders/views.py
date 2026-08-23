@@ -7,6 +7,7 @@ from django.db.models import Prefetch, Q, Sum
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 from customers.models import Customer
 from decimal import Decimal, ROUND_HALF_UP
 from inventory.models import Color, InventoryItem, Size
@@ -559,6 +560,7 @@ def order_list(request):
     status = (request.GET.get("status") or "").strip()
     order_type = (request.GET.get("order_type") or "").strip()
     service_type = (request.GET.get("service_type") or "").strip()
+    film_status = (request.GET.get("film_status") or "").strip().upper()
     show_trash = request.GET.get("trash") == "1"
 
     today = timezone.localdate()
@@ -599,6 +601,21 @@ def order_list(request):
             qs = qs.exclude(service_type=Order.SERVICE_FILM_ONLY)
         else:
             qs = qs.filter(service_type=service_type)
+
+    film_required_services = [
+        Order.SERVICE_FULL,
+        Order.SERVICE_PRINT_HEATPRESS,
+    ]
+    if film_status == "MISSING":
+        qs = qs.filter(
+            service_type__in=film_required_services,
+            production_film_meter__lte=0,
+        )
+    elif film_status == "ADDED":
+        qs = qs.filter(
+            service_type__in=film_required_services,
+            production_film_meter__gt=0,
+        )
 
     if created_date_from:
         qs = qs.filter(created_at__date__gte=created_date_from)
@@ -661,10 +678,21 @@ def order_list(request):
             and order.deadline < today
         )
 
+        requires_film_meter = order.service_type in [
+            Order.SERVICE_FULL,
+            Order.SERVICE_PRINT_HEATPRESS,
+        ]
+        internal_film_meter = Decimal(order.production_film_meter or 0)
+
         rows.append({
             "obj": order,
             "cloth_qty": cloth_qty,
+            # For Film Only this remains the customer sold meter.
             "film_meter": film_meter,
+            # Separate internal production consumption used for COS/profit.
+            "production_film_meter": internal_film_meter,
+            "requires_film_meter": requires_film_meter,
+            "film_meter_missing": requires_film_meter and internal_film_meter <= 0,
             "balance_amount": balance_amount,
             "is_late": is_late,
         })
@@ -675,6 +703,7 @@ def order_list(request):
         "status": status,
         "order_type": order_type,
         "service_type": service_type,
+        "film_status": film_status,
         "created_date_from": created_date_from,
         "created_date_to": created_date_to,
         "show_trash": show_trash,
@@ -821,6 +850,71 @@ def production_list(request):
             "service_type_choices": getattr(Order, "SERVICE_CHOICES", []),
         },
     )
+
+@login_required
+@permission_required("orders.change_order", raise_exception=True)
+@transaction.atomic
+def order_film_meter_update(request, pk):
+    order = get_object_or_404(
+        Order.objects.select_for_update(),
+        pk=pk,
+        is_deleted=False,
+    )
+
+    if request.method != "POST":
+        return redirect("order_list")
+
+    if order.service_type not in [Order.SERVICE_FULL, Order.SERVICE_PRINT_HEATPRESS]:
+        messages.error(request, "Film meter is only recorded for Full Order and Printing Service.")
+        return redirect("order_list")
+
+    raw_meter = (request.POST.get("production_film_meter") or "").strip()
+
+    try:
+        meter = Decimal(raw_meter or "0").quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    except Exception:
+        messages.error(request, "Please enter a valid film meter.")
+        return redirect("order_list")
+
+    if meter < 0:
+        messages.error(request, "Film meter cannot be negative.")
+        return redirect("order_list")
+
+    old_meter = Decimal(order.production_film_meter or 0).quantize(Decimal("0.01"))
+    order.production_film_meter = meter
+    order.production_film_recorded_by = request.user
+    order.production_film_recorded_at = timezone.now() if meter > 0 else None
+    order.save(update_fields=[
+        "production_film_meter",
+        "production_film_recorded_by",
+        "production_film_recorded_at",
+    ])
+
+    _log_order_history(
+        order=order,
+        action=OrderHistory.ACTION_EDIT,
+        field_name="production_film_meter",
+        old_value=old_meter,
+        new_value=meter,
+        user=request.user,
+        remark="Internal film usage for COS/profit reporting.",
+    )
+
+    if meter > 0:
+        messages.success(request, f"Film usage saved: {meter:.2f} m for {order.order_no}.")
+    else:
+        messages.warning(request, f"Film usage cleared for {order.order_no}. It is now marked Not Added.")
+
+    next_url = (request.POST.get("next") or "").strip()
+    if next_url and url_has_allowed_host_and_scheme(
+        next_url,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return redirect(next_url)
+
+    return redirect("order_list")
+
 
 @login_required
 @permission_required("orders.view_order", raise_exception=True)

@@ -699,6 +699,10 @@
                 <div class="metric-name">Film Revenue</div>
                 <div class="metric-value">${{ niron.film_revenue|floatformat:2 }}</div>
             </div>
+            <div class="metric-row">
+                <div class="metric-name">Film Printed (Internal)</div>
+                <div class="metric-value">{{ niron.production_film_meter|floatformat:2 }} m</div>
+            </div>
         </div>
     </div>
 
@@ -838,6 +842,7 @@
                     <th>Kampu Projects</th>
                     <th>Niron Revenue</th>
                     <th>Kampu Revenue</th>
+                    <th>Niron Film Printed</th>
                     <th>Niron Avg/Project</th>
                     <th>Kampu Avg/Project</th>
                 </tr>
@@ -854,6 +859,7 @@
                     <td><div class="metric-main">{{ row.kampu_projects }}</div><span class="growth-badge {{ row.growth.kampu_projects.css }}">{{ row.growth.kampu_projects.display }}</span></td>
                     <td><div class="metric-main">${{ row.niron_revenue|floatformat:2 }}</div><span class="growth-badge {{ row.growth.niron_revenue.css }}">{{ row.growth.niron_revenue.display }}</span></td>
                     <td><div class="metric-main">${{ row.kampu_revenue|floatformat:2 }}</div><span class="growth-badge {{ row.growth.kampu_revenue.css }}">{{ row.growth.kampu_revenue.display }}</span></td>
+                    <td><div class="metric-main">{{ row.niron_film_printed|floatformat:2 }} m</div><span class="growth-badge {{ row.growth.niron_film_printed.css }}">{{ row.growth.niron_film_printed.display }}</span></td>
                     <td><div class="metric-main">${{ row.niron_average|floatformat:2 }}</div></td>
                     <td><div class="metric-main">${{ row.kampu_average|floatformat:2 }}</div></td>
                 </tr>

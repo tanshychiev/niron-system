@@ -1516,6 +1516,13 @@
                         </a>
                         {% endif %}
 
+                        {% if perms.inventory.view_inventorybatch %}
+                        <a class="nav-link" href="{% url 'inventory_stock_in_list' %}">
+                            <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M5 6h14M5 12h14M5 18h14"/></svg></span>
+                            <span>Stock In List</span>
+                        </a>
+                        {% endif %}
+
                         {% if perms.inventory.add_inventoryadjustment %}
                         <a class="nav-link" href="{% url 'material_usage' %}">
                             <span class="nav-mini-icon"><svg viewBox="0 0 24 24"><path d="M12 3s5 5.2 5 10a5 5 0 0 1-10 0c0-4.8 5-10 5-10Z"/><path d="M10 15c.6.8 1.2 1.2 2 1.2"/></svg></span>
