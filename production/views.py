@@ -21,6 +21,7 @@ from .forms import (
     FabricTypeForm,
     fabric_receipt_line_formset,
     PaymentBatchForm,
+    SewingReturnBulkPaymentForm,
     ProductionProjectForm,
     SewingJobForm,
     SewingPartnerForm,
@@ -71,40 +72,70 @@ def _active_sizes():
 
 
 def _cutting_is_complete(project):
-    """Return cutting completion without requiring a dedicated model field."""
-    if project.status in {
-        ProductionProject.STATUS_DRAFT,
-        ProductionProject.STATUS_CUTTING,
-        ProductionProject.STATUS_CANCELLED,
-    }:
+    """
+    Cutting is complete when it was explicitly finished OR when the production
+    data proves no more planned cloth is waiting to be cut.
+
+    This also repairs older projects that still show "Cutting Open" even though
+    every planned/cut piece has already been sent and accounted for.
+    """
+    if project.status == ProductionProject.STATUS_CANCELLED:
         return False
+
+    explicit_flag = bool(getattr(project, "cutting_is_complete", False))
+    if explicit_flag:
+        return True
 
     if project.roll_usages.filter(applied=False).exists():
         return False
 
-    return bool(
-        int(project.cut_total or 0) > 0
-        and project.status in {
-            ProductionProject.STATUS_CUT_COMPLETE,
-            ProductionProject.STATUS_SENT,
-            ProductionProject.STATUS_PARTIAL_RETURN,
-            ProductionProject.STATUS_COMPLETED,
-        }
-    )
+    cut_total = int(project.cut_total or 0)
+    expected_total = int(getattr(project, "expected_qty", 0) or 0)
+
+    if cut_total <= 0:
+        return False
+
+    # Normal explicit-status path.
+    if project.status in {
+        ProductionProject.STATUS_CUT_COMPLETE,
+        ProductionProject.STATUS_SENT,
+        ProductionProject.STATUS_PARTIAL_RETURN,
+        ProductionProject.STATUS_COMPLETED,
+    }:
+        return True
+
+    # Safe inferred path for older records:
+    # if the planned quantity is already fully cut, cutting is effectively done.
+    if expected_total > 0 and cut_total >= expected_total:
+        return True
+
+    return False
 
 
 def _recalculate_project_status(project):
     """
     Rebuild production status from actual production movement.
 
-    Good, damaged, and missing pieces are all ACCOUNTED FOR.
-    Only good pieces go into finished inventory, but damaged/missing pieces
-    still close the sewing quantity so production can complete.
+    ACCOUNTED = good + damaged + missing.
+
+    Good pieces go to inventory.
+    Damaged/missing pieces do NOT go to inventory, but they still close the
+    production quantity.
+
+    Example:
+        Plan/Cut/Sent = 294
+        Good = 289
+        Missing = 5
+        Accounted = 294
+        Remaining with sewer = 0
+        => Production COMPLETED
+        => Sewing payment quantity = 289 good pcs only
     """
     project.refresh_from_db()
 
     cut_total = int(project.cut_total or 0)
     sent_total = int(project.sent_total or 0)
+    expected_total = int(getattr(project, "expected_qty", 0) or 0)
 
     stocked_totals = SewingReturnLine.objects.filter(
         sewing_return__job__project=project,
@@ -123,26 +154,47 @@ def _recalculate_project_status(project):
     remaining_to_send = max(cut_total - sent_total, 0)
     still_with_sewer = max(sent_total - accounted_total, 0)
 
-    if (
-        _cutting_is_complete(project)
-        and cut_total > 0
-        and remaining_to_send <= 0
-        and still_with_sewer <= 0
-    ):
+    planned_cut_done = bool(
+        cut_total > 0
+        and (
+            _cutting_is_complete(project)
+            or expected_total <= 0
+            or cut_total >= expected_total
+        )
+    )
+
+    fully_accounted = bool(
+        planned_cut_done
+        and sent_total >= cut_total
+        and remaining_to_send == 0
+        and still_with_sewer == 0
+        and accounted_total >= sent_total
+    )
+
+    if fully_accounted:
         status = ProductionProject.STATUS_COMPLETED
     elif accounted_total > 0:
         status = ProductionProject.STATUS_PARTIAL_RETURN
     elif still_with_sewer > 0 or sent_total > 0:
         status = ProductionProject.STATUS_SENT
-    elif _cutting_is_complete(project):
+    elif planned_cut_done:
         status = ProductionProject.STATUS_CUT_COMPLETE
     elif cut_total > 0 or project.roll_usages.exists():
         status = ProductionProject.STATUS_CUTTING
     else:
         status = ProductionProject.STATUS_DRAFT
 
+    update_fields = ["status", "updated_at"]
     project.status = status
-    project.save(update_fields=["status", "updated_at"])
+
+    # When the data proves production is finished, also close the explicit
+    # cutting flag when this model version has that field.
+    if fully_accounted and hasattr(project, "cutting_is_complete"):
+        if not project.cutting_is_complete:
+            project.cutting_is_complete = True
+            update_fields.append("cutting_is_complete")
+
+    project.save(update_fields=update_fields)
     return project
 
 
@@ -662,6 +714,10 @@ def project_detail(request, pk):
         ),
         pk=pk,
     )
+
+    # Repair old status values from the actual production movements.
+    if project.status != ProductionProject.STATUS_CANCELLED:
+        project = _recalculate_project_status(project)
 
     sizes = list(_active_sizes())
     color_rows = []
@@ -2423,22 +2479,36 @@ def sewing_return_list(request):
         paid_amount = Decimal("0")
         has_unpaid = False
         has_paid = False
+        has_partial_payment = False
 
         for sewing_return in stocked_returns:
             good_qty = int(sewing_return.good_total or 0)
+            if good_qty <= 0:
+                continue
+
             payable = getattr(sewing_return, "sewing_payable", None)
 
+            # No payable yet OR a zero-amount payable means the good cloth is
+            # still waiting for the user to enter "price per cloth".
             if payable is None:
-                if good_qty > 0:
-                    has_unpaid = True
-                    unpaid_good += good_qty
+                has_unpaid = True
+                unpaid_good += good_qty
                 continue
 
             paid = Decimal(payable.paid_amount or 0)
+            amount = Decimal(payable.amount or 0)
+            balance = Decimal(payable.balance or 0)
             paid_amount += paid
+
             if paid > 0:
                 has_paid = True
-            if payable.balance > 0:
+
+            if paid > 0 and balance > 0:
+                has_partial_payment = True
+                has_unpaid = True
+                unpaid_good += good_qty
+            elif paid <= 0:
+                # Even if amount == 0, it is not "paid"; it still needs pricing.
                 has_unpaid = True
                 unpaid_good += good_qty
 
@@ -2457,6 +2527,7 @@ def sewing_return_list(request):
                 "latest_received": None,
                 "has_unpaid": False,
                 "has_paid": False,
+                "has_partial_payment": False,
                 "is_paid": False,
                 "is_finished": False,
                 "can_pay": False,
@@ -2474,6 +2545,7 @@ def sewing_return_list(request):
             "unpaid_good": unpaid_good,
             "paid_amount": paid_amount,
             "has_unpaid": has_unpaid,
+            "has_partial_payment": has_partial_payment,
             "is_paid": bool(stocked_returns) and not has_unpaid and has_paid,
         })
 
@@ -2489,6 +2561,9 @@ def sewing_return_list(request):
         row["paid_amount"] += paid_amount
         row["has_unpaid"] = row["has_unpaid"] or has_unpaid
         row["has_paid"] = row["has_paid"] or has_paid
+        row["has_partial_payment"] = (
+            row["has_partial_payment"] or has_partial_payment
+        )
 
         if row["latest_sent"] is None or job.sent_date > row["latest_sent"]:
             row["latest_sent"] = job.sent_date
@@ -2508,45 +2583,57 @@ def sewing_return_list(request):
     project_rows = list(grouped.values())
 
     for row in project_rows:
-        # Fully received/accounted means nothing is left with the sewer.
+        row["project"] = _recalculate_project_status(row["project"])
+
+        # Completion uses ACCOUNTED quantity, not only good stock.
+        # job.pending_total already subtracts good + damaged + missing.
         row["is_finished"] = bool(
-            row["sent_total"] > 0 and row["remaining_total"] == 0
+            row["sent_total"] > 0
+            and row["remaining_total"] == 0
+            and row["project"].status == ProductionProject.STATUS_COMPLETED
         )
+
         row["is_paid"] = bool(
             row["is_finished"]
             and row["received_total"] > 0
             and not row["has_unpaid"]
             and row["has_paid"]
         )
+
+        # A completed project with good cloth can be priced and paid even if
+        # its current payable amount is 0.00.
         row["can_pay"] = bool(
             row["is_finished"]
-            and row["has_unpaid"]
+            and row["received_total"] > 0
             and row["unpaid_good"] > 0
+            and not row["has_partial_payment"]
             and row["payee_name"] != "Multiple sewers"
         )
 
-        # Completion and payment are separate concepts.
-        # A production project is complete when nothing remains with the sewer,
-        # even if there is no sewing payment due.
         row["is_complete_no_payment"] = bool(
             row["is_finished"]
-            and not row["can_pay"]
+            and row["received_total"] <= 0
             and not row["is_paid"]
-            and row["remaining_total"] == 0
         )
 
         if row["is_paid"]:
             row["payment_lock_reason"] = "Project already paid."
         elif row["remaining_total"] > 0:
-            row["payment_lock_reason"] = f"{row['remaining_total']} pcs are still with the sewer."
+            row["payment_lock_reason"] = (
+                f"{row['remaining_total']} pcs are still with the sewer."
+            )
+        elif row["has_partial_payment"]:
+            row["payment_lock_reason"] = (
+                "This project has a partial payment. Use Sewing Payments to finish it."
+            )
         elif row["payee_name"] == "Multiple sewers":
             row["payment_lock_reason"] = "This project contains multiple sewers."
         elif row["is_complete_no_payment"]:
-            row["payment_lock_reason"] = "Production completed. No sewing payment is due."
-        elif not row["has_unpaid"]:
-            row["payment_lock_reason"] = "No unpaid received cloth."
-        elif row["unpaid_good"] <= 0:
-            row["payment_lock_reason"] = "No good received cloth is ready to pay."
+            row["payment_lock_reason"] = (
+                "Production completed, but there are no good pieces to pay."
+            )
+        elif not row["is_finished"]:
+            row["payment_lock_reason"] = "Production is not fully completed yet."
         else:
             row["payment_lock_reason"] = ""
 
@@ -2584,8 +2671,9 @@ def sewing_return_list(request):
         "date_type": date_type,
         "date_from": date_from,
         "date_to": date_to,
-        # The current code uses the separate Sewing Payments workflow.
-        "payment_form": None,
+        "payment_form": SewingReturnBulkPaymentForm(
+            initial={"payment_date": timezone.localdate()}
+        ),
     })
 
 
@@ -2593,20 +2681,238 @@ def sewing_return_list(request):
 @permission_required("production.manage_production_payments", raise_exception=True)
 def sewing_return_bulk_pay(request):
     """
-    Compatibility view for the existing production_return_bulk_pay URL.
+    Pay completed sewing projects from the Sewing Returns page.
 
-    The current production package uses the regular payment workflow rather than
-    the older SewingReturnBulkPaymentForm/pay_selected_sewing_jobs implementation.
-    Keep this URL available so Django can load production.urls safely without
-    breaking the rest of Production/Fabric features.
+    Production completion:
+        good + damaged + missing = accounted.
+
+    Sewing payment:
+        GOOD pieces only.
+
+    Example:
+        294 sent
+        289 good
+        5 missing
+        => production completed
+        => payment quantity = 289 pcs
     """
     if request.method != "POST":
         return redirect("production_return_list")
 
-    messages.info(
-        request,
-        "Use the Sewing Payments page to record sewing payments.",
+    form = SewingReturnBulkPaymentForm(request.POST)
+
+    selected_project_ids = []
+    for value in request.POST.getlist("selected_projects"):
+        if str(value or "").isdigit():
+            project_id = int(value)
+            if project_id not in selected_project_ids:
+                selected_project_ids.append(project_id)
+
+    # Backward compatibility with old one-project form name.
+    if not selected_project_ids:
+        one_project = request.POST.get("selected_project")
+        if str(one_project or "").isdigit():
+            selected_project_ids = [int(one_project)]
+
+    if not selected_project_ids:
+        messages.error(request, "Choose at least one completed production project.")
+        return redirect("production_return_list")
+
+    if not form.is_valid():
+        for errors in form.errors.values():
+            for error in errors:
+                messages.error(request, error)
+        return redirect("production_return_list")
+
+    projects = list(
+        ProductionProject.objects
+        .filter(id__in=selected_project_ids)
+        .select_related("finished_item")
     )
+
+    if len(projects) != len(selected_project_ids):
+        messages.error(request, "One or more selected projects could not be found.")
+        return redirect("production_return_list")
+
+    all_payee_names = set()
+    payables_to_pay = []
+    project_numbers = []
+    total_good_qty = 0
+
+    price_per_piece = Decimal(form.cleaned_data["price_per_piece"] or 0)
+    if price_per_piece <= 0:
+        messages.error(request, "Enter a price per cloth greater than zero.")
+        return redirect("production_return_list")
+
+    for project in projects:
+        project = _recalculate_project_status(project)
+
+        jobs = list(
+            SewingJob.objects
+            .filter(project=project)
+            .exclude(status=SewingJob.STATUS_CANCELLED)
+            .select_related("partner")
+            .prefetch_related("returns__lines", "returns__sewing_payable")
+            .order_by("id")
+        )
+
+        if not jobs:
+            messages.error(request, f"{project.project_no} has no sewing records.")
+            return redirect("production_return_list")
+
+        if project.status != ProductionProject.STATUS_COMPLETED:
+            messages.error(
+                request,
+                f"{project.project_no} is not complete yet. "
+                "All sent cloth must be good, damaged, or missing."
+            )
+            return redirect("production_return_list")
+
+        project_remaining = sum(int(job.pending_total or 0) for job in jobs)
+        if project_remaining > 0:
+            messages.error(
+                request,
+                f"{project.project_no} still has {project_remaining} pcs with the sewer."
+            )
+            return redirect("production_return_list")
+
+        payee_names = {job.payee_name for job in jobs}
+        if len(payee_names) != 1:
+            messages.error(
+                request,
+                f"{project.project_no} contains multiple sewers and cannot be paid together."
+            )
+            return redirect("production_return_list")
+
+        all_payee_names.update(payee_names)
+        project_numbers.append(project.project_no)
+
+        for job in jobs:
+            # Ensure every stocked return has a payable record first.
+            sync_sewing_payables(job)
+
+            for sewing_return in job.returns.filter(
+                status=SewingReturn.STATUS_STOCKED
+            ).select_related("sewing_payable"):
+                good_qty = int(sewing_return.good_total or 0)
+                if good_qty <= 0:
+                    continue
+
+                payable = getattr(sewing_return, "sewing_payable", None)
+                if payable is None:
+                    messages.error(
+                        request,
+                        f"{sewing_return.return_no} has no sewing payable record."
+                    )
+                    return redirect("production_return_list")
+
+                paid_amount = Decimal(payable.paid_amount or 0)
+                if paid_amount > 0:
+                    messages.error(
+                        request,
+                        f"{sewing_return.return_no} was already paid or partially paid."
+                    )
+                    return redirect("production_return_list")
+
+                payable.amount = (
+                    Decimal(good_qty) * price_per_piece
+                ).quantize(Decimal("0.01"))
+                payable.payee_name = job.payee_name
+                payable.description = (
+                    f"Sewing return {sewing_return.return_no}: "
+                    f"{good_qty} good pcs × ${price_per_piece}"
+                )
+                payable.save(
+                    update_fields=["amount", "payee_name", "description"]
+                )
+
+                payables_to_pay.append(payable)
+                total_good_qty += good_qty
+
+    if len(all_payee_names) != 1:
+        messages.error(request, "Select projects for only one sewer at a time.")
+        return redirect("production_return_list")
+
+    if not payables_to_pay:
+        messages.error(request, "There are no good sewing pieces to pay.")
+        return redirect("production_return_list")
+
+    # Optional extra sewing cost from the current modal.
+    raw_additional = (request.POST.get("additional_cost") or "0").strip()
+    try:
+        additional_cost = Decimal(raw_additional or "0")
+    except (InvalidOperation, TypeError, ValueError):
+        messages.error(request, "Enter a valid additional cost.")
+        return redirect("production_return_list")
+
+    if additional_cost < 0:
+        messages.error(request, "Additional cost cannot be negative.")
+        return redirect("production_return_list")
+
+    currency = (request.POST.get("payment_currency") or "USD").strip().upper()
+    exchange_rate = Decimal("4000")
+
+    if currency == "KHR":
+        # Price entered in KHR on the modal -> store accounting in USD.
+        khr_price = price_per_piece
+        usd_price = (khr_price / exchange_rate).quantize(Decimal("0.0001"))
+
+        # Reprice the payables in USD.
+        for payable in payables_to_pay:
+            sewing_return = payable.sewing_return
+            good_qty = int(sewing_return.good_total or 0)
+            payable.amount = (
+                Decimal(good_qty) * usd_price
+            ).quantize(Decimal("0.01"))
+            payable.description = (
+                f"Sewing return {sewing_return.return_no}: "
+                f"{good_qty} good pcs × {khr_price} KHR "
+                f"(1 USD = 4,000 KHR)"
+            )
+            payable.save(update_fields=["amount", "description"])
+
+        additional_cost = (
+            additional_cost / exchange_rate
+        ).quantize(Decimal("0.01"))
+
+    if additional_cost > 0:
+        first = payables_to_pay[0]
+        first.amount = (
+            Decimal(first.amount or 0) + additional_cost
+        ).quantize(Decimal("0.01"))
+        first.description = (
+            f"{first.description}. Additional sewing cost: ${additional_cost}"
+        )
+        first.save(update_fields=["amount", "description"])
+
+    note = (
+        f"Combined sewing payment for projects: {', '.join(project_numbers)}. "
+        f"Good cloth paid: {total_good_qty} pcs. "
+        f"Missing/damaged pieces are completed production but are not paid. "
+        f"{form.cleaned_data.get('note') or ''}"
+    ).strip()
+
+    try:
+        batch = pay_selected_payables(
+            payables_to_pay,
+            {
+                "payment_date": form.cleaned_data["payment_date"],
+                "payment_method": ProductionPaymentBatch.METHOD_CASH,
+                "reference": "",
+                "note": note,
+            },
+            request.user,
+        )
+        messages.success(
+            request,
+            f"{len(project_numbers)} project"
+            f"{'s' if len(project_numbers) != 1 else ''} paid. "
+            f"{total_good_qty} good pcs · Total ${batch.total_amount}."
+        )
+    except ValidationError as exc:
+        for error in exc.messages:
+            messages.error(request, error)
+
     return redirect("production_return_list")
 
 
