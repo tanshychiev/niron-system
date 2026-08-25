@@ -1,51 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Orders
-<script>
-document.addEventListener("DOMContentLoaded", function(){
-    document.querySelectorAll("[data-film-toggle]").forEach(function(btn){
-        btn.addEventListener("click", function(event){
-            event.preventDefault();
-            event.stopPropagation();
-
-            const targetId = btn.getAttribute("data-film-toggle");
-            const form = targetId ? document.getElementById(targetId) : null;
-
-            if(!form) return;
-
-            const opening = !form.classList.contains("is-open");
-
-            document.querySelectorAll(".film-inline-form.is-open").forEach(function(openForm){
-                if(openForm !== form){
-                    openForm.classList.remove("is-open");
-                }
-            });
-
-            form.classList.toggle("is-open", opening);
-
-            if(opening){
-                const input = form.querySelector('input[name="production_film_meter"]');
-                if(input){
-                    setTimeout(function(){
-                        input.focus();
-                        input.select();
-                    }, 30);
-                }
-            }
-        });
-    });
-
-    document.addEventListener("click", function(event){
-        document.querySelectorAll(".more-actions[open]").forEach(function(menu){
-            if(!menu.contains(event.target)){
-                menu.removeAttribute("open");
-            }
-        });
-    });
-});
-</script>
-
-{% endblock %}
+{% block title %}Orders{% endblock %}
 {% block page_title %}Orders{% endblock %}
 {% block page_subtitle %}Manage customer orders{% endblock %}
 
@@ -1114,4 +1069,54 @@ tfoot th{
         }
     });
 </script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll("[data-film-toggle]").forEach(function (btn) {
+        btn.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            const targetId = btn.getAttribute("data-film-toggle");
+            const form = targetId ? document.getElementById(targetId) : null;
+
+            if (!form) {
+                console.warn("Film/COS form not found:", targetId);
+                return;
+            }
+
+            const opening = !form.classList.contains("is-open");
+
+            // Keep only one Film/COS editor open at a time.
+            document.querySelectorAll(".film-inline-form.is-open").forEach(function (openForm) {
+                if (openForm !== form) {
+                    openForm.classList.remove("is-open");
+                }
+            });
+
+            form.classList.toggle("is-open", opening);
+
+            if (opening) {
+                const input = form.querySelector('input[name="production_film_meter"]');
+                if (input) {
+                    window.setTimeout(function () {
+                        input.focus();
+                        input.select();
+                    }, 30);
+                }
+            }
+        });
+    });
+
+    // Close action ⋯ menus when clicking elsewhere.
+    document.addEventListener("click", function (event) {
+        document.querySelectorAll(".more-actions[open]").forEach(function (menu) {
+            if (!menu.contains(event.target)) {
+                menu.removeAttribute("open");
+            }
+        });
+    });
+});
+</script>
+
 {% endblock %}
