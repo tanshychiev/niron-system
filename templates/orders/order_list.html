@@ -622,6 +622,7 @@ tfoot th{
                     <tr>
                         <th>Order No</th>
                         <th>Created</th>
+                        <th>Created By</th>
                         <th>Customer</th>
                         <th>Service</th>
                         <th>Status</th>
@@ -762,40 +763,52 @@ tfoot th{
                         <td>
                             <div class="action-row">
                                 <a href="{% url 'order_detail' row.obj.pk %}"
-                                   class="btn-mini btn-mini-light">
+                                   class="btn-mini btn-mini-view">
                                     View
                                 </a>
 
                                 {% if not show_trash %}
-                                    <details class="more-actions">
-                                        <summary>⋯</summary>
-                                        <div class="more-actions-menu">
-                                            <a href="{% url 'order_edit' row.obj.pk %}"
-                                               class="btn-mini btn-mini-light">
-                                                Edit
-                                            </a>
+                                    <a href="{% url 'order_edit' row.obj.pk %}"
+                                       class="btn-mini btn-mini-edit">
+                                        Edit
+                                    </a>
 
-                                            <form method="post"
-                                                  action="{% url 'order_trash' row.obj.pk %}"
-                                                  class="inline-form trash-form">
-                                                {% csrf_token %}
-                                                <input type="hidden"
-                                                       name="reason"
-                                                       value="Deleted from order list">
-                                                <button type="submit"
-                                                        class="btn-mini btn-mini-danger">
-                                                    Trash
-                                                </button>
-                                            </form>
-                                        </div>
-                                    </details>
+                                    <form method="post"
+                                          action="{% url 'order_trash' row.obj.pk %}"
+                                          class="inline-form trash-form">
+                                        {% csrf_token %}
+                                        <input type="hidden"
+                                               name="reason"
+                                               value="Deleted from order list">
+                                        <button type="submit"
+                                                class="btn-mini btn-mini-danger btn-trash-icon"
+                                                title="Move to Trash"
+                                                aria-label="Move to Trash">
+                                            <svg viewBox="0 0 24 24"
+                                                 width="14"
+                                                 height="14"
+                                                 fill="none"
+                                                 stroke="currentColor"
+                                                 stroke-width="2"
+                                                 stroke-linecap="round"
+                                                 stroke-linejoin="round"
+                                                 aria-hidden="true">
+                                                <path d="M3 6h18"></path>
+                                                <path d="M8 6V4h8v2"></path>
+                                                <path d="M19 6l-1 14H6L5 6"></path>
+                                                <path d="M10 11v5"></path>
+                                                <path d="M14 11v5"></path>
+                                            </svg>
+                                        </button>
+                                    </form>
                                 {% else %}
+                                    <span></span>
                                     <form method="post"
                                           action="{% url 'order_restore' row.obj.pk %}"
                                           class="inline-form">
                                         {% csrf_token %}
                                         <button type="submit"
-                                                class="btn-mini btn-mini-light">
+                                                class="btn-mini btn-mini-edit">
                                             Restore
                                         </button>
                                     </form>
@@ -805,7 +818,7 @@ tfoot th{
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="11">
+                        <td colspan="12">
                             <div class="empty-state">
                                 No orders found.
                             </div>
@@ -817,7 +830,7 @@ tfoot th{
                 {% if rows and show_money_totals %}
                 <tfoot>
                     <tr>
-                        <th colspan="7" style="text-align:right;">Filtered Total</th>
+                        <th colspan="8" style="text-align:right;">Filtered Total</th>
                         <th class="money-cell">${{ total_money|floatformat:2 }}</th>
                         <th class="balance-cell">${{ total_balance|floatformat:2 }}</th>
                         <th colspan="2"></th>
@@ -1118,5 +1131,110 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 });
 </script>
+
+
+<style>
+/* ===== Final cleanup: aligned table + all 3 actions visible ===== */
+.orders-table{
+  min-width:1180px!important;
+}
+
+.orders-table th,
+.orders-table td{
+  padding:8px 10px!important;
+  font-size:11px!important;
+}
+
+.orders-table th:last-child,
+.orders-table td:last-child{
+  min-width:190px;
+  text-align:right;
+}
+
+.action-row{
+  display:grid!important;
+  grid-template-columns:54px 54px 58px;
+  justify-content:end;
+  align-items:center;
+  gap:5px!important;
+  width:100%;
+}
+
+.action-row .btn-mini{
+  width:100%;
+  min-height:28px;
+  padding:5px 6px!important;
+  border-radius:8px!important;
+  font-size:9px!important;
+}
+
+.btn-mini-view{
+  background:#f8f6ef;
+  color:#1f2937;
+  border:1px solid var(--line);
+}
+
+.btn-mini-edit{
+  background:#fff7e6;
+  color:#9a6200;
+  border:1px solid #f2cf8b;
+}
+
+.btn-mini-danger{
+  background:#fff1f2!important;
+  color:#c81e3a!important;
+  border:1px solid #fecdd3!important;
+}
+
+.film-cos-cell{
+  min-width:128px!important;
+}
+
+.film-compact{
+  min-height:28px;
+}
+
+.film-status{
+  min-width:68px;
+}
+
+@media(max-width:900px){
+  .orders-table{
+    min-width:1100px!important;
+  }
+}
+</style>
+
+
+<style>
+/* ===== Final v4: 12-column alignment + compact trash icon ===== */
+.orders-table th:nth-child(11),
+.orders-table td:nth-child(11){
+    text-align:center!important;
+    min-width:100px;
+}
+
+.orders-table th:nth-child(12),
+.orders-table td:nth-child(12){
+    text-align:center!important;
+    min-width:156px!important;
+    width:156px;
+}
+
+.action-row{
+    grid-template-columns:54px 54px 34px!important;
+    justify-content:center!important;
+}
+
+.btn-trash-icon{
+    width:34px!important;
+    min-width:34px!important;
+    padding:0!important;
+}
+
+.btn-trash-icon svg{
+    display:block;
+}
+</style>
 
 {% endblock %}
