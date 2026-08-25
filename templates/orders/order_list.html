@@ -4,22 +4,32 @@
 <script>
 document.addEventListener("DOMContentLoaded", function(){
     document.querySelectorAll("[data-film-toggle]").forEach(function(btn){
-        btn.addEventListener("click", function(){
-            const cell = btn.closest(".film-cos-cell");
-            if(!cell) return;
+        btn.addEventListener("click", function(event){
+            event.preventDefault();
+            event.stopPropagation();
 
-            const form = cell.querySelector(".film-inline-form");
+            const targetId = btn.getAttribute("data-film-toggle");
+            const form = targetId ? document.getElementById(targetId) : null;
+
             if(!form) return;
 
-            form.classList.toggle("is-open");
+            const opening = !form.classList.contains("is-open");
 
-            if(form.classList.contains("is-open")){
+            document.querySelectorAll(".film-inline-form.is-open").forEach(function(openForm){
+                if(openForm !== form){
+                    openForm.classList.remove("is-open");
+                }
+            });
+
+            form.classList.toggle("is-open", opening);
+
+            if(opening){
                 const input = form.querySelector('input[name="production_film_meter"]');
                 if(input){
                     setTimeout(function(){
                         input.focus();
                         input.select();
-                    }, 20);
+                    }, 30);
                 }
             }
         });
@@ -348,10 +358,12 @@ document.addEventListener("DOMContentLoaded", function(){
     background:#111827;
     color:#fff;
     border-radius:7px;
-    padding:4px 6px;
-    font-size:8px;
+    padding:5px 8px;
+    font-size:9px;
     font-weight:900;
     cursor:pointer;
+    position:relative;
+    z-index:2;
 }
 
 .film-inline-form{
@@ -729,7 +741,7 @@ tfoot th{
                                     {% if perms.orders.change_order and not show_trash %}
                                         <button type="button"
                                                 class="film-edit-toggle"
-                                                data-film-toggle>
+                                                data-film-toggle="filmForm{{ row.obj.pk }}">
                                             {% if row.film_meter_missing %}Add{% else %}Edit{% endif %}
                                         </button>
                                     {% endif %}
@@ -738,7 +750,8 @@ tfoot th{
                                 {% if perms.orders.change_order and not show_trash %}
                                 <form method="post"
                                       action="{% url 'order_film_meter_update' row.obj.pk %}"
-                                      class="film-inline-form">
+                                      class="film-inline-form"
+                                      id="filmForm{{ row.obj.pk }}">
                                     {% csrf_token %}
                                     <input type="hidden" name="next" value="{{ request.get_full_path }}">
                                     <span class="film-input-wrap">
