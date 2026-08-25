@@ -2319,9 +2319,246 @@ def sewing_return_create(request, job_id):
 @login_required
 @permission_required("production.view_sewingreturn", raise_exception=True)
 def sewing_return_list(request):
-    returns = SewingReturn.objects.select_related("job__project", "job__partner", "created_by", "stocked_by")
-    return render(request, "production/sewing_return_list.html", {"returns": returns})
+    """Show every project that has cloth sent to sewing, grouped by project."""
+    status_filter = (request.GET.get("status") or "all").strip().lower()
+    date_type = (request.GET.get("date_type") or "sent").strip().lower()
+    date_from = (request.GET.get("date_from") or "").strip()
+    date_to = (request.GET.get("date_to") or "").strip()
 
+    if status_filter not in {"all", "unpaid", "paid", "sent", "received"}:
+        status_filter = "all"
+
+    # First decide which projects match the requested date range.
+    filtered_jobs = (
+        SewingJob.objects
+        .exclude(status=SewingJob.STATUS_CANCELLED)
+        .select_related("project")
+    )
+
+    if date_type == "received":
+        if date_from:
+            filtered_jobs = filtered_jobs.filter(returns__return_date__gte=date_from)
+        if date_to:
+            filtered_jobs = filtered_jobs.filter(returns__return_date__lte=date_to)
+        filtered_jobs = filtered_jobs.distinct()
+    else:
+        date_type = "sent"
+        if date_from:
+            filtered_jobs = filtered_jobs.filter(sent_date__gte=date_from)
+        if date_to:
+            filtered_jobs = filtered_jobs.filter(sent_date__lte=date_to)
+
+    project_ids = list(
+        filtered_jobs.values_list("project_id", flat=True).distinct()
+    )
+
+    # Once a project matches the date filter, load all of its colour sewing jobs
+    # so project totals stay correct.
+    jobs = (
+        SewingJob.objects
+        .filter(project_id__in=project_ids)
+        .exclude(status=SewingJob.STATUS_CANCELLED)
+        .select_related(
+            "project",
+            "project__finished_item",
+            "project_color__color",
+            "partner",
+        )
+        .prefetch_related(
+            "lines",
+            "returns__lines",
+            "returns__sewing_payable",
+        )
+        .order_by(
+            "-project__created_at",
+            "-project_id",
+            "project_color__sort_order",
+            "id",
+        )
+    )
+
+    grouped = OrderedDict()
+    total_sent = 0
+    total_received = 0
+    total_in_sewing = 0
+    total_unpaid_good = 0
+
+    for job in jobs:
+        project = job.project
+        stocked_returns = [
+            item for item in job.returns.all()
+            if item.status == SewingReturn.STATUS_STOCKED
+        ]
+
+        sent_total = int(job.sent_total or 0)
+        received_total = sum(
+            int(item.good_total or 0)
+            for item in stocked_returns
+        )
+        # pending_total subtracts good + damaged + missing, so a missing/damaged
+        # piece can still complete the sewing job correctly.
+        remaining = int(job.pending_total or 0)
+        latest_received = max(
+            (item.return_date for item in stocked_returns),
+            default=None,
+        )
+
+        unpaid_good = 0
+        paid_amount = Decimal("0")
+        has_unpaid = False
+        has_paid = False
+
+        for sewing_return in stocked_returns:
+            good_qty = int(sewing_return.good_total or 0)
+            payable = getattr(sewing_return, "sewing_payable", None)
+
+            if payable is None:
+                if good_qty > 0:
+                    has_unpaid = True
+                    unpaid_good += good_qty
+                continue
+
+            paid = Decimal(payable.paid_amount or 0)
+            paid_amount += paid
+            if paid > 0:
+                has_paid = True
+            if payable.balance > 0:
+                has_unpaid = True
+                unpaid_good += good_qty
+
+        row = grouped.setdefault(
+            project.id,
+            {
+                "project": project,
+                "children": [],
+                "payee_name": "",
+                "sent_total": 0,
+                "received_total": 0,
+                "remaining_total": 0,
+                "unpaid_good": 0,
+                "paid_amount": Decimal("0"),
+                "latest_sent": None,
+                "latest_received": None,
+                "has_unpaid": False,
+                "has_paid": False,
+                "is_paid": False,
+                "is_finished": False,
+                "can_pay": False,
+                "payment_lock_reason": "",
+            },
+        )
+
+        row["children"].append({
+            "job": job,
+            "color": job.project_color.color if job.project_color_id else project.color,
+            "sent_total": sent_total,
+            "received_total": received_total,
+            "remaining": remaining,
+            "latest_received": latest_received,
+            "unpaid_good": unpaid_good,
+            "paid_amount": paid_amount,
+            "has_unpaid": has_unpaid,
+            "is_paid": bool(stocked_returns) and not has_unpaid and has_paid,
+        })
+
+        if not row["payee_name"]:
+            row["payee_name"] = job.payee_name
+        elif row["payee_name"] != job.payee_name:
+            row["payee_name"] = "Multiple sewers"
+
+        row["sent_total"] += sent_total
+        row["received_total"] += received_total
+        row["remaining_total"] += remaining
+        row["unpaid_good"] += unpaid_good
+        row["paid_amount"] += paid_amount
+        row["has_unpaid"] = row["has_unpaid"] or has_unpaid
+        row["has_paid"] = row["has_paid"] or has_paid
+
+        if row["latest_sent"] is None or job.sent_date > row["latest_sent"]:
+            row["latest_sent"] = job.sent_date
+        if latest_received and (
+            row["latest_received"] is None
+            or latest_received > row["latest_received"]
+        ):
+            row["latest_received"] = latest_received
+
+    # Summary is based on all projects matching the date range.
+    for row in grouped.values():
+        total_sent += row["sent_total"]
+        total_received += row["received_total"]
+        total_in_sewing += row["remaining_total"]
+        total_unpaid_good += row["unpaid_good"]
+
+    project_rows = list(grouped.values())
+
+    for row in project_rows:
+        # Fully received/accounted means nothing is left with the sewer.
+        row["is_finished"] = bool(
+            row["sent_total"] > 0 and row["remaining_total"] == 0
+        )
+        row["is_paid"] = bool(
+            row["is_finished"]
+            and row["received_total"] > 0
+            and not row["has_unpaid"]
+            and row["has_paid"]
+        )
+        row["can_pay"] = bool(
+            row["is_finished"]
+            and row["has_unpaid"]
+            and row["unpaid_good"] > 0
+            and row["payee_name"] != "Multiple sewers"
+        )
+
+        if row["is_paid"]:
+            row["payment_lock_reason"] = "Project already paid."
+        elif row["remaining_total"] > 0:
+            row["payment_lock_reason"] = f"{row['remaining_total']} pcs are still with the sewer."
+        elif row["payee_name"] == "Multiple sewers":
+            row["payment_lock_reason"] = "This project contains multiple sewers."
+        elif not row["has_unpaid"]:
+            row["payment_lock_reason"] = "No unpaid received cloth."
+        elif row["unpaid_good"] <= 0:
+            row["payment_lock_reason"] = "No good received cloth is ready to pay."
+        else:
+            row["payment_lock_reason"] = ""
+
+    if status_filter == "paid":
+        project_rows = [row for row in project_rows if row["is_paid"]]
+    elif status_filter == "unpaid":
+        project_rows = [
+            row for row in project_rows
+            if row["has_unpaid"] and not row["is_paid"]
+        ]
+    elif status_filter == "sent":
+        project_rows = [
+            row for row in project_rows
+            if row["sent_total"] > 0 and row["remaining_total"] > 0
+        ]
+    elif status_filter == "received":
+        project_rows = [
+            row for row in project_rows
+            if row["sent_total"] > 0 and row["remaining_total"] == 0
+        ]
+
+    project_rows.sort(
+        key=lambda row: (row["latest_sent"] or date.min, row["project"].id),
+        reverse=True,
+    )
+
+    return render(request, "production/sewing_return_list.html", {
+        "project_rows": project_rows,
+        "total_projects": len(grouped),
+        "total_sent": total_sent,
+        "total_received": total_received,
+        "total_in_sewing": total_in_sewing,
+        "total_unpaid_good": total_unpaid_good,
+        "status_filter": status_filter,
+        "date_type": date_type,
+        "date_from": date_from,
+        "date_to": date_to,
+        # The current code uses the separate Sewing Payments workflow.
+        "payment_form": None,
+    })
 
 
 @login_required
