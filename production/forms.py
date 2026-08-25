@@ -418,6 +418,52 @@ class StaffPayableForm(forms.ModelForm):
         }
 
 
+class SewingReturnBulkPaymentForm(forms.Form):
+    """
+    Payment form used by the Sewing Returns project-payment modal.
+
+    Production completion may include good + damaged + missing pieces,
+    but sewing payment is calculated from GOOD received pieces only.
+    """
+    price_per_piece = forms.DecimalField(
+        label="Price per cloth",
+        min_value=Decimal("0.0001"),
+        max_digits=12,
+        decimal_places=4,
+        widget=forms.NumberInput(
+            attrs={
+                "class": "form-control",
+                "step": "0.0001",
+                "min": "0.0001",
+                "placeholder": "0.50",
+                "inputmode": "decimal",
+            }
+        ),
+    )
+
+    payment_date = forms.DateField(
+        label="Payment date",
+        widget=forms.DateInput(
+            attrs={
+                "type": "date",
+                "class": "form-control",
+            }
+        ),
+    )
+
+    note = forms.CharField(
+        label="Note",
+        required=False,
+        widget=forms.Textarea(
+            attrs={
+                "class": "form-control",
+                "rows": 3,
+                "placeholder": "Optional note",
+            }
+        ),
+    )
+
+
 class PaymentBatchForm(forms.ModelForm):
     class Meta:
         model = ProductionPaymentBatch
