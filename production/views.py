@@ -2525,12 +2525,24 @@ def sewing_return_list(request):
             and row["payee_name"] != "Multiple sewers"
         )
 
+        # Completion and payment are separate concepts.
+        # A production project is complete when nothing remains with the sewer,
+        # even if there is no sewing payment due.
+        row["is_complete_no_payment"] = bool(
+            row["is_finished"]
+            and not row["can_pay"]
+            and not row["is_paid"]
+            and row["remaining_total"] == 0
+        )
+
         if row["is_paid"]:
             row["payment_lock_reason"] = "Project already paid."
         elif row["remaining_total"] > 0:
             row["payment_lock_reason"] = f"{row['remaining_total']} pcs are still with the sewer."
         elif row["payee_name"] == "Multiple sewers":
             row["payment_lock_reason"] = "This project contains multiple sewers."
+        elif row["is_complete_no_payment"]:
+            row["payment_lock_reason"] = "Production completed. No sewing payment is due."
         elif not row["has_unpaid"]:
             row["payment_lock_reason"] = "No unpaid received cloth."
         elif row["unpaid_good"] <= 0:

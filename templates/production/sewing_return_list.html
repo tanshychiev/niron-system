@@ -1814,6 +1814,13 @@ Pay the sewer only after the full production project is received
     }
   }
 
+
+.status-complete{
+  background:#e9fbf1;
+  color:#0a7a46;
+  border:1px solid #bcebd2;
+}
+
 </style>
 
 <div class="sew-page">
@@ -1945,7 +1952,7 @@ Pay the sewer only after the full production project is received
     {% for row in project_rows %}
     <article class="project-card {% if not row.can_pay %}is-locked{% endif %}"
              data-project-card
-             data-project-status="{% if row.is_paid %}paid{% elif row.can_pay %}ready{% else %}waiting{% endif %}"
+             data-project-status="{% if row.is_paid %}paid{% elif row.can_pay %}ready{% elif row.is_complete_no_payment %}complete{% else %}waiting{% endif %}"
              data-project-id="{{ row.project.id }}"
              data-project-no="{{ row.project.project_no }}"
              data-payee="{{ row.payee_name }}"
@@ -1992,6 +1999,11 @@ Pay the sewer only after the full production project is received
             <span class="status-pill status-paid">✓ Paid</span>
           {% elif row.can_pay %}
             <span class="status-pill status-ready">Ready to Pay</span>
+          {% elif row.is_complete_no_payment %}
+            <span class="status-pill status-complete">✓ Completed</span>
+            <small class="lock-reason">
+              No payment due
+            </small>
           {% else %}
             <span class="status-pill status-wait">Not Ready</span>
             <small class="lock-reason">
