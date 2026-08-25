@@ -94,24 +94,43 @@ def _cutting_is_complete(project):
 
 
 def _recalculate_project_status(project):
-    """Rebuild project status after a safe undo action."""
+    """
+    Rebuild production status from actual production movement.
+
+    Good, damaged, and missing pieces are all ACCOUNTED FOR.
+    Only good pieces go into finished inventory, but damaged/missing pieces
+    still close the sewing quantity so production can complete.
+    """
     project.refresh_from_db()
 
     cut_total = int(project.cut_total or 0)
     sent_total = int(project.sent_total or 0)
-    good_total = int(project.returned_good_total or 0)
-    still_with_sewer = int(project.still_with_sewer or 0)
+
+    stocked_totals = SewingReturnLine.objects.filter(
+        sewing_return__job__project=project,
+        sewing_return__status=SewingReturn.STATUS_STOCKED,
+    ).aggregate(
+        good=Sum("good_qty"),
+        damaged=Sum("damaged_qty"),
+        missing=Sum("missing_qty"),
+    )
+
+    good_total = int(stocked_totals["good"] or 0)
+    damaged_total = int(stocked_totals["damaged"] or 0)
+    missing_total = int(stocked_totals["missing"] or 0)
+    accounted_total = good_total + damaged_total + missing_total
+
+    remaining_to_send = max(cut_total - sent_total, 0)
+    still_with_sewer = max(sent_total - accounted_total, 0)
 
     if (
         _cutting_is_complete(project)
         and cut_total > 0
-        and sent_total >= cut_total
+        and remaining_to_send <= 0
         and still_with_sewer <= 0
     ):
-        # Completed means every cut piece is accounted for:
-        # good stock, damaged, or missing.
         status = ProductionProject.STATUS_COMPLETED
-    elif good_total > 0 or project.damaged_total > 0 or project.missing_total > 0:
+    elif accounted_total > 0:
         status = ProductionProject.STATUS_PARTIAL_RETURN
     elif still_with_sewer > 0 or sent_total > 0:
         status = ProductionProject.STATUS_SENT
@@ -650,6 +669,7 @@ def project_detail(request, pk):
     project_cut_total = 0
     project_sent_total = 0
     project_done_total = 0
+    project_accounted_total = 0
 
     for pc in project.project_colors.select_related("color").all():
         plan = {x.size_id: int(x.planned_qty or 0) for x in pc.plan_sizes.all()}
@@ -660,14 +680,22 @@ def project_detail(request, pk):
             .values("size_id")
             .annotate(total=Sum("sent_qty"))
         }
-        done = {
-            x["size_id"]: int(x["total"] or 0)
-            for x in SewingReturnLine.objects.filter(
+        return_lines = (
+            SewingReturnLine.objects.filter(
                 sewing_return__job__project_color=pc,
                 sewing_return__status=SewingReturn.STATUS_STOCKED,
             )
             .values("size_id")
-            .annotate(total=Sum("good_qty"))
+            .annotate(
+                good_total=Sum("good_qty"),
+                damaged_total=Sum("damaged_qty"),
+                missing_total=Sum("missing_qty"),
+            )
+        )
+        done = {x["size_id"]: int(x["good_total"] or 0) for x in return_lines}
+        accounted = {
+            x["size_id"]: int(x["good_total"] or 0) + int(x["damaged_total"] or 0) + int(x["missing_total"] or 0)
+            for x in return_lines
         }
 
         rows = []
@@ -676,6 +704,7 @@ def project_detail(request, pk):
             saved_cut = cut.get(size.id, 0)
             sent_qty = sent.get(size.id, 0)
             done_qty = done.get(size.id, 0)
+            accounted_qty = accounted.get(size.id, 0)
             rows.append({
                 "size": size,
                 "planned": planned,
@@ -684,13 +713,15 @@ def project_detail(request, pk):
                 "saved_cut": saved_cut,
                 "sent": sent_qty,
                 "done": done_qty,
+                "accounted": accounted_qty,
                 "available_to_send": max(saved_cut - sent_qty, 0),
-                "waiting_from_sewer": max(sent_qty - done_qty, 0),
+                "waiting_from_sewer": max(sent_qty - accounted_qty, 0),
             })
             project_plan_total += planned
             project_cut_total += saved_cut
             project_sent_total += sent_qty
             project_done_total += done_qty
+            project_accounted_total += accounted_qty
 
         reserved_rolls = list(
             pc.roll_usages.select_related(
@@ -736,6 +767,7 @@ def project_detail(request, pk):
             "variance_total": sum(cut.values()) - sum(plan.values()),
             "sent_total": sum(sent.values()),
             "done_total": sum(done.values()),
+            "accounted_total": sum(accounted.values()),
         })
 
     jobs = (
@@ -825,7 +857,7 @@ def project_detail(request, pk):
 
     remaining_to_cut = max(project_plan_total - project_cut_total, 0)
     remaining_to_send = max(project_cut_total - project_sent_total, 0)
-    waiting_from_sewer = max(project_sent_total - project_done_total, 0)
+    waiting_from_sewer = max(project_sent_total - project_accounted_total, 0)
 
     latest_job = jobs.order_by("-created_at", "-id").first()
     latest_stocked_return = (
@@ -885,6 +917,7 @@ def project_detail(request, pk):
         "project_cut_total": project_cut_total,
         "project_sent_total": project_sent_total,
         "project_done_total": project_done_total,
+        "project_accounted_total": project_accounted_total,
         "remaining_to_cut": remaining_to_cut,
         "cut_variance": project_cut_total - project_plan_total,
         "remaining_to_send": remaining_to_send,
@@ -1673,35 +1706,7 @@ def project_receive_selected_jobs(request, pk):
                 total_good += job_total
                 received_jobs += 1
 
-            project.refresh_from_db()
-            cut_total = int(project.cut_total or 0)
-            good_total = int(project.returned_good_total or 0)
-            still_with_sewer = int(project.still_with_sewer or 0)
-
-            if (
-                _cutting_is_complete(project)
-                and cut_total > 0
-                and int(project.sent_total or 0) >= cut_total
-                and still_with_sewer <= 0
-            ):
-                # Good + damaged + missing are all accounted for.
-                project.status = ProductionProject.STATUS_COMPLETED
-            elif (
-                good_total > 0
-                or int(project.damaged_total or 0) > 0
-                or int(project.missing_total or 0) > 0
-            ):
-                project.status = ProductionProject.STATUS_PARTIAL_RETURN
-            elif still_with_sewer > 0 or project.sent_total > 0:
-                project.status = ProductionProject.STATUS_SENT
-            else:
-                project.status = (
-                    ProductionProject.STATUS_CUT_COMPLETE
-                    if _cutting_is_complete(project)
-                    else ProductionProject.STATUS_CUTTING
-                )
-
-            project.save(update_fields=["status", "updated_at"])
+            _recalculate_project_status(project)
 
         messages.success(
             request,
@@ -1769,7 +1774,18 @@ def project_receive_sewing_inline(request, pk, job_id):
                         missing_qty=values["missing"],
                     )
             confirm_sewing_return(sewing_return, request.user)
-        messages.success(request, "Sewing received and good pieces added to Cloth Inventory.")
+            _recalculate_project_status(project)
+
+        missing_total = sum(v["missing"] for v in quantities.values())
+        damaged_total = sum(v["damaged"] for v in quantities.values())
+        good_total = sum(v["good"] for v in quantities.values())
+        message = f"Sewing completed: {good_total} good"
+        if damaged_total:
+            message += f", {damaged_total} damaged"
+        if missing_total:
+            message += f", {missing_total} missing"
+        message += ". Good pieces were added to Cloth Inventory."
+        messages.success(request, message)
     except ValidationError as exc:
         messages.error(request, " ".join(exc.messages))
 
@@ -2602,7 +2618,11 @@ def sewing_return_confirm(request, pk):
     if request.method == "POST":
         try:
             confirm_sewing_return(sewing_return, request.user)
-            messages.success(request, "Return confirmed and good pieces stocked into Cloth Inventory.")
+            _recalculate_project_status(sewing_return.job.project)
+            messages.success(
+                request,
+                "Return confirmed. Good pieces were stocked; damaged/missing pieces were recorded and count as completed production."
+            )
         except ValidationError as exc:
             for error in exc.messages:
                 messages.error(request, error)
