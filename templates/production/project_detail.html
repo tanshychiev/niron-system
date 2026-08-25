@@ -864,27 +864,154 @@ function changeRollCount(button, delta){
         {% endif %}
       </div>
 
-      {% if not project.cutting_is_complete and project.status != 'COMPLETED' and project.status != 'CANCELLED' %}
-      <form class="simple-roll-form simple-one-button-form"
-            method="post"
-            action="{% url 'production_project_add_roll' project.id %}">
-        {% csrf_token %}
-        <input type="hidden"
-               name="project_color_id"
-               value="{{ row.pc.id }}">
-        <input type="hidden" name="roll_count" value="1">
-        <input type="hidden" name="selection_order" value="FULL_FIRST">
+      {% if not can_reopen_cutting and project.status != 'COMPLETED' and project.status != 'CANCELLED' %}
+      <button type="button"
+              class="btn btn-primary simple-choose-fabric-btn open-fabric-modal"
+              data-fabric-modal="fabricModal{{ row.pc.id }}"
+              {% if row.available_count <= 0 %}disabled{% endif %}>
+        {% if row.reserved_count %}
+          + Add Fabric
+        {% else %}
+          Choose Fabric
+        {% endif %}
+      </button>
 
-        <button class="btn btn-primary simple-choose-fabric-btn"
-                type="submit"
-                {% if row.available_count <= 0 %}disabled{% endif %}>
-          {% if row.reserved_count %}
-            + Add Fabric
-          {% else %}
-            Choose Fabric
-          {% endif %}
-        </button>
-      </form>
+      <div class="fabric-modal" id="fabricModal{{ row.pc.id }}" aria-hidden="true">
+        <div class="fabric-modal-backdrop" data-close-fabric-modal></div>
+
+        <div class="fabric-modal-dialog" role="dialog" aria-modal="true">
+          <div class="fabric-modal-head">
+            <div>
+              <h3>Choose Fabric Roll</h3>
+              <div class="sub">
+                {{ row.pc.color.name }} · {{ row.available_count }} available
+              </div>
+            </div>
+            <button type="button"
+                    class="fabric-modal-close"
+                    data-close-fabric-modal
+                    aria-label="Close">×</button>
+          </div>
+
+          <div class="fabric-modal-filters fabric-modal-filters-3">
+            <div class="fabric-filter-field">
+              <label>Supplier</label>
+              <select data-fabric-supplier-filter>
+                <option value="">All suppliers</option>
+                {% regroup row.available_rolls by receipt.supplier as supplier_groups %}
+                {% for supplier_group in supplier_groups %}
+                  <option value="{{ supplier_group.grouper|default:'-'|lower }}">
+                    {{ supplier_group.grouper|default:"No supplier" }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="fabric-filter-field">
+              <label>Roll Type</label>
+              <select data-fabric-type-filter>
+                <option value="">All rolls</option>
+                <option value="FULL">Full roll</option>
+                <option value="PARTIAL">Partial roll</option>
+              </select>
+            </div>
+
+            <div class="fabric-filter-field fabric-code-search">
+              <label>Search Roll Code</label>
+              <input type="search"
+                     data-fabric-code-filter
+                     placeholder="Type roll code..."
+                     autocomplete="off">
+            </div>
+          </div>
+
+          <div class="fabric-modal-result-info">
+            <span><b data-fabric-visible-count>{{ row.available_count }}</b> matching roll(s)</span>
+            <span>Only suppliers with available stock are shown.</span>
+          </div>
+
+          <div class="fabric-modal-roll-list">
+            {% for roll in row.available_rolls %}
+            <label class="fabric-modal-roll"
+                   data-fabric-roll
+                   data-supplier="{{ roll.receipt.supplier|default:'-'|lower }}"
+                   data-supplier-label="{{ roll.receipt.supplier|default:'No supplier' }}"
+                   data-code="{{ roll.roll_code|lower }}"
+                   data-kg="{{ roll.available_qty }}"
+                   data-roll-type="{% if roll.status == 'PARTIAL' or roll.available_qty < 1 %}PARTIAL{% else %}FULL{% endif %}">
+              <input type="checkbox"
+                     class="fabric-roll-check"
+                     data-fabric-roll-check
+                     value="{{ roll.id }}">
+
+              <div class="fabric-roll-main">
+                <div class="fabric-roll-code-line">
+                  <div class="fabric-roll-code">{{ roll.roll_code }}</div>
+                  {% if roll.status == 'PARTIAL' or roll.available_qty < 1 %}
+                    <span class="fabric-roll-type-badge is-partial">PARTIAL</span>
+                  {% else %}
+                    <span class="fabric-roll-type-badge is-full">FULL</span>
+                  {% endif %}
+                </div>
+                <div class="fabric-roll-meta">
+                  <span>{{ roll.receipt.supplier|default:"No supplier" }}</span>
+                  <span>·</span>
+                  <span>{{ roll.receipt.fabric_name }}</span>
+                </div>
+              </div>
+
+              <div class="fabric-roll-kg">
+                <span>Available</span>
+                <strong>{{ roll.available_qty|floatformat:"-3" }} KG</strong>
+                <small>Remaining {{ roll.remaining_qty|floatformat:"-3" }} KG</small>
+              </div>
+
+              <span class="fabric-roll-select-label">Select</span>
+            </label>
+            {% empty %}
+            <div class="fabric-modal-empty">No available fabric roll for this colour.</div>
+            {% endfor %}
+          </div>
+
+          <div class="fabric-modal-no-match" data-fabric-no-match hidden>
+            No roll matches this supplier / code.
+          </div>
+
+          <form method="post"
+                class="fabric-modal-submit"
+                data-fabric-multi-form
+                action="{% url 'production_project_add_roll' project.id %}">
+            {% csrf_token %}
+            <input type="hidden" name="project_color_id" value="{{ row.pc.id }}">
+            <div data-fabric-selected-inputs></div>
+
+            <div class="fabric-modal-submit-info fabric-selected-summary">
+              <div class="fabric-selected-roll-total">
+                <span data-fabric-selected-count>0</span>
+                <small>ROLLS SELECTED</small>
+              </div>
+              <div class="fabric-selected-kg-total">
+                <strong><span data-fabric-selected-kg>0</span> KG</strong>
+                <small>TOTAL AVAILABLE</small>
+              </div>
+            </div>
+
+            <div class="fabric-modal-submit-actions">
+              <button type="button"
+                      class="btn btn-light"
+                      data-clear-fabric-selection>
+                Clear
+              </button>
+              <button type="submit"
+                      class="btn btn-primary"
+                      data-choose-selected-rolls
+                      disabled>
+                Choose Selected Rolls
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
       {% else %}
       <div class="simple-confirmed-label">Fabric confirmed</div>
       {% endif %}
@@ -1385,20 +1512,36 @@ function changeRollCount(button, delta){
                 <tbody>
                   {% for s in item.sizes %}
                     {% if s.pending %}
-                    <tr>
+                    <tr class="receive-size-row"
+                        data-receive-size-row
+                        data-size-id="{{ s.size.id }}"
+                        data-pending="{{ s.pending }}">
                       <td><strong>{{ s.size.name }}</strong></td>
                       <td>{{ s.sent }}</td>
                       <td>{{ s.good }}</td>
                       <td>
-                        <input
-                          class="qty-input receive-now-input"
-                          data-receive-now
-                          type="number"
-                          min="0"
-                          max="{{ s.pending }}"
-                          name="good_{{ item.job.id }}_{{ s.size.id }}"
-                          value="{{ s.pending }}"
-                        >
+                        <div class="receive-now-control">
+                          <input
+                            class="qty-input receive-now-input"
+                            data-receive-now
+                            type="number"
+                            min="0"
+                            max="{{ s.pending }}"
+                            name="good_{{ item.job.id }}_{{ s.size.id }}"
+                            value="{{ s.pending }}"
+                          >
+                          <div class="receive-quick-actions">
+                            <button type="button"
+                                    class="receive-quick-btn is-good"
+                                    data-receive-action="good">✓ All Good</button>
+                            <button type="button"
+                                    class="receive-quick-btn is-damage"
+                                    data-receive-action="damage">Damage</button>
+                            <button type="button"
+                                    class="receive-quick-btn is-missing"
+                                    data-receive-action="missing">Missing</button>
+                          </div>
+                        </div>
                       </td>
                     </tr>
                     {% endif %}
@@ -1407,7 +1550,7 @@ function changeRollCount(button, delta){
               </table>
 
               <details class="issue combined-issue">
-                <summary><strong>Damage or missing</strong></summary>
+                <summary><strong>Damage or Missing</strong> <span class="issue-help">Use the quick buttons above or enter quantities here.</span></summary>
 
                 <div class="issue-grid">
                   {% for s in item.sizes %}
@@ -1418,6 +1561,8 @@ function changeRollCount(button, delta){
                         type="number"
                         min="0"
                         name="damaged_{{ item.job.id }}_{{ s.size.id }}"
+                        data-damaged
+                        data-size-id="{{ s.size.id }}"
                         value="0"
                       >
                     </div>
@@ -1428,6 +1573,8 @@ function changeRollCount(button, delta){
                         type="number"
                         min="0"
                         name="missing_{{ item.job.id }}_{{ s.size.id }}"
+                        data-missing
+                        data-size-id="{{ s.size.id }}"
                         value="0"
                       >
                     </div>
@@ -3916,5 +4063,840 @@ function changeRollCount(button, delta){
   }
 }
 </style>
+
+
+<style>
+/* ===== Reliable exact-roll picker ===== */
+.fabric-roll-picker{
+  position:relative;
+  width:100%;
+}
+.fabric-roll-picker > summary{
+  list-style:none;
+  cursor:pointer;
+}
+.fabric-roll-picker > summary::-webkit-details-marker{display:none}
+.fabric-roll-picker > summary.is-disabled{
+  opacity:.45;
+  pointer-events:none;
+}
+.fabric-roll-picker-menu,
+.fabric-roll-picker-empty{
+  position:absolute;
+  right:0;
+  top:calc(100% + 7px);
+  z-index:80;
+  width:min(430px,92vw);
+  padding:10px;
+  border:1px solid #e4d4b9;
+  border-radius:14px;
+  background:#fffdf8;
+  box-shadow:0 18px 50px rgba(58,38,12,.18);
+}
+.fabric-roll-picker-empty{
+  color:#8a6a43;
+  font-size:11px;
+}
+.fabric-roll-picker-title{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-end;
+  gap:10px;
+  padding:4px 4px 9px;
+}
+.fabric-roll-picker-title strong{font-size:13px}
+.fabric-roll-picker-title small{font-size:10px;color:#7d6b55}
+.fabric-roll-picker-list{
+  display:grid;
+  gap:7px;
+  max-height:320px;
+  overflow:auto;
+}
+.fabric-roll-option{margin:0!important}
+.fabric-roll-option-btn{
+  width:100%;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  padding:10px 11px;
+  border:1px solid #eadbc4;
+  border-radius:11px;
+  background:#fff;
+  cursor:pointer;
+  text-align:left;
+}
+.fabric-roll-option-btn:hover{
+  border-color:#e6a61c;
+  background:#fff8e7;
+}
+.fabric-roll-option-btn span strong,
+.fabric-roll-option-btn span small{display:block}
+.fabric-roll-option-btn span small{
+  margin-top:3px;
+  color:#7d6b55;
+  font-size:10px;
+}
+.fabric-roll-option-btn b{
+  flex:0 0 auto;
+  padding:6px 9px;
+  border-radius:8px;
+  background:#f7ad12;
+  color:#31200b;
+  font-size:10px;
+}
+
+/* ===== Easy sewer receiving ===== */
+.receive-now-control{display:grid;gap:7px}
+.receive-quick-actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:5px;
+}
+.receive-quick-btn{
+  min-height:28px;
+  padding:4px 8px;
+  border:1px solid #dce2df;
+  border-radius:8px;
+  background:#fff;
+  cursor:pointer;
+  font-size:9px;
+  font-weight:850;
+}
+.receive-quick-btn.is-good{color:#087545;border-color:#a9d8be;background:#effaf4}
+.receive-quick-btn.is-damage{color:#a46109;border-color:#f0cf95;background:#fff8e8}
+.receive-quick-btn.is-missing{color:#b42318;border-color:#efc0bc;background:#fff4f3}
+.receive-quick-btn.active{
+  box-shadow:0 0 0 2px rgba(39,92,68,.13);
+  transform:translateY(-1px);
+}
+.issue-help{
+  margin-left:6px;
+  color:#817464;
+  font-size:9px;
+  font-weight:600;
+}
+.issue-grid input[data-damaged],
+.issue-grid input[data-missing]{
+  font-weight:850;
+}
+@media(max-width:700px){
+  .fabric-roll-picker-menu{position:fixed;left:12px;right:12px;top:auto;bottom:12px;width:auto}
+  .receive-quick-actions{display:grid;grid-template-columns:repeat(3,1fr)}
+}
+</style>
+
+<script>
+(function(){
+  function num(input){
+    const value = Number(input && input.value || 0);
+    return Number.isFinite(value) && value > 0 ? value : 0;
+  }
+
+  function issueInput(card, role, sizeId){
+    return card.querySelector(
+      '[' + role + '][data-size-id="' + sizeId + '"]'
+    );
+  }
+
+  function selectCard(card){
+    const checkbox = card.querySelector('.receive-job-checkbox');
+    if(checkbox && !checkbox.checked){
+      checkbox.checked = true;
+      checkbox.dispatchEvent(new Event('change', {bubbles:true}));
+    }
+  }
+
+  function applyQuickAction(button){
+    const row = button.closest('[data-receive-size-row]');
+    const card = button.closest('[data-receive-card]');
+    if(!row || !card) return;
+
+    const pending = Number(row.dataset.pending || 0);
+    const sizeId = row.dataset.sizeId;
+    const good = row.querySelector('[data-receive-now]');
+    const damaged = issueInput(card, 'data-damaged', sizeId);
+    const missing = issueInput(card, 'data-missing', sizeId);
+
+    if(!good || !damaged || !missing) return;
+
+    const action = button.dataset.receiveAction;
+
+    if(action === 'good'){
+      good.value = pending;
+      damaged.value = 0;
+      missing.value = 0;
+    }else if(action === 'damage'){
+      good.value = 0;
+      damaged.value = pending;
+      missing.value = 0;
+    }else if(action === 'missing'){
+      good.value = 0;
+      damaged.value = 0;
+      missing.value = pending;
+    }
+
+    row.querySelectorAll('[data-receive-action]').forEach(function(item){
+      item.classList.toggle('active', item === button);
+    });
+
+    selectCard(card);
+    refreshEasyReceive();
+  }
+
+  function refreshEasyReceive(){
+    const cards = Array.from(document.querySelectorAll('[data-receive-card]'));
+    const button = document.getElementById('confirmSelectedReceive');
+    const count = document.getElementById('selectedReceiveCount');
+    const selectedJobsOutput = document.getElementById('receiveTotalSelectedJobs');
+    const receiveNowOutput = document.getElementById('receiveTotalNow');
+    const stickyTotal = document.getElementById('receiveStickyTotal');
+    const stickyJobs = document.getElementById('receiveStickyJobs');
+
+    let selected = 0;
+    let goodTotal = 0;
+    let issueTotal = 0;
+    let accountedTotal = 0;
+
+    cards.forEach(function(card){
+      const checkbox = card.querySelector('.receive-job-checkbox');
+      if(!checkbox || !checkbox.checked) return;
+
+      selected += 1;
+
+      card.querySelectorAll('[data-receive-size-row]').forEach(function(row){
+        const sizeId = row.dataset.sizeId;
+        const good = row.querySelector('[data-receive-now]');
+        const damaged = issueInput(card, 'data-damaged', sizeId);
+        const missing = issueInput(card, 'data-missing', sizeId);
+
+        const g = num(good);
+        const d = num(damaged);
+        const m = num(missing);
+
+        goodTotal += g;
+        issueTotal += d + m;
+        accountedTotal += g + d + m;
+      });
+    });
+
+    if(count) count.textContent = String(selected);
+    if(selectedJobsOutput) selectedJobsOutput.textContent = String(selected);
+    if(receiveNowOutput) receiveNowOutput.textContent = String(goodTotal);
+    if(stickyTotal) stickyTotal.textContent = String(goodTotal);
+    if(stickyJobs) stickyJobs.textContent = String(selected);
+
+    if(button){
+      button.disabled = selected === 0 || accountedTotal <= 0;
+
+      if(accountedTotal > 0){
+        button.textContent =
+          issueTotal > 0
+            ? 'Complete ' + accountedTotal + ' pcs (' + goodTotal + ' good, ' + issueTotal + ' issue)'
+            : 'Confirm ' + goodTotal + ' pcs & Add Stock';
+      }else{
+        button.textContent = 'Confirm Selected & Add Stock';
+      }
+    }
+  }
+
+  document.addEventListener('click', function(event){
+    const quick = event.target.closest('[data-receive-action]');
+    if(quick){
+      event.preventDefault();
+      applyQuickAction(quick);
+    }
+  });
+
+  document.querySelectorAll(
+    '[data-receive-now], [data-damaged], [data-missing], .receive-job-checkbox'
+  ).forEach(function(input){
+    input.addEventListener('input', refreshEasyReceive);
+    input.addEventListener('change', refreshEasyReceive);
+  });
+
+  const allBoxes = [
+    document.getElementById('selectAllReceiveJobs'),
+    document.getElementById('combinedReceiveAll')
+  ].filter(Boolean);
+
+  allBoxes.forEach(function(box){
+    box.addEventListener('change', function(){
+      window.setTimeout(refreshEasyReceive, 0);
+    });
+  });
+
+  refreshEasyReceive();
+})();
+</script>
+
+
+<style>
+.fabric-modal{position:fixed;inset:0;z-index:3000;display:none;align-items:center;justify-content:center;padding:24px}
+.fabric-modal.is-open{display:flex}
+.fabric-modal-backdrop{position:absolute;inset:0;background:rgba(28,25,20,.48);backdrop-filter:blur(2px)}
+.fabric-modal-dialog{position:relative;z-index:1;width:min(780px,96vw);max-height:min(720px,88vh);display:flex;flex-direction:column;overflow:hidden;border:1px solid #e7d8bf;border-radius:18px;background:#fffdf9;box-shadow:0 28px 90px rgba(35,26,12,.28)}
+.fabric-modal-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 20px 14px;border-bottom:1px solid #eee3d2}
+.fabric-modal-head h3{margin:0 0 3px;font-size:20px}
+.fabric-modal-close{width:36px;height:36px;border:1px solid #eadbc5;border-radius:10px;background:#fff;font-size:24px;line-height:1;cursor:pointer}
+.fabric-modal-filters{display:grid;grid-template-columns:minmax(190px,.7fr) minmax(260px,1.3fr);gap:12px;padding:14px 20px;background:#fff9ee;border-bottom:1px solid #eee3d2}
+.fabric-filter-field{display:grid;gap:5px}
+.fabric-filter-field label{font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.04em;color:#6f5c44}
+.fabric-filter-field select,.fabric-filter-field input{width:100%;height:42px;border:1px solid #dfceb1;border-radius:10px;background:#fff;padding:0 11px;font-size:13px;outline:none}
+.fabric-filter-field select:focus,.fabric-filter-field input:focus{border-color:#e6a21a;box-shadow:0 0 0 3px rgba(230,162,26,.13)}
+.fabric-modal-result-info{display:flex;justify-content:space-between;gap:12px;padding:10px 20px;font-size:10px;color:#776854;border-bottom:1px solid #f0e7da}
+.fabric-modal-roll-list{overflow:auto;padding:10px 12px 16px}
+.fabric-modal-roll{display:grid;grid-template-columns:minmax(0,1fr) 150px 86px;align-items:center;gap:14px;padding:11px 12px;margin:0 0 8px;border:1px solid #e9dcc8;border-radius:12px;background:#fff}
+.fabric-modal-roll:hover{border-color:#e4aa38;background:#fffaf0}
+.fabric-roll-code{font-size:14px;font-weight:950;word-break:break-word}
+.fabric-roll-meta{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px;color:#7e705f;font-size:10px}
+.fabric-roll-kg{text-align:right}
+.fabric-roll-kg span,.fabric-roll-kg small{display:block;color:#7c6b54;font-size:9px}
+.fabric-roll-kg strong{display:block;margin:2px 0;font-size:15px;color:#1c6d4b}
+.fabric-roll-choose-btn{height:36px;border:0;border-radius:9px;background:#f5aa0a;color:#2e200b;font-weight:900;cursor:pointer}
+.fabric-modal-no-match,.fabric-modal-empty{margin:14px;padding:18px;text-align:center;border:1px dashed #dcc8a8;border-radius:12px;color:#806f57;background:#fffaf2}
+body.fabric-modal-open{overflow:hidden}
+@media(max-width:700px){
+  .fabric-modal{padding:10px}
+  .fabric-modal-dialog{width:100%;max-height:92vh;border-radius:14px}
+  .fabric-modal-filters{grid-template-columns:1fr}
+  .fabric-modal-roll{grid-template-columns:1fr auto}
+  .fabric-roll-kg{text-align:left}
+  .fabric-roll-choose-btn{grid-column:1 / -1;width:100%}
+}
+</style>
+
+<script>
+(function(){
+  function normalize(value){ return String(value || '').trim().toLowerCase(); }
+
+  function refreshModal(modal){
+    const supplierSelect = modal.querySelector('[data-fabric-supplier-filter]');
+    const typeSelect = modal.querySelector('[data-fabric-type-filter]');
+    const codeInput = modal.querySelector('[data-fabric-code-filter]');
+
+    const supplier = normalize(supplierSelect && supplierSelect.value);
+    const rollType = String(typeSelect && typeSelect.value || '').trim().toUpperCase();
+    const code = normalize(codeInput && codeInput.value);
+
+    let visible = 0;
+
+    modal.querySelectorAll('[data-fabric-roll]').forEach(function(row){
+      const supplierOK = !supplier || normalize(row.dataset.supplier) === supplier;
+      const typeOK = !rollType || String(row.dataset.rollType || '').toUpperCase() === rollType;
+      const codeOK = !code || normalize(row.dataset.code).includes(code);
+
+      const show = supplierOK && typeOK && codeOK;
+      row.hidden = !show;
+
+      if(show) visible++;
+    });
+
+    const count = modal.querySelector('[data-fabric-visible-count]');
+    const noMatch = modal.querySelector('[data-fabric-no-match]');
+
+    if(count) count.textContent = visible;
+    if(noMatch) noMatch.hidden = visible !== 0;
+  }
+
+  function openModal(id){
+    const modal = document.getElementById(id);
+    if(!modal) return;
+    modal.classList.add('is-open');
+    modal.setAttribute('aria-hidden','false');
+    document.body.classList.add('fabric-modal-open');
+    refreshModal(modal);
+    const search = modal.querySelector('[data-fabric-code-filter]');
+    if(search) setTimeout(function(){ search.focus(); search.select(); }, 50);
+  }
+
+  function closeModal(modal){
+    if(!modal) return;
+    modal.classList.remove('is-open');
+    modal.setAttribute('aria-hidden','true');
+    if(!document.querySelector('.fabric-modal.is-open')) document.body.classList.remove('fabric-modal-open');
+  }
+
+  document.addEventListener('click', function(e){
+    const open = e.target.closest('[data-fabric-modal]');
+    if(open){ e.preventDefault(); openModal(open.dataset.fabricModal); return; }
+
+    const close = e.target.closest('[data-close-fabric-modal]');
+    if(close){ e.preventDefault(); closeModal(close.closest('.fabric-modal')); }
+  });
+
+  document.addEventListener('input', function(e){
+    const modal = e.target.closest('.fabric-modal');
+    if(modal && e.target.matches('[data-fabric-code-filter]')) refreshModal(modal);
+  });
+
+  document.addEventListener('change', function(e){
+    const modal = e.target.closest('.fabric-modal');
+    if(
+      modal &&
+      e.target.matches('[data-fabric-supplier-filter], [data-fabric-type-filter]')
+    ){
+      refreshModal(modal);
+    }
+  });
+
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape'){
+      const modal = document.querySelector('.fabric-modal.is-open');
+      if(modal) closeModal(modal);
+    }
+  });
+})();
+</script>
+
+
+<style>
+/* Multi-roll selection */
+.fabric-modal-roll{
+  grid-template-columns:28px minmax(0,1fr) 150px 74px !important;
+  cursor:pointer;
+}
+.fabric-roll-check{
+  width:18px;
+  height:18px;
+  accent-color:#e9a20f;
+  cursor:pointer;
+}
+.fabric-modal-roll:has(.fabric-roll-check:checked){
+  border-color:#e6a21a;
+  background:#fff6df;
+  box-shadow:0 0 0 2px rgba(230,162,26,.10);
+}
+.fabric-roll-select-label{
+  justify-self:end;
+  padding:6px 9px;
+  border-radius:8px;
+  background:#fff1c8;
+  color:#6f4b00;
+  font-size:10px;
+  font-weight:900;
+}
+.fabric-modal-roll:has(.fabric-roll-check:checked) .fabric-roll-select-label{
+  background:#e9a20f;
+  color:#251900;
+}
+.fabric-modal-submit{
+  flex:0 0 auto;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  padding:12px 20px;
+  border-top:1px solid #e9ddca;
+  background:#fffaf0;
+}
+.fabric-modal-submit-info{
+  display:grid;
+  gap:2px;
+}
+.fabric-modal-submit-info strong{font-size:12px}
+.fabric-modal-submit-info span{font-size:10px;color:#75664f}
+.fabric-modal-submit-actions{
+  display:flex;
+  gap:8px;
+  align-items:center;
+}
+@media(max-width:700px){
+  .fabric-modal-roll{
+    grid-template-columns:28px minmax(0,1fr) !important;
+  }
+  .fabric-roll-kg{
+    grid-column:2;
+  }
+  .fabric-roll-select-label{
+    grid-column:2;
+    justify-self:start;
+  }
+  .fabric-modal-submit{
+    align-items:stretch;
+    flex-direction:column;
+  }
+  .fabric-modal-submit-actions{
+    display:grid;
+    grid-template-columns:.7fr 1.3fr;
+  }
+}
+</style>
+
+<script>
+(function(){
+  /* ---------------------------------------------------------
+     Keep the user at the same section after ANY form save.
+     This works across normal Django POST -> redirect -> GET.
+  --------------------------------------------------------- */
+  const scrollKey = 'niron-production-scroll:' + window.location.pathname;
+
+  document.addEventListener('submit', function(){
+    try{
+      sessionStorage.setItem(scrollKey, String(window.scrollY || 0));
+    }catch(e){}
+  }, true);
+
+  window.addEventListener('load', function(){
+    try{
+      const saved = sessionStorage.getItem(scrollKey);
+      if(saved !== null){
+        sessionStorage.removeItem(scrollKey);
+        requestAnimationFrame(function(){
+          window.scrollTo({top:Number(saved) || 0, behavior:'instant'});
+        });
+      }
+    }catch(e){}
+  });
+
+  function n(v){
+    const x = Number(v || 0);
+    return Number.isFinite(x) ? x : 0;
+  }
+
+  function buildSupplierOptions(modal){
+    const select = modal.querySelector('[data-fabric-supplier-filter]');
+    if(!select || select.dataset.ready === '1') return;
+
+    const suppliers = new Map();
+    modal.querySelectorAll('[data-fabric-roll]').forEach(function(row){
+      const value = String(row.dataset.supplier || '').trim();
+      const label = String(row.dataset.supplierLabel || 'No supplier').trim();
+      if(value && !suppliers.has(value)) suppliers.set(value, label);
+    });
+
+    Array.from(suppliers.entries())
+      .sort(function(a,b){ return a[1].localeCompare(b[1]); })
+      .forEach(function(pair){
+        const option = document.createElement('option');
+        option.value = pair[0];
+        option.textContent = pair[1];
+        select.appendChild(option);
+      });
+
+    select.dataset.ready = '1';
+  }
+
+  function refreshSelected(modal){
+    const selected = Array.from(
+      modal.querySelectorAll('[data-fabric-roll-check]:checked')
+    );
+
+    const holder = modal.querySelector('[data-fabric-selected-inputs]');
+    const count = modal.querySelector('[data-fabric-selected-count]');
+    const kg = modal.querySelector('[data-fabric-selected-kg]');
+    const submit = modal.querySelector('[data-choose-selected-rolls]');
+
+    if(holder){
+      holder.innerHTML = '';
+      selected.forEach(function(box){
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'roll_ids';
+        input.value = box.value;
+        holder.appendChild(input);
+      });
+    }
+
+    let totalKg = 0;
+    selected.forEach(function(box){
+      const row = box.closest('[data-fabric-roll]');
+      totalKg += n(row && row.dataset.kg);
+    });
+
+    if(count) count.textContent = String(selected.length);
+    if(kg) kg.textContent = totalKg.toFixed(3).replace(/\.?0+$/,'');
+    if(submit) submit.disabled = selected.length === 0;
+  }
+
+  document.addEventListener('click', function(e){
+    const open = e.target.closest('[data-fabric-modal]');
+    if(open){
+      const modal = document.getElementById(open.dataset.fabricModal);
+      if(modal){
+        buildSupplierOptions(modal);
+        setTimeout(function(){ refreshSelected(modal); }, 0);
+      }
+    }
+
+    const clear = e.target.closest('[data-clear-fabric-selection]');
+    if(clear){
+      e.preventDefault();
+      const modal = clear.closest('.fabric-modal');
+      if(modal){
+        modal.querySelectorAll('[data-fabric-roll-check]').forEach(function(box){
+          box.checked = false;
+        });
+        refreshSelected(modal);
+      }
+    }
+  });
+
+  document.addEventListener('change', function(e){
+    if(e.target.matches('[data-fabric-roll-check]')){
+      const modal = e.target.closest('.fabric-modal');
+      if(modal) refreshSelected(modal);
+    }
+  });
+})();
+</script>
+
+
+<style>
+.fabric-modal-filters-3{
+  grid-template-columns:minmax(170px,.65fr) minmax(140px,.48fr) minmax(250px,1fr) !important;
+}
+.fabric-roll-code-line{
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:8px;
+}
+.fabric-roll-type-badge{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:54px;
+  height:22px;
+  padding:0 8px;
+  border-radius:999px;
+  font-size:9px;
+  font-weight:950;
+  letter-spacing:.045em;
+}
+.fabric-roll-type-badge.is-full{
+  color:#09613f;
+  background:#e9f8ef;
+  border:1px solid #b8e1c9;
+}
+.fabric-roll-type-badge.is-partial{
+  color:#9a5a00;
+  background:#fff2ce;
+  border:1px solid #efcf7f;
+}
+.fabric-selected-summary{
+  display:flex !important;
+  align-items:center;
+  gap:24px !important;
+}
+.fabric-selected-roll-total{
+  min-width:150px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+.fabric-selected-roll-total > span{
+  display:block;
+  font-size:34px !important;
+  line-height:1;
+  font-weight:1000;
+  color:#251a0b !important;
+}
+.fabric-selected-roll-total small,
+.fabric-selected-kg-total small{
+  display:block;
+  font-size:8px !important;
+  line-height:1.15;
+  letter-spacing:.07em;
+  font-weight:900;
+  color:#7a684d;
+}
+.fabric-selected-kg-total{
+  padding-left:20px;
+  border-left:1px solid #dfcfb5;
+}
+.fabric-selected-kg-total strong{
+  display:block;
+  font-size:20px;
+  line-height:1.1;
+  color:#146848;
+}
+@media(max-width:760px){
+  .fabric-modal-filters-3{grid-template-columns:1fr !important}
+  .fabric-selected-summary{
+    justify-content:space-between;
+    width:100%;
+  }
+}
+</style>
+
+<script>
+(function(){
+  function norm(v){ return String(v || '').trim().toLowerCase(); }
+
+  function refreshRollFilters(modal){
+    if(!modal) return;
+
+    const supplierEl = modal.querySelector('[data-fabric-supplier-filter]');
+    const typeEl = modal.querySelector('[data-fabric-type-filter]');
+    const codeEl = modal.querySelector('[data-fabric-code-filter]');
+
+    const supplier = norm(supplierEl && supplierEl.value);
+    const type = String(typeEl && typeEl.value || '').trim().toUpperCase();
+    const code = norm(codeEl && codeEl.value);
+
+    let visible = 0;
+
+    modal.querySelectorAll('[data-fabric-roll]').forEach(function(row){
+      const supplierOK = !supplier || norm(row.dataset.supplier) === supplier;
+      const typeOK = !type || String(row.dataset.rollType || '').toUpperCase() === type;
+      const codeOK = !code || norm(row.dataset.code).includes(code);
+      const show = supplierOK && typeOK && codeOK;
+
+      row.hidden = !show;
+      if(show) visible += 1;
+    });
+
+    const count = modal.querySelector('[data-fabric-visible-count]');
+    const noMatch = modal.querySelector('[data-fabric-no-match]');
+    if(count) count.textContent = String(visible);
+    if(noMatch) noMatch.hidden = visible !== 0;
+  }
+
+  document.addEventListener('input', function(e){
+    const modal = e.target.closest('.fabric-modal');
+    if(modal && e.target.matches('[data-fabric-code-filter]')){
+      refreshRollFilters(modal);
+    }
+  });
+
+  document.addEventListener('change', function(e){
+    const modal = e.target.closest('.fabric-modal');
+    if(modal && e.target.matches('[data-fabric-supplier-filter], [data-fabric-type-filter]')){
+      refreshRollFilters(modal);
+    }
+  });
+
+  document.addEventListener('click', function(e){
+    const opener = e.target.closest('[data-fabric-modal]');
+    if(opener){
+      const modal = document.getElementById(opener.dataset.fabricModal);
+      if(modal) setTimeout(function(){ refreshRollFilters(modal); }, 0);
+    }
+  });
+})();
+</script>
+
+
+<style>
+/* Critical: filtered roll rows must actually disappear.
+   The .fabric-modal-roll { display:grid } rule was overriding the HTML hidden state. */
+.fabric-modal-roll[hidden]{
+  display:none !important;
+}
+</style>
+
+
+<script>
+(function(){
+  function norm(v){ return String(v || '').trim().toLowerCase(); }
+
+  function selectedFirst(modal){
+    const list = modal.querySelector('.fabric-modal-roll-list');
+    if(!list) return;
+
+    const rows = Array.from(list.querySelectorAll('[data-fabric-roll]'));
+    const selected = rows.filter(function(row){
+      const box = row.querySelector('[data-fabric-roll-check]');
+      return box && box.checked;
+    });
+    const unselected = rows.filter(function(row){
+      const box = row.querySelector('[data-fabric-roll-check]');
+      return !box || !box.checked;
+    });
+
+    selected.concat(unselected).forEach(function(row){
+      list.appendChild(row);
+    });
+  }
+
+  function applySelectedAwareFilter(modal){
+    if(!modal) return;
+
+    const supplierEl = modal.querySelector('[data-fabric-supplier-filter]');
+    const typeEl = modal.querySelector('[data-fabric-type-filter]');
+    const codeEl = modal.querySelector('[data-fabric-code-filter]');
+
+    const supplier = norm(supplierEl && supplierEl.value);
+    const type = String(typeEl && typeEl.value || '').trim().toUpperCase();
+    const code = norm(codeEl && codeEl.value);
+
+    let visible = 0;
+
+    modal.querySelectorAll('[data-fabric-roll]').forEach(function(row){
+      const box = row.querySelector('[data-fabric-roll-check]');
+      const isSelected = !!(box && box.checked);
+
+      const supplierOK = !supplier || norm(row.dataset.supplier) === supplier;
+      const typeOK = !type || String(row.dataset.rollType || '').toUpperCase() === type;
+      const codeOK = !code || norm(row.dataset.code).includes(code);
+
+      /* Selected rolls always stay visible.
+         Example: if Partial is selected, show:
+         - all selected rolls, even selected FULL rolls
+         - plus all unselected PARTIAL rolls */
+      const show = isSelected || (supplierOK && typeOK && codeOK);
+
+      row.hidden = !show;
+      if(show) visible += 1;
+    });
+
+    selectedFirst(modal);
+
+    const count = modal.querySelector('[data-fabric-visible-count]');
+    const noMatch = modal.querySelector('[data-fabric-no-match]');
+    if(count) count.textContent = String(visible);
+    if(noMatch) noMatch.hidden = visible !== 0;
+  }
+
+  document.addEventListener('change', function(e){
+    const modal = e.target.closest('.fabric-modal');
+    if(!modal) return;
+
+    if(e.target.matches('[data-fabric-roll-check]')){
+      setTimeout(function(){
+        selectedFirst(modal);
+        applySelectedAwareFilter(modal);
+      }, 0);
+      return;
+    }
+
+    if(e.target.matches('[data-fabric-supplier-filter], [data-fabric-type-filter]')){
+      applySelectedAwareFilter(modal);
+    }
+  });
+
+  document.addEventListener('input', function(e){
+    const modal = e.target.closest('.fabric-modal');
+    if(modal && e.target.matches('[data-fabric-code-filter]')){
+      applySelectedAwareFilter(modal);
+    }
+  });
+
+  document.addEventListener('click', function(e){
+    const opener = e.target.closest('[data-fabric-modal]');
+    if(opener){
+      const modal = document.getElementById(opener.dataset.fabricModal);
+      if(modal){
+        setTimeout(function(){
+          selectedFirst(modal);
+          applySelectedAwareFilter(modal);
+        }, 0);
+      }
+    }
+
+    const clear = e.target.closest('[data-clear-fabric-selection]');
+    if(clear){
+      const modal = clear.closest('.fabric-modal');
+      if(modal){
+        setTimeout(function(){
+          selectedFirst(modal);
+          applySelectedAwareFilter(modal);
+        }, 0);
+      }
+    }
+  });
+})();
+</script>
 
 {% endblock %}

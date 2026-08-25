@@ -28,14 +28,122 @@
     .summary-grid,
     .filter-card,
 
-    .film-cos-cell { min-width: 190px; }
-    .film-status { display:inline-flex; align-items:center; gap:6px; padding:5px 9px; border-radius:999px; font-size:11px; font-weight:900; }
-    .film-status-missing { background:#fff1f2; color:#be123c; border:1px solid #fecdd3; }
-    .film-status-added { background:#ecfdf5; color:#047857; border:1px solid #a7f3d0; }
-    .film-status-na { color:var(--muted); font-weight:800; }
-    .film-inline-form { display:flex; align-items:center; gap:6px; margin-top:7px; }
-    .film-inline-form input { width:82px; height:30px; border:1px solid var(--line); border-radius:9px; padding:0 8px; font-size:12px; font-weight:800; }
-    .film-save-btn { height:30px; border:0; border-radius:9px; padding:0 9px; background:#111827; color:#fff; font-size:11px; font-weight:900; cursor:pointer; }
+    .film-cos-cell {
+        min-width: 215px;
+    }
+
+    .film-meter-control {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        min-height: 34px;
+        white-space: nowrap;
+    }
+
+    .film-status {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        height: 28px;
+        padding: 0 9px;
+        border-radius: 999px;
+        font-size: 10px;
+        font-weight: 900;
+        line-height: 1;
+        white-space: nowrap;
+    }
+
+    .film-status-missing {
+        background: #fff7ed;
+        color: #c2410c;
+        border: 1px solid #fed7aa;
+    }
+
+    .film-status-added {
+        background: #ecfdf5;
+        color: #047857;
+        border: 1px solid #a7f3d0;
+    }
+
+    .film-status-na {
+        color: var(--muted);
+        font-weight: 800;
+    }
+
+    .film-inline-form {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        margin: 0;
+    }
+
+    .film-input-wrap {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+    }
+
+    .film-inline-form input {
+        width: 72px;
+        height: 30px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        padding: 0 23px 0 8px;
+        background: #fff;
+        font-size: 12px;
+        font-weight: 800;
+        color: var(--text);
+        outline: none;
+    }
+
+    .film-inline-form input:focus {
+        border-color: #f59e0b;
+        box-shadow: 0 0 0 3px rgba(245, 158, 11, .12);
+    }
+
+    .film-unit {
+        position: absolute;
+        right: 7px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 10px;
+        font-weight: 900;
+        color: var(--muted);
+        pointer-events: none;
+    }
+
+    .film-save-btn {
+        height: 30px;
+        min-width: 62px;
+        border: 0;
+        border-radius: 9px;
+        padding: 0 10px;
+        background: #f59e0b;
+        color: #111827;
+        font-size: 10px;
+        font-weight: 900;
+        cursor: pointer;
+        transition: .15s ease;
+        white-space: nowrap;
+    }
+
+    .film-save-btn:hover {
+        transform: translateY(-1px);
+        background: #e99a06;
+    }
+
+    .film-sold {
+        display: inline-flex;
+        align-items: center;
+        height: 28px;
+        padding: 0 9px;
+        border-radius: 999px;
+        background: #f8fafc;
+        border: 1px solid #e5e7eb;
+        color: #475569;
+        font-size: 11px;
+        font-weight: 850;
+    }
 
     .table-card {
         min-width: 0;
@@ -560,30 +668,35 @@
 
                         <td class="film-cos-cell">
                             {% if row.requires_film_meter %}
-                                {% if row.film_meter_missing %}
-                                    <span class="film-status film-status-missing">⚠ Film Not Added</span>
-                                {% else %}
-                                    <span class="film-status film-status-added">✓ {{ row.production_film_meter|floatformat:2 }} m Added</span>
-                                {% endif %}
+                                <div class="film-meter-control">
+                                    {% if row.film_meter_missing %}
+                                        <span class="film-status film-status-missing">Missing</span>
+                                    {% else %}
+                                        <span class="film-status film-status-added">{{ row.production_film_meter|floatformat:2 }} m</span>
+                                    {% endif %}
 
-                                {% if perms.orders.change_order and not show_trash %}
-                                <form method="post" action="{% url 'order_film_meter_update' row.obj.pk %}" class="film-inline-form">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                                    <input
-                                        type="number"
-                                        name="production_film_meter"
-                                        value="{% if row.production_film_meter > 0 %}{{ row.production_film_meter }}{% endif %}"
-                                        step="0.01"
-                                        min="0"
-                                        placeholder="Meter"
-                                        aria-label="Internal film meter for {{ row.obj.order_no }}"
-                                    >
-                                    <button type="submit" class="film-save-btn">{% if row.film_meter_missing %}Add{% else %}Edit{% endif %}</button>
-                                </form>
-                                {% endif %}
+                                    {% if perms.orders.change_order and not show_trash %}
+                                    <form method="post" action="{% url 'order_film_meter_update' row.obj.pk %}" class="film-inline-form">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                        <span class="film-input-wrap">
+                                            <input
+                                                type="text"
+                                                inputmode="decimal"
+                                                name="production_film_meter"
+                                                value="{% if row.production_film_meter > 0 %}{{ row.production_film_meter }}{% endif %}"
+                                                placeholder="0.00"
+                                                autocomplete="off"
+                                                aria-label="Internal film meter for {{ row.obj.order_no }}"
+                                            >
+                                            <span class="film-unit">m</span>
+                                        </span>
+                                        <button type="submit" class="film-save-btn">{% if row.film_meter_missing %}Add Film{% else %}Save{% endif %}</button>
+                                    </form>
+                                    {% endif %}
+                                </div>
                             {% elif row.obj.service_type == "FILM_ONLY" %}
-                                <span title="Customer film quantity">{{ row.film_meter|floatformat:2 }} m sold</span>
+                                <span class="film-sold" title="Customer film quantity">{{ row.film_meter|floatformat:2 }} m sold</span>
                             {% else %}
                                 <span class="film-status-na">—</span>
                             {% endif %}
@@ -844,6 +957,27 @@
                 const ok = confirm("Move this order to trash?");
                 if (!ok) {
                     e.preventDefault();
+                }
+            });
+        });
+
+        const filmForms = document.querySelectorAll(".film-inline-form");
+
+        filmForms.forEach(function (form) {
+            const input = form.querySelector('input[name="production_film_meter"]');
+            if (!input) return;
+
+            input.addEventListener("input", function () {
+                this.value = this.value
+                    .replace(",", ".")
+                    .replace(/[^0-9.]/g, "")
+                    .replace(/(\..*)\./g, "$1");
+            });
+
+            input.addEventListener("keydown", function (event) {
+                if (event.key === "Enter") {
+                    event.preventDefault();
+                    form.requestSubmit();
                 }
             });
         });

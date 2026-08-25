@@ -23,19 +23,55 @@ from .models import (
 ZERO = Decimal("0")
 
 
+def _fabric_supplier_token(name):
+    """Short printable supplier token, e.g. 'Kam' -> 'KAM'."""
+    cleaned = "".join(ch for ch in str(name or "").upper() if ch.isalnum())
+    return (cleaned[:6] or "SUP")
+
+
+def _fabric_roll_code(receipt, index, weight):
+    """
+    Human-friendly printed code:
+        01-KAM-230826-24.65
+
+    Roll number is within this fabric/color receipt. If an identical code
+    already exists (possible when another color has the same supplier/date/
+    roll number/weight), append a small numeric suffix to keep DB uniqueness.
+    """
+    supplier = _fabric_supplier_token(receipt.supplier)
+    date_token = receipt.received_date.strftime("%d%m%y")
+    weight_token = f"{Decimal(weight):.2f}"
+    base = f"{index:02d}-{supplier}-{date_token}-{weight_token}"
+    code = base
+    suffix = 2
+    while FabricRoll.objects.filter(roll_code=code).exists():
+        code = f"{base}-{suffix}"
+        suffix += 1
+    return code
+
+
 @transaction.atomic
-def create_fabric_rolls(receipt):
+def create_fabric_rolls(receipt, roll_weights=None):
     if receipt.rolls.exists():
         return list(receipt.rolls.all())
+
+    weights = [Decimal(str(x)) for x in (roll_weights or [])]
+    if len(weights) != int(receipt.roll_count or 0):
+        raise ValidationError(
+            f"Expected {receipt.roll_count} fabric roll weight(s), got {len(weights)}."
+        )
+
     rolls = []
-    color_code = (receipt.color.code or "COL").upper()
-    for index in range(1, receipt.roll_count + 1):
-        code = f"{receipt.receipt_no}-{color_code}-{index:03d}"
+    for index, weight in enumerate(weights, start=1):
+        if weight <= 0:
+            raise ValidationError(f"Roll {index} weight must be greater than 0 KG.")
+
+        weight = weight.quantize(Decimal("0.001"))
         roll = FabricRoll.objects.create(
             receipt=receipt,
-            roll_code=code,
-            original_qty=Decimal("1.000"),
-            remaining_qty=Decimal("1.000"),
+            roll_code=_fabric_roll_code(receipt, index, weight),
+            original_qty=weight,
+            remaining_qty=weight,
         )
         rolls.append(roll)
     return rolls
@@ -312,217 +348,3 @@ def pay_selected_payables(payables, form_data, user=None):
     batch.finance_expense_id = expense.id
     batch.save(update_fields=["finance_expense_id"])
     return batch
-
-@transaction.atomic
-def pay_selected_sewing_jobs(
-    job_ids,
-    *,
-    price_per_piece,
-    payment_date,
-    note="",
-    user=None,
-):
-    job_ids = list(dict.fromkeys(int(value) for value in job_ids))
-    if not job_ids:
-        raise ValidationError("Tick at least one sewing row to pay.")
-
-    jobs = list(
-        SewingJob.objects.select_for_update()
-        .filter(id__in=job_ids)
-        .select_related("partner", "project")
-        .prefetch_related("returns__lines", "returns__sewing_payable")
-    )
-    if len(jobs) != len(job_ids):
-        raise ValidationError("One or more selected sewing records could not be found.")
-
-    payee_names = {job.payee_name for job in jobs}
-    if len(payee_names) != 1:
-        raise ValidationError("Tick records for only one sewer at a time.")
-
-    price = Decimal(price_per_piece or 0)
-    if price <= 0:
-        raise ValidationError("Enter a price per cloth greater than zero.")
-
-    payables = []
-    for job in jobs:
-        for sewing_return in job.returns.all():
-            if sewing_return.status != SewingReturn.STATUS_STOCKED:
-                continue
-            payable = getattr(sewing_return, "sewing_payable", None)
-            if payable is None:
-                continue
-
-            if Decimal(payable.paid_amount or 0) > 0:
-                raise ValidationError(
-                    f"{sewing_return.return_no} was already paid or partially paid "
-                    "and cannot use bulk price payment."
-                )
-
-            amount = (Decimal(sewing_return.good_total or 0) * price).quantize(Decimal("0.01"))
-            if amount <= 0:
-                continue
-            payable.amount = amount
-            payable.payee_name = job.payee_name
-            payable.description = (
-                f"Sewing return {sewing_return.return_no}: "
-                f"{sewing_return.good_total} pcs × ${price}"
-            )
-            payable.save(update_fields=["amount", "payee_name", "description"])
-            payables.append(payable)
-
-    if not payables:
-        raise ValidationError("The selected sewing records have no unpaid received cloth.")
-
-    return pay_selected_payables(
-        payables,
-        {
-            "payment_date": payment_date,
-            "payment_method": ProductionPaymentBatch.METHOD_CASH,
-            "reference": "",
-            "note": note,
-        },
-        user,
-    )
-
-
-@transaction.atomic
-def pay_sewing_project(
-    project_id,
-    *,
-    price_per_piece,
-    payment_date,
-    note="",
-    user=None,
-):
-    """
-    Pay every unpaid stocked sewing return for one completed production project.
-
-    Receiving stock never marks a payable as paid. This function is the only
-    action that prices the received cloth and records the sewer payment.
-    """
-    project = (
-        ProductionProject.objects.select_for_update()
-        .get(pk=int(project_id))
-    )
-
-    if not project.cutting_is_complete:
-        raise ValidationError(
-            "Finish cutting before paying this production project."
-        )
-
-    if int(project.still_with_sewer or 0) > 0:
-        raise ValidationError(
-            f"{project.project_no} still has "
-            f"{project.still_with_sewer} pieces with the sewer."
-        )
-
-    price = Decimal(price_per_piece or 0)
-    if price <= 0:
-        raise ValidationError(
-            "Enter a price per cloth greater than zero."
-        )
-
-    returns = list(
-        SewingReturn.objects.select_for_update()
-        .filter(
-            job__project=project,
-            status=SewingReturn.STATUS_STOCKED,
-        )
-        .select_related(
-            "job",
-            "job__partner",
-            "sewing_payable",
-        )
-        .order_by("return_date", "id")
-    )
-
-    if not returns:
-        raise ValidationError(
-            "This project has no confirmed sewing returns to pay."
-        )
-
-    payee_names = {
-        sewing_return.job.payee_name
-        for sewing_return in returns
-    }
-    if len(payee_names) != 1:
-        raise ValidationError(
-            "This project contains more than one sewer. "
-            "Correct the sewing records before payment."
-        )
-
-    payables = []
-    unpaid_good_total = 0
-
-    for sewing_return in returns:
-        payable = getattr(sewing_return, "sewing_payable", None)
-
-        if payable is None:
-            payable = ProductionPayable.objects.create(
-                payable_type=ProductionPayable.TYPE_SEWER,
-                project=project,
-                sewing_job=sewing_return.job,
-                sewing_return=sewing_return,
-                payee_name=sewing_return.job.payee_name,
-                work_type="Sewing",
-                description=(
-                    f"Sewing return {sewing_return.return_no}"
-                ),
-                amount=Decimal("0"),
-                paid_amount=Decimal("0"),
-                created_by=user,
-            )
-
-        paid_amount = Decimal(payable.paid_amount or 0)
-        if paid_amount > 0:
-            # Already-paid returns are not charged again.
-            continue
-
-        good_qty = int(sewing_return.good_total or 0)
-        if good_qty <= 0:
-            continue
-
-        amount = (
-            Decimal(good_qty) * price
-        ).quantize(Decimal("0.01"))
-
-        payable.amount = amount
-        payable.payee_name = sewing_return.job.payee_name
-        payable.description = (
-            f"{project.project_no} · "
-            f"{sewing_return.return_no}: "
-            f"{good_qty} pcs × ${price}"
-        )
-        payable.save(
-            update_fields=[
-                "amount",
-                "payee_name",
-                "description",
-            ]
-        )
-
-        payables.append(payable)
-        unpaid_good_total += good_qty
-
-    if not payables:
-        raise ValidationError(
-            "This production project is already paid."
-        )
-
-    payment_note = (
-        f"Full project sewing payment for {project.project_no}. "
-        f"{unpaid_good_total} received pcs × ${price}."
-    )
-    if note:
-        payment_note = f"{payment_note} {note}".strip()
-
-    return pay_selected_payables(
-        payables,
-        {
-            "payment_date": payment_date,
-            "payment_method": ProductionPaymentBatch.METHOD_CASH,
-            "reference": project.project_no,
-            "note": payment_note,
-        },
-        user,
-    )

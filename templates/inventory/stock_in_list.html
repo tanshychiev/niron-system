@@ -1,72 +1,630 @@
 {% extends "base.html" %}
+
+{% block title %}Stock In List{% endblock %}
 {% block page_title %}Stock In List{% endblock %}
-{% block page_subtitle %}Purchases waiting to arrive and received Stock In batches{% endblock %}
+{% block page_subtitle %}Waiting Purchase, Purchased Stock In and Production Stock are separated so staff always know what needs action.{% endblock %}
 
 {% block content %}
 <style>
-.stock-list-wrap{max-width:1450px;margin:0 auto}.stock-list-head{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px}.filter-card,.list-card{background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow)}.filter-card{padding:12px;margin-bottom:12px}.filter-row{display:flex;gap:8px;flex-wrap:wrap}.filter-row input,.filter-row select{min-height:40px;border:1px solid var(--line);border-radius:10px;padding:8px 10px}.list-card{overflow:hidden}.stock-table{width:100%;border-collapse:collapse;min-width:1050px}.stock-table th,.stock-table td{padding:12px 13px;border-bottom:1px solid var(--line);text-align:left;font-size:12px;vertical-align:middle}.stock-table th{font-size:9px;text-transform:uppercase;color:var(--muted);background:#fcfbf8}.badge{display:inline-flex;padding:6px 9px;border-radius:999px;font-size:10px;font-weight:900}.badge-coming{background:#fff0cc;color:#8b5a10}.badge-received{background:#eaf8f1;color:#08724f}.badge-cost-none{background:#fff0f0;color:#a73540}.badge-cost-ok{background:#eaf8f1;color:#08724f}.actions{display:flex;gap:6px;flex-wrap:wrap}.btn-mini{display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:7px 10px;border:1px solid var(--line);border-radius:9px;background:#fff;text-decoration:none;font-size:10px;font-weight:900;cursor:pointer}.btn-receive{background:#1f6f52;color:#fff;border-color:#1f6f52}.cost-form{display:none;margin-top:8px;padding:10px;border:1px solid var(--line);border-radius:12px;background:#fffaf0}.cost-form.open{display:block}.cost-form-grid{display:grid;grid-template-columns:repeat(3,minmax(90px,1fr));gap:7px}.cost-form input{width:100%;min-height:36px;border:1px solid var(--line);border-radius:8px;padding:7px}.table-wrap{overflow:auto}@media(max-width:760px){.cost-form-grid{grid-template-columns:1fr}.filter-row>*{width:100%}}
+.stock-shell{width:100%;max-width:none;margin:0 auto;padding:0 8px}
+.stock-filter,.stock-card{background:rgba(255,255,255,.96);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow)}
+.stock-filter{padding:14px;margin-bottom:14px}
+.stock-top-actions{display:flex;justify-content:flex-end;align-items:center;margin:0 0 9px}
+.stock-filter-grid{display:grid;grid-template-columns:minmax(210px,1.2fr) 145px 145px 165px 185px 135px auto auto;gap:8px;align-items:end}
+.stock-filter label{display:block;font-size:10px;font-weight:900;color:var(--muted);letter-spacing:.7px;text-transform:uppercase;margin-bottom:6px}
+.stock-filter input,.stock-filter select,.cost-mini input{width:100%;height:40px;border:1px solid var(--line);border-radius:10px;background:#fff;padding:0 11px}
+.btn-stock{height:40px;border-radius:10px;padding:0 13px;border:1px solid var(--line);display:inline-flex;align-items:center;justify-content:center;text-decoration:none;font-size:12px;font-weight:900;white-space:nowrap;cursor:pointer}
+.btn-primary-stock{background:#f5a900;color:#111827;border-color:#f5a900}
+.btn-dark-stock{background:#111827;color:#fff;border-color:#111827}
+.btn-light-stock{background:#fff;color:var(--text)}
+.btn-reset-stock{height:34px;padding:0 10px;font-size:10px;align-self:end;margin-bottom:3px}
+.btn-top-stock{height:38px;padding:0 16px}
+.stock-card{overflow:hidden;margin-bottom:18px}
+.stock-card.waiting-card{border-color:rgba(245,169,0,.45)}
+.stock-card.production-card{border-color:#d9ddff}
+.stock-card-head{padding:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line)}
+.stock-card-head h2{margin:0;font-size:20px;font-weight:950;color:var(--text)}
+.stock-card-head p{margin:4px 0 0;font-size:11px;font-weight:700;color:var(--muted)}
+.source-badge{display:inline-flex;align-items:center;height:28px;padding:0 10px;border-radius:999px;background:#fff5d6;color:#9a6400;font-size:10px;font-weight:900;white-space:nowrap}
+.source-badge.received{background:#ecfdf5;color:#047857}
+.source-badge.production{background:#eef2ff;color:#4338ca}
+.sub-head{padding:10px 16px;background:#faf8f2;border-bottom:1px solid var(--line);font-size:11px;font-weight:950;color:#6b4a1f;text-transform:uppercase;letter-spacing:.05em}
+.table-wrap{width:100%;overflow-x:auto}
+.stock-table{width:100%;border-collapse:collapse;min-width:1120px}
+.stock-table th,.stock-table td{padding:12px 13px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle;white-space:nowrap;font-size:12px}
+.stock-table th{background:#fffdf8;color:var(--muted);font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.55px}
+.stock-table tbody tr:hover{background:#fffaf0}
+.ref-link{font-weight:950;color:var(--text);text-decoration:none}
+.item-summary{max-width:310px;overflow:hidden;text-overflow:ellipsis}
+.badge{display:inline-flex;align-items:center;min-height:24px;padding:0 8px;border-radius:999px;font-size:10px;font-weight:900}
+.badge-received{background:#ecfdf5;color:#047857}
+.badge-coming{background:#fff7ed;color:#c2410c}
+.badge-partial{background:#eff6ff;color:#1d4ed8}
+.badge-cost-ok{background:#ecfdf5;color:#047857}
+.badge-cost-missing{background:#fff1f2;color:#be123c}
+.type-badge{background:#f8fafc;color:#475569;border:1px solid #e2e8f0}
+.action-link{min-height:31px;border-radius:9px;padding:0 10px;display:inline-flex;align-items:center;justify-content:center;background:#f5a900;color:#111827;text-decoration:none;font-size:10px;font-weight:900;border:0;cursor:pointer}
+.action-light{background:#fff;border:1px solid var(--line)}
+.empty-row{text-align:center!important;color:var(--muted);padding:25px!important}
+.help-strip{padding:11px 16px;background:#faf8f2;border-top:1px solid var(--line);font-size:11px;color:var(--muted);font-weight:700}
+.cost-inline summary{list-style:none;cursor:pointer}.cost-inline summary::-webkit-details-marker{display:none}
+.cost-mini{position:absolute;right:0;z-index:50;width:285px;padding:12px;margin-top:6px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 18px 40px rgba(0,0,0,.15)}
+.cost-mini-grid{display:grid;gap:8px}.cost-mini label{font-size:9px;font-weight:900;color:var(--muted);text-transform:uppercase}.cost-mini button{width:100%;margin-top:4px}
+.action-cell{position:relative;display:flex;gap:6px;align-items:center}
+.section-empty{padding:28px;text-align:center;color:var(--muted);font-size:12px;font-weight:800}
+@media(max-width:1200px){.stock-filter-grid{grid-template-columns:minmax(200px,1fr) 135px 135px 155px 175px 125px auto auto}}
+@media(max-width:980px){.stock-filter-grid{grid-template-columns:1fr 1fr 1fr}.stock-filter-grid .search-field{grid-column:1/-1}}
+@media(max-width:600px){.stock-shell{padding:0 2px}.stock-filter-grid{grid-template-columns:1fr}.stock-filter-grid .search-field{grid-column:auto}.stock-card-head{align-items:flex-start}.source-badge{flex:0 0 auto}}
 </style>
-<div class="stock-list-wrap">
-  <div class="stock-list-head">
-    <div><h1 style="margin:0">Stock In List</h1><p style="margin:5px 0 0;color:var(--muted)">Coming Soon does not increase stock until Confirm Received.</p></div>
-    {% if perms.inventory.add_inventorybatch %}<a href="{% url 'inventory_batch_create' %}" class="btn btn-primary">＋ Create Stock In</a>{% endif %}
+
+<div class="stock-shell">
+  <div class="stock-top-actions">
+    <a class="btn-stock btn-dark-stock btn-top-stock" href="{% url 'inventory_batch_create' %}">+ Stock In</a>
   </div>
-  <form class="filter-card" method="get">
-    <div class="filter-row">
-      <select name="status">
-        <option value="all" {% if status_filter == 'ALL' %}selected{% endif %}>All Status</option>
-        <option value="COMING_SOON" {% if status_filter == 'COMING_SOON' %}selected{% endif %}>Coming Soon</option>
-        <option value="RECEIVED" {% if status_filter == 'RECEIVED' %}selected{% endif %}>Received</option>
-      </select>
-      <input type="search" name="q" value="{{ q }}" placeholder="Batch, supplier or item">
-      <button class="btn-mini" type="submit">Search</button>
+
+  <div class="stock-filter">
+    <form method="get">
+      <div class="stock-filter-grid">
+        <div class="search-field">
+          <label>Search</label>
+          <input type="text" name="q" value="{{ q }}" placeholder="Batch, supplier, item, roll code...">
+        </div>
+        <div>
+          <label>From Date</label>
+          <input type="date" name="from_date" value="{{ from_date }}">
+        </div>
+        <div>
+          <label>To Date</label>
+          <input type="date" name="to_date" value="{{ to_date }}">
+        </div>
+        <div>
+          <label>Material Type</label>
+          <select name="material_type">
+            <option value="all" {% if material_type == "all" %}selected{% endif %}>All Types</option>
+            <option value="cloth" {% if material_type == "cloth" %}selected{% endif %}>Cloth</option>
+            <option value="printing" {% if material_type == "printing" %}selected{% endif %}>Printing Material</option>
+            <option value="fabric" {% if material_type == "fabric" %}selected{% endif %}>Fabric</option>
+          </select>
+        </div>
+        <div>
+          <label>Stock In Type</label>
+          <select name="list_type">
+            <option value="waiting" {% if stock_list_type == "waiting" %}selected{% endif %}>Waiting Purchase Stock</option>
+            <option value="purchased" {% if stock_list_type == "purchased" %}selected{% endif %}>Purchase Stock In</option>
+            <option value="production" {% if stock_list_type == "production" %}selected{% endif %}>Production Stock</option>
+            <option value="all" {% if stock_list_type == "all" %}selected{% endif %}>All Stock In</option>
+          </select>
+        </div>
+        <div>
+          <label>Cost</label>
+          <select name="cost_status">
+            <option value="all" {% if cost_status == "all" %}selected{% endif %}>All Cost</option>
+            <option value="missing" {% if cost_status == "missing" %}selected{% endif %}>Cost Missing</option>
+            <option value="added" {% if cost_status == "added" %}selected{% endif %}>Cost Added</option>
+          </select>
+        </div>
+        <button class="btn-stock btn-primary-stock" type="submit">Search</button>
+        <a class="btn-stock btn-light-stock btn-reset-stock" href="{% url 'inventory_stock_in_list' %}">Reset</a>
+      </div>
+    </form>
+  </div>
+
+
+{% if show_waiting %}
+<section class="stock-card waiting-card">
+  <div class="stock-card-head">
+    <div>
+      <h2>Waiting Purchase Stock</h2>
+      <p>All purchases still waiting to be received — Cloth, Printing Material and Fabric in one list.</p>
     </div>
-  </form>
-  <div class="list-card"><div class="table-wrap"><table class="stock-table">
-    <thead><tr><th>Date</th><th>Batch</th><th>Supplier</th><th>Qty</th><th>Status</th><th>Cost</th><th>Created By</th><th>Received By</th><th>Action</th></tr></thead>
-    <tbody>
-    {% for batch in batches %}
-      <tr>
-        <td>{% if batch.status == 'COMING_SOON' %}Expected {{ batch.expected_date|default:batch.received_date }}{% else %}{{ batch.received_date }}{% endif %}</td>
-        <td><a href="{% url 'inventory_batch_detail' batch.pk %}"><strong>{{ batch.batch_no }}</strong></a></td>
-        <td>{{ batch.supplier_name|default:"-" }}</td>
-        <td>{{ batch.total_qty }}</td>
-        <td>{% if batch.status == 'COMING_SOON' %}<span class="badge badge-coming">Coming Soon</span>{% else %}<span class="badge badge-received">Received</span>{% endif %}</td>
-        <td>
-          {% if batch.cost_is_added %}
-            <span class="badge badge-cost-ok">Cost Already Added</span>
-            {% if can_view_stock_cost %}<div style="margin-top:5px;font-weight:800">${{ batch.total_expense|floatformat:2 }}</div>{% endif %}
-          {% else %}<span class="badge badge-cost-none">No Cost Added</span>{% endif %}
-        </td>
-        <td>{{ batch.created_by.username|default:"-" }}</td>
-        <td>{{ batch.received_by.username|default:"-" }}</td>
-        <td>
-          <div class="actions">
-            {% if batch.status == 'COMING_SOON' and perms.inventory.change_inventorybatch %}
-            <form method="post" action="{% url 'inventory_batch_confirm_received' batch.pk %}" onsubmit="return confirm('Confirm these goods physically arrived? This will add the quantity to stock.');">{% csrf_token %}<button class="btn-mini btn-receive" type="submit">✓ Confirm Received</button></form>
+    <span class="source-badge">Action Required</span>
+  </div>
+
+  <div class="table-wrap">
+    <table class="stock-table">
+      <thead>
+        <tr>
+          <th>Reference</th>
+          <th>Expected Date</th>
+          <th>Supplier</th>
+          <th>Type</th>
+          <th>Item</th>
+          <th>Ordered</th>
+          <th>Arrived</th>
+          <th>Still Waiting</th>
+          <th>KG</th>
+          <th>Status</th>
+          {% if can_view_stock_cost %}<th>Cost</th>{% endif %}
+          <th>Created By</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in waiting_rows %}
+        <tr>
+          <td>
+            {% if row.kind == "batch" %}
+              <a class="ref-link" href="{% url 'inventory_batch_detail' row.obj.pk %}">{{ row.ref }}</a>
+            {% else %}
+              <strong>{{ row.ref }}</strong>
             {% endif %}
-            {% if perms.inventory.add_inventorybatch %}
-              {% if not batch.cost_is_added or can_view_stock_cost %}
-              <button type="button" class="btn-mini cost-toggle" data-target="cost-{{ batch.pk }}">{% if batch.cost_is_added %}Edit Cost{% else %}+ Add Cost{% endif %}</button>
+          </td>
+          <td>{{ row.date|date:"d M Y" }}</td>
+          <td>{{ row.supplier }}</td>
+          <td><span class="badge type-badge">{{ row.type }}</span></td>
+          <td class="item-summary" title="{{ row.item }}">{{ row.item }}</td>
+          <td>{{ row.ordered|floatformat:"-2" }}</td>
+          <td>{{ row.arrived|floatformat:"-2" }}</td>
+          <td><strong>{{ row.waiting|floatformat:"-2" }}</strong></td>
+          <td>{% if row.qty_label %}<strong>{{ row.qty_label }}</strong>{% else %}-{% endif %}</td>
+          <td>
+            {% if row.status == "partial" %}
+              <span class="badge badge-partial">Partially Received</span>
+            {% else %}
+              <span class="badge badge-coming">Waiting to Receive</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if row.kind == "batch" %}
+              {% if row.cost_added %}
+                <span class="badge badge-cost-ok">Cost Added</span>
+              {% else %}
+                <span class="badge badge-cost-missing">Cost Missing</span>
               {% endif %}
+            {% else %}
+              <span class="badge {% if row.cost_added %}badge-cost-ok{% else %}badge-cost-missing{% endif %}">
+                {{ row.cost_text }}
+              </span>
             {% endif %}
-          </div>
-          {% if perms.inventory.add_inventorybatch %}{% if not batch.cost_is_added or can_view_stock_cost %}
-          <form id="cost-{{ batch.pk }}" class="cost-form" method="post" action="{% url 'inventory_batch_add_cost' batch.pk %}">
-            {% csrf_token %}
-            <div class="cost-form-grid">
-              <div><small>Goods Cost</small><input name="total_goods_cost" type="number" min="0" step="0.01" {% if can_view_stock_cost %}value="{{ batch.total_goods_cost }}"{% endif %} required></div>
-              <div><small>Delivery Fee</small><input name="shipping_cost" type="number" min="0" step="0.01" {% if can_view_stock_cost %}value="{{ batch.shipping_cost }}"{% endif %}></div>
-              <div><small>Other Fee</small><input name="extra_cost" type="number" min="0" step="0.01" {% if can_view_stock_cost %}value="{{ batch.extra_cost }}"{% endif %}></div>
-            </div>
-            <button type="submit" class="btn-mini" style="margin-top:8px">Save Cost</button>
-          </form>
-          {% endif %}{% endif %}
-        </td>
-      </tr>
-    {% empty %}<tr><td colspan="9" style="padding:30px;text-align:center;color:var(--muted)">No Stock In records found.</td></tr>{% endfor %}
-    </tbody>
-  </table></div></div>
+          </td>
+          <td>{{ row.created_by }}</td>
+          <td>
+            <div class="action-cell">
+              {% if row.kind == "batch" %}
+                <a class="action-link" href="{% url 'inventory_batch_confirm_received' row.obj.pk %}">✓ Confirm Received</a>
+                <a class="action-link action-light" href="{% url 'inventory_batch_detail' row.obj.pk %}">Detail</a>
+
+                {% if can_view_stock_cost %}
+                <button type="button"
+        class="action-link action-light js-open-cost"
+        data-cost-modal="costModal{{ row.obj.pk }}">
+  {% if row.obj.cost_is_added %}Cost{% else %}+ Cost{% endif %}
+</button>
+
+<div class="cost-modal" id="costModal{{ row.obj.pk }}" aria-hidden="true">
+  <div class="cost-modal-backdrop" data-close-cost></div>
+  <div class="cost-modal-card">
+    <div class="cost-modal-head">
+      <div>
+        <h3>{% if row.obj.cost_is_added %}Edit Purchase Cost{% else %}Add Purchase Cost{% endif %}</h3>
+        <p>{{ row.ref }} · {{ row.supplier }}</p>
+      </div>
+      <button type="button" class="cost-modal-close" data-close-cost>×</button>
+    </div>
+
+    <form method="post"
+          class="clean-cost-form"
+          action="{% url 'inventory_batch_add_cost' row.obj.pk %}">
+      {% csrf_token %}
+
+      <div class="clean-cost-grid">
+        <label>
+          <span>Goods Cost</span>
+          <div class="money-input"><b>$</b><input class="js-cost-number" type="number" step="0.01" min="0" name="total_goods_cost" value="{% if can_view_stock_cost %}{{ row.obj.total_goods_cost }}{% else %}0{% endif %}" required></div>
+        </label>
+        <label>
+          <span>Delivery Fee</span>
+          <div class="money-input"><b>$</b><input class="js-cost-number" type="number" step="0.01" min="0" name="shipping_cost" value="{% if can_view_stock_cost %}{{ row.obj.shipping_cost }}{% else %}0{% endif %}"></div>
+        </label>
+        <label>
+          <span>Extra Cost</span>
+          <div class="money-input"><b>$</b><input class="js-cost-number" type="number" step="0.01" min="0" name="extra_cost" value="{% if can_view_stock_cost %}{{ row.obj.extra_cost }}{% else %}0{% endif %}"></div>
+        </label>
+      </div>
+
+      <div class="clean-cost-total">
+        <span>Total Purchase Cost</span>
+        <strong>$<span data-cost-total>0.00</span></strong>
+      </div>
+
+      <div class="clean-cost-actions">
+        <button type="button" class="btn-cost-cancel" data-close-cost>Cancel</button>
+        <button type="submit" class="btn-cost-save">Save Cost</button>
+      </div>
+    </form>
+  </div>
 </div>
-<script>document.querySelectorAll('.cost-toggle').forEach(btn=>btn.addEventListener('click',()=>document.getElementById(btn.dataset.target)?.classList.toggle('open')));</script>
+                {% endif %}
+              {% else %}
+                <a class="action-link" href="{% url 'inventory_fabric_confirm_received' row.obj.pk %}">✓ Confirm Received</a>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="13" class="empty-row">No waiting purchases.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="help-strip">
+    Cloth, Printing Material and Fabric are combined here so staff only checks one waiting list.
+  </div>
+</section>
+{% endif %}
+
+
+{% if show_purchased %}
+<section class="stock-card">
+  <div class="stock-card-head">
+    <div>
+      <h2>Purchase Stock In</h2>
+      <p>All supplier purchases already received — Cloth, Printing Material and Fabric in one list.</p>
+    </div>
+    <span class="source-badge received">Received Purchase</span>
+  </div>
+
+  <div class="table-wrap">
+    <table class="stock-table">
+      <thead>
+        <tr>
+          <th>Reference</th>
+          <th>Received Date</th>
+          <th>Supplier</th>
+          <th>Type</th>
+          <th>Item</th>
+          <th>Qty / Rolls</th>
+          <th>KG</th>
+          <th>Status</th>
+          {% if can_view_stock_cost %}<th>Cost</th>{% endif %}
+          <th>Created By</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in purchased_rows %}
+        <tr>
+          <td>
+            {% if row.kind == "batch" %}
+              <a class="ref-link" href="{% url 'inventory_batch_detail' row.obj.pk %}">{{ row.ref }}</a>
+            {% else %}
+              <strong>{{ row.ref }}</strong>
+            {% endif %}
+          </td>
+          <td>{{ row.date|date:"d M Y" }}</td>
+          <td>{{ row.supplier }}</td>
+          <td><span class="badge type-badge">{{ row.type }}</span></td>
+          <td class="item-summary" title="{{ row.item }}">{{ row.item }}</td>
+          <td><strong>{{ row.qty|floatformat:"-2" }}</strong></td>
+          <td>{% if row.qty_label %}<strong>{{ row.qty_label }}</strong>{% else %}-{% endif %}</td>
+          <td><span class="badge badge-received">Received</span></td>
+          <td>
+            {% if row.kind == "batch" %}
+              {% if row.cost_added %}
+                <span class="badge badge-cost-ok">Cost Added</span>
+              {% else %}
+                <span class="badge badge-cost-missing">Old Record: Cost Missing</span>
+              {% endif %}
+            {% else %}
+              <span class="badge {% if row.cost_added %}badge-cost-ok{% else %}badge-cost-missing{% endif %}">
+                {{ row.cost_text }}
+              </span>
+            {% endif %}
+          </td>
+          <td>{{ row.created_by }}</td>
+          <td>
+            <div class="action-cell">
+              {% if row.kind == "batch" %}
+                <a class="action-link action-light" href="{% url 'inventory_batch_detail' row.obj.pk %}">Detail</a>
+                {% if can_view_stock_cost %}
+                <button type="button"
+        class="action-link action-light js-open-cost"
+        data-cost-modal="costModal{{ row.obj.pk }}">
+  {% if row.obj.cost_is_added %}Cost{% else %}+ Cost{% endif %}
+</button>
+
+<div class="cost-modal" id="costModal{{ row.obj.pk }}" aria-hidden="true">
+  <div class="cost-modal-backdrop" data-close-cost></div>
+  <div class="cost-modal-card">
+    <div class="cost-modal-head">
+      <div>
+        <h3>{% if row.obj.cost_is_added %}Edit Purchase Cost{% else %}Add Purchase Cost{% endif %}</h3>
+        <p>{{ row.ref }} · {{ row.supplier }}</p>
+      </div>
+      <button type="button" class="cost-modal-close" data-close-cost>×</button>
+    </div>
+
+    <form method="post"
+          class="clean-cost-form"
+          action="{% url 'inventory_batch_add_cost' row.obj.pk %}">
+      {% csrf_token %}
+
+      <div class="clean-cost-grid">
+        <label>
+          <span>Goods Cost</span>
+          <div class="money-input"><b>$</b><input class="js-cost-number" type="number" step="0.01" min="0" name="total_goods_cost" value="{% if can_view_stock_cost %}{{ row.obj.total_goods_cost }}{% else %}0{% endif %}" required></div>
+        </label>
+        <label>
+          <span>Delivery Fee</span>
+          <div class="money-input"><b>$</b><input class="js-cost-number" type="number" step="0.01" min="0" name="shipping_cost" value="{% if can_view_stock_cost %}{{ row.obj.shipping_cost }}{% else %}0{% endif %}"></div>
+        </label>
+        <label>
+          <span>Extra Cost</span>
+          <div class="money-input"><b>$</b><input class="js-cost-number" type="number" step="0.01" min="0" name="extra_cost" value="{% if can_view_stock_cost %}{{ row.obj.extra_cost }}{% else %}0{% endif %}"></div>
+        </label>
+      </div>
+
+      <div class="clean-cost-total">
+        <span>Total Purchase Cost</span>
+        <strong>$<span data-cost-total>0.00</span></strong>
+      </div>
+
+      <div class="clean-cost-actions">
+        <button type="button" class="btn-cost-cancel" data-close-cost>Cancel</button>
+        <button type="submit" class="btn-cost-save">Save Cost</button>
+      </div>
+    </form>
+  </div>
+</div>
+                {% endif %}
+              {% else %}
+                {% if perms.production.change_fabricreceipt %}
+                  <a class="action-link action-light"
+                     href="{% url 'production_fabric_receipt_edit' row.obj.pk %}">
+                    Detail
+                  </a>
+                {% endif %}
+                <a class="action-link action-print"
+                   target="_blank"
+                   href="/production/materials/roll-labels/?receipt_ids={{ row.obj.pk }}">
+                  🖨 Printing
+                </a>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="11" class="empty-row">No received purchases.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="help-strip">
+    Purchase Stock In now combines Cloth, Printing Material and Fabric in one table.
+  </div>
+</section>
+{% endif %}
+
+  {% if show_production %}
+  <section class="stock-card production-card">
+    <div class="stock-card-head">
+      <div>
+        <h2>Production Stock</h2>
+        <p>Finished stock automatically added after Production/Sewing is completed. No extra purchase cost is added here.</p>
+      </div>
+      <span class="source-badge production">Automatic Production</span>
+    </div>
+    <div class="table-wrap">
+      <table class="stock-table">
+        <thead><tr><th>Batch</th><th>Date</th><th>Production</th><th>Color</th><th>Items</th><th>Qty Added</th><th>Created By</th><th>Action</th></tr></thead>
+        <tbody>
+          {% for batch in production_batches %}
+          <tr>
+            <td><a class="ref-link" href="{% url 'inventory_batch_detail' batch.pk %}">{{ batch.batch_no }}</a></td>
+            <td>{{ batch.received_date|date:"d M Y" }}</td>
+            <td>{% if batch.production_sewing_return %}{{ batch.production_sewing_return.job.project.project_no }}{% else %}-{% endif %}</td>
+            <td>{% if batch.production_sewing_return %}{{ batch.production_sewing_return.job.project_color.color.name|default:"-" }}{% else %}-{% endif %}</td>
+            <td class="item-summary">{{ batch.stock_item_summary }}</td>
+            <td><strong>{{ batch.stock_arrived_qty|floatformat:"-2" }}</strong></td>
+            <td>{{ batch.created_by.username|default:"System" }}</td>
+            <td><a class="action-link action-light" href="{% url 'inventory_batch_detail' batch.pk %}">Detail</a></td>
+          </tr>
+          {% empty %}<tr><td colspan="8" class="empty-row">No Production Stock records found.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="help-strip"><strong>No Add Cost here.</strong> Fabric purchase and sewing/production cost are already recorded elsewhere.</div>
+  </section>
+  {% endif %}
+</div>
+
+<style>
+/* ===== Clean purchase-cost modal ===== */
+.cost-modal{
+  position:fixed;
+  inset:0;
+  z-index:4000;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:18px;
+}
+.cost-modal.is-open{display:flex}
+.cost-modal-backdrop{
+  position:absolute;
+  inset:0;
+  background:rgba(24,22,18,.45);
+  backdrop-filter:blur(2px);
+}
+.cost-modal-card{
+  position:relative;
+  z-index:1;
+  width:min(600px,96vw);
+  overflow:hidden;
+  border:1px solid #e5d5bd;
+  border-radius:18px;
+  background:#fffdf9;
+  box-shadow:0 25px 80px rgba(38,28,13,.25);
+}
+.cost-modal-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:14px;
+  padding:16px 18px 13px;
+  border-bottom:1px solid #eee2d1;
+}
+.cost-modal-head h3{margin:0;font-size:18px}
+.cost-modal-head p{margin:3px 0 0;font-size:10px;color:#7f6d55}
+.cost-modal-close{
+  width:34px;height:34px;border:1px solid #eadac3;border-radius:9px;
+  background:#fff;font-size:22px;line-height:1;cursor:pointer
+}
+.clean-cost-form{padding:16px 18px 18px}
+.clean-cost-grid{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:10px;
+}
+.clean-cost-grid label{display:grid;gap:5px}
+.clean-cost-grid label>span{
+  font-size:9px;font-weight:900;text-transform:uppercase;color:#725f47
+}
+.money-input{
+  height:44px;display:flex;align-items:center;border:1px solid #dfcdb0;
+  border-radius:10px;background:#fff;overflow:hidden
+}
+.money-input b{padding:0 0 0 11px;color:#795b2a}
+.money-input input{
+  width:100%;height:100%;border:0!important;outline:0!important;
+  padding:0 10px;font-size:15px;font-weight:850;text-align:right;background:transparent
+}
+.money-input input::-webkit-inner-spin-button,
+.money-input input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.clean-cost-total{
+  margin-top:12px;padding:12px 14px;display:flex;align-items:center;
+  justify-content:space-between;border:1px solid #edce8d;border-radius:11px;
+  background:#fff4d8
+}
+.clean-cost-total span{font-size:11px;font-weight:900;text-transform:uppercase}
+.clean-cost-total strong{font-size:36px;line-height:1;color:#2f1f08;font-weight:1000}
+.clean-cost-actions{
+  margin-top:14px;display:flex;justify-content:flex-end;gap:8px
+}
+.btn-cost-cancel,.btn-cost-save{
+  min-width:96px;height:38px;border-radius:9px;font-weight:850;cursor:pointer
+}
+.btn-cost-cancel{border:1px solid #dfd2bf;background:#fff}
+.btn-cost-save{border:0;background:#f1a600;color:#241700}
+.action-print{
+  background:#eef9f3!important;
+  border-color:#bfe0cd!important;
+  color:#126542!important;
+  white-space:nowrap;
+}
+body.cost-modal-open{overflow:hidden}
+
+@media(max-width:720px){
+  .clean-cost-grid{grid-template-columns:1fr}
+}
+
+/* Keep action buttons tidy in the table */
+.action-cell{display:flex!important;align-items:center!important;gap:5px!important;flex-wrap:wrap!important}
+.action-cell .action-link,
+.action-cell button.action-link{
+  min-height:29px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:5px 8px!important;
+  white-space:nowrap;
+}
+</style>
+
+<script>
+(function(){
+  function money(v){
+    const n = Number(v || 0);
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  function refreshCostTotal(modal){
+    if(!modal) return;
+    let total = 0;
+    modal.querySelectorAll('.js-cost-number').forEach(function(input){
+      total += money(input.value);
+    });
+    const out = modal.querySelector('[data-cost-total]');
+    if(out) out.textContent = total.toFixed(2);
+  }
+
+  function openCost(id){
+    const modal = document.getElementById(id);
+    if(!modal) return;
+    modal.classList.add('is-open');
+    modal.setAttribute('aria-hidden','false');
+    document.body.classList.add('cost-modal-open');
+    refreshCostTotal(modal);
+    const first = modal.querySelector('.js-cost-number');
+    if(first){
+      setTimeout(function(){ first.focus(); first.select(); }, 40);
+    }
+  }
+
+  function closeCost(modal){
+    if(!modal) return;
+    modal.classList.remove('is-open');
+    modal.setAttribute('aria-hidden','true');
+    if(!document.querySelector('.cost-modal.is-open')){
+      document.body.classList.remove('cost-modal-open');
+    }
+  }
+
+  document.addEventListener('click',function(e){
+    const opener=e.target.closest('.js-open-cost');
+    if(opener){
+      e.preventDefault();
+      openCost(opener.dataset.costModal);
+      return;
+    }
+    const closer=e.target.closest('[data-close-cost]');
+    if(closer){
+      e.preventDefault();
+      closeCost(closer.closest('.cost-modal'));
+    }
+  });
+
+  document.addEventListener('input',function(e){
+    if(e.target.matches('.js-cost-number')){
+      refreshCostTotal(e.target.closest('.cost-modal'));
+    }
+  });
+
+  document.addEventListener('focusin',function(e){
+    if(e.target.matches('.js-cost-number')){
+      e.target.select();
+    }
+  });
+
+  document.addEventListener('keydown',function(e){
+    if(e.key==='Escape'){
+      const modal=document.querySelector('.cost-modal.is-open');
+      if(modal) closeCost(modal);
+    }
+  });
+})();
+</script>
+
+
+<style>
+.action-cell{
+  width:100%;
+}
+.action-cell .action-print{
+  margin-left:auto;
+  background:#111827;
+  color:#fff;
+  border:1px solid #111827;
+}
+@media(max-width:900px){
+  .action-cell .action-print{margin-left:0}
+}
+</style>
+
 {% endblock %}

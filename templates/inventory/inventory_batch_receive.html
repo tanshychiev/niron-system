@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="max-width:1050px;margin:20px auto;padding:0 14px;">
+  <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:16px;">
+    <div>
+      <h1 style="margin:0;">Receive Purchase</h1>
+      <div style="opacity:.7;margin-top:4px;">{{ batch.batch_no }} · {{ batch.supplier_name }}</div>
+    </div>
+    <a href="{% url 'inventory_stock_in_list' %}" class="btn btn-light">Back to Stock In List</a>
+  </div>
+
+  <form method="post">
+    {% csrf_token %}
+    <div style="background:#fff;border:1px solid #eadcc8;border-radius:16px;padding:16px;margin-bottom:14px;">
+      <label style="font-weight:700;">Received date</label>
+      <input type="date" name="receive_date" value="{{ today|date:'Y-m-d' }}" required
+             style="display:block;margin-top:7px;max-width:240px;width:100%;padding:10px;border:1px solid #d8c8b1;border-radius:10px;">
+    </div>
+
+    <div style="background:#fff;border:1px solid #eadcc8;border-radius:16px;overflow:auto;">
+      <table style="width:100%;border-collapse:collapse;min-width:760px;">
+        <thead>
+          <tr style="background:#faf4ea;text-align:left;">
+            <th style="padding:12px;">Item</th><th>Ordered</th><th>Received Before</th><th>Remaining to Arrive</th><th style="padding-right:12px;">Receive Now</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr style="border-top:1px solid #eee2d1;">
+            <td style="padding:12px;"><strong>{{ row.item.name }}</strong><br><small>{{ row.color|default:"" }}{% if row.size %} / {{ row.size }}{% endif %}</small></td>
+            <td>{{ row.qty_received }}</td>
+            <td>{{ row.qty_arrived }}</td>
+            <td><strong>{{ row.qty_pending_arrival }}</strong></td>
+            <td style="padding-right:12px;">
+              <input type="number" step="0.01" min="0" max="{{ row.qty_pending_arrival }}" name="receive_qty_{{ row.pk }}" value="{{ row.qty_pending_arrival }}"
+                     {% if row.qty_pending_arrival <= 0 %}disabled{% endif %}
+                     style="width:130px;padding:9px;border:1px solid #d8c8b1;border-radius:9px;">
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;margin-top:16px;">
+      <button type="submit" class="btn btn-primary" style="padding:11px 20px;">Confirm Received Stock</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

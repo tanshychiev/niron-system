@@ -159,10 +159,18 @@ class FabricReceiptLineForm(forms.Form):
         initial=1,
         widget=forms.NumberInput(
             attrs={
-                "class": "form-control",
+                "class": "form-control fabric-roll-count",
                 "min": 1,
             }
         ),
+    )
+
+    # One KG value for every physical roll. The Stock In page keeps this
+    # synchronized with roll_count. Stored as comma-separated decimals so we
+    # can keep the existing flat formset structure.
+    roll_weights = forms.CharField(
+        required=True,
+        widget=forms.HiddenInput(attrs={"class": "fabric-roll-weights"}),
     )
 
     note = forms.CharField(
@@ -189,6 +197,33 @@ class FabricReceiptLineForm(forms.Form):
             .filter(is_active=True)
             .order_by("name")
         )
+
+    def clean(self):
+        cleaned = super().clean()
+        roll_count = int(cleaned.get("roll_count") or 0)
+        raw = str(cleaned.get("roll_weights") or "").strip()
+
+        weights = []
+        if raw:
+            for part in raw.split(","):
+                part = part.strip()
+                if not part:
+                    continue
+                try:
+                    weight = Decimal(part)
+                except Exception:
+                    raise forms.ValidationError("Every fabric roll weight must be a valid number.")
+                if weight <= 0:
+                    raise forms.ValidationError("Every fabric roll weight must be greater than 0 KG.")
+                weights.append(weight.quantize(Decimal("0.001")))
+
+        if roll_count > 0 and len(weights) != roll_count:
+            raise forms.ValidationError(
+                f"Enter the KG for all {roll_count} roll(s). Currently {len(weights)} weight(s) are filled."
+            )
+
+        cleaned["roll_weights_list"] = weights
+        return cleaned
 
 
 def fabric_receipt_line_formset(
@@ -296,7 +331,6 @@ class SewingPartnerForm(forms.ModelForm):
             "phone",
             "location",
             "is_active",
-            "is_default",
             "note",
         ]
         widgets = {
@@ -306,15 +340,9 @@ class SewingPartnerForm(forms.ModelForm):
             "is_active": forms.CheckboxInput(
                 attrs={"class": "form-check-input"}
             ),
-            "is_default": forms.CheckboxInput(
-                attrs={"class": "form-check-input"}
-            ),
             "note": forms.Textarea(
                 attrs={"class": "form-control", "rows": 3}
             ),
-        }
-        labels = {
-            "is_default": "Use as default sewer",
         }
 
 
@@ -388,32 +416,6 @@ class StaffPayableForm(forms.ModelForm):
             "amount": forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": 0}),
             "description": forms.TextInput(attrs={"class": "form-control", "placeholder": "Optional note"}),
         }
-
-
-class SewingReturnBulkPaymentForm(forms.Form):
-    price_per_piece = forms.DecimalField(
-        label="Price per cloth",
-        min_value=Decimal("0.0001"),
-        max_digits=12,
-        decimal_places=4,
-        widget=forms.NumberInput(
-            attrs={
-                "class": "form-control",
-                "step": "0.0001",
-                "min": "0.0001",
-                "placeholder": "0.50",
-            }
-        ),
-    )
-    payment_date = forms.DateField(
-        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"})
-    )
-    note = forms.CharField(
-        required=False,
-        widget=forms.Textarea(
-            attrs={"class": "form-control", "rows": 3, "placeholder": "Optional note"}
-        ),
-    )
 
 
 class PaymentBatchForm(forms.ModelForm):

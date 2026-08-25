@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block page_title %}{{ page_title|default:"Stock In" }}{% endblock %}
-{% block page_subtitle %}Receive Cloth, Printing Material, or Fabric in one batch workflow{% endblock %}
+{% block page_subtitle %}Purchased stock only — choose Stock In Now or Purchase / Receive Later{% endblock %}
 
 {% block content %}
 <style>
@@ -454,17 +454,6 @@
 .toast.show{display:block}
 .toast.ok{background:#ecfdf3;color:#067647;border:1px solid #abefc6}
 .toast.fail{background:#fdecec;color:#b42318;border:1px solid #f5c2c7}
-.toast-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
-.toast-message{line-height:1.45}
-.toast-actions{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px}
-.toast-countdown{font-size:11px;opacity:.78}
-.toast-detail{
-  display:inline-flex;align-items:center;justify-content:center;
-  min-height:34px;padding:7px 11px;border-radius:10px;
-  text-decoration:none;background:#fff;color:inherit;border:1px solid currentColor;
-  font-size:11px;font-weight:900
-}
-.toast-close{border:0;background:transparent;color:inherit;font-size:18px;cursor:pointer}
 
 .modal-mask{
   display:none;
@@ -621,56 +610,68 @@
 }
 
 
-.toast-actions{
-  display:block;
-  margin-top:10px;
+.fabric-weight-panel{margin-top:12px;padding:13px;border:1px solid #eadfcf;border-radius:14px;background:#fffdf9}
+.fabric-weight-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+.fabric-weight-head strong{font-size:12px;color:#23180d}
+.fabric-weight-head small{display:block;margin-top:2px;font-size:10px;color:var(--stock-muted)}
+.fabric-weight-total{font-size:11px;color:var(--stock-muted);white-space:nowrap}
+.fabric-weight-total strong{font-size:15px;color:#7c4a03;margin-left:5px}
+.fabric-weight-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(150px,170px));
+  gap:8px;
+  justify-content:start;
 }
-.toast-bottom-row{
+.fabric-roll-weight{
   display:flex;
   align-items:center;
-  justify-content:space-between;
-  gap:10px;
-}
-.toast-progress-track{
+  gap:6px;
   width:100%;
-  height:4px;
-  margin-top:9px;
-  overflow:hidden;
-  border-radius:999px;
-  background:rgba(6,118,71,.14);
+  max-width:170px;
+  padding:6px 7px;
+  border:1px solid #eee2d4;
+  border-radius:10px;
+  background:#fff;
 }
-.toast-progress-bar{
-  width:100%;
-  height:100%;
-  border-radius:inherit;
-  background:currentColor;
-  transform-origin:left center;
+.fabric-roll-weight label{
+  min-width:32px;
+  font-size:10px;
+  font-weight:900;
+  color:#8a5b22;
 }
-.toast.show .toast-progress-bar{
-  animation:toastCountdownLine 5s linear forwards;
+.fabric-roll-weight input{
+  width:78px;
+  min-width:78px;
+  height:32px;
+  border:1px solid #ddd0c0;
+  border-radius:8px;
+  padding:0 7px;
+  font-weight:850;
+  outline:none;
 }
-@keyframes toastCountdownLine{
-  from{transform:scaleX(1)}
-  to{transform:scaleX(0)}
+.fabric-roll-weight input:focus{
+  border-color:#f2a900;
+  box-shadow:0 0 0 3px rgba(242,169,0,.12);
 }
-
+.fabric-roll-weight .kg-unit{
+  flex:0 0 auto;
+  font-size:9px;
+  font-weight:900;
+  color:#7b6a58;
+}
+@media(max-width:900px){
+  .fabric-weight-grid{grid-template-columns:repeat(auto-fill,minmax(145px,165px))}
+  .fabric-roll-weight{max-width:165px}
+}
+@media(max-width:520px){
+  .fabric-weight-head{align-items:flex-start;flex-direction:column}
+  .fabric-weight-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .fabric-roll-weight{max-width:none}
+  .fabric-roll-weight input{width:100%;min-width:0}
+}
 </style>
 
-<div id="pageToast" class="toast" role="status" aria-live="polite">
-  <div class="toast-head">
-    <div id="toastMessage" class="toast-message"></div>
-    <button type="button" id="toastClose" class="toast-close" aria-label="Close">×</button>
-  </div>
-  <div id="toastActions" class="toast-actions" hidden>
-    <div class="toast-bottom-row">
-      <span id="toastCountdown" class="toast-countdown"></span>
-      <a id="toastDetailLink" class="toast-detail" href="#">View detail</a>
-    </div>
-    <div class="toast-progress-track" aria-hidden="true">
-      <div id="toastProgressBar" class="toast-progress-bar"></div>
-    </div>
-  </div>
-</div>
+<div id="pageToast" class="toast"></div>
 
 <div class="stock-page">
   <div class="stock-shell">
@@ -678,7 +679,7 @@
       <div class="top-row">
         <div class="title">
           <h1>Stock In</h1>
-          <p>Receive stock now, or save a purchase and confirm it when the goods arrive.</p><div class="stock-cost-later-note">Cost is optional now. Staff can add it now or later; only Admin/Finance viewers can see saved amounts.</div>
+          <p>Purchased stock only: Cloth, Printing Material and Fabric.</p><div class="stock-cost-later-note"><strong>Choose one:</strong> Stock In Now if goods are here, or Purchase / Receive Later if they have not arrived.</div>
         </div>
 
         <div class="type-tabs" role="tablist">
@@ -728,27 +729,36 @@
           </div>
         </section>
 
-        
-
-        <section class="panel" id="inventoryCostPanel">
+        <section class="panel">
           <div class="panel-head">
             <div class="panel-title">
-              <span class="panel-icon">$</span>
+              <span class="panel-icon">＄</span>
               <div>
-                <h2>Purchase cost</h2>
-                <small>Add now or leave it for later</small>
+                <h2>Purchase Cost <span style="color:var(--stock-red);font-weight:900">Required</span></h2>
+                <small>Goods Cost is required. Delivery Fee and Extra Cost can be 0.</small>
               </div>
             </div>
-            <button type="button" class="btn-light" id="toggleInventoryCost">＋ Add Cost</button>
+            <span class="cost-status" id="inventoryCostStatus">Cost missing</span>
           </div>
-          <input type="hidden" name="cost_is_added" id="costIsAddedInput" value="0">
-          <div id="inventoryCostFields" hidden>
-            <div class="cost-grid">
-              <div class="field"><label>Goods Cost</label><div class="money-wrap"><span class="money-prefix">$</span>{{ form.total_goods_cost }}</div></div>
-              <div class="field"><label>Delivery Fee</label><div class="money-wrap"><span class="money-prefix">$</span>{{ form.shipping_cost }}</div></div>
-              <div class="field"><label>Other Fee</label><div class="money-wrap"><span class="money-prefix">$</span>{{ form.extra_cost }}</div></div>
+
+          <div class="cost-grid">
+            <div class="field">
+              <label>Goods Cost</label>
+              <div class="money-wrap"><span class="money-prefix">$</span>{{ form.total_goods_cost }}</div>
             </div>
-            <div class="stock-cost-later-note">After staff saves a cost, staff will only see “Cost Already Added”. Admin/Finance viewers can see the amount.</div>
+            <div class="field">
+              <label>Delivery Fee</label>
+              <div class="money-wrap"><span class="money-prefix">$</span>{{ form.shipping_cost }}</div>
+            </div>
+            <div class="field">
+              <label>Extra Cost</label>
+              <div class="money-wrap"><span class="money-prefix">$</span>{{ form.extra_cost }}</div>
+            </div>
+          </div>
+
+          <div class="cost-total">
+            <span>Total batch cost</span>
+            <strong>$<span id="inventoryCostTotal">0.00</span></strong>
           </div>
         </section>
 
@@ -813,11 +823,24 @@
         <div class="form-actions">
           <div class="action-group">
             <button type="button" class="btn-light addInventoryRow">＋ Add Row</button>
+            <a href="{% url 'inventory_list' %}" class="btn-light">Cancel</a>
           </div>
           <div class="action-group">
             <span style="font-size:10px;color:var(--stock-muted)"><strong id="inventoryRowCount">0</strong> active rows</span>
-            <button type="submit" name="submit_action" value="save_purchase" class="btn-light" id="inventoryPurchaseBtn">Save Purchase</button>
-            <button type="submit" name="submit_action" value="stock_in_now" class="btn-primary" id="inventorySaveBtn">Stock In Now</button>
+            <button type="submit"
+                    name="submit_action"
+                    value="save_purchase"
+                    class="btn-light"
+                    id="inventoryPurchaseBtn">
+              Save Purchase
+            </button>
+            <button type="submit"
+                    name="submit_action"
+                    value="stock_in_now"
+                    class="btn-primary"
+                    id="inventorySaveBtn">
+              Stock In Now
+            </button>
           </div>
         </div>
       </form>
@@ -839,13 +862,75 @@
 
           <div class="header-grid">
             <div class="field">
-              <label>Received Date</label>
+              <label>Received / Expected Date</label>
               {{ fabric_header_form.received_date }}
             </div>
             <div class="field">
               <label>Supplier</label>
               {{ fabric_header_form.supplier }}
             </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div class="panel-title">
+              <span class="panel-icon">＄</span>
+              <div>
+                <h2>Purchase Cost <span style="color:var(--stock-red);font-weight:900">Required</span></h2>
+                <small>Goods Cost is required. Delivery Fee and Extra Cost can be 0.</small>
+              </div>
+            </div>
+            <span class="cost-status" id="fabricCostStatus">Cost missing</span>
+          </div>
+
+          <div class="cost-grid">
+            <div class="field">
+              <label>Goods Cost</label>
+              <div class="money-wrap">
+                <span class="money-prefix">$</span>
+                <input type="number"
+                       name="fabric_goods_cost"
+                       id="fabric_goods_cost"
+                       value="0.00"
+                       min="0"
+                       step="0.01"
+                       inputmode="decimal">
+              </div>
+            </div>
+
+            <div class="field">
+              <label>Delivery Fee</label>
+              <div class="money-wrap">
+                <span class="money-prefix">$</span>
+                <input type="number"
+                       name="fabric_shipping_cost"
+                       id="fabric_shipping_cost"
+                       value="0.00"
+                       min="0"
+                       step="0.01"
+                       inputmode="decimal">
+              </div>
+            </div>
+
+            <div class="field">
+              <label>Extra Cost</label>
+              <div class="money-wrap">
+                <span class="money-prefix">$</span>
+                <input type="number"
+                       name="fabric_extra_cost"
+                       id="fabric_extra_cost"
+                       value="0.00"
+                       min="0"
+                       step="0.01"
+                       inputmode="decimal">
+              </div>
+            </div>
+          </div>
+
+          <div class="cost-total">
+            <span>Total Fabric Cost</span>
+            <strong>$<span id="fabricCostTotal">0.00</span></strong>
           </div>
         </section>
 
@@ -900,7 +985,18 @@
                     <label>Note</label>
                     {{ line_form.note }}
                   </div>
-                  <div style="display:none">{{ line_form.DELETE }}</div>
+                  <div style="display:none">{{ line_form.DELETE }}{{ line_form.roll_weights }}</div>
+                </div>
+
+                <div class="fabric-weight-panel">
+                  <div class="fabric-weight-head">
+                    <div>
+                      <strong>Physical Roll Weight (KG)</strong>
+                      <small>Enter the actual KG printed on each roll.</small>
+                    </div>
+                    <div class="fabric-weight-total">Total <strong class="fabric-weight-total-value">0.00 KG</strong></div>
+                  </div>
+                  <div class="fabric-weight-grid"></div>
                 </div>
 
                 <div class="cute-fabric-preview">
@@ -925,7 +1021,8 @@
           </div>
           <div class="action-group">
             <span style="font-size:10px;color:var(--stock-muted)"><strong id="fabricRowCount">0</strong> fabric types</span>
-            <button type="submit" class="btn-primary" id="fabricSaveBtn">Save Fabric Batch</button>
+            <button type="submit" name="submit_action" value="save_purchase" class="btn-light" id="fabricPurchaseBtn">Purchase / Receive Later</button>
+            <button type="submit" name="submit_action" value="stock_in_now" class="btn-primary" id="fabricSaveBtn">Stock In Now</button>
           </div>
         </div>
       </form>
@@ -937,6 +1034,7 @@
         <div class="summary-grid">
           <div class="summary-box"><span>Rows</span><strong id="summaryRows">0</strong></div>
           <div class="summary-box"><span>Total Qty / Rolls</span><strong id="summaryQty">0</strong></div>
+          <div class="summary-box"><span>Total Fabric KG</span><strong id="summaryFabricKg">0.00</strong></div>
         </div>
         <div class="side-lines">
           <div class="side-line"><span>Mode</span><strong id="summaryMode">Cloth</strong></div>
@@ -948,7 +1046,7 @@
       <div class="side-card">
         <h3 class="side-title">How it works</h3>
         <div class="help">
-          Cloth and Printing Material save into Inventory batches. Fabric saves into the existing Fabric Receipt and Fabric Roll records, so the same fabric data continues to work in Production.
+          This page is only for purchased stock. Stock In Now increases stock immediately. Purchase / Receive Later saves the purchase without increasing stock. Production stock is added automatically from Production and does not add another cost.
         </div>
       </div>
     </aside>
@@ -996,7 +1094,18 @@
       <div class="field cost-field"><label>Delivery Fee</label>{{ fabric_formset.empty_form.shipping_cost }}</div>
       <div class="field cost-field"><label>Extra Cost</label>{{ fabric_formset.empty_form.extra_cost }}</div>
       <div class="field"><label>Note</label>{{ fabric_formset.empty_form.note }}</div>
-      <div style="display:none">{{ fabric_formset.empty_form.DELETE }}</div>
+      <div style="display:none">{{ fabric_formset.empty_form.DELETE }}{{ fabric_formset.empty_form.roll_weights }}</div>
+    </div>
+
+    <div class="fabric-weight-panel">
+      <div class="fabric-weight-head">
+        <div>
+          <strong>Physical Roll Weight (KG)</strong>
+          <small>Enter the actual KG printed on each roll.</small>
+        </div>
+        <div class="fabric-weight-total">Total <strong class="fabric-weight-total-value">0.00 KG</strong></div>
+      </div>
+      <div class="fabric-weight-grid"></div>
     </div>
 
     <div class="cute-fabric-preview">
@@ -1100,82 +1209,11 @@
     return Number.isFinite(number)?number:0;
   };
 
-  let toastTimer=null;
-  let toastCountdownTimer=null;
-
-  const hideToast=()=>{
-    clearTimeout(toastTimer);
-    clearInterval(toastCountdownTimer);
-    toast.classList.remove('show');
-    document.getElementById('toastActions').hidden=true;
-  };
-
-  const show=(message,ok=false,detailUrl='',duration=5000)=>{
-    clearTimeout(toastTimer);
-    clearInterval(toastCountdownTimer);
-
-    document.getElementById('toastMessage').textContent=message;
+  const show=(message,ok=false)=>{
+    toast.textContent=message;
     toast.className='toast show '+(ok?'ok':'fail');
-
-    const actions=document.getElementById('toastActions');
-    const detailLink=document.getElementById('toastDetailLink');
-    const countdown=document.getElementById('toastCountdown');
-    const progressBar=document.getElementById('toastProgressBar');
-
-    progressBar.style.animation='none';
-    void progressBar.offsetWidth;
-    progressBar.style.animation=`toastCountdownLine ${duration}ms linear forwards`;
-
-    if(ok&&detailUrl){
-      actions.hidden=false;
-      detailLink.href=detailUrl;
-
-      const expiresAt=Date.now()+duration;
-
-      const updateCountdown=()=>{
-        const seconds=Math.max(0,Math.ceil((expiresAt-Date.now())/1000));
-        countdown.textContent=`Closing in ${seconds}s`;
-      };
-
-      updateCountdown();
-      toastCountdownTimer=setInterval(updateCountdown,250);
-    }else{
-      actions.hidden=true;
-    }
-
-    toastTimer=setTimeout(()=>{
-      try{sessionStorage.removeItem('nironStockInSuccessToast')}catch(e){}
-      hideToast();
-    },duration);
+    setTimeout(()=>toast.classList.remove('show'),5000);
   };
-
-  document.getElementById('toastClose')?.addEventListener('click',()=>{
-    try{sessionStorage.removeItem('nironStockInSuccessToast')}catch(e){}
-    hideToast();
-  });
-
-  // Restore the success notification after the immediate page refresh.
-  try{
-    const savedToastRaw=sessionStorage.getItem('nironStockInSuccessToast');
-
-    if(savedToastRaw){
-      const savedToast=JSON.parse(savedToastRaw);
-      const remaining=Math.max(0,(savedToast.expiresAt||0)-Date.now());
-
-      if(remaining>0){
-        show(
-          savedToast.message||'Stock In created successfully.',
-          true,
-          savedToast.detailUrl||'',
-          remaining
-        );
-      }else{
-        sessionStorage.removeItem('nironStockInSuccessToast');
-      }
-    }
-  }catch(e){
-    try{sessionStorage.removeItem('nironStockInSuccessToast')}catch(ignore){}
-  }
 
   let activeMode=pageMode==='fabric'?'fabric':(pageMode==='printing'?'printing':'cloth');
 
@@ -1441,44 +1479,70 @@
   const fabricLines=document.getElementById('fabricLines');
   const fabricTotal=document.getElementById('id_fabric_items-TOTAL_FORMS');
 
-  // On a fresh Fabric Stock In page, keep only one blank row.
-  // More rows appear only after clicking + Add Fabric.
-  (function keepOneInitialFabricRow(){
-    if(!fabricLines || !fabricTotal) return;
+  function parseFabricWeights(row){
+    const hidden=row.querySelector('input[name$="-roll_weights"]');
+    if(!hidden || !hidden.value) return [];
+    return hidden.value.split(',').map(v=>v.trim()).filter(Boolean);
+  }
 
-    const rows=[...fabricLines.querySelectorAll('.fabric-line')];
-    if(rows.length<=1) return;
+  function syncFabricWeightHidden(row){
+    const hidden=row.querySelector('input[name$="-roll_weights"]');
+    if(!hidden) return;
+    const values=[...row.querySelectorAll('.fabric-roll-weight-input')].map(input=>input.value.trim());
+    hidden.value=values.join(',');
+    const total=values.reduce((sum,value)=>sum+(parseFloat(value)||0),0);
+    const totalEl=row.querySelector('.fabric-weight-total-value');
+    if(totalEl) totalEl.textContent=total.toFixed(2)+' KG';
+    updateAllSummary();
+  }
 
-    const rowHasValue=(row)=>{
-      return [...row.querySelectorAll('input,select,textarea')].some(field=>{
-        if(field.type==='hidden' || field.name?.endsWith('-DELETE')) return false;
-        if(field.tagName==='SELECT') return Boolean(field.value);
-        if(field.name?.includes('roll_count')){
-          return field.value && field.value!=='1';
-        }
-        return Boolean((field.value||'').trim());
+  function renderFabricWeightInputs(row){
+    const countInput=row.querySelector('input[name$="-roll_count"]');
+    const grid=row.querySelector('.fabric-weight-grid');
+    if(!countInput || !grid) return;
+
+    const count=Math.max(parseInt(countInput.value||'1',10)||1,1);
+    const oldValues=[...row.querySelectorAll('.fabric-roll-weight-input')].map(x=>x.value);
+    const stored=parseFabricWeights(row);
+    const source=oldValues.length?oldValues:stored;
+
+    grid.innerHTML='';
+    for(let i=0;i<count;i++){
+      const wrap=document.createElement('div');
+      wrap.className='fabric-roll-weight';
+      const label=document.createElement('label');
+      label.textContent=String(i+1).padStart(2,'0')+'/'+String(count).padStart(2,'0');
+      const input=document.createElement('input');
+      input.type='text';
+      input.inputMode='decimal';
+      input.className='fabric-roll-weight-input';
+      input.placeholder='0.00';
+      input.value=source[i]||'';
+      input.required=true;
+      input.addEventListener('input',()=>{
+        input.value=input.value.replace(',','.').replace(/[^0-9.]/g,'').replace(/(\..*)\./g,'$1');
+        syncFabricWeightHidden(row);
       });
-    };
+      const unit=document.createElement('span');
+      unit.className='kg-unit';
+      unit.textContent='KG';
+      wrap.append(label,input,unit);
+      grid.appendChild(wrap);
+    }
+    syncFabricWeightHidden(row);
+  }
 
-    // Never remove rows that contain entered data or server-side validation errors.
-    const hasEnteredData=rows.some(row=>rowHasValue(row));
-    const hasErrors=rows.some(row=>row.querySelector('.errorlist,.field-error,.row-error'));
-
-    if(hasEnteredData || hasErrors) return;
-
-    rows.slice(1).forEach(row=>row.remove());
-    fabricTotal.value='1';
-
-    const firstRow=rows[0];
-    firstRow?.querySelectorAll('[name],[id],[for]').forEach(element=>{
-      if(element.name) element.name=element.name.replace(/fabric_items-\d+-/,'fabric_items-0-');
-      if(element.id) element.id=element.id.replace(/fabric_items-\d+-/,'fabric_items-0-');
-      if(element.htmlFor) element.htmlFor=element.htmlFor.replace(/fabric_items-\d+-/,'fabric_items-0-');
-    });
-
-    const number=firstRow?.querySelector('.row-number');
-    if(number) number.textContent='1';
-  })();
+  function bindFabricWeights(row){
+    const countInput=row.querySelector('input[name$="-roll_count"]');
+    if(!countInput || countInput.dataset.weightBound==='1'){
+      renderFabricWeightInputs(row);
+      return;
+    }
+    countInput.dataset.weightBound='1';
+    countInput.addEventListener('input',()=>renderFabricWeightInputs(row));
+    countInput.addEventListener('change',()=>renderFabricWeightInputs(row));
+    renderFabricWeightInputs(row);
+  }
 
   function bindFabricRemove(row){
     row.querySelector('.removeFabricRow')?.addEventListener('click',()=>{
@@ -1527,12 +1591,13 @@
 
     const row=fabricLines.lastElementChild;
     bindFabricRemove(row);
+    bindFabricWeights(row);
     renumberFabricRows();
     updateAllSummary();
     row?.querySelector('input,select')?.focus();
   }
 
-  fabricLines.querySelectorAll('.fabric-line').forEach(bindFabricRemove);
+  fabricLines.querySelectorAll('.fabric-line').forEach(row=>{bindFabricRemove(row);bindFabricWeights(row);});
   document.getElementById('addFabricRow').addEventListener('click',addFabricRow);
   document.getElementById('addFabricRowBottom').addEventListener('click',addFabricRow);
   fabricLines.addEventListener('input',updateAllSummary);
@@ -1547,14 +1612,11 @@
   }
 
   function fabricCost(){
-    return [...fabricLines.querySelectorAll('.fabric-line')]
-      .filter(row=>row.style.display!=='none')
-      .reduce((total,row)=>{
-        return total+
-          money(row.querySelector('input[name$="-total_goods_cost"]')?.value)+
-          money(row.querySelector('input[name$="-shipping_cost"]')?.value)+
-          money(row.querySelector('input[name$="-extra_cost"]')?.value);
-      },0);
+    return [
+      document.getElementById('fabric_goods_cost'),
+      document.getElementById('fabric_shipping_cost'),
+      document.getElementById('fabric_extra_cost')
+    ].filter(Boolean).reduce((sum,input)=>sum+money(input.value),0);
   }
 
   function updateAllSummary(){
@@ -1568,11 +1630,25 @@
 
       const cost=fabricCost();
 
+      const totalKg=rows.reduce((sum,row)=>{
+        return sum+[...row.querySelectorAll('.fabric-roll-weight-input')].reduce((s,input)=>s+(parseFloat(input.value)||0),0);
+      },0);
+
       document.getElementById('summaryRows').textContent=rows.length;
       document.getElementById('summaryQty').textContent=rolls.toFixed(0);
+      const summaryFabricKg=document.getElementById('summaryFabricKg');
+      if(summaryFabricKg) summaryFabricKg.textContent=totalKg.toFixed(2);
       document.getElementById('fabricRowCount').textContent=rows.length;
       document.getElementById('summaryCostTotal').textContent=cost.toFixed(2);
       document.getElementById('summaryCostStatus').textContent=cost>0?'Filled':'Missing';
+
+      const fabricCostTotal=document.getElementById('fabricCostTotal');
+      if(fabricCostTotal) fabricCostTotal.textContent=cost.toFixed(2);
+      const fabricCostStatus=document.getElementById('fabricCostStatus');
+      if(fabricCostStatus){
+        fabricCostStatus.textContent=cost>0?'Cost added':'Cost missing';
+        fabricCostStatus.classList.toggle('filled',cost>0);
+      }
       return;
     }
 
@@ -1603,7 +1679,18 @@
     field.addEventListener('change',updateAllSummary);
   });
 
-  async function ajaxSubmit(form,button){
+  // Fabric header cost fields are outside fabricLines, so bind them directly.
+  // This makes Total Fabric Cost update immediately while typing.
+  [
+    document.getElementById('fabric_goods_cost'),
+    document.getElementById('fabric_shipping_cost'),
+    document.getElementById('fabric_extra_cost')
+  ].filter(Boolean).forEach(field=>{
+    field.addEventListener('input',updateAllSummary);
+    field.addEventListener('change',updateAllSummary);
+  });
+
+  async function ajaxSubmit(form,button,submitAction){
     document.querySelectorAll('.error-highlight,.row-error').forEach(element=>{
       element.classList.remove('error-highlight','row-error');
     });
@@ -1616,6 +1703,7 @@
       const safeMessage=message||'Failed: Could not save. Your entered data is still here.';
 
       show(safeMessage,false);
+      window.alert(safeMessage);
 
       const first=Object.keys(errors)[0];
 
@@ -1633,17 +1721,17 @@
     };
 
     try{
-      const formData=new FormData(form);
-      if(button?.name && button?.value){
-        formData.set(button.name,button.value);
-      }
       const response=await fetch(location.href,{
         method:'POST',
         headers:{
           'X-Requested-With':'XMLHttpRequest',
           'Accept':'application/json'
         },
-        body:formData,
+        body:(()=>{
+          const payload=new FormData(form);
+          if(submitAction) payload.set('submit_action',submitAction);
+          return payload;
+        })(),
         credentials:'same-origin',
         redirect:'follow'
       });
@@ -1689,22 +1777,13 @@
         return;
       }
 
-      const successMessage=data.message||'Stock In created successfully.';
-      const detailUrl=data.detail_url||'';
+      show(data.message||'Saved successfully.',true);
 
-      try{
-        sessionStorage.setItem(
-          'nironStockInSuccessToast',
-          JSON.stringify({
-            message:successMessage,
-            detailUrl:detailUrl,
-            expiresAt:Date.now()+5000
-          })
-        );
-      }catch(e){}
-
-      // Refresh immediately after save.
-      window.location.reload();
+      // Redirect only after a confirmed successful save.
+      const target=data.redirect_url||data.detail_url;
+      if(target){
+        setTimeout(()=>window.location.assign(target),450);
+      }
     }catch(error){
       console.error('Stock In save error:',error);
       failWithoutReload(
@@ -1716,33 +1795,16 @@
     }
   }
 
-  const toggleInventoryCost=document.getElementById('toggleInventoryCost');
-  const inventoryCostFields=document.getElementById('inventoryCostFields');
-  const costIsAddedInput=document.getElementById('costIsAddedInput');
-  toggleInventoryCost?.addEventListener('click',()=>{
-    const willOpen=inventoryCostFields.hasAttribute('hidden');
-    if(willOpen){
-      inventoryCostFields.removeAttribute('hidden');
-      costIsAddedInput.value='1';
-      toggleInventoryCost.textContent='Cost Added to This Save';
-      inventoryCostFields.querySelector('input')?.focus();
-    }else{
-      inventoryCostFields.setAttribute('hidden','');
-      costIsAddedInput.value='0';
-      toggleInventoryCost.textContent='＋ Add Cost';
-      inventoryCostFields.querySelectorAll('input').forEach(input=>input.value='');
-    }
-    updateAllSummary();
-  });
-
   inventoryForm.addEventListener('submit',event=>{
     event.preventDefault();
-    ajaxSubmit(inventoryForm,event.submitter||document.getElementById('inventorySaveBtn'));
+    const submitter=event.submitter||document.getElementById('inventorySaveBtn');
+    ajaxSubmit(inventoryForm,submitter,submitter?.value||'stock_in_now');
   });
 
   fabricForm.addEventListener('submit',event=>{
     event.preventDefault();
-    ajaxSubmit(fabricForm,document.getElementById('fabricSaveBtn'));
+    const submitter=event.submitter||document.getElementById('fabricSaveBtn');
+    ajaxSubmit(fabricForm,submitter,submitter?.value||'stock_in_now');
   });
 
   const modal=document.getElementById('supplierModal');
@@ -3452,10 +3514,13 @@
   color:#8a5b1a!important;
 }
 
-#inventoryCostTotal{
+#inventoryCostTotal,
+#fabricCostTotal{
   font-size:30px!important;
+  line-height:1!important;
   font-weight:950!important;
   color:#32200d!important;
+  letter-spacing:-.04em!important;
 }
 
 .cost-total strong small,
@@ -3536,7 +3601,8 @@
   }
 
   .cost-total strong,
-  #inventoryCostTotal{
+  #inventoryCostTotal,
+  #fabricCostTotal{
     font-size:25px!important;
   }
 }
@@ -7221,12 +7287,47 @@
 </script>
 
 
-<style id="niron-stock-cost-visibility">
-/* Fabric cost stays in its current Finance flow. Cloth/Printing can add cost here. */
-#fabricStockForm .cost-field,
-#fabricStockForm .cost-grid,
-#fabricStockForm .cost-total,
-#fabricStockForm .cost-status{display:none!important}
-.stock-cost-later-note{margin:7px 0 0;color:#856b4c;font-size:10px;font-weight:750}
+
+
+<style>
+/* Purchase cost fields: hide browser number stepper arrows. */
+.money-wrap input[type="number"]::-webkit-outer-spin-button,
+.money-wrap input[type="number"]::-webkit-inner-spin-button{
+  -webkit-appearance:none!important;
+  margin:0!important;
+}
+.money-wrap input[type="number"]{
+  -moz-appearance:textfield!important;
+  appearance:textfield!important;
+}
 </style>
+
+<script id="purchase-cost-behaviour">
+(function(){
+  const costInputs = [
+    document.getElementById('id_total_goods_cost'),
+    document.getElementById('id_shipping_cost'),
+    document.getElementById('id_extra_cost'),
+    document.getElementById('fabric_goods_cost'),
+    document.getElementById('fabric_shipping_cost'),
+    document.getElementById('fabric_extra_cost')
+  ].filter(Boolean);
+
+  // Click or Tab into a cost field -> select the old number.
+  // Staff can type immediately and replace 0.00 / the previous amount.
+  costInputs.forEach(input => {
+    input.addEventListener('focus', () => input.select());
+    input.addEventListener('click', () => input.select());
+    input.addEventListener('input', () => {
+      if (typeof updateAllSummary === 'function') updateAllSummary();
+    });
+    input.addEventListener('change', () => {
+      if (typeof updateAllSummary === 'function') updateAllSummary();
+    });
+  });
+
+  if (typeof updateAllSummary === 'function') updateAllSummary();
+})();
+</script>
+
 {% endblock %}

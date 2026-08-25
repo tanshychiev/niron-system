@@ -1,0 +1,491 @@
+{% extends "base.html" %}
+
+{% block page_title %}Fabric Stock In Detail{% endblock %}
+{% block page_subtitle %}Review every physical roll and print only the labels you need{% endblock %}
+
+{% block content %}
+<style>
+.fabric-detail{
+  width:100%;
+  max-width:1450px;
+  margin:12px auto 42px;
+  padding:0 14px;
+  color:#291d11;
+}
+
+.fd-card{
+  background:#fff;
+  border:1px solid #eadfce;
+  border-radius:18px;
+  box-shadow:0 14px 38px rgba(80,45,10,.07);
+  margin-bottom:14px;
+  overflow:hidden;
+}
+
+.fd-head{
+  padding:16px 18px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:14px;
+  border-bottom:1px solid #eee5d9;
+}
+
+.fd-head h2{
+  margin:0;
+  font-size:20px;
+}
+
+.fd-head small{
+  color:#7c6d5d;
+}
+
+.fd-actions{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  flex-wrap:wrap;
+}
+
+.fd-btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:36px;
+  padding:0 12px;
+  border-radius:9px;
+  text-decoration:none;
+  font-size:10px;
+  font-weight:900;
+  border:1px solid #dfd2c0;
+  background:#fff;
+  color:#271a0e;
+  cursor:pointer;
+}
+
+.fd-btn.print{
+  background:#172033;
+  color:#fff;
+  border-color:#172033;
+}
+
+.fd-btn.gold{
+  background:#ffb000;
+  border-color:#ffb000;
+  color:#17110a;
+}
+
+.fd-summary{
+  display:grid;
+  grid-template-columns:repeat(6,minmax(120px,1fr));
+  gap:10px;
+  padding:14px;
+}
+
+.fd-stat{
+  background:#fffaf1;
+  border:1px solid #eadfcf;
+  border-radius:13px;
+  padding:12px;
+}
+
+.fd-stat span{
+  display:block;
+  font-size:9px;
+  font-weight:900;
+  text-transform:uppercase;
+  color:#806e59;
+}
+
+.fd-stat strong{
+  display:block;
+  margin-top:5px;
+  font-size:15px;
+}
+
+.roll-toolbar{
+  padding:10px 14px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  border-bottom:1px solid #eee5d9;
+  background:#fffaf2;
+}
+
+.roll-toolbar-left,
+.roll-toolbar-right{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  flex-wrap:wrap;
+}
+
+.selected-count{
+  min-width:92px;
+  padding:7px 9px;
+  border-radius:9px;
+  background:#fff0c7;
+  font-size:10px;
+  font-weight:900;
+  text-align:center;
+}
+
+.roll-table-wrap{
+  overflow:auto;
+}
+
+.roll-table{
+  width:100%;
+  border-collapse:collapse;
+  min-width:1050px;
+}
+
+.roll-table th{
+  padding:10px 12px;
+  background:#fff8ec;
+  border-bottom:1px solid #eadfce;
+  text-align:left;
+  font-size:9px;
+  text-transform:uppercase;
+  color:#786650;
+}
+
+.roll-table td{
+  padding:10px 12px;
+  border-bottom:1px solid #f0e7db;
+  font-size:12px;
+  vertical-align:middle;
+}
+
+.roll-row.selected{
+  background:#fff7df;
+}
+
+.roll-code{
+  font-weight:950;
+  font-size:13px;
+}
+
+.kg{
+  font-weight:900;
+}
+
+.remain{
+  color:#08744b;
+}
+
+.roll-no{
+  display:inline-flex;
+  padding:5px 9px;
+  border-radius:999px;
+  background:#fff0c9;
+  color:#845500;
+  font-weight:950;
+}
+
+.roll-check{
+  width:17px;
+  height:17px;
+  accent-color:#ffb000;
+}
+
+.status-pill{
+  display:inline-flex;
+  padding:5px 8px;
+  border-radius:999px;
+  background:#ecfdf3;
+  color:#067647;
+  font-size:9px;
+  font-weight:900;
+}
+
+.print-one{
+  background:#fff;
+  border-color:#172033;
+  color:#172033;
+}
+
+.print-one:hover{
+  background:#172033;
+  color:#fff;
+}
+
+@media(max-width:850px){
+  .fd-summary{
+    grid-template-columns:1fr 1fr;
+  }
+
+  .fd-head{
+    align-items:flex-start;
+    flex-direction:column;
+  }
+
+  .fd-actions{
+    width:100%;
+  }
+
+  .fd-actions .fd-btn{
+    flex:1;
+  }
+
+  .roll-toolbar{
+    align-items:flex-start;
+    flex-direction:column;
+  }
+
+  .roll-toolbar-left,
+  .roll-toolbar-right{
+    width:100%;
+  }
+}
+</style>
+
+<div class="fabric-detail">
+
+  <section class="fd-card">
+    <div class="fd-head">
+      <div>
+        <h2>{{ receipt.receipt_no }} · {{ receipt.fabric_name }} · {{ receipt.color.name }}</h2>
+        <small>
+          Supplier {{ receipt.supplier }} · Stocked {{ receipt.received_date|date:"d M Y" }}
+        </small>
+      </div>
+
+      <div class="fd-actions">
+        <a class="fd-btn" href="{% url 'inventory_stock_in_list' %}">
+          Back to Stock In List
+        </a>
+
+        <a class="fd-btn print"
+           target="_blank"
+           href="{% url 'production_fabric_roll_labels' %}?receipt_ids={{ receipt.pk }}">
+          Open Printing Page
+        </a>
+      </div>
+    </div>
+
+    <div class="fd-summary">
+      <div class="fd-stat">
+        <span>Supplier</span>
+        <strong>{{ receipt.supplier }}</strong>
+      </div>
+
+      <div class="fd-stat">
+        <span>Color</span>
+        <strong>{{ receipt.color.name }}</strong>
+      </div>
+
+      <div class="fd-stat">
+        <span>Stock In Date</span>
+        <strong>{{ receipt.received_date|date:"d M Y" }}</strong>
+      </div>
+
+      <div class="fd-stat">
+        <span>Total Rolls</span>
+        <strong>{{ receipt.roll_count }}</strong>
+      </div>
+
+      <div class="fd-stat">
+        <span>Original KG</span>
+        <strong>{{ total_original_kg|floatformat:2 }} KG</strong>
+      </div>
+
+      <div class="fd-stat">
+        <span>Remaining KG</span>
+        <strong>{{ total_remaining_kg|floatformat:2 }} KG</strong>
+      </div>
+    </div>
+  </section>
+
+  <section class="fd-card">
+    <div class="fd-head">
+      <div>
+        <h2>Physical Rolls</h2>
+        <small>
+          Select several rolls and print them together, or print only one exact roll.
+        </small>
+      </div>
+    </div>
+
+    <div class="roll-toolbar">
+      <div class="roll-toolbar-left">
+        <div class="selected-count">
+          <span id="detailSelectedCount">0</span> selected
+        </div>
+
+        <button type="button" class="fd-btn" id="detailSelectAll">
+          Select All
+        </button>
+
+        <button type="button" class="fd-btn" id="detailClearAll">
+          Clear
+        </button>
+      </div>
+
+      <div class="roll-toolbar-right">
+        <button type="button"
+                class="fd-btn gold"
+                id="detailPrintSelected"
+                disabled>
+          Print Selected
+        </button>
+      </div>
+    </div>
+
+    <div class="roll-table-wrap">
+      <table class="roll-table">
+        <thead>
+          <tr>
+            <th style="width:42px"></th>
+            <th>Roll</th>
+            <th>Printed Code</th>
+            <th>Original KG</th>
+            <th>Remaining KG</th>
+            <th>Status</th>
+            <th style="text-align:right">Printing</th>
+          </tr>
+        </thead>
+
+        <tbody>
+        {% for row in roll_rows %}
+          <tr class="roll-row"
+              data-detail-roll-row
+              data-roll-id="{{ row.roll.pk }}">
+
+            <td>
+              <input type="checkbox"
+                     class="roll-check"
+                     data-detail-roll-check>
+            </td>
+
+            <td>
+              <span class="roll-no">
+                {{ row.roll_no_text }}/{{ row.roll_total_text }}
+              </span>
+            </td>
+
+            <td class="roll-code">
+              {{ row.roll.roll_code }}
+            </td>
+
+            <td class="kg">
+              {{ row.roll.original_qty|floatformat:2 }} KG
+            </td>
+
+            <td class="kg remain">
+              {{ row.roll.remaining_qty|floatformat:2 }} KG
+            </td>
+
+            <td>
+              <span class="status-pill">
+                {{ row.roll.get_status_display }}
+              </span>
+            </td>
+
+            <td style="text-align:right">
+              <a class="fd-btn print-one"
+                 target="_blank"
+                 href="{% url 'production_fabric_roll_labels' %}?roll_id={{ row.roll.pk }}">
+                Print This
+              </a>
+            </td>
+          </tr>
+
+        {% empty %}
+          <tr>
+            <td colspan="7" style="padding:28px;text-align:center;color:#817465">
+              No physical rolls found.
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+</div>
+
+<script>
+(function(){
+  const rows = Array.from(document.querySelectorAll('[data-detail-roll-row]'));
+  const selectedCount = document.getElementById('detailSelectedCount');
+  const selectAll = document.getElementById('detailSelectAll');
+  const clearAll = document.getElementById('detailClearAll');
+  const printSelected = document.getElementById('detailPrintSelected');
+
+  function selectedRows(){
+    return rows.filter(function(row){
+      const box = row.querySelector('[data-detail-roll-check]');
+      return box && box.checked;
+    });
+  }
+
+  function refresh(){
+    const selected = selectedRows();
+
+    rows.forEach(function(row){
+      const box = row.querySelector('[data-detail-roll-check]');
+      row.classList.toggle('selected', !!(box && box.checked));
+    });
+
+    if(selectedCount){
+      selectedCount.textContent = String(selected.length);
+    }
+
+    if(printSelected){
+      printSelected.disabled = selected.length === 0;
+    }
+  }
+
+  rows.forEach(function(row){
+    const box = row.querySelector('[data-detail-roll-check]');
+
+    if(box){
+      box.addEventListener('change', refresh);
+    }
+  });
+
+  if(selectAll){
+    selectAll.addEventListener('click', function(){
+      rows.forEach(function(row){
+        const box = row.querySelector('[data-detail-roll-check]');
+        if(box){
+          box.checked = true;
+        }
+      });
+      refresh();
+    });
+  }
+
+  if(clearAll){
+    clearAll.addEventListener('click', function(){
+      rows.forEach(function(row){
+        const box = row.querySelector('[data-detail-roll-check]');
+        if(box){
+          box.checked = false;
+        }
+      });
+      refresh();
+    });
+  }
+
+  if(printSelected){
+    printSelected.addEventListener('click', function(){
+      const ids = selectedRows().map(function(row){
+        return row.dataset.rollId;
+      });
+
+      if(!ids.length){
+        return;
+      }
+
+      const url = "{% url 'production_fabric_roll_labels' %}?roll_ids=" + encodeURIComponent(ids.join(","));
+      window.open(url, "_blank");
+    });
+  }
+
+  refresh();
+})();
+</script>
+{% endblock %}

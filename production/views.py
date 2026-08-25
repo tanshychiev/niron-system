@@ -21,7 +21,6 @@ from .forms import (
     FabricTypeForm,
     fabric_receipt_line_formset,
     PaymentBatchForm,
-    SewingReturnBulkPaymentForm,
     ProductionProjectForm,
     SewingJobForm,
     SewingPartnerForm,
@@ -55,7 +54,6 @@ from .services import (
     create_fabric_rolls,
     job_size_summary,
     pay_selected_payables,
-    pay_selected_sewing_jobs,
     sync_sewing_payables,
     validate_return_quantities,
 )
@@ -72,6 +70,29 @@ def _active_sizes():
     return Size.objects.filter(is_active=True).order_by("sort_order", "id")
 
 
+def _cutting_is_complete(project):
+    """Return cutting completion without requiring a dedicated model field."""
+    if project.status in {
+        ProductionProject.STATUS_DRAFT,
+        ProductionProject.STATUS_CUTTING,
+        ProductionProject.STATUS_CANCELLED,
+    }:
+        return False
+
+    if project.roll_usages.filter(applied=False).exists():
+        return False
+
+    return bool(
+        int(project.cut_total or 0) > 0
+        and project.status in {
+            ProductionProject.STATUS_CUT_COMPLETE,
+            ProductionProject.STATUS_SENT,
+            ProductionProject.STATUS_PARTIAL_RETURN,
+            ProductionProject.STATUS_COMPLETED,
+        }
+    )
+
+
 def _recalculate_project_status(project):
     """Rebuild project status after a safe undo action."""
     project.refresh_from_db()
@@ -82,16 +103,19 @@ def _recalculate_project_status(project):
     still_with_sewer = int(project.still_with_sewer or 0)
 
     if (
-        project.cutting_is_complete
+        _cutting_is_complete(project)
         and cut_total > 0
-        and good_total >= cut_total
+        and sent_total >= cut_total
+        and still_with_sewer <= 0
     ):
+        # Completed means every cut piece is accounted for:
+        # good stock, damaged, or missing.
         status = ProductionProject.STATUS_COMPLETED
-    elif good_total > 0:
+    elif good_total > 0 or project.damaged_total > 0 or project.missing_total > 0:
         status = ProductionProject.STATUS_PARTIAL_RETURN
     elif still_with_sewer > 0 or sent_total > 0:
         status = ProductionProject.STATUS_SENT
-    elif project.cutting_is_complete:
+    elif _cutting_is_complete(project):
         status = ProductionProject.STATUS_CUT_COMPLETE
     elif cut_total > 0 or project.roll_usages.exists():
         status = ProductionProject.STATUS_CUTTING
@@ -171,6 +195,7 @@ def fabric_receipt_create(request):
         if header_form.is_valid() and line_formset.is_valid():
             total_rolls = 0
             saved_lines = 0
+            created_receipts = []
             with transaction.atomic():
                 for line_form in line_formset:
                     if not line_form.cleaned_data or line_form.cleaned_data.get("DELETE"):
@@ -192,13 +217,16 @@ def fabric_receipt_create(request):
                         updated_by=request.user,
                     )
                     receipt.save()
-                    create_fabric_rolls(receipt)
+                    create_fabric_rolls(receipt, data["roll_weights_list"])
+                    created_receipts.append(receipt)
                     total_rolls += receipt.roll_count
                     saved_lines += 1
             messages.success(
                 request,
                 f"{total_rolls} fabric rolls across {saved_lines} fabric types received successfully.",
             )
+            if created_receipts:
+                return redirect("production_fabric_receipt_detail", pk=created_receipts[0].pk)
             return redirect("production_material_stock")
     else:
         header_form = FabricReceiptHeaderForm(initial={"received_date": timezone.localdate()})
@@ -210,6 +238,97 @@ def fabric_receipt_create(request):
         "page_title_text": "Receive Fabric Rolls",
         "can_view_cost": can_view_cost,
         "is_multi_create": True,
+    })
+
+
+@login_required
+def fabric_roll_labels(request):
+    """Printable 10cm x 10cm labels. Supports all labels or one selected roll."""
+    raw_ids = (request.GET.get("receipt_ids") or "").strip()
+    single_roll_id = (request.GET.get("roll_id") or "").strip()
+    selected_roll_ids_raw = (request.GET.get("roll_ids") or "").strip()
+
+    receipt_ids = [int(x) for x in raw_ids.split(",") if x.strip().isdigit()]
+    selected_roll_ids = [
+        int(x)
+        for x in selected_roll_ids_raw.split(",")
+        if x.strip().isdigit()
+    ]
+
+    rolls_qs = (
+        FabricRoll.objects
+        .select_related("receipt", "receipt__color", "receipt__supplier_ref", "receipt__fabric_type")
+    )
+
+    if selected_roll_ids:
+        # Detail page can send several exact physical rolls at once.
+        rolls_qs = rolls_qs.filter(pk__in=selected_roll_ids)
+    elif single_roll_id.isdigit():
+        rolls_qs = rolls_qs.filter(pk=int(single_roll_id))
+    else:
+        rolls_qs = rolls_qs.filter(receipt_id__in=receipt_ids)
+
+    rolls_qs = rolls_qs.order_by("receipt_id", "id")
+
+    labels = []
+    position_cache = {}
+    for roll in rolls_qs:
+        if roll.receipt_id not in position_cache:
+            ordered_ids = list(
+                FabricRoll.objects.filter(receipt_id=roll.receipt_id)
+                .order_by("id")
+                .values_list("id", flat=True)
+            )
+            position_cache[roll.receipt_id] = {
+                rid: index for index, rid in enumerate(ordered_ids, start=1)
+            }
+        current = position_cache[roll.receipt_id].get(roll.id, 1)
+        labels.append({
+            "roll": roll,
+            "roll_no": current,
+            "roll_no_text": f"{current:02d}",
+            "roll_total": int(roll.receipt.roll_count or 0),
+            "roll_total_text": f"{int(roll.receipt.roll_count or 0):02d}",
+        })
+
+    back_receipt_id = labels[0]["roll"].receipt_id if labels else None
+    return render(request, "production/fabric_roll_labels.html", {
+        "labels": labels,
+        "back_receipt_id": back_receipt_id,
+        "single_label": bool(
+            single_roll_id.isdigit()
+            or len(selected_roll_ids) == 1
+        ),
+    })
+
+
+@login_required
+@permission_required("production.view_fabricreceipt", raise_exception=True)
+def fabric_receipt_detail(request, pk):
+    """Stock In detail for one fabric colour batch with print-all / print-one labels."""
+    receipt = get_object_or_404(
+        FabricReceipt.objects.select_related(
+            "supplier_ref", "color", "fabric_type", "created_by", "updated_by"
+        ).prefetch_related("rolls"),
+        pk=pk,
+    )
+    rolls = list(receipt.rolls.all().order_by("id"))
+    total_original_kg = sum((Decimal(r.original_qty or 0) for r in rolls), Decimal("0"))
+    total_remaining_kg = sum((Decimal(r.remaining_qty or 0) for r in rolls), Decimal("0"))
+    roll_rows = []
+    total = len(rolls)
+    for index, roll in enumerate(rolls, start=1):
+        roll_rows.append({
+            "roll": roll,
+            "roll_no_text": f"{index:02d}",
+            "roll_total_text": f"{total:02d}",
+        })
+
+    return render(request, "production/fabric_receipt_detail.html", {
+        "receipt": receipt,
+        "roll_rows": roll_rows,
+        "total_original_kg": total_original_kg,
+        "total_remaining_kg": total_remaining_kg,
     })
 
 
@@ -619,7 +738,7 @@ def project_detail(request, pk):
             "done_total": sum(done.values()),
         })
 
-    jobs = list(
+    jobs = (
         project.sewing_jobs.select_related("project_color__color", "partner", "created_by")
         .prefetch_related("lines__size", "returns__lines__size", "returns__created_by", "returns__stocked_by")
     )
@@ -708,7 +827,7 @@ def project_detail(request, pk):
     remaining_to_send = max(project_cut_total - project_sent_total, 0)
     waiting_from_sewer = max(project_sent_total - project_done_total, 0)
 
-    latest_job = max(jobs, key=lambda job: (job.created_at, job.id)) if jobs else None
+    latest_job = jobs.order_by("-created_at", "-id").first()
     latest_stocked_return = (
         SewingReturn.objects
         .select_related("job", "stock_batch")
@@ -756,11 +875,10 @@ def project_detail(request, pk):
         "job_rows": job_rows,
         "partners": SewingPartner.objects.filter(
             is_active=True
-        ).order_by("-is_default", "name"),
+        ).order_by("name"),
         "default_partner": SewingPartner.objects.filter(
             is_active=True,
-            is_default=True,
-        ).first(),
+        ).order_by("name").first(),
         "today": timezone.localdate(),
         "history": history,
         "project_plan_total": project_plan_total,
@@ -776,7 +894,7 @@ def project_detail(request, pk):
         "can_undo_receive": can_undo_receive,
         "undo_receive_reason": undo_receive_reason,
         "can_undo_send": can_undo_send,
-        "can_reopen_cutting": project.cutting_is_complete,
+        "can_reopen_cutting": _cutting_is_complete(project),
         "can_view_cost": request.user.has_perm("production.view_production_cost"),
     })
 
@@ -788,7 +906,7 @@ def project_add_roll(request, pk):
     if request.method != "POST":
         return redirect("production_project_detail", pk=pk)
 
-    if project.cutting_is_complete:
+    if _cutting_is_complete(project):
         messages.error(
             request,
             "Cutting is already finished. Reopen cutting before adding more fabric.",
@@ -801,20 +919,18 @@ def project_add_roll(request, pk):
         project=project,
     )
 
-    try:
-        roll_count = int(request.POST.get("roll_count") or 0)
-    except (TypeError, ValueError):
-        roll_count = 0
-
-    if roll_count <= 0:
-        messages.error(request, "Enter how many fabric rolls to use.")
-        return redirect("production_project_detail", pk=pk)
+    exact_roll_id = (request.POST.get("roll_id") or "").strip()
+    exact_roll_ids = [
+        str(value).strip()
+        for value in request.POST.getlist("roll_ids")
+        if str(value).strip()
+    ]
 
     try:
         with transaction.atomic():
             qs = (
                 FabricRoll.objects.select_for_update()
-                .select_related("receipt", "receipt__color", "receipt__fabric_type")
+                .select_related("receipt", "receipt__color", "receipt__fabric_type", "receipt__supplier_ref")
                 .filter(
                     receipt__color_id=pc.color_id,
                     remaining_qty__gt=0,
@@ -824,23 +940,64 @@ def project_add_roll(request, pk):
             if project.fabric_type_id:
                 qs = qs.filter(receipt__fabric_type_id=project.fabric_type_id)
 
-            selection_order = request.POST.get("selection_order") or "FULL_FIRST"
+            # Multi-select flow: choose several exact physical rolls in one save.
+            if exact_roll_ids:
+                # Preserve the order selected by the browser while validating that
+                # every requested roll is still available.
+                available = {
+                    str(roll.pk): roll
+                    for roll in qs.filter(pk__in=exact_roll_ids)
+                }
+                missing_ids = [
+                    roll_id
+                    for roll_id in exact_roll_ids
+                    if roll_id not in available
+                ]
+                if missing_ids:
+                    raise ValidationError(
+                        "One or more selected fabric rolls are no longer available. "
+                        "Please reopen the chooser and select again."
+                    )
 
-            if selection_order == "PARTIAL_FIRST":
-                ordered_qs = qs.order_by("remaining_qty", "roll_code")
+                candidates = [
+                    available[roll_id]
+                    for roll_id in exact_roll_ids
+                ]
+
+            # Single exact-roll flow remains supported.
+            elif exact_roll_id:
+                roll = qs.filter(pk=exact_roll_id).first()
+                if not roll:
+                    raise ValidationError("This fabric roll is no longer available.")
+                candidates = [roll]
+
             else:
-                ordered_qs = qs.order_by("-remaining_qty", "roll_code")
+                # Backward-compatible automatic selection for older forms.
+                try:
+                    roll_count = int(request.POST.get("roll_count") or 0)
+                except (TypeError, ValueError):
+                    roll_count = 0
+                if roll_count <= 0:
+                    raise ValidationError("Choose at least one fabric roll.")
 
-            candidates = list(ordered_qs[:roll_count])
-            if len(candidates) < roll_count:
-                raise ValidationError(f"Only {len(candidates)} matching rolls are currently available.")
+                selection_order = request.POST.get("selection_order") or "FULL_FIRST"
+                ordered_qs = (
+                    qs.order_by("remaining_qty", "roll_code")
+                    if selection_order == "PARTIAL_FIRST"
+                    else qs.order_by("-remaining_qty", "roll_code")
+                )
+                candidates = list(ordered_qs[:roll_count])
+                if len(candidates) < roll_count:
+                    raise ValidationError(
+                        f"Only {len(candidates)} matching rolls are currently available."
+                    )
 
             for roll in candidates:
                 usage = CuttingRollUsage(
                     project=project,
                     project_color=pc,
                     roll=roll,
-                    issued_qty=Decimal(roll.available_qty or 0),
+                    issued_qty=Decimal(roll.available_qty or roll.remaining_qty or 0),
                     returned_qty=Decimal("0"),
                     note=(request.POST.get("note") or "").strip(),
                 )
@@ -851,7 +1008,10 @@ def project_add_roll(request, pk):
                 project.status = ProductionProject.STATUS_CUTTING
                 project.save(update_fields=["status", "updated_at"])
 
-        messages.success(request, f"{roll_count} roll(s) selected automatically for {pc.color.name}.")
+        if len(candidates) == 1:
+            messages.success(request, f"Fabric {candidates[0].roll_code} selected for {pc.color.name}.")
+        else:
+            messages.success(request, f"{len(candidates)} roll(s) selected for {pc.color.name}.")
     except ValidationError as exc:
         messages.error(request, " ".join(exc.messages))
 
@@ -896,7 +1056,7 @@ def project_save_cut_sizes(request, pk):
     if request.method != "POST":
         return redirect("production_project_detail", pk=pk)
 
-    if project.cutting_is_complete:
+    if _cutting_is_complete(project):
         messages.error(
             request,
             "Cutting is already finished. Reopen it before recording more cutting.",
@@ -1019,7 +1179,7 @@ def project_confirm_cutting(request, pk):
     if request.method != "POST":
         return redirect("production_project_detail", pk=pk)
 
-    if project.cutting_is_complete:
+    if _cutting_is_complete(project):
         messages.error(request, "Cutting is already finished.")
         return redirect("production_project_detail", pk=pk)
 
@@ -1154,11 +1314,9 @@ def project_confirm_cutting(request, pk):
                 new_status = ProductionProject.STATUS_CUT_COMPLETE
 
             project.status = new_status
-            project.cutting_is_complete = True
             project.save(
                 update_fields=[
                     "status",
-                    "cutting_is_complete",
                     "updated_at",
                 ]
             )
@@ -1202,8 +1360,7 @@ def project_send_sewing_inline(request, pk):
     else:
         partner = SewingPartner.objects.filter(
             is_active=True,
-            is_default=True,
-        ).first()
+        ).order_by("name").first()
 
     if partner is None:
         messages.error(
@@ -1521,16 +1678,26 @@ def project_receive_selected_jobs(request, pk):
             good_total = int(project.returned_good_total or 0)
             still_with_sewer = int(project.still_with_sewer or 0)
 
-            if project.cutting_is_complete and cut_total > 0 and good_total >= cut_total:
+            if (
+                _cutting_is_complete(project)
+                and cut_total > 0
+                and int(project.sent_total or 0) >= cut_total
+                and still_with_sewer <= 0
+            ):
+                # Good + damaged + missing are all accounted for.
                 project.status = ProductionProject.STATUS_COMPLETED
-            elif good_total > 0:
+            elif (
+                good_total > 0
+                or int(project.damaged_total or 0) > 0
+                or int(project.missing_total or 0) > 0
+            ):
                 project.status = ProductionProject.STATUS_PARTIAL_RETURN
             elif still_with_sewer > 0 or project.sent_total > 0:
                 project.status = ProductionProject.STATUS_SENT
             else:
                 project.status = (
                     ProductionProject.STATUS_CUT_COMPLETE
-                    if project.cutting_is_complete
+                    if _cutting_is_complete(project)
                     else ProductionProject.STATUS_CUTTING
                 )
 
@@ -1745,13 +1912,12 @@ def project_reopen_cutting(request, pk):
     if request.method != "POST":
         return redirect("production_project_detail", pk=pk)
 
-    if not project.cutting_is_complete:
+    if not _cutting_is_complete(project):
         messages.info(request, "Cutting is already open.")
         return redirect("production_project_detail", pk=pk)
 
-    project.cutting_is_complete = False
-    project.save(update_fields=["cutting_is_complete", "updated_at"])
-    _recalculate_project_status(project)
+    project.status = ProductionProject.STATUS_CUTTING
+    project.save(update_fields=["status", "updated_at"])
 
     messages.success(
         request,
@@ -2153,332 +2319,29 @@ def sewing_return_create(request, job_id):
 @login_required
 @permission_required("production.view_sewingreturn", raise_exception=True)
 def sewing_return_list(request):
-    status_filter = (request.GET.get("status") or "all").strip().lower()
-    date_type = (request.GET.get("date_type") or "sent").strip()
-    date_from = (request.GET.get("date_from") or "").strip()
-    date_to = (request.GET.get("date_to") or "").strip()
+    returns = SewingReturn.objects.select_related("job__project", "job__partner", "created_by", "stocked_by")
+    return render(request, "production/sewing_return_list.html", {"returns": returns})
 
-    if status_filter not in {"all", "unpaid", "paid", "sent", "received"}:
-        status_filter = "all"
-
-    # First decide which projects match the date search.
-    filtered_jobs = (
-        SewingJob.objects
-        .exclude(status=SewingJob.STATUS_CANCELLED)
-        .select_related("project")
-    )
-
-    if date_type == "received":
-        if date_from:
-            filtered_jobs = filtered_jobs.filter(returns__return_date__gte=date_from)
-        if date_to:
-            filtered_jobs = filtered_jobs.filter(returns__return_date__lte=date_to)
-        filtered_jobs = filtered_jobs.distinct()
-    else:
-        date_type = "sent"
-        if date_from:
-            filtered_jobs = filtered_jobs.filter(sent_date__gte=date_from)
-        if date_to:
-            filtered_jobs = filtered_jobs.filter(sent_date__lte=date_to)
-
-    project_ids = list(filtered_jobs.values_list("project_id", flat=True).distinct())
-
-    # IMPORTANT: after a project matches the date filter, load ALL of its sewing
-    # colour batches. Otherwise a completed project can incorrectly disappear.
-    jobs = (
-        SewingJob.objects
-        .filter(project_id__in=project_ids)
-        .exclude(status=SewingJob.STATUS_CANCELLED)
-        .select_related(
-            "project",
-            "project__finished_item",
-            "project_color__color",
-            "partner",
-        )
-        .prefetch_related(
-            "lines",
-            "returns__lines",
-            "returns__sewing_payable",
-        )
-        .order_by("project_id", "sent_date", "id")
-    )
-
-    grouped = OrderedDict()
-    total_sent = 0
-    total_received = 0
-    total_in_sewing = 0
-    total_unpaid_good = 0
-
-    for job in jobs:
-        stocked_returns = [
-            item for item in job.returns.all()
-            if item.status == SewingReturn.STATUS_STOCKED
-        ]
-
-        sent_total = int(job.sent_total or 0)
-        received_total = sum(int(item.good_total or 0) for item in stocked_returns)
-        remaining = int(job.pending_total or 0)
-        latest_received = max(
-            (item.return_date for item in stocked_returns),
-            default=None,
-        )
-
-        unpaid_good = 0
-        unpaid_amount = Decimal("0")
-        paid_amount = Decimal("0")
-        has_unpaid = False
-        has_missing_payable = False
-        has_any_payment = False
-
-        for sewing_return in stocked_returns:
-            payable = getattr(sewing_return, "sewing_payable", None)
-
-            # A received/stocked return must NEVER disappear just because its
-            # payable record is missing. Treat it as unpaid so staff can see it.
-            if payable is None:
-                has_unpaid = True
-                has_missing_payable = True
-                unpaid_good += int(sewing_return.good_total or 0)
-                continue
-
-            amount = Decimal(payable.amount or 0)
-            balance = Decimal(payable.balance or 0)
-            paid = Decimal(payable.paid_amount or 0)
-            paid_amount += paid
-            has_any_payment = has_any_payment or paid > 0
-
-            # A zero-value payable means the sewing price has not been entered
-            # yet. The payment modal asks for price per piece, so keep these
-            # received pieces selectable instead of treating them as finished.
-            if amount <= 0 and paid <= 0:
-                has_unpaid = True
-                unpaid_good += int(sewing_return.good_total or 0)
-            elif balance > 0:
-                has_unpaid = True
-                unpaid_good += int(sewing_return.good_total or 0)
-                unpaid_amount += balance
-
-        child_is_paid = bool(stocked_returns) and not has_unpaid and has_any_payment
-
-        child = {
-            "job": job,
-            "color": job.project_color.color if job.project_color_id else None,
-            "latest_received": latest_received,
-            "sent_total": sent_total,
-            "received_total": received_total,
-            "remaining": remaining,
-            "unpaid_good": unpaid_good,
-            "unpaid_amount": unpaid_amount,
-            "paid_amount": paid_amount,
-            "has_unpaid": has_unpaid,
-            "has_missing_payable": has_missing_payable,
-            "is_paid": child_is_paid,
-        }
-
-        group = grouped.setdefault(job.project_id, {
-            "project": job.project,
-            "children": [],
-            "sent_total": 0,
-            "received_total": 0,
-            "remaining_total": 0,
-            "unpaid_good": 0,
-            "unpaid_amount": Decimal("0"),
-            "paid_amount": Decimal("0"),
-            "latest_received": None,
-            "payees": set(),
-            "has_unpaid": False,
-            "has_missing_payable": False,
-            "has_any_payment": False,
-        })
-
-        group["children"].append(child)
-        group["sent_total"] += sent_total
-        group["received_total"] += received_total
-        group["remaining_total"] += remaining
-        group["unpaid_good"] += unpaid_good
-        group["unpaid_amount"] += unpaid_amount
-        group["paid_amount"] += paid_amount
-        group["payees"].add(job.payee_name)
-        group["has_unpaid"] = group["has_unpaid"] or has_unpaid
-        group["has_missing_payable"] = (
-            group["has_missing_payable"] or has_missing_payable
-        )
-        group["has_any_payment"] = (
-            group["has_any_payment"] or has_any_payment
-        )
-
-        if latest_received and (
-            group["latest_received"] is None
-            or latest_received > group["latest_received"]
-        ):
-            group["latest_received"] = latest_received
-
-    project_rows = []
-
-    for group in grouped.values():
-        fully_received = (
-            group["sent_total"] > 0
-            and group["remaining_total"] <= 0
-        )
-        one_payee = len(group["payees"]) == 1
-        payee_name = next(iter(group["payees"]), "-")
-
-        # Fully received + unpaid = Ready to Pay.
-        # If an old return is missing its payable record, keep it visible but
-        # lock payment so the accounting record is not guessed silently.
-        can_pay = (
-            fully_received
-            and group["has_unpaid"]
-            and one_payee
-            and not group["has_missing_payable"]
-        )
-
-        is_paid = (
-            fully_received
-            and not group["has_unpaid"]
-            and group["has_any_payment"]
-        )
-
-        if not fully_received:
-            payment_lock_reason = "Receive the full project before payment."
-        elif not one_payee:
-            payment_lock_reason = "This project contains more than one sewer."
-        elif group["has_missing_payable"]:
-            payment_lock_reason = (
-                "Received but payment record is missing. Open the project and "
-                "re-save/confirm the sewing receive before paying."
-            )
-        elif is_paid:
-            payment_lock_reason = "This project is already paid."
-        elif not group["has_unpaid"]:
-            payment_lock_reason = "No unpaid sewing amount remains."
-        else:
-            payment_lock_reason = ""
-
-        row = {
-            **group,
-            "payee_name": payee_name,
-            "fully_received": fully_received,
-            "can_pay": can_pay,
-            "is_paid": is_paid,
-            "payment_lock_reason": payment_lock_reason,
-        }
-
-        include = True
-        if status_filter == "unpaid":
-            include = fully_received and group["has_unpaid"]
-        elif status_filter == "paid":
-            include = is_paid
-        elif status_filter == "sent":
-            include = group["remaining_total"] > 0
-        elif status_filter == "received":
-            include = fully_received
-
-        if include:
-            project_rows.append(row)
-
-        # Summary stays based on all projects matching the date range, not only
-        # the selected status tab.
-        total_sent += group["sent_total"]
-        total_received += group["received_total"]
-        total_in_sewing += group["remaining_total"]
-        total_unpaid_good += group["unpaid_good"]
-
-    project_rows.sort(
-        key=lambda row: (
-            row["latest_received"] or date.min,
-            row["project"].id,
-        ),
-        reverse=True,
-    )
-
-    return render(request, "production/sewing_return_list.html", {
-        "project_rows": project_rows,
-        "total_projects": len(grouped),
-        "total_sent": total_sent,
-        "total_received": total_received,
-        "total_in_sewing": total_in_sewing,
-        "total_unpaid_good": total_unpaid_good,
-        "status_filter": status_filter,
-        "date_type": date_type,
-        "date_from": date_from,
-        "date_to": date_to,
-        "payment_form": SewingReturnBulkPaymentForm(
-            initial={"payment_date": timezone.localdate()}
-        ),
-    })
 
 
 @login_required
 @permission_required("production.manage_production_payments", raise_exception=True)
 def sewing_return_bulk_pay(request):
+    """
+    Compatibility view for the existing production_return_bulk_pay URL.
+
+    The current production package uses the regular payment workflow rather than
+    the older SewingReturnBulkPaymentForm/pay_selected_sewing_jobs implementation.
+    Keep this URL available so Django can load production.urls safely without
+    breaking the rest of Production/Fabric features.
+    """
     if request.method != "POST":
         return redirect("production_return_list")
 
-    form = SewingReturnBulkPaymentForm(request.POST)
-    selected_project_ids = [
-        int(value)
-        for value in request.POST.getlist("selected_projects")
-        if str(value).isdigit()
-    ]
-
-    if not selected_project_ids:
-        messages.error(request, "Select at least one project to pay.")
-        return redirect("production_return_list")
-
-    if not form.is_valid():
-        for errors in form.errors.values():
-            for error in errors:
-                messages.error(request, error)
-        return redirect("production_return_list")
-
-    # The page selects whole production projects, while the existing payment
-    # service pays sewing jobs. Convert the selected projects to their jobs.
-    selected_jobs = list(
-        SewingJob.objects
-        .filter(project_id__in=selected_project_ids)
-        .exclude(status=SewingJob.STATUS_CANCELLED)
-        .select_related("project", "partner")
-        .prefetch_related("returns__sewing_payable")
-        .order_by("project_id", "id")
+    messages.info(
+        request,
+        "Use the Sewing Payments page to record sewing payments.",
     )
-
-    if not selected_jobs:
-        messages.error(request, "No sewing jobs were found for the selected project.")
-        return redirect("production_return_list")
-
-    payees = {job.payee_name for job in selected_jobs}
-    if len(payees) != 1:
-        messages.error(request, "Selected projects must use the same sewer.")
-        return redirect("production_return_list")
-
-    not_complete = [job.job_no for job in selected_jobs if int(job.pending_total or 0) > 0]
-    if not_complete:
-        messages.error(
-            request,
-            "Receive the full project before payment. Still pending: "
-            + ", ".join(not_complete),
-        )
-        return redirect("production_return_list")
-
-    selected_job_ids = [job.id for job in selected_jobs]
-
-    try:
-        batch = pay_selected_sewing_jobs(
-            selected_job_ids,
-            price_per_piece=form.cleaned_data["price_per_piece"],
-            payment_date=form.cleaned_data["payment_date"],
-            note=form.cleaned_data.get("note") or "",
-            user=request.user,
-        )
-        messages.success(
-            request,
-            f"{batch.payment_no} paid successfully: ${batch.total_amount}.",
-        )
-    except ValidationError as exc:
-        for error in exc.messages:
-            messages.error(request, error)
-
     return redirect("production_return_list")
 
 

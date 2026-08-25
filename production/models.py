@@ -72,6 +72,15 @@ class FabricType(models.Model):
         return f"{self.name} ({' / '.join(details)})" if details else self.name
 
 class FabricReceipt(models.Model):
+    # Manual Fabric purchase / receiving workflow.
+    # Default RECEIVED keeps every existing FabricReceipt behaving exactly as before.
+    STATUS_WAITING = "WAITING"
+    STATUS_RECEIVED = "RECEIVED"
+    STATUS_CHOICES = [
+        (STATUS_WAITING, "Waiting to Receive"),
+        (STATUS_RECEIVED, "Received"),
+    ]
+
     receipt_no = models.CharField(max_length=50, unique=True, blank=True)
     supplier = models.CharField(max_length=150)
     supplier_ref = models.ForeignKey(
@@ -89,6 +98,20 @@ class FabricReceipt(models.Model):
         related_name="fabric_receipts",
     )
     received_date = models.DateField(default=timezone.localdate)
+    # For a saved purchase this is the planned date until staff confirms arrival.
+    expected_date = models.DateField(null=True, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_RECEIVED)
+    purchase_group = models.CharField(max_length=60, blank=True, default="", db_index=True)
+    # Roll weights entered while ordering are stored here until physical receipt.
+    pending_roll_weights = models.JSONField(default=list, blank=True)
+    received_at = models.DateTimeField(null=True, blank=True)
+    received_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="production_fabric_receipts_received",
+    )
     # Legacy snapshot kept so all old receipts and reports remain compatible.
     fabric_name = models.CharField(max_length=150)
     color = models.ForeignKey(
@@ -144,6 +167,14 @@ class FabricReceipt(models.Model):
         super().save(*args, **kwargs)
 
     @property
+    def is_waiting(self):
+        return self.status == self.STATUS_WAITING
+
+    @property
+    def is_received(self):
+        return self.status == self.STATUS_RECEIVED
+
+    @property
     def total_cost(self):
         return (
             Decimal(self.total_goods_cost or 0)
@@ -155,6 +186,20 @@ class FabricReceipt(models.Model):
     def cost_per_roll(self):
         count = Decimal(self.roll_count or 0)
         return self.total_cost / count if count > 0 else ZERO
+
+    @property
+    def total_weight_kg(self):
+        # New receipts store each physical roll weight in FabricRoll.original_qty.
+        # Old receipts (created before KG tracking) safely remain 1.000 per roll.
+        return (
+            self.rolls.aggregate(total=Sum("original_qty"))["total"]
+            or ZERO
+        )
+
+    @property
+    def cost_per_kg(self):
+        total_kg = Decimal(self.total_weight_kg or 0)
+        return self.total_cost / total_kg if total_kg > 0 else ZERO
 
 
 class FabricRoll(models.Model):
@@ -250,7 +295,8 @@ class FabricRoll(models.Model):
 
     @property
     def unit_cost(self):
-        return self.receipt.cost_per_roll
+        # Fabric quantity is now tracked in KG, so this is cost per KG.
+        return self.receipt.cost_per_kg
 
     @property
     def remaining_value(self):
@@ -262,29 +308,10 @@ class SewingPartner(models.Model):
     phone = models.CharField(max_length=50, blank=True, default="")
     location = models.CharField(max_length=255, blank=True, default="")
     is_active = models.BooleanField(default=True)
-    is_default = models.BooleanField(
-        default=False,
-        help_text="Automatically use this sewer for new production sewing jobs.",
-    )
     note = models.TextField(blank=True, default="")
 
     class Meta:
-        ordering = ["-is_default", "name"]
-
-    def save(self, *args, **kwargs):
-        # Only one active sewer can be the system default.
-        if self.is_default:
-            type(self).objects.exclude(pk=self.pk).filter(
-                is_default=True
-            ).update(is_default=False)
-        elif not self.pk and not type(self).objects.filter(
-            is_default=True,
-            is_active=True,
-        ).exists():
-            # The first active sewing partner becomes default automatically.
-            self.is_default = True
-
-        super().save(*args, **kwargs)
+        ordering = ["name"]
 
     def __str__(self):
         return self.name
@@ -332,18 +359,7 @@ class ProductionProject(models.Model):
         help_text="Legacy first colour; new projects use project_colors.",
     )
     expected_qty = models.PositiveIntegerField(default=0)
-    status = models.CharField(
-        max_length=30,
-        choices=STATUS_CHOICES,
-        default=STATUS_DRAFT,
-    )
-    cutting_is_complete = models.BooleanField(
-        default=False,
-        help_text=(
-            "Keep false while partial cutting is still continuing. "
-            "Set true only when no more pieces will be cut."
-        ),
-    )
+    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default=STATUS_DRAFT)
     note = models.TextField(blank=True, default="")
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)

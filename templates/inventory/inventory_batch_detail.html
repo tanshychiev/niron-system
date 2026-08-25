@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block page_title %}Batch {{ batch.batch_no }}{% endblock %}
-{% block page_subtitle %}Batch detail and stock rows{% endblock %}
+{% block page_subtitle %}{% if is_production_stock_in %}Production Stock In — quantity added automatically, no extra purchase cost{% else %}Purchased Stock In — purchase and receiving detail{% endif %}{% endblock %}
 
 {% block content %}
 <style>
@@ -482,8 +482,13 @@
     </div>
 
     <div class="batch-toolbar-right">
-      <a href="{% url 'inventory_batch_edit' batch.id %}" class="btn-primary">Edit Batch</a>
-      <a href="{% url 'inventory_batch_delete' batch.id %}" class="btn-danger">Delete</a>
+      {% if not is_production_stock_in %}
+        {% if batch.status != "RECEIVED" %}
+          <a href="{% url 'inventory_batch_confirm_received' batch.id %}" class="btn-primary">✓ Confirm Received</a>
+        {% endif %}
+        <a href="{% url 'inventory_batch_edit' batch.id %}" class="btn-primary">Edit Purchase</a>
+        <a href="{% url 'inventory_batch_delete' batch.id %}" class="btn-danger">Delete</a>
+      {% endif %}
     </div>
   </div>
 
@@ -497,7 +502,7 @@
           {% else %}
             {{ batch.supplier|default:"No supplier" }}
           {% endif %}
-          · Received {{ batch.received_date|date:"d M Y" }}
+          · {% if batch.status == "COMING_SOON" %}Expected{% else %}Received{% endif %} {{ batch.received_date|date:"d M Y" }}
         </p>
       </div>
 
@@ -512,7 +517,7 @@
 
     <div class="batch-metrics">
       <div class="metric-card">
-        <span>Total Received</span>
+        <span>{% if batch.status == "COMING_SOON" %}Ordered Qty{% else %}Total Received{% endif %}</span>
         <strong>{{ batch.total_cloth|floatformat:0 }}</strong>
       </div>
 
@@ -557,7 +562,7 @@
         </div>
 
         <div class="detail-item">
-          <span>Received Date</span>
+          <span>{% if batch.status == "COMING_SOON" %}Expected Date{% else %}Received Date{% endif %}</span>
           <strong>{{ batch.received_date|date:"d M Y" }}</strong>
         </div>
 
@@ -595,8 +600,8 @@
         </div>
 
         <div class="summary-item">
-          <span>Received At</span>
-          <strong>{{ batch.created_at|date:"d M Y H:i" }}</strong>
+          <span>{% if batch.status == "COMING_SOON" %}Purchase Saved At{% else %}Received At{% endif %}</span>
+          <strong>{% if batch.received_at %}{{ batch.received_at|date:"d M Y H:i" }}{% else %}{{ batch.created_at|date:"d M Y H:i" }}{% endif %}</strong>
         </div>
 
         <div class="summary-item">

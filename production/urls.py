@@ -1,6 +1,5 @@
 from django.urls import path
 
-from accounts import views as account_views
 from . import views
 
 
@@ -22,6 +21,16 @@ urlpatterns = [
         "materials/receipts/<int:pk>/edit/",
         views.fabric_receipt_edit,
         name="production_fabric_receipt_edit",
+    ),
+    path(
+        "materials/receipts/<int:pk>/",
+        views.fabric_receipt_detail,
+        name="production_fabric_receipt_detail",
+    ),
+    path(
+        "materials/roll-labels/",
+        views.fabric_roll_labels,
+        name="production_fabric_roll_labels",
     ),
 
     # Fabric types
@@ -219,14 +228,7 @@ urlpatterns = [
         name="production_return_confirm",
     ),
 
-    # Staff monthly payroll
-    path(
-        "payments/staff/",
-        account_views.staff_payroll,
-        name="production_staff_payroll",
-    ),
-
-    # Existing sewing / project payments
+    # Payments
     path(
         "payments/<str:payable_type>/",
         views.payment_list,

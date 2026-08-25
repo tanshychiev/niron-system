@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Receive Fabric Purchase{% endblock %}
+{% block page_title %}Confirm Fabric Received{% endblock %}
+{% block page_subtitle %}Check the actual KG on every physical roll. Stock increases only after you confirm.{% endblock %}
+
+{% block content %}
+<style>
+.receive-wrap{max-width:1050px;margin:0 auto}.receive-card{background:#fff;border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:14px}.receive-head{padding:18px;border-bottom:1px solid var(--line);background:#fffaf0}.receive-head h2{margin:0;font-size:20px}.receive-head p{margin:5px 0 0;color:var(--muted);font-size:12px}.receive-body{padding:16px}.date-row{display:grid;grid-template-columns:240px 1fr;gap:12px;align-items:end}.field label{display:block;margin-bottom:6px;font-size:10px;font-weight:900;color:var(--muted);text-transform:uppercase}.field input{width:100%;height:42px;border:1px solid var(--line);border-radius:10px;padding:0 11px}.fabric-block{border:1px solid var(--line);border-radius:16px;padding:14px;margin-top:12px}.fabric-title{display:flex;justify-content:space-between;gap:10px;align-items:center}.fabric-title h3{margin:0;font-size:15px}.fabric-title span{font-size:11px;color:var(--muted)}.weight-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:8px;margin-top:12px}.weight-box{padding:9px;border:1px solid var(--line);border-radius:11px;background:#fafafa}.weight-box label{display:block;font-size:9px;font-weight:900;color:var(--muted);margin-bottom:5px}.weight-box input{width:100%;height:38px;border:1px solid var(--line);border-radius:9px;padding:0 9px;font-weight:850}.actions{display:flex;justify-content:flex-end;gap:8px;padding:14px 16px;border-top:1px solid var(--line);background:#fafafa}.btn{min-height:40px;padding:0 14px;border-radius:10px;border:1px solid var(--line);display:inline-flex;align-items:center;justify-content:center;text-decoration:none;font-weight:900;font-size:12px;cursor:pointer}.btn-light{background:#fff;color:var(--text)}.btn-primary{background:#f5a900;color:#111827;border-color:#f5a900}.warning{padding:11px 13px;border-radius:12px;background:#fff7ed;color:#9a3412;font-size:11px;font-weight:750;margin-top:12px}@media(max-width:600px){.date-row{grid-template-columns:1fr}.actions{display:grid;grid-template-columns:1fr 1fr}.weight-grid{grid-template-columns:1fr 1fr}}
+</style>
+<div class="receive-wrap">
+  <form method="post">
+    {% csrf_token %}
+    <section class="receive-card">
+      <div class="receive-head">
+        <h2>Fabric Purchase {{ anchor.purchase_group|default:anchor.receipt_no }}</h2>
+        <p>{{ anchor.supplier }} · {{ receive_rows|length }} fabric type{{ receive_rows|length|pluralize }}</p>
+      </div>
+      <div class="receive-body">
+        <div class="date-row">
+          <div class="field"><label>Actual Received Date</label><input type="date" name="receive_date" value="{{ today|date:'Y-m-d' }}" required></div>
+          <div class="warning">Confirm only when the fabric is physically in the office. This action creates the Fabric Rolls and increases Fabric stock once.</div>
+        </div>
+
+        {% for item in receive_rows %}
+        <div class="fabric-block">
+          <div class="fabric-title">
+            <h3>{{ item.receipt.fabric_name }} / {{ item.receipt.color.name }}</h3>
+            <span>{{ item.receipt.roll_count }} roll{{ item.receipt.roll_count|pluralize }}</span>
+          </div>
+          <div class="weight-grid">
+            {% for weight in item.weights %}
+            <div class="weight-box">
+              <label>Roll {{ forloop.counter }} — Actual KG</label>
+              <input type="number" name="weight_{{ item.receipt.pk }}_{{ forloop.counter }}" value="{{ weight }}" min="0.001" step="0.001" required>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="actions">
+        <a class="btn btn-light" href="{% url 'inventory_stock_in_list' %}">Cancel</a>
+        <button class="btn btn-primary" type="submit">✓ Confirm Received & Add Stock</button>
+      </div>
+    </section>
+  </form>
+</div>
+{% endblock %}

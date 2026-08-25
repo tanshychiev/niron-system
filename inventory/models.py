@@ -184,6 +184,7 @@ class InventoryItem(models.Model):
 class InventoryBatch(models.Model):
     # Purchase / receiving workflow.
     STATUS_COMING_SOON = "COMING_SOON"
+    STATUS_PARTIAL = "PARTIAL"
     STATUS_RECEIVED = "RECEIVED"
 
     # Legacy aliases kept so older code does not break while migrating.
@@ -191,8 +192,9 @@ class InventoryBatch(models.Model):
     STATUS_FINAL = STATUS_RECEIVED
 
     STATUS_CHOICES = [
-        (STATUS_COMING_SOON, "Coming Soon"),
-        (STATUS_RECEIVED, "Received"),
+        (STATUS_COMING_SOON, "Waiting Arrival"),
+        (STATUS_PARTIAL, "Partially Received"),
+        (STATUS_RECEIVED, "Fully Received"),
     ]
 
     batch_no = models.CharField(max_length=50, unique=True)
@@ -293,6 +295,19 @@ class InventoryBatch(models.Model):
         return self.status == self.STATUS_RECEIVED
 
     @property
+    def is_partial(self):
+        return self.status == self.STATUS_PARTIAL
+
+    @property
+    def total_arrived(self):
+        result = self.items.filter(is_active=True).aggregate(total=Sum("qty_arrived"))
+        return result["total"] or Decimal("0")
+
+    @property
+    def total_pending_arrival(self):
+        return max(self.total_qty - self.total_arrived, Decimal("0"))
+
+    @property
     def total_cloth(self):
         result = self.items.filter(
             is_active=True,
@@ -337,6 +352,15 @@ class InventoryBatchItem(models.Model):
         decimal_places=2,
         validators=[MinValueValidator(Decimal("0.01"))],
     )
+    # qty_received = quantity ordered / expected for this purchase row.
+    # qty_arrived = cumulative physical quantity actually received from supplier.
+    # qty_remaining = currently available stock; it can decrease later from usage/orders.
+    qty_arrived = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        validators=[MinValueValidator(Decimal("0"))],
+    )
     qty_remaining = models.DecimalField(
         max_digits=12,
         decimal_places=2,
@@ -360,7 +384,12 @@ class InventoryBatchItem(models.Model):
 
     @property
     def qty_used(self):
-        return (self.qty_received or Decimal("0")) - (self.qty_remaining or Decimal("0"))
+        # Only stock that physically arrived can be used.
+        return max((self.qty_arrived or Decimal("0")) - (self.qty_remaining or Decimal("0")), Decimal("0"))
+
+    @property
+    def qty_pending_arrival(self):
+        return max((self.qty_received or Decimal("0")) - (self.qty_arrived or Decimal("0")), Decimal("0"))
 
     @property
     def can_edit_received_qty(self):

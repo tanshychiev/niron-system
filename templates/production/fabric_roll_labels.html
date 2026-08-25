@@ -1,0 +1,943 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fabric Roll Labels</title>
+
+<style>
+*{box-sizing:border-box}
+body{
+  margin:0;
+  background:#ececec;
+  font-family:Arial,Helvetica,sans-serif;
+  color:#111;
+}
+
+/* =========================
+   TOOLBAR
+========================= */
+.toolbar{
+  position:sticky;
+  top:0;
+  z-index:20;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:10px 16px;
+  background:#fff;
+  border-bottom:1px solid #ddd;
+}
+.toolbar strong{font-size:15px}
+.toolbar small{display:block;color:#666;margin-top:2px}
+.toolbar-actions{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.selected-box{
+  min-width:105px;
+  padding:7px 10px;
+  border-radius:9px;
+  background:#fff4d6;
+  color:#7c5200;
+  text-align:center;
+  font-size:10px;
+  font-weight:900;
+}
+.selected-box b{
+  font-size:18px;
+  margin-right:3px;
+  color:#111;
+}
+.btn{
+  min-height:34px;
+  border:1px solid #ccc;
+  background:#fff;
+  border-radius:9px;
+  padding:8px 12px;
+  font-weight:800;
+  font-size:11px;
+  cursor:pointer;
+  text-decoration:none;
+  color:#111;
+}
+.btn-print{
+  background:#111;
+  color:#fff;
+  border-color:#111;
+}
+.btn-gold{
+  background:#f5aa0a;
+  color:#211600;
+  border-color:#f5aa0a;
+}
+.btn:disabled{
+  opacity:.45;
+  cursor:not-allowed;
+}
+
+/* =========================
+   SCREEN PREVIEW
+   Smaller only on screen
+========================= */
+.sheet{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(230px,260px));
+  justify-content:center;
+  gap:14px;
+  padding:18px;
+}
+
+.label-wrap{
+  position:relative;
+  padding:8px;
+  border:2px solid transparent;
+  border-radius:14px;
+  background:#f7f7f7;
+  cursor:pointer;
+  transition:.15s ease;
+}
+.label-wrap:hover{
+  background:#fff9eb;
+}
+.label-wrap.selected{
+  border-color:#f5aa0a;
+  background:#fff4d4;
+}
+.label-check{
+  position:absolute;
+  top:13px;
+  left:13px;
+  z-index:5;
+  width:18px;
+  height:18px;
+  accent-color:#f5aa0a;
+}
+.print-one-btn{
+  position:absolute;
+  bottom:13px;
+  right:13px;
+  z-index:5;
+  border:0;
+  border-radius:8px;
+  padding:6px 8px;
+  background:#172033;
+  color:#fff;
+  font-size:9px;
+  font-weight:900;
+  cursor:pointer;
+}
+
+/* label preview scales to card */
+.label{
+  width:100%;
+  aspect-ratio:1/1;
+  height:auto;
+  background:#fff;
+  border:3px solid #111;
+  border-radius:10px;
+  padding:12px;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
+
+.title{
+  text-align:center;
+  font-size:9px;
+  font-weight:900;
+  letter-spacing:1.1px;
+  margin-bottom:5px;
+}
+.code{
+  text-align:center;
+  font-size:14px;
+  line-height:1.08;
+  font-weight:1000;
+  padding:5px 2px 6px;
+  border-bottom:2px solid #111;
+  white-space:normal;
+  overflow-wrap:anywhere;
+  word-break:break-word;
+}
+.grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  margin-top:8px;
+  border-top:1px solid #111;
+  border-left:1px solid #111;
+}
+.cell{
+  min-height:48px;
+  padding:6px;
+  border-right:1px solid #111;
+  border-bottom:1px solid #111;
+}
+.cell .k{
+  font-size:6px;
+  font-weight:900;
+  letter-spacing:.35px;
+  text-transform:uppercase;
+}
+.cell .v{
+  margin-top:3px;
+  font-size:10px;
+  font-weight:1000;
+  line-height:1.12;
+  overflow-wrap:anywhere;
+  word-break:break-word;
+}
+.roll-line{
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap:8px;
+  padding-top:8px;
+  margin-top:auto;
+}
+.roll-block .k{
+  font-size:6px;
+  font-weight:900;
+  text-transform:uppercase;
+}
+.roll-block .v{
+  font-size:15px;
+  font-weight:1000;
+  line-height:1;
+}
+.fabric-name{
+  text-align:right;
+  max-width:48%;
+  font-size:7px;
+  font-weight:800;
+  line-height:1.15;
+  padding-bottom:22px;
+  overflow-wrap:anywhere;
+  word-break:break-word;
+}
+.fabric-name small{
+  display:block;
+  color:#555;
+  font-size:6px;
+  font-weight:700;
+  margin-bottom:2px;
+}
+
+/* =========================
+   PRINT
+   Actual output stays 10cm
+========================= */
+@page{
+  size:100mm 100mm;
+  margin:0;
+}
+
+@media print{
+  body{
+    background:#fff;
+  }
+
+  .toolbar{
+    display:none!important;
+  }
+
+  .sheet{
+    display:block;
+    padding:0;
+  }
+
+  .label-wrap{
+    display:none!important;
+    margin:0!important;
+    padding:0!important;
+    border:0!important;
+    background:#fff!important;
+  }
+
+  .label-wrap.print-this{
+    display:block!important;
+    width:100mm!important;
+    height:100mm!important;
+    page-break-after:always;
+    break-after:page;
+  }
+
+  .label-wrap.print-this:last-child{
+    page-break-after:auto;
+    break-after:auto;
+  }
+
+  .label{
+    width:100mm!important;
+    height:100mm!important;
+    aspect-ratio:auto!important;
+    border:1.4mm solid #111!important;
+    border-radius:0!important;
+    padding:5mm!important;
+  }
+
+  .label-check,
+  .print-one-btn{
+    display:none!important;
+  }
+
+  .title{
+    font-size:5mm!important;
+    letter-spacing:.8mm!important;
+    margin-bottom:2.8mm!important;
+  }
+  .code{
+    font-size:7.2mm!important;
+    line-height:1.08!important;
+    letter-spacing:-.15mm!important;
+    padding:2.5mm 1mm 3mm!important;
+    border-bottom:.65mm solid #111!important;
+    white-space:normal!important;
+    overflow:visible!important;
+    overflow-wrap:anywhere!important;
+    word-break:break-word!important;
+  }
+  .grid{
+    margin-top:3.5mm!important;
+    border-top:.35mm solid #111!important;
+    border-left:.35mm solid #111!important;
+  }
+  .cell{
+    min-height:19mm!important;
+    padding:3mm!important;
+    border-right:.35mm solid #111!important;
+    border-bottom:.35mm solid #111!important;
+  }
+  .cell .k{
+    font-size:3.1mm!important;
+    letter-spacing:.25mm!important;
+  }
+  .cell .v{
+    margin-top:2mm!important;
+    font-size:5.0mm!important;
+  }
+  .roll-line{
+    gap:4mm!important;
+    padding-top:4mm!important;
+  }
+  .roll-block .k{
+    font-size:3.1mm!important;
+  }
+  .roll-block .v{
+    font-size:9mm!important;
+  }
+  .fabric-name{
+    max-width:50%!important;
+    font-size:2.8mm!important;
+    padding-bottom:0!important;
+  }
+  .fabric-name small{
+    font-size:2.7mm!important;
+    margin-bottom:1mm!important;
+  }
+}
+
+@media(max-width:650px){
+  .toolbar{
+    align-items:flex-start;
+    flex-direction:column;
+  }
+  .toolbar-actions{
+    width:100%;
+  }
+  .toolbar-actions .btn{
+    flex:1;
+  }
+  .sheet{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:8px;
+    padding:10px;
+  }
+}
+</style>
+
+<style>
+/* =========================================================
+   FINAL PRINT FIT FIX
+   Keep every field inside one 10cm x 10cm label.
+   ========================================================= */
+@media print{
+  @page{
+    size:100mm 100mm;
+    margin:0;
+  }
+
+  .label-wrap.print-this{
+    width:100mm!important;
+    height:100mm!important;
+    overflow:hidden!important;
+  }
+
+  .label-wrap.print-this .label{
+    width:100mm!important;
+    height:100mm!important;
+    min-height:100mm!important;
+    max-height:100mm!important;
+    padding:3.2mm!important;
+    border:1mm solid #111!important;
+    overflow:hidden!important;
+    display:grid!important;
+    grid-template-rows:auto auto auto 1fr!important;
+    align-content:stretch!important;
+  }
+
+  .label-wrap.print-this .title{
+    margin:0 0 1.2mm!important;
+    font-size:3.5mm!important;
+    line-height:1!important;
+    letter-spacing:.5mm!important;
+  }
+
+  .label-wrap.print-this .code{
+    margin:0!important;
+    padding:1.5mm .8mm 2mm!important;
+    font-size:5.4mm!important;
+    line-height:1.04!important;
+    letter-spacing:-.08mm!important;
+    border-bottom:.45mm solid #111!important;
+    white-space:normal!important;
+    overflow-wrap:anywhere!important;
+    word-break:break-word!important;
+    overflow:hidden!important;
+    max-height:14mm!important;
+  }
+
+  .label-wrap.print-this .grid{
+    margin-top:2mm!important;
+    border-top:.28mm solid #111!important;
+    border-left:.28mm solid #111!important;
+  }
+
+  .label-wrap.print-this .cell{
+    min-height:13.5mm!important;
+    padding:1.8mm 2mm!important;
+    border-right:.28mm solid #111!important;
+    border-bottom:.28mm solid #111!important;
+  }
+
+  .label-wrap.print-this .cell .k{
+    margin:0!important;
+    font-size:2.15mm!important;
+    line-height:1.05!important;
+    letter-spacing:.12mm!important;
+  }
+
+  .label-wrap.print-this .cell .v{
+    margin-top:1mm!important;
+    font-size:4mm!important;
+    line-height:1.02!important;
+    overflow-wrap:anywhere!important;
+    word-break:break-word!important;
+  }
+
+  .label-wrap.print-this .roll-line{
+    min-height:0!important;
+    margin:0!important;
+    padding-top:2mm!important;
+    align-self:end!important;
+    display:flex!important;
+    align-items:flex-end!important;
+    justify-content:space-between!important;
+    gap:2mm!important;
+    overflow:hidden!important;
+  }
+
+  .label-wrap.print-this .roll-block{
+    min-width:0!important;
+    max-width:58%!important;
+  }
+
+  .label-wrap.print-this .roll-block .k{
+    font-size:2mm!important;
+    line-height:1.05!important;
+  }
+
+  .label-wrap.print-this .roll-block .v{
+    margin-top:.8mm!important;
+    font-size:7mm!important;
+    line-height:.95!important;
+  }
+
+  .label-wrap.print-this .fabric-name{
+    max-width:40%!important;
+    padding:0!important;
+    margin:0!important;
+    font-size:2.5mm!important;
+    line-height:1.05!important;
+    text-align:right!important;
+    overflow-wrap:anywhere!important;
+    word-break:break-word!important;
+  }
+
+  .label-wrap.print-this .fabric-name small{
+    margin-bottom:.4mm!important;
+    font-size:1.9mm!important;
+    line-height:1!important;
+  }
+}
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+
+<style>
+/* ===== Niron logo + barcode ===== */
+.label-brand{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  min-height:24px;
+  margin-bottom:4px;
+}
+.niron-label-logo{
+  width:24px;
+  height:24px;
+  object-fit:contain;
+  flex:0 0 24px;
+}
+.label-brand .title{
+  margin:0!important;
+}
+.barcode-area{
+  width:100%;
+  margin:8px auto 0;
+  padding:5px 5px 3px;
+  text-align:center;
+  overflow:hidden;
+}
+.roll-barcode{
+  width:100%;
+  max-width:210px;
+  height:40px;
+  display:block;
+  margin:0 auto;
+}
+.barcode-text{
+  margin-top:1px;
+  font-size:6px;
+  line-height:1;
+  font-weight:800;
+  letter-spacing:.2px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+/* Print logo/barcode in the empty middle area without wasting space. */
+@media print{
+  .label-wrap.print-this .label{
+    grid-template-rows:auto auto auto auto 1fr!important;
+  }
+
+  .label-wrap.print-this .label-brand{
+    min-height:6mm!important;
+    margin:0 0 .8mm!important;
+    gap:1.6mm!important;
+  }
+
+  .label-wrap.print-this .niron-label-logo{
+    width:6mm!important;
+    height:6mm!important;
+    flex-basis:6mm!important;
+  }
+
+  .label-wrap.print-this .label-brand .title{
+    font-size:3.5mm!important;
+    line-height:1!important;
+    margin:0!important;
+  }
+
+  .label-wrap.print-this .barcode-area{
+    margin:1.7mm 0 0!important;
+    padding:0!important;
+    height:14mm!important;
+    overflow:hidden!important;
+  }
+
+  .label-wrap.print-this .roll-barcode{
+    width:72mm!important;
+    max-width:72mm!important;
+    height:10mm!important;
+    margin:0 auto!important;
+  }
+
+  .label-wrap.print-this .barcode-text{
+    margin-top:.4mm!important;
+    font-size:1.8mm!important;
+    line-height:1!important;
+    letter-spacing:.08mm!important;
+  }
+
+  .label-wrap.print-this .roll-line{
+    padding-top:1.5mm!important;
+  }
+}
+</style>
+
+
+<style>
+/* ===== FINAL LABEL SPACING UPDATE =====
+   Larger brand/header and use more of the available 10x10cm space. */
+@media print{
+  .label-wrap.print-this .label{
+    padding:4mm!important;
+    grid-template-rows:auto auto auto auto 1fr!important;
+  }
+
+  .label-wrap.print-this .label-brand{
+    min-height:10mm!important;
+    margin:1.8mm 0 1.4mm!important;
+    gap:2.4mm!important;
+  }
+
+  .label-wrap.print-this .niron-label-logo{
+    width:10mm!important;
+    height:10mm!important;
+    flex-basis:10mm!important;
+  }
+
+  .label-wrap.print-this .label-brand .title{
+    font-size:5.3mm!important;
+    line-height:1!important;
+    letter-spacing:.8mm!important;
+  }
+
+  .label-wrap.print-this .code{
+    padding:2mm .8mm 2.6mm!important;
+    font-size:6.1mm!important;
+    line-height:1.02!important;
+    max-height:15mm!important;
+  }
+
+  .label-wrap.print-this .grid{
+    margin-top:2.4mm!important;
+  }
+
+  .label-wrap.print-this .cell{
+    min-height:15mm!important;
+    padding:2.2mm!important;
+  }
+
+  .label-wrap.print-this .cell .k{
+    font-size:2.45mm!important;
+  }
+
+  .label-wrap.print-this .cell .v{
+    margin-top:1.1mm!important;
+    font-size:4.3mm!important;
+  }
+
+  .label-wrap.print-this .barcode-area{
+    margin:3.2mm 0 0!important;
+    height:15mm!important;
+  }
+
+  .label-wrap.print-this .roll-barcode{
+    width:76mm!important;
+    max-width:76mm!important;
+    height:10.5mm!important;
+  }
+
+  .label-wrap.print-this .barcode-text{
+    margin-top:.6mm!important;
+    font-size:1.9mm!important;
+  }
+
+  .label-wrap.print-this .roll-line{
+    padding-top:2.5mm!important;
+  }
+}
+
+/* Make the on-screen preview match the stronger printed header. */
+.label-brand{
+  min-height:32px;
+  margin:3px 0 6px;
+  gap:9px;
+}
+.niron-label-logo{
+  width:32px;
+  height:32px;
+  flex-basis:32px;
+}
+.label-brand .title{
+  font-size:12px!important;
+}
+</style>
+
+</head>
+
+<body>
+
+<div class="toolbar">
+  <div>
+    <strong>Fabric Roll Labels</strong>
+    <small>{{ labels|length }} label(s) · select only what you want to print</small>
+  </div>
+
+  <div class="toolbar-actions">
+    <div class="selected-box">
+      <b id="selectedCount">0</b> selected
+    </div>
+
+    <button type="button" class="btn" id="selectAll">Select All</button>
+    <button type="button" class="btn" id="clearAll">Clear</button>
+
+    {% if back_receipt_id %}
+      <a class="btn" href="{% url 'production_fabric_receipt_detail' back_receipt_id %}">Back to Detail</a>
+    {% else %}
+      <a class="btn" href="{% url 'inventory_stock_in_list' %}">Back to Stock In</a>
+    {% endif %}
+
+    <button type="button" class="btn btn-gold" id="printSelected" disabled>
+      Print Selected
+    </button>
+  </div>
+</div>
+
+<div class="sheet">
+
+{% for item in labels %}
+  <div class="label-wrap" data-label-wrap>
+    <input type="checkbox" class="label-check" data-label-check>
+
+    <section class="label">
+      <div class="label-brand">
+        <img class="niron-label-logo"
+             src="{% static 'img/niron-logo.png' %}"
+             alt="Niron">
+        <div class="title">FABRIC ROLL</div>
+      </div>
+
+      <div class="code">{{ item.roll.roll_code }}</div>
+
+      <div class="grid">
+        <div class="cell">
+          <div class="k">Supplier</div>
+          <div class="v">{{ item.roll.receipt.supplier }}</div>
+        </div>
+
+        <div class="cell">
+          <div class="k">Color</div>
+          <div class="v">{{ item.roll.receipt.color.name }}</div>
+        </div>
+
+        <div class="cell">
+          <div class="k">Stock In Date</div>
+          <div class="v">{{ item.roll.receipt.received_date|date:"d-M-Y" }}</div>
+        </div>
+
+        <div class="cell">
+          <div class="k">Original Weight</div>
+          <div class="v">{{ item.roll.original_qty|floatformat:2 }} KG</div>
+        </div>
+      </div>
+
+      <div class="barcode-area">
+        <svg class="roll-barcode"
+             data-barcode="{{ item.roll.roll_code }}"
+             aria-label="Barcode {{ item.roll.roll_code }}"></svg>
+        <div class="barcode-text">{{ item.roll.roll_code }}</div>
+      </div>
+
+      <div class="roll-line">
+        <div class="roll-block">
+          <div class="k">Roll No. / This Color Batch</div>
+          <div class="v">{{ item.roll_no_text }}/{{ item.roll_total_text }}</div>
+        </div>
+
+        <div class="fabric-name">
+          <small>Fabric</small>
+          {{ item.roll.receipt.fabric_name }}
+        </div>
+      </div>
+    </section>
+
+    <button type="button" class="print-one-btn" data-print-one>
+      Print This
+    </button>
+  </div>
+
+{% empty %}
+  <div style="background:#fff;padding:30px;border-radius:12px">No labels found.</div>
+{% endfor %}
+
+</div>
+
+<script>
+(function(){
+  const cards = Array.from(document.querySelectorAll('[data-label-wrap]'));
+  const selectedCount = document.getElementById('selectedCount');
+  const printSelected = document.getElementById('printSelected');
+  const selectAll = document.getElementById('selectAll');
+  const clearAll = document.getElementById('clearAll');
+
+  function refresh(){
+    let count = 0;
+
+    cards.forEach(function(card){
+      const box = card.querySelector('[data-label-check]');
+      const selected = box && box.checked;
+
+      card.classList.toggle('selected', selected);
+
+      if(selected){
+        count += 1;
+      }
+    });
+
+    if(selectedCount){
+      selectedCount.textContent = count;
+    }
+
+    if(printSelected){
+      printSelected.disabled = count === 0;
+    }
+  }
+
+  function clearPrintState(){
+    cards.forEach(function(card){
+      card.classList.remove('print-this');
+    });
+  }
+
+  function printCards(targetCards){
+    clearPrintState();
+
+    targetCards.forEach(function(card){
+      card.classList.add('print-this');
+    });
+
+    if(!targetCards.length){
+      return;
+    }
+
+    window.print();
+
+    setTimeout(clearPrintState, 300);
+  }
+
+  cards.forEach(function(card){
+    const box = card.querySelector('[data-label-check]');
+    const oneButton = card.querySelector('[data-print-one]');
+
+    card.addEventListener('click', function(event){
+      if(
+        event.target.matches('[data-label-check]') ||
+        event.target.closest('[data-print-one]')
+      ){
+        return;
+      }
+
+      box.checked = !box.checked;
+      refresh();
+    });
+
+    if(box){
+      box.addEventListener('change', refresh);
+    }
+
+    if(oneButton){
+      oneButton.addEventListener('click', function(event){
+        event.preventDefault();
+        event.stopPropagation();
+        printCards([card]);
+      });
+    }
+  });
+
+  if(selectAll){
+    selectAll.addEventListener('click', function(){
+      cards.forEach(function(card){
+        const box = card.querySelector('[data-label-check]');
+        if(box){
+          box.checked = true;
+        }
+      });
+      refresh();
+    });
+  }
+
+  if(clearAll){
+    clearAll.addEventListener('click', function(){
+      cards.forEach(function(card){
+        const box = card.querySelector('[data-label-check]');
+        if(box){
+          box.checked = false;
+        }
+      });
+      refresh();
+    });
+  }
+
+  if(printSelected){
+    printSelected.addEventListener('click', function(){
+      const selectedCards = cards.filter(function(card){
+        const box = card.querySelector('[data-label-check]');
+        return box && box.checked;
+      });
+
+      printCards(selectedCards);
+    });
+  }
+
+  if(cards.length === 1){
+    const box = cards[0].querySelector('[data-label-check]');
+    if(box){
+      box.checked = true;
+    }
+  }
+
+  refresh();
+})();
+</script>
+
+
+<script>
+(function(){
+  function renderBarcodes(){
+    if(typeof JsBarcode === 'undefined'){
+      console.warn('JsBarcode library did not load.');
+      return;
+    }
+
+    document.querySelectorAll('.roll-barcode[data-barcode]').forEach(function(svg){
+      const value = svg.getAttribute('data-barcode') || '';
+      if(!value) return;
+
+      try{
+        JsBarcode(svg, value, {
+          format: 'CODE128',
+          displayValue: false,
+          margin: 0,
+          height: 42,
+          width: 1.35,
+          background: '#ffffff',
+          lineColor: '#000000'
+        });
+      }catch(err){
+        console.warn('Barcode error:', err);
+      }
+    });
+  }
+
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', renderBarcodes);
+  }else{
+    renderBarcodes();
+  }
+
+  window.addEventListener('beforeprint', renderBarcodes);
+})();
+</script>
+
+</body>
+</html>
