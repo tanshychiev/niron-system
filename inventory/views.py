@@ -1674,11 +1674,14 @@ def inventory_stock_in_list(request):
 @login_required
 @permission_required("inventory.view_inventorybatch", raise_exception=True)
 def inventory_fabric_print_labels(request, pk):
-    """Print all roll labels for one Fabric purchase group (actual or planned)."""
+    """Print a Fabric purchase group using the existing Production 10x10cm label template."""
+    from types import SimpleNamespace
+
     anchor = get_object_or_404(
         FabricReceipt.objects.select_related("color", "supplier_ref", "fabric_type"),
         pk=pk,
     )
+
     if anchor.purchase_group:
         receipts = list(
             FabricReceipt.objects.filter(purchase_group=anchor.purchase_group)
@@ -1690,32 +1693,52 @@ def inventory_fabric_print_labels(request, pk):
         receipts = [anchor]
 
     labels = []
+
     for receipt in receipts:
-        actual_rolls = list(receipt.rolls.all())
+        actual_rolls = list(receipt.rolls.all().order_by("id"))
+
         if actual_rolls:
-            for roll in actual_rolls:
+            total = len(actual_rolls)
+            for index, roll in enumerate(actual_rolls, start=1):
                 labels.append({
-                    "code": roll.roll_code,
-                    "kg": Decimal(roll.original_qty or 0),
-                    "receipt": receipt,
+                    "roll": roll,
+                    "roll_no_text": index,
+                    "roll_total_text": total,
                     "planned": False,
                 })
-        else:
-            weights = [Decimal(str(x)) for x in (receipt.pending_roll_weights or []) if str(x).strip()]
-            while len(weights) < int(receipt.roll_count or 0):
-                weights.append(Decimal("0"))
-            color_code = (getattr(receipt.color, "code", "") or "COL").upper()
-            for index in range(1, int(receipt.roll_count or 0) + 1):
-                labels.append({
-                    "code": f"{receipt.receipt_no}-{color_code}-{index:03d}",
-                    "kg": weights[index - 1],
-                    "receipt": receipt,
-                    "planned": True,
-                })
+            continue
 
-    return render(request, "inventory/fabric_roll_labels.html", {
-        "anchor": anchor,
+        # Waiting purchase: create temporary in-memory roll objects only for label preview.
+        # Nothing is written to the database here.
+        weights = [
+            Decimal(str(x))
+            for x in (receipt.pending_roll_weights or [])
+            if str(x).strip()
+        ]
+
+        total = int(receipt.roll_count or 0)
+        while len(weights) < total:
+            weights.append(Decimal("0"))
+
+        color_code = (getattr(receipt.color, "code", "") or "COL").upper()
+
+        for index in range(1, total + 1):
+            planned_roll = SimpleNamespace(
+                roll_code=f"{receipt.receipt_no}-{color_code}-{index:03d}",
+                original_qty=weights[index - 1],
+                receipt=receipt,
+            )
+            labels.append({
+                "roll": planned_roll,
+                "roll_no_text": index,
+                "roll_total_text": total,
+                "planned": True,
+            })
+
+    return render(request, "production/fabric_roll_labels.html", {
         "labels": labels,
+        "back_receipt_id": None,
+        "anchor": anchor,
         "group_ref": anchor.purchase_group or anchor.receipt_no,
     })
 
