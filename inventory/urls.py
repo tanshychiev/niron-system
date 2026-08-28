@@ -14,6 +14,7 @@ from .views import (
     inventory_batch_add_cost,
     inventory_batch_confirm_received,
     inventory_fabric_confirm_received,
+    inventory_fabric_print_labels,
     inventory_batch_create,
     inventory_batch_delete,
     inventory_batch_detail,
@@ -85,6 +86,11 @@ urlpatterns = [
         "fabric-purchases/<int:pk>/receive/",
         inventory_fabric_confirm_received,
         name="inventory_fabric_confirm_received",
+    ),
+    path(
+        "fabric-purchases/<int:pk>/labels/",
+        inventory_fabric_print_labels,
+        name="inventory_fabric_print_labels",
     ),
     path(
         "batches/<int:pk>/add-cost/",

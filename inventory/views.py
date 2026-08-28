@@ -1295,6 +1295,74 @@ def _backfill_legacy_received_stock_in():
 
 @login_required
 @permission_required("inventory.view_inventorybatch", raise_exception=True)
+
+def _fabric_purchase_groups(receipts, status_kind):
+    """Group FabricReceipt children by purchase_group for one batch-style Stock In row."""
+    grouped = OrderedDict()
+    for receipt in receipts:
+        key = receipt.purchase_group or f"legacy-{receipt.pk}"
+        group = grouped.setdefault(key, {
+            "key": key,
+            "receipts": [],
+            "anchor": receipt,
+            "total_rolls": Decimal("0"),
+            "total_kg": Decimal("0"),
+            "total_cost": Decimal("0"),
+        })
+        group["receipts"].append(receipt)
+        group["total_rolls"] += Decimal(receipt.roll_count or 0)
+        group["total_kg"] += Decimal(getattr(receipt, "total_kg_display", 0) or 0)
+        group["total_cost"] += Decimal(receipt.total_cost or 0)
+        if receipt.pk < group["anchor"].pk:
+            group["anchor"] = receipt
+
+    rows = []
+    for group in grouped.values():
+        receipts = sorted(group["receipts"], key=lambda r: (r.receipt_no or "", r.pk))
+        anchor = group["anchor"]
+        row_date = (
+            (anchor.expected_date or anchor.received_date)
+            if status_kind == "waiting"
+            else anchor.received_date
+        )
+        children = []
+        for receipt in receipts:
+            children.append({
+                "ref": receipt.receipt_no,
+                "fabric": receipt.fabric_name or "-",
+                "color": receipt.color.name if receipt.color else "-",
+                "color_hex": getattr(receipt.color, "hex_code", "#D1D5DB") if receipt.color else "#D1D5DB",
+                "rolls": Decimal(receipt.roll_count or 0),
+                "kg": Decimal(getattr(receipt, "total_kg_display", 0) or 0),
+                "cost": Decimal(receipt.total_cost or 0),
+                "obj": receipt,
+            })
+        rows.append({
+            "kind": "fabric_group",
+            "sort_date": row_date or anchor.created_at.date(),
+            "ref": receipts[0].receipt_no if receipts else anchor.receipt_no,
+            "purchase_group": anchor.purchase_group or "",
+            "date": row_date,
+            "supplier": anchor.supplier or "-",
+            "type": "Fabric",
+            "item": f"{len(children)} fabric type(s)",
+            "ordered": group["total_rolls"],
+            "arrived": Decimal("0") if status_kind == "waiting" else group["total_rolls"],
+            "waiting": group["total_rolls"] if status_kind == "waiting" else Decimal("0"),
+            "qty": group["total_rolls"],
+            "qty_label": f"{group['total_kg']:.2f} KG",
+            "status": "waiting" if status_kind == "waiting" else "received",
+            "cost_added": bool(group["total_cost"] > 0),
+            "cost_text": f"$ {group['total_cost']:.2f}",
+            "created_by": anchor.created_by.username if anchor.created_by else "-",
+            "obj": anchor,
+            "children": children,
+            "child_count": len(children),
+            "print_ready": True,
+        })
+    return rows
+
+
 def inventory_stock_in_list(request):
     """Stock In List grouped into Waiting Purchase, Purchased Stock In, and Production Stock."""
     # Safe one-time legacy repair. After the first successful page load there
@@ -1518,26 +1586,7 @@ def inventory_stock_in_list(request):
             "obj": batch,
         })
 
-    for receipt in waiting_fabric_receipts:
-        row_date = receipt.expected_date or receipt.received_date
-        waiting_rows.append({
-            "kind": "fabric",
-            "sort_date": row_date or receipt.created_at.date(),
-            "ref": receipt.receipt_no,
-            "date": row_date,
-            "supplier": receipt.supplier or "-",
-            "type": "Fabric",
-            "item": f"{receipt.fabric_name or '-'} / {receipt.color.name if receipt.color else '-'}",
-            "ordered": receipt.roll_count,
-            "arrived": Decimal("0"),
-            "waiting": receipt.roll_count,
-            "qty_label": f"{receipt.total_kg_display:.2f} KG",
-            "status": "waiting",
-            "cost_added": bool(Decimal(receipt.total_cost or 0) > 0),
-            "cost_text": f"$ {Decimal(receipt.total_cost or 0):.2f}",
-            "created_by": receipt.created_by.username if receipt.created_by else "-",
-            "obj": receipt,
-        })
+    waiting_rows.extend(_fabric_purchase_groups(waiting_fabric_receipts, "waiting"))
 
     for batch in purchased_batches:
         purchased_rows.append({
@@ -1556,22 +1605,7 @@ def inventory_stock_in_list(request):
             "obj": batch,
         })
 
-    for receipt in purchased_fabric_receipts:
-        purchased_rows.append({
-            "kind": "fabric",
-            "sort_date": receipt.received_date or receipt.created_at.date(),
-            "ref": receipt.receipt_no,
-            "date": receipt.received_date,
-            "supplier": receipt.supplier or "-",
-            "type": "Fabric",
-            "item": f"{receipt.fabric_name or '-'} / {receipt.color.name if receipt.color else '-'}",
-            "qty": receipt.roll_count,
-            "qty_label": f"{receipt.total_kg_display:.2f} KG",
-            "cost_added": bool(Decimal(receipt.total_cost or 0) > 0),
-            "cost_text": f"$ {Decimal(receipt.total_cost or 0):.2f}",
-            "created_by": receipt.created_by.username if receipt.created_by else "-",
-            "obj": receipt,
-        })
+    purchased_rows.extend(_fabric_purchase_groups(purchased_fabric_receipts, "received"))
 
     # Optional material-type filter across the combined list.
     # Fabric is stored in FabricReceipt; Cloth/Printing Material are InventoryBatch rows.
@@ -1637,6 +1671,55 @@ def inventory_stock_in_list(request):
         "cost_status": cost_status,
         "material_type": material_type,
         "can_view_stock_cost": _can_view_stock_cost(request.user),
+    })
+
+
+@login_required
+@permission_required("inventory.view_inventorybatch", raise_exception=True)
+def inventory_fabric_print_labels(request, pk):
+    """Print all roll labels for one Fabric purchase group (actual or planned)."""
+    anchor = get_object_or_404(
+        FabricReceipt.objects.select_related("color", "supplier_ref", "fabric_type"),
+        pk=pk,
+    )
+    if anchor.purchase_group:
+        receipts = list(
+            FabricReceipt.objects.filter(purchase_group=anchor.purchase_group)
+            .select_related("color", "supplier_ref", "fabric_type")
+            .prefetch_related("rolls")
+            .order_by("receipt_no", "id")
+        )
+    else:
+        receipts = [anchor]
+
+    labels = []
+    for receipt in receipts:
+        actual_rolls = list(receipt.rolls.all())
+        if actual_rolls:
+            for roll in actual_rolls:
+                labels.append({
+                    "code": roll.roll_code,
+                    "kg": Decimal(roll.original_qty or 0),
+                    "receipt": receipt,
+                    "planned": False,
+                })
+        else:
+            weights = [Decimal(str(x)) for x in (receipt.pending_roll_weights or []) if str(x).strip()]
+            while len(weights) < int(receipt.roll_count or 0):
+                weights.append(Decimal("0"))
+            color_code = (getattr(receipt.color, "code", "") or "COL").upper()
+            for index in range(1, int(receipt.roll_count or 0) + 1):
+                labels.append({
+                    "code": f"{receipt.receipt_no}-{color_code}-{index:03d}",
+                    "kg": weights[index - 1],
+                    "receipt": receipt,
+                    "planned": True,
+                })
+
+    return render(request, "inventory/fabric_roll_labels.html", {
+        "anchor": anchor,
+        "labels": labels,
+        "group_ref": anchor.purchase_group or anchor.receipt_no,
     })
 
 

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Fabric Roll Labels - {{ group_ref }}</title>
+<style>
+@page{size:100mm 100mm;margin:0}
+*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+html,body{margin:0;padding:0;background:#fff;font-family:Arial,sans-serif;color:#161616}
+.label{width:100mm;height:100mm;padding:7mm;page-break-after:always;display:flex;flex-direction:column;border:1px solid #ddd}
+.label:last-child{page-break-after:auto}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:4mm;border-bottom:2px solid #111;padding-bottom:4mm}
+.brand{font-size:17pt;font-weight:900}.batch{font-size:8pt;color:#666;text-align:right}
+.code{margin:7mm 0 3mm;font-size:18pt;font-weight:950;word-break:break-all;line-height:1.05}
+.meta{display:grid;grid-template-columns:28mm 1fr;gap:2.5mm 3mm;font-size:10pt}
+.meta b{color:#666}.kg{margin-top:auto;display:flex;justify-content:space-between;align-items:end;border-top:1px solid #ddd;padding-top:5mm}
+.kg span{font-size:9pt;color:#666}.kg strong{font-size:25pt}.swatch{width:15mm;height:15mm;border-radius:50%;border:1px solid #777;display:inline-block;vertical-align:middle;margin-right:3mm}
+.planned{margin-top:3mm;font-size:8pt;color:#996200;font-weight:800}
+@media screen{body{background:#eee}.label{margin:8px auto;background:#fff;box-shadow:0 4px 20px rgba(0,0,0,.12)}}
+</style>
+</head>
+<body>
+{% for label in labels %}
+<section class="label">
+  <div class="top">
+    <div class="brand">NIRON FABRIC</div>
+    <div class="batch">Purchase Batch<br><strong>{{ anchor.receipt_no }}</strong></div>
+  </div>
+  <div class="code">{{ label.code }}</div>
+  <div class="meta">
+    <b>Supplier</b><span>{{ label.receipt.supplier|default:"-" }}</span>
+    <b>Fabric</b><span>{{ label.receipt.fabric_name|default:"-" }}</span>
+    <b>Colour</b><span><i class="swatch" style="background:{{ label.receipt.color.hex_code|default:'#ddd' }}"></i>{{ label.receipt.color.name|default:"-" }}</span>
+    <b>Receipt</b><span>{{ label.receipt.receipt_no }}</span>
+    <b>Date</b><span>{{ label.receipt.received_date|date:"d M Y" }}</span>
+  </div>
+  {% if label.planned %}<div class="planned">Planned label — physical roll will be created when purchase is confirmed received.</div>{% endif %}
+  <div class="kg"><span>PHYSICAL ROLL WEIGHT</span><strong>{{ label.kg|floatformat:2 }} KG</strong></div>
+</section>
+{% empty %}
+<p>No fabric roll labels found.</p>
+{% endfor %}
+<script>window.addEventListener('load',()=>setTimeout(()=>window.print(),250));</script>
+</body>
+</html>

@@ -7108,7 +7108,7 @@
   function optionColour(option){
     if(!option) return '#D9B06D';
 
-    const raw =
+    let raw =
       option.dataset.colorHex ||
       option.dataset.hexCode ||
       option.dataset.hex ||
@@ -7116,6 +7116,40 @@
       option.getAttribute('data-hex-code') ||
       option.getAttribute('data-hex') ||
       '';
+
+    /*
+      Fabric colour <option>s do not always carry data-color-hex, while the
+      normal Cloth colour selects do. Both selects use the same Color record
+      ID as their option value, so reuse the real hex from any matching cloth
+      option before falling back to the colour name.
+    */
+    if(!/^#[0-9a-f]{6}$/i.test(String(raw).trim()) && option.value){
+      const matchingOptions=[...document.querySelectorAll('select.color-select option')];
+      const matching=matchingOptions.find(other=>
+        other!==option &&
+        String(other.value)===String(option.value) &&
+        /^#[0-9a-f]{6}$/i.test(String(
+          other.dataset.colorHex ||
+          other.dataset.hexCode ||
+          other.dataset.hex ||
+          other.getAttribute('data-color-hex') ||
+          other.getAttribute('data-hex-code') ||
+          other.getAttribute('data-hex') ||
+          ''
+        ).trim())
+      );
+
+      if(matching){
+        raw =
+          matching.dataset.colorHex ||
+          matching.dataset.hexCode ||
+          matching.dataset.hex ||
+          matching.getAttribute('data-color-hex') ||
+          matching.getAttribute('data-hex-code') ||
+          matching.getAttribute('data-hex') ||
+          '';
+      }
+    }
 
     if(/^#[0-9a-f]{6}$/i.test(String(raw).trim())){
       return String(raw).trim().toUpperCase();

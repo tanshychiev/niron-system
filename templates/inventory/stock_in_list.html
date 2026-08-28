@@ -52,6 +52,12 @@
 .cost-mini-grid{display:grid;gap:8px}.cost-mini label{font-size:9px;font-weight:900;color:var(--muted);text-transform:uppercase}.cost-mini button{width:100%;margin-top:4px}
 .action-cell{position:relative;display:flex;gap:6px;align-items:center}
 .section-empty{padding:28px;text-align:center;color:var(--muted);font-size:12px;font-weight:800}
+.fabric-batch-row{background:#fffaf0}
+.fabric-batch-row .ref-link{display:inline-flex;align-items:center;gap:6px}
+.fabric-child-row td{background:#fcfcfb;font-size:11px!important;color:#675a4a;padding-top:8px!important;padding-bottom:8px!important}
+.fabric-child-indent{padding-left:28px!important}
+.fabric-swatch{display:inline-block;width:13px;height:13px;border-radius:50%;border:1px solid rgba(0,0,0,.16);vertical-align:-2px;margin-right:6px}
+.fabric-child-count{display:inline-flex;min-width:20px;height:20px;padding:0 6px;align-items:center;justify-content:center;border-radius:999px;background:#fff0c2;color:#7c5200;font-size:9px;font-weight:950}
 @media(max-width:1200px){.stock-filter-grid{grid-template-columns:minmax(200px,1fr) 135px 135px 155px 175px 125px auto auto}}
 @media(max-width:980px){.stock-filter-grid{grid-template-columns:1fr 1fr 1fr}.stock-filter-grid .search-field{grid-column:1/-1}}
 @media(max-width:600px){.stock-shell{padding:0 2px}.stock-filter-grid{grid-template-columns:1fr}.stock-filter-grid .search-field{grid-column:auto}.stock-card-head{align-items:flex-start}.source-badge{flex:0 0 auto}}
@@ -141,10 +147,12 @@
       </thead>
       <tbody>
         {% for row in waiting_rows %}
-        <tr>
+        <tr{% if row.kind == "fabric_group" %} class="fabric-batch-row"{% endif %}>
           <td>
             {% if row.kind == "batch" %}
               <a class="ref-link" href="{% url 'inventory_batch_detail' row.obj.pk %}">{{ row.ref }}</a>
+            {% elif row.kind == "fabric_group" %}
+              <strong class="ref-link">{{ row.ref }} <span class="fabric-child-count">{{ row.child_count }} children</span></strong>
             {% else %}
               <strong>{{ row.ref }}</strong>
             {% endif %}
@@ -235,12 +243,29 @@
   </div>
 </div>
                 {% endif %}
+              {% elif row.kind == "fabric_group" %}
+                <a class="action-link" href="{% url 'inventory_fabric_confirm_received' row.obj.pk %}">✓ Confirm Batch</a>
+                <a class="action-link action-light action-print" target="_blank" href="{% url 'inventory_fabric_print_labels' row.obj.pk %}">🖨 Print Labels</a>
               {% else %}
                 <a class="action-link" href="{% url 'inventory_fabric_confirm_received' row.obj.pk %}">✓ Confirm Received</a>
               {% endif %}
             </div>
           </td>
         </tr>
+        {% if row.kind == "fabric_group" %}
+          {% for child in row.children %}
+          <tr class="fabric-child-row">
+            <td class="fabric-child-indent">↳ {{ child.ref }}</td>
+            <td></td><td></td><td><span class="badge type-badge">Child</span></td>
+            <td><span class="fabric-swatch" style="background:{{ child.color_hex }}"></span>{{ child.fabric }} / {{ child.color }}</td>
+            <td>{{ child.rolls|floatformat:"-2" }}</td><td>0</td><td>{{ child.rolls|floatformat:"-2" }}</td>
+            <td><strong>{{ child.kg|floatformat:2 }} KG</strong></td>
+            <td><span class="badge badge-coming">Waiting</span></td>
+            {% if can_view_stock_cost %}<td>${{ child.cost|floatformat:2 }}</td>{% endif %}
+            <td></td><td></td>
+          </tr>
+          {% endfor %}
+        {% endif %}
         {% empty %}
         <tr>
           <td colspan="13" class="empty-row">No waiting purchases.</td>
@@ -286,10 +311,12 @@
       </thead>
       <tbody>
         {% for row in purchased_rows %}
-        <tr>
+        <tr{% if row.kind == "fabric_group" %} class="fabric-batch-row"{% endif %}>
           <td>
             {% if row.kind == "batch" %}
               <a class="ref-link" href="{% url 'inventory_batch_detail' row.obj.pk %}">{{ row.ref }}</a>
+            {% elif row.kind == "fabric_group" %}
+              <strong class="ref-link">{{ row.ref }} <span class="fabric-child-count">{{ row.child_count }} children</span></strong>
             {% else %}
               <strong>{{ row.ref }}</strong>
             {% endif %}
@@ -370,22 +397,31 @@
   </div>
 </div>
                 {% endif %}
+              {% elif row.kind == "fabric_group" %}
+                <a class="action-link action-print" target="_blank" href="{% url 'inventory_fabric_print_labels' row.obj.pk %}">🖨 Print Labels</a>
               {% else %}
                 {% if perms.production.change_fabricreceipt %}
-                  <a class="action-link action-light"
-                     href="{% url 'production_fabric_receipt_edit' row.obj.pk %}">
-                    Detail
-                  </a>
+                  <a class="action-link action-light" href="{% url 'production_fabric_receipt_edit' row.obj.pk %}">Detail</a>
                 {% endif %}
-                <a class="action-link action-print"
-                   target="_blank"
-                   href="/production/materials/roll-labels/?receipt_ids={{ row.obj.pk }}">
-                  🖨 Printing
-                </a>
+                <a class="action-link action-print" target="_blank" href="/production/materials/roll-labels/?receipt_ids={{ row.obj.pk }}">🖨 Printing</a>
               {% endif %}
             </div>
           </td>
         </tr>
+        {% if row.kind == "fabric_group" %}
+          {% for child in row.children %}
+          <tr class="fabric-child-row">
+            <td class="fabric-child-indent">↳ {{ child.ref }}</td>
+            <td></td><td></td><td><span class="badge type-badge">Child</span></td>
+            <td><span class="fabric-swatch" style="background:{{ child.color_hex }}"></span>{{ child.fabric }} / {{ child.color }}</td>
+            <td><strong>{{ child.rolls|floatformat:"-2" }}</strong></td>
+            <td><strong>{{ child.kg|floatformat:2 }} KG</strong></td>
+            <td><span class="badge badge-received">Received</span></td>
+            {% if can_view_stock_cost %}<td>${{ child.cost|floatformat:2 }}</td>{% endif %}
+            <td></td><td></td>
+          </tr>
+          {% endfor %}
+        {% endif %}
         {% empty %}
         <tr>
           <td colspan="11" class="empty-row">No received purchases.</td>
