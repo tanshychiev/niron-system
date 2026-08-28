@@ -1293,9 +1293,6 @@ def _backfill_legacy_received_stock_in():
     legacy_batches.update(status=InventoryBatch.STATUS_RECEIVED)
 
 
-@login_required
-@permission_required("inventory.view_inventorybatch", raise_exception=True)
-
 def _fabric_purchase_groups(receipts, status_kind):
     """Group FabricReceipt children by purchase_group for one batch-style Stock In row."""
     grouped = OrderedDict()
