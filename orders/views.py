@@ -3,14 +3,14 @@ from django.contrib.auth.decorators import login_required, permission_required
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import Prefetch, Q, Sum
+from django.db.models import Prefetch, Q, Sum, Count, Max
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from customers.models import Customer
 from decimal import Decimal, ROUND_HALF_UP
-from inventory.models import Color, InventoryItem, Size
+from inventory.models import Color, InventoryItem, Size, InventoryBatchItem
 from openpyxl import Workbook
 from django.templatetags.static import static
 import calendar
@@ -241,10 +241,24 @@ def _order_form_context_base():
 
 
 def _build_design_payloads_from_post(request):
-    payloads = []
-    design_total = int(request.POST.get("design_total", 0) or 0)
+    """Build design payloads from the actual submitted design indexes.
 
-    for design_index in range(design_total):
+    Do not trust ``design_total`` to imply indexes are contiguous. The browser
+    can legitimately submit design-0 and design-2 after a newly-created middle
+    design was removed. Reading range(design_total) would silently skip the
+    later design (and its uploaded images).
+    """
+    payloads = []
+
+    design_indexes = set()
+    key_pattern = re.compile(r"^design-(\d+)-")
+
+    for key in list(request.POST.keys()) + list(request.FILES.keys()):
+        match = key_pattern.match(key)
+        if match:
+            design_indexes.add(int(match.group(1)))
+
+    for design_index in sorted(design_indexes):
         prefix = f"design-{design_index}"
         item_total = int(request.POST.get(f"{prefix}-item_total", 0) or 0)
 
@@ -488,7 +502,21 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
                 total_pcs += Decimal(item.quantity or 0)
 
         for f in design_data["files"]:
-            OrderDesignFile.objects.create(order=order, design=design, image=f)
+            saved_file = OrderDesignFile.objects.create(
+                order=order,
+                design=design,
+                image=f,
+            )
+
+            # Never silently accept an upload whose physical file was not
+            # written to storage. This makes a storage problem fail visibly
+            # instead of leaving the order looking saved while the image is gone.
+            if not saved_file.image.name or not saved_file.image.storage.exists(saved_file.image.name):
+                raise ValidationError(
+                    f"Design image '{getattr(f, 'name', 'upload')}' could not be saved. "
+                    "Please try uploading it again."
+                )
+
             has_item_or_file = True
 
         if not has_item_or_file:
@@ -500,9 +528,11 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
             if str(item.pk) not in kept_item_ids:
                 item.delete()
 
-        for design in list(order.designs.all()):
-            if str(design.pk) not in kept_design_ids:
-                design.delete()
+        # IMPORTANT: do not delete an existing design merely because it was
+        # absent from POST. A frontend/indexing problem must never be allowed
+        # to cascade-delete its OrderDesignFile rows. Existing designs are only
+        # deleted above when the user explicitly submits DESIGN-DELETE=1.
+        # This protects previously uploaded design images from silent loss.
 
     return _money2(total_amount), total_pcs
 
@@ -1848,3 +1878,226 @@ def customer_payment_detail(request, pk):
         "balance": balance,
         "logs": order.payment_logs.all().order_by("-created_at", "-id"),
     })
+
+@login_required
+@permission_required("orders.view_order", raise_exception=True)
+def sales_ranking(request):
+    """Monthly decision dashboard for sales mix and shirt stock planning."""
+    from collections import defaultdict
+    from datetime import date
+    from django.db.models.functions import Coalesce
+
+    def month_start(value):
+        try:
+            y, m = [int(x) for x in value.split("-")]
+            return date(y, m, 1)
+        except Exception:
+            return None
+
+    def add_months(d, delta):
+        total = d.year * 12 + (d.month - 1) + delta
+        return date(total // 12, total % 12 + 1, 1)
+
+    def pct_change(current, previous):
+        current = Decimal(current or 0)
+        previous = Decimal(previous or 0)
+        if previous == 0:
+            return None if current == 0 else Decimal("100.0")
+        return ((current - previous) / previous * Decimal("100")).quantize(Decimal("0.1"))
+
+    valid_orders = Order.objects.filter(is_deleted=False).exclude(status=_get_cancel_status())
+
+    # The system has legacy rows without invoice_date. For those rows, created_at is the sales date.
+    requested_month = month_start((request.GET.get("month") or "").strip())
+    if requested_month:
+        selected_start = requested_month
+    else:
+        max_invoice = valid_orders.aggregate(v=Max("invoice_date"))["v"]
+        max_created = valid_orders.aggregate(v=Max("created_at"))["v"]
+        latest_dates = [d for d in [max_invoice, max_created.date() if max_created else None] if d]
+        selected_start = date(timezone.localdate().year, timezone.localdate().month, 1)
+        if latest_dates:
+            latest = max(latest_dates)
+            selected_start = date(latest.year, latest.month, 1)
+
+    selected_end = add_months(selected_start, 1)
+    previous_start = add_months(selected_start, -1)
+    previous_end = selected_start
+
+    def month_order_q(start, end):
+        return (
+            Q(invoice_date__gte=start, invoice_date__lt=end)
+            | Q(invoice_date__isnull=True, created_at__date__gte=start, created_at__date__lt=end)
+        )
+
+    month_orders = valid_orders.filter(month_order_q(selected_start, selected_end))
+    previous_orders = valid_orders.filter(month_order_q(previous_start, previous_end))
+
+    month_summary = month_orders.aggregate(
+        orders=Count("id"),
+        revenue=Sum("total_amount"),
+    )
+    prev_summary = previous_orders.aggregate(
+        orders=Count("id"),
+        revenue=Sum("total_amount"),
+    )
+
+    month_items = OrderItem.objects.filter(order__in=month_orders)
+    previous_items = OrderItem.objects.filter(order__in=previous_orders)
+    shirt_items = month_items.filter(
+        shirt_item__isnull=False,
+        shirt_item__item_type=InventoryItem.TYPE_SHIRT,
+        order__service_type__in=[Order.SERVICE_FULL, Order.SERVICE_RETAIL],
+    )
+    previous_shirt_items = previous_items.filter(
+        shirt_item__isnull=False,
+        shirt_item__item_type=InventoryItem.TYPE_SHIRT,
+        order__service_type__in=[Order.SERVICE_FULL, Order.SERVICE_RETAIL],
+    )
+
+    shirt_pcs = shirt_items.aggregate(v=Sum("quantity"))["v"] or Decimal("0")
+    prev_shirt_pcs = previous_shirt_items.aggregate(v=Sum("quantity"))["v"] or Decimal("0")
+
+    total_revenue = month_summary["revenue"] or Decimal("0")
+    total_orders = month_summary["orders"] or 0
+    avg_order = total_revenue / total_orders if total_orders else Decimal("0")
+
+    service_labels = dict(Order.SERVICE_CHOICES)
+    service_rows = []
+    raw_services = month_orders.values("service_type").annotate(
+        orders=Count("id"), revenue=Sum("total_amount")
+    ).order_by("-revenue", "-orders")
+    for row in raw_services:
+        revenue = row["revenue"] or Decimal("0")
+        row["label"] = service_labels.get(row["service_type"], row["service_type"])
+        row["revenue"] = revenue
+        row["revenue_share"] = (revenue / total_revenue * 100).quantize(Decimal("0.1")) if total_revenue else Decimal("0")
+        service_rows.append(row)
+
+    type_labels = dict(Order.TYPE_CHOICES)
+    order_type_rows = []
+    for row in month_orders.values("order_type").annotate(orders=Count("id"), revenue=Sum("total_amount")).order_by("-revenue"):
+        row["label"] = type_labels.get(row["order_type"], row["order_type"])
+        row["revenue"] = row["revenue"] or Decimal("0")
+        order_type_rows.append(row)
+
+    style_labels = dict(InventoryItem.STYLE_CHOICES)
+    def ranked(qs, fields, labels=None, limit=20):
+        rows = list(qs.values(*fields).annotate(pcs=Sum("quantity"), revenue=Sum("line_total")).order_by("-pcs", "-revenue")[:limit])
+        total = sum((r["pcs"] or Decimal("0")) for r in rows) if rows else Decimal("0")
+        for i, row in enumerate(rows, 1):
+            row["rank"] = i
+            row["pcs"] = row["pcs"] or Decimal("0")
+            row["revenue"] = row["revenue"] or Decimal("0")
+            row["share"] = (row["pcs"] / shirt_pcs * 100).quantize(Decimal("0.1")) if shirt_pcs else Decimal("0")
+            if labels:
+                for key, mapping in labels.items():
+                    row[key + "_label"] = mapping.get(row.get(key), row.get(key) or "Unknown")
+        return rows
+
+    style_rows = ranked(shirt_items, ["shirt_item__sample_style"])
+    for row in style_rows:
+        row["label"] = style_labels.get(row["shirt_item__sample_style"], row["shirt_item__sample_style"] or "Unknown")
+
+    color_rows = ranked(shirt_items, ["color__name", "color__hex_code"])
+    for row in color_rows:
+        row["label"] = row["color__name"] or "Unknown"
+        row["hex"] = row["color__hex_code"] or "#D9D9D9"
+
+    size_rows = ranked(shirt_items, ["size__name", "size__sort_order"])
+    for row in size_rows:
+        row["label"] = row["size__name"] or "Unknown"
+
+    combo_rows = ranked(
+        shirt_items,
+        ["shirt_item__sample_style", "color__name", "color__hex_code", "size__name"],
+        limit=30,
+    )
+    for row in combo_rows:
+        row["style"] = style_labels.get(row["shirt_item__sample_style"], row["shirt_item__sample_style"] or "Unknown")
+        row["color"] = row["color__name"] or "Unknown"
+        row["hex"] = row["color__hex_code"] or "#D9D9D9"
+        row["size"] = row["size__name"] or "Unknown"
+
+    # Current physical stock by the same decision dimensions.
+    stock_map = defaultdict(Decimal)
+    current_stock = (
+        InventoryBatchItem.objects.filter(
+            is_active=True,
+            batch__is_deleted=False,
+            item__item_type=InventoryItem.TYPE_SHIRT,
+        )
+        .values("item__sample_style", "color__name", "size__name")
+        .annotate(stock=Sum("qty_remaining"))
+    )
+    for row in current_stock:
+        key = (row["item__sample_style"] or "", row["color__name"] or "", row["size__name"] or "")
+        stock_map[key] += row["stock"] or Decimal("0")
+
+    stock_action_rows = []
+    for row in combo_rows[:15]:
+        key = (row["shirt_item__sample_style"] or "", row["color"] or "", row["size"] or "")
+        stock = stock_map.get(key, Decimal("0"))
+        sold = row["pcs"] or Decimal("0")
+        cover = (stock / sold).quantize(Decimal("0.1")) if sold else None
+        if cover is None:
+            status = "No demand"
+            tone = "muted"
+        elif cover < Decimal("0.75"):
+            status = "Reorder"
+            tone = "danger"
+        elif cover < Decimal("1.50"):
+            status = "Watch"
+            tone = "warning"
+        elif cover <= Decimal("3.00"):
+            status = "Healthy"
+            tone = "good"
+        else:
+            status = "High stock"
+            tone = "info"
+        stock_action_rows.append({**row, "stock": stock, "cover": cover, "stock_status": status, "tone": tone})
+
+    # Decision Center: concise, data-backed actions.
+    decisions = []
+    if service_rows:
+        top = service_rows[0]
+        decisions.append({"title": "Revenue focus", "text": f"{top['label']} is #1 with ${top['revenue']:,.2f} ({top['revenue_share']}% of monthly revenue).", "tone": "gold"})
+    if style_rows:
+        top = style_rows[0]
+        decisions.append({"title": "Shirt type", "text": f"Prioritize {top['label']}: {top['pcs']:,.0f} pcs sold ({top['share']}% of shirt volume).", "tone": "blue"})
+    if color_rows and size_rows:
+        colors = ", ".join(r["label"] for r in color_rows[:2])
+        sizes = ", ".join(r["label"] for r in size_rows[:2])
+        decisions.append({"title": "Stock focus", "text": f"Keep more depth in {colors}; strongest sizes are {sizes}.", "tone": "green"})
+    if stock_action_rows:
+        urgent = [r for r in stock_action_rows if r["stock_status"] == "Reorder"]
+        if urgent:
+            u = urgent[0]
+            decisions.append({"title": "Reorder alert", "text": f"{u['style']} / {u['color']} / {u['size']} sold {u['pcs']:,.0f} pcs but current stock is {u['stock']:,.0f}. Review purchase quantity.", "tone": "red"})
+    revenue_change = pct_change(total_revenue, prev_summary["revenue"] or 0)
+    pcs_change = pct_change(shirt_pcs, prev_shirt_pcs)
+    if revenue_change is not None:
+        direction = "up" if revenue_change >= 0 else "down"
+        decisions.append({"title": "Monthly trend", "text": f"Revenue is {direction} {abs(revenue_change)}% vs previous month; shirt volume change is {pcs_change if pcs_change is not None else 0}%.", "tone": "purple"})
+
+    context = {
+        "selected_month": selected_start.strftime("%Y-%m"),
+        "selected_month_label": selected_start.strftime("%B %Y"),
+        "previous_month_label": previous_start.strftime("%B %Y"),
+        "total_revenue": total_revenue,
+        "total_orders": total_orders,
+        "avg_order": avg_order,
+        "shirt_pcs": shirt_pcs,
+        "revenue_change": revenue_change,
+        "orders_change": pct_change(total_orders, prev_summary["orders"] or 0),
+        "shirt_pcs_change": pcs_change,
+        "service_rows": service_rows,
+        "order_type_rows": order_type_rows,
+        "style_rows": style_rows,
+        "color_rows": color_rows,
+        "size_rows": size_rows,
+        "combo_rows": combo_rows,
+        "stock_action_rows": stock_action_rows,
+        "decisions": decisions,
+    }
+    return render(request, "orders/sales_ranking.html", context)

@@ -2553,7 +2553,14 @@ document.addEventListener("DOMContentLoaded", function () {
 
     if (addDesignBtn) {
         addDesignBtn.addEventListener("click", function () {
-            const designIndex = document.querySelectorAll(".design-block").length;
+            // Use a never-colliding index. Counting blocks is unsafe after a
+            // new middle design is removed (e.g. 0,2 -> count 2 -> duplicate 2).
+            const usedDesignIndexes = Array.from(document.querySelectorAll(".design-block"))
+                .map(block => parseInt(block.dataset.designIndex, 10))
+                .filter(Number.isFinite);
+            const designIndex = usedDesignIndexes.length
+                ? Math.max(...usedDesignIndexes) + 1
+                : 0;
 
             let rowHtml = itemRowTemplate
                 .replaceAll("__DESIGN_INDEX__", designIndex)

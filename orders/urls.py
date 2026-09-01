@@ -7,6 +7,7 @@ urlpatterns = [
     path("new/", views.order_create, name="order_create"),
     path("trash/", views.order_trash_list, name="order_trash_list"),
     path("export-excel/", views.order_list_export_excel, name="order_list_export_excel"),
+    path("sales-ranking/", views.sales_ranking, name="sales_ranking"),
 
     # ===== PRODUCTION =====
     path("production/", views.production_list, name="production_list"),
