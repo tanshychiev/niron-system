@@ -596,12 +596,57 @@
             font-size: 29px;
         }
     }
-</style>
 
-<div class="dashboard-hero">
-    <h1>Profit Dashboard</h1>
-    <p>Niron, Kampu, totals, revenue, deposit, receivable, cloth and film overview</p>
-</div>
+    /* Compact sales decision center */
+    .sales-decision-shell { background:rgba(255,255,255,.94); border:1px solid var(--line); border-radius:22px; box-shadow:var(--shadow); padding:18px; margin-bottom:20px; }
+    .sales-decision-head { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:14px; }
+    .sales-decision-head .eyebrow { font-size:11px; font-weight:950; letter-spacing:.8px; color:#9a6400; text-transform:uppercase; margin-bottom:4px; }
+    .sales-decision-head h3 { margin:0 0 4px; font-size:21px; font-weight:950; }
+    .sales-decision-head p { margin:0; color:var(--muted); font-size:12px; font-weight:750; }
+    .sales-alert-pill { border:1px solid #d7e8dc; background:#f2fbf5; color:#067647; border-radius:999px; padding:8px 12px; font-size:12px; font-weight:950; white-space:nowrap; }
+    .sales-alert-pill.has-alert { border-color:#f2c8c5; background:#fff3f2; color:#b42318; }
+    .decision-strip { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }
+    .decision-chip { border:1px solid var(--line); background:#fbfaf7; border-radius:15px; padding:12px 14px; min-width:0; }
+    .decision-chip span,.decision-chip small { display:block; color:var(--muted); font-size:10px; font-weight:850; }
+    .decision-chip span { text-transform:uppercase; letter-spacing:.5px; }
+    .decision-chip strong { display:block; font-size:17px; margin:3px 0 2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .sales-details { margin-top:12px; border-top:1px solid var(--line); }
+    .sales-details > summary { list-style:none; cursor:pointer; padding:14px 2px 2px; display:flex; align-items:center; justify-content:space-between; gap:12px; font-weight:950; color:#9a6400; }
+    .sales-details > summary::-webkit-details-marker { display:none; }
+    .sales-details > summary:after { content:'+'; width:28px; height:28px; border-radius:9px; background:#fff7e3; border:1px solid #f0d89f; display:flex; align-items:center; justify-content:center; font-size:18px; flex:0 0 auto; }
+    .sales-details[open] > summary:after { content:'−'; }
+    .sales-details > summary small { color:var(--muted); font-weight:750; margin-left:auto; }
+    .sales-details-body { padding-top:16px; }
+    .rank-summary-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-bottom:12px; }
+    .compact-rank-card,.style-breakdown-card,.stock-decision-card { border:1px solid var(--line); border-radius:17px; background:#fff; padding:15px; }
+    .compact-rank-card h4,.style-breakdown-card h4,.stock-decision-card h4 { margin:0 0 10px; font-size:16px; font-weight:950; }
+    .compact-rank-row { display:flex; justify-content:space-between; gap:12px; padding:8px 0; border-bottom:1px solid #f0ede5; font-size:13px; }
+    .compact-rank-row:last-child { border-bottom:0; }
+    .compact-rank-row span small { color:var(--muted); margin-left:4px; }
+    .style-breakdown-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-bottom:12px; }
+    .style-card-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+    .style-kicker { font-size:9px; font-weight:950; color:var(--muted); letter-spacing:.7px; }
+    .style-card-head h4 { font-size:20px; margin:2px 0 0; }
+    .style-total { text-align:right; }
+    .style-total strong { display:block; font-size:20px; }
+    .style-total span { display:block; color:var(--muted); font-size:10px; font-weight:800; }
+    .style-top-note { margin:10px 0 6px; padding:8px 10px; border-radius:10px; background:#fff8e7; font-size:11px; color:#76521b; }
+    .color-row { display:grid; grid-template-columns:minmax(100px,1fr) minmax(180px,2fr) auto; gap:10px; align-items:center; border-top:1px solid #f0ede5; padding:9px 0; }
+    .color-main strong,.color-main small { display:block; }
+    .color-main small { color:var(--muted); font-size:10px; margin-top:2px; }
+    .size-pills { display:flex; gap:5px; flex-wrap:wrap; }
+    .size-pills span { background:#f6f5f1; border:1px solid #ebe7dc; border-radius:999px; padding:4px 7px; font-size:10px; white-space:nowrap; }
+    .size-pills b { margin-left:2px; }
+    .color-qty { font-weight:950; white-space:nowrap; font-size:12px; }
+    .empty-note { color:var(--muted); font-size:12px; padding:12px 0; }
+    .stock-decision-card { margin-top:0; }
+    .stock-head p,.stock-rule { margin:0; color:var(--muted); font-size:11px; font-weight:750; }
+    .stock-rule { margin-top:9px; }
+
+    @media (max-width: 1000px) { .decision-strip { grid-template-columns:repeat(2,1fr); } .style-breakdown-grid { grid-template-columns:1fr; } }
+    @media (max-width: 700px) { .sales-decision-head { align-items:flex-start; flex-direction:column; } .decision-strip,.rank-summary-grid { grid-template-columns:1fr 1fr; } .sales-details > summary small { display:none; } .color-row { grid-template-columns:1fr auto; } .size-pills { grid-column:1 / -1; order:3; } }
+
+</style>
 
 <form method="get" class="dashboard-filter-card">
     <div class="filter-left">
@@ -659,50 +704,83 @@
     </div>
 </div>
 
-<div class="dash-card" id="sales-ranking" style="margin-bottom:20px;">
-    <div class="section-head">
+<div class="sales-decision-shell" id="sales-ranking">
+    <div class="sales-decision-head">
         <div>
-            <h3 class="section-title">Sales Ranking & Decision Center</h3>
-            <div style="font-size:12px;color:var(--muted);font-weight:800;">Uses the same Date From / Date To filter. Shirt rankings use structured shirt sales only.</div>
+            <div class="eyebrow">Sales Decision</div>
+            <h3>What should we sell and stock?</h3>
+            <p>{{ date_from|date:"d M Y" }} - {{ date_to|date:"d M Y" }} · Demand includes Pending + Processing + Done, separated by type, color and size.</p>
         </div>
-        <div class="section-badge">Decision</div>
-    </div>
-
-    <div class="mini-grid" style="margin-bottom:18px;">
-        <div class="mini-card"><div class="mini-label">Top Service</div><div class="mini-value dark" style="font-size:20px;">{{ decision_cards.service.label|default:"-" }}</div><div class="metric-name">${{ decision_cards.service.revenue|default:0|floatformat:2 }}</div></div>
-        <div class="mini-card"><div class="mini-label">Top Shirt Type</div><div class="mini-value dark" style="font-size:20px;">{{ decision_cards.style.label|default:"-" }}</div><div class="metric-name">{{ decision_cards.style.qty|default:0|floatformat:0 }} pcs</div></div>
-        <div class="mini-card"><div class="mini-label">Top Color / Size</div><div class="mini-value dark" style="font-size:20px;">{{ decision_cards.color.label|default:"-" }} / {{ decision_cards.size.label|default:"-" }}</div><div class="metric-name">Best demand signals</div></div>
-        <div class="mini-card"><div class="mini-label">Stock Attention</div><div class="mini-value {% if decision_cards.reorder_count %}red{% else %}green{% endif %}" style="font-size:20px;">{{ decision_cards.reorder_count }} Reorder</div><div class="metric-name">{{ decision_cards.watch_count }} Watch</div></div>
-    </div>
-
-    <div class="section-grid">
-        <div class="section-card">
-            <h3 class="section-title">Service Ranking</h3>
-            <div class="metric-list">{% for r in service_ranking %}<div class="metric-row"><div class="metric-name">#{{ r.rank }} {{ r.label }}<br><small>{{ r.orders }} orders · {{ r.share|floatformat:1 }}%</small></div><div class="metric-value">${{ r.revenue|floatformat:2 }}</div></div>{% empty %}<div class="metric-name">No sales</div>{% endfor %}</div>
-        </div>
-        <div class="section-card">
-            <h3 class="section-title">Shirt Type Ranking</h3>
-            <div class="metric-list">{% for r in style_ranking %}<div class="metric-row"><div class="metric-name">#{{ r.rank }} {{ r.label }}<br><small>{{ r.share|floatformat:1 }}% of shirt pcs</small></div><div class="metric-value">{{ r.qty|floatformat:0 }} pcs<br><small>${{ r.revenue|floatformat:2 }}</small></div></div>{% empty %}<div class="metric-name">No shirt sales</div>{% endfor %}</div>
-        </div>
-        <div class="section-card">
-            <h3 class="section-title">Color Ranking</h3>
-            <div class="metric-list">{% for r in color_ranking|slice:":8" %}<div class="metric-row"><div class="metric-name">#{{ r.rank }} {{ r.label }}<br><small>{{ r.share|floatformat:1 }}%</small></div><div class="metric-value">{{ r.qty|floatformat:0 }} pcs</div></div>{% empty %}<div class="metric-name">No color sales</div>{% endfor %}</div>
+        <div class="sales-alert-pill {% if decision_cards.reorder_count %}has-alert{% endif %}">
+            {{ decision_cards.reorder_count }} reorder · {{ decision_cards.watch_count }} watch
         </div>
     </div>
 
-    <div class="section-grid">
-        <div class="section-card">
-            <h3 class="section-title">Size Ranking</h3>
-            <div class="metric-list">{% for r in size_ranking %}<div class="metric-row"><div class="metric-name">#{{ r.rank }} {{ r.label }}<br><small>{{ r.share|floatformat:1 }}%</small></div><div class="metric-value">{{ r.qty|floatformat:0 }} pcs</div></div>{% empty %}<div class="metric-name">No size sales</div>{% endfor %}</div>
-        </div>
-        <div class="section-card" style="grid-column:span 2;">
-            <h3 class="section-title">Best Combination + Stock Decision</h3>
-            <div class="table-scroll"><table class="growth-table" style="min-width:760px;"><thead><tr><th>#</th><th>Type</th><th>Color</th><th>Size</th><th>Sold</th><th>Revenue</th><th>Stock Now</th><th>Coverage</th><th>Decision</th></tr></thead><tbody>
-            {% for r in combo_ranking %}<tr><td>#{{ r.rank }}</td><td><strong>{{ r.style }}</strong></td><td>{{ r.color }}</td><td>{{ r.size }}</td><td>{{ r.qty|floatformat:0 }}</td><td>${{ r.revenue|floatformat:2 }}</td><td>{{ r.stock|floatformat:0 }}</td><td>{{ r.coverage|floatformat:1 }}x</td><td><strong class="{% if r.action_css == 'danger' %}red{% elif r.action_css == 'success' %}green{% elif r.action_css == 'warning' %}dark{% else %}blue{% endif %}">{{ r.action }}</strong></td></tr>{% empty %}<tr><td colspan="9">No shirt combination sales in this period.</td></tr>{% endfor %}
-            </tbody></table></div>
-            <div style="margin-top:12px;font-size:12px;color:var(--muted);font-weight:800;">REORDER = stock below 50% of selected-period sales · WATCH = below 1x · HEALTHY = 1x–2.5x · HIGH STOCK = above 2.5x.</div>
-        </div>
+    <div class="decision-strip">
+        <div class="decision-chip"><span>Top service</span><strong>{{ decision_cards.service.label|default:"-" }}</strong><small>${{ decision_cards.service.revenue|default:0|floatformat:2 }}</small></div>
+        <div class="decision-chip"><span>Top shirt</span><strong>{{ decision_cards.style.label|default:"-" }}</strong><small>{{ decision_cards.style.qty|default:0|floatformat:0 }} pcs</small></div>
+        <div class="decision-chip"><span>Top color</span><strong>{{ decision_cards.color.label|default:"-" }}</strong><small>{{ decision_cards.color.qty|default:0|floatformat:0 }} pcs</small></div>
+        <div class="decision-chip"><span>Top size</span><strong>{{ decision_cards.size.label|default:"-" }}</strong><small>{{ decision_cards.size.qty|default:0|floatformat:0 }} pcs</small></div>
     </div>
+
+    <details class="sales-details">
+        <summary>
+            <span>Show sales ranking details</span>
+            <small>Oversize · Polo · Boxy · Regular · service · stock</small>
+        </summary>
+
+        <div class="sales-details-body">
+            <div class="rank-summary-grid">
+                <div class="compact-rank-card">
+                    <h4>Service Ranking</h4>
+                    {% for r in service_ranking %}
+                    <div class="compact-rank-row"><span>#{{ r.rank }} {{ r.label }} <small>{{ r.orders }} orders</small></span><strong>${{ r.revenue|floatformat:2 }}</strong></div>
+                    {% empty %}<div class="empty-note">No sales in this period.</div>{% endfor %}
+                </div>
+                <div class="compact-rank-card">
+                    <h4>Shirt Type Ranking</h4>
+                    {% for r in style_ranking %}
+                    <div class="compact-rank-row"><span>#{{ r.rank }} {{ r.label }} <small>{{ r.share|floatformat:1 }}%</small></span><strong>{{ r.qty|floatformat:0 }} pcs</strong></div>
+                    {% empty %}<div class="empty-note">No shirt sales in this period.</div>{% endfor %}
+                </div>
+            </div>
+
+            <div class="style-breakdown-grid">
+                {% for style in shirt_style_details %}
+                <div class="style-breakdown-card">
+                    <div class="style-card-head">
+                        <div><span class="style-kicker">SHIRT TYPE</span><h4>{{ style.label }}</h4></div>
+                        <div class="style-total"><strong>{{ style.qty|floatformat:0 }}</strong><span>pcs demand</span></div>
+                    </div>
+                    {% if style.colors %}
+                        <div class="style-top-note">Top color: <strong>{{ style.top_color.label }}</strong> · {{ style.top_color.qty|floatformat:0 }} pcs</div>
+                        <div class="color-table">
+                            {% for color in style.colors|slice:":8" %}
+                            <div class="color-row">
+                                <div class="color-main"><strong>#{{ forloop.counter }} {{ color.label }}</strong><small>{{ color.share|floatformat:1 }}% of {{ style.label }}</small></div>
+                                <div class="size-pills">
+                                    {% for size in color.sizes|slice:":7" %}<span>{{ size.label }} <b>{{ size.qty|floatformat:0 }}</b></span>{% endfor %}
+                                </div>
+                                <div class="color-qty">{{ color.qty|floatformat:0 }} pcs</div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="empty-note">No {{ style.label }} sales in this period.</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+
+            <div class="stock-decision-card">
+                <div class="stock-head"><div><h4>Best Combination + Stock Decision</h4><p>Use this only when you need purchasing detail.</p></div></div>
+                <div class="table-scroll"><table class="growth-table" style="min-width:760px;"><thead><tr><th>#</th><th>Type</th><th>Color</th><th>Size</th><th>Demand</th><th>Stock Now</th><th>Coverage</th><th>Decision</th></tr></thead><tbody>
+                {% for r in combo_ranking %}<tr><td>#{{ r.rank }}</td><td><strong>{{ r.style }}</strong></td><td>{{ r.color }}</td><td>{{ r.size }}</td><td>{{ r.qty|floatformat:0 }}</td><td>{{ r.stock|floatformat:0 }}</td><td>{{ r.coverage|floatformat:1 }}x</td><td><strong class="{% if r.action_css == 'danger' %}red{% elif r.action_css == 'success' %}green{% elif r.action_css == 'warning' %}dark{% else %}blue{% endif %}">{{ r.action }}</strong></td></tr>{% empty %}<tr><td colspan="8">No active shirt demand in this period.</td></tr>{% endfor %}
+                </tbody></table></div>
+                <div class="stock-rule">REORDER: stock &lt; 50% of period demand · WATCH: stock &lt; 1x · HEALTHY: 1x–2.5x · HIGH STOCK: &gt; 2.5x.</div>
+            </div>
+        </div>
+    </details>
 </div>
 
 <div class="section-grid">
@@ -730,8 +808,11 @@
                 <div class="metric-value">${{ niron.receivable|floatformat:2 }}</div>
             </div>
             <div class="metric-row">
-                <div class="metric-name">Cloth Sold</div>
-                <div class="metric-value">{{ niron.cloth_sold|floatformat:0 }}</div>
+                <div class="metric-name">Cloth Sold / Demand</div>
+                <div style="text-align:right;">
+                    <div class="metric-value">{{ niron.cloth_sold|floatformat:0 }}</div>
+                    <div style="font-size:10px;color:#7a746b;margin-top:2px;white-space:nowrap;">Pending {{ niron.cloth_pending|floatformat:0 }} · Processing {{ niron.cloth_processing|floatformat:0 }} · Done {{ niron.cloth_done|floatformat:0 }}</div>
+                </div>
             </div>
             <div class="metric-row">
                 <div class="metric-name">Cloth Revenue</div>
@@ -776,8 +857,11 @@
                 <div class="metric-value">${{ kampu.receivable|floatformat:2 }}</div>
             </div>
             <div class="metric-row">
-                <div class="metric-name">Cloth Sold</div>
-                <div class="metric-value">{{ kampu.cloth_sold|floatformat:0 }}</div>
+                <div class="metric-name">Cloth Sold / Demand</div>
+                <div style="text-align:right;">
+                    <div class="metric-value">{{ kampu.cloth_sold|floatformat:0 }}</div>
+                    <div style="font-size:10px;color:#7a746b;margin-top:2px;white-space:nowrap;">Pending {{ kampu.cloth_pending|floatformat:0 }} · Processing {{ kampu.cloth_processing|floatformat:0 }} · Done {{ kampu.cloth_done|floatformat:0 }}</div>
+                </div>
             </div>
             <div class="metric-row">
                 <div class="metric-name">Cloth Revenue</div>
@@ -818,8 +902,11 @@
                 <div class="metric-value">${{ total.receivable|floatformat:2 }}</div>
             </div>
             <div class="metric-row">
-                <div class="metric-name">Cloth Sold</div>
-                <div class="metric-value">{{ total.cloth_sold|floatformat:0 }}</div>
+                <div class="metric-name">Cloth Sold / Demand</div>
+                <div style="text-align:right;">
+                    <div class="metric-value">{{ total.cloth_sold|floatformat:0 }}</div>
+                    <div style="font-size:10px;color:#7a746b;margin-top:2px;white-space:nowrap;">Pending {{ total.cloth_pending|floatformat:0 }} · Processing {{ total.cloth_processing|floatformat:0 }} · Done {{ total.cloth_done|floatformat:0 }}</div>
+                </div>
             </div>
             <div class="metric-row">
                 <div class="metric-name">Cloth Revenue</div>

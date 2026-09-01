@@ -656,9 +656,17 @@ def profit_dashboard(request):
         paid = order_qs.aggregate(total=Sum("paid_amount"))["total"] or Decimal("0")
         receivable = total_amount - deposit - paid
 
-        cloth_qs = item_qs.filter(shirt_item__isnull=False)
+        # Cloth demand counts every active order stage: Pending + Processing + Done.
+        # Cancelled orders are already excluded by base_item_qs above.
+        cloth_qs = item_qs.filter(
+            shirt_item__isnull=False,
+            order__status__in=[Order.STATUS_PENDING, Order.STATUS_PROCESSING, Order.STATUS_DONE],
+        )
         cloth_sold = cloth_qs.aggregate(total=Sum("quantity"))["total"] or Decimal("0")
         cloth_revenue = cloth_qs.aggregate(total=Sum("line_total"))["total"] or Decimal("0")
+        cloth_pending = cloth_qs.filter(order__status=Order.STATUS_PENDING).aggregate(total=Sum("quantity"))["total"] or Decimal("0")
+        cloth_processing = cloth_qs.filter(order__status=Order.STATUS_PROCESSING).aggregate(total=Sum("quantity"))["total"] or Decimal("0")
+        cloth_done = cloth_qs.filter(order__status=Order.STATUS_DONE).aggregate(total=Sum("quantity"))["total"] or Decimal("0")
 
         film_qs = item_qs.filter(film_item__isnull=False)
         film_sold = film_qs.aggregate(total=Sum("film_meter"))["total"] or Decimal("0")
@@ -674,6 +682,9 @@ def profit_dashboard(request):
             "paid": paid,
             "receivable": receivable,
             "cloth_sold": cloth_sold,
+            "cloth_pending": cloth_pending,
+            "cloth_processing": cloth_processing,
+            "cloth_done": cloth_done,
             "cloth_revenue": cloth_revenue,
             "film_sold": film_sold,
             "film_revenue": film_revenue,
@@ -1028,7 +1039,11 @@ def profit_dashboard(request):
     # ==========================================================
     from inventory.models import InventoryBatchItem
 
-    shirt_sales_qs = base_item_qs.filter(shirt_item__isnull=False)
+    # Ranking is demand-based: include Pending + Processing + Done immediately.
+    shirt_sales_qs = base_item_qs.filter(
+        shirt_item__isnull=False,
+        order__status__in=[Order.STATUS_PENDING, Order.STATUS_PROCESSING, Order.STATUS_DONE],
+    )
     total_shirt_qty = shirt_sales_qs.aggregate(total=Sum("quantity"))["total"] or Decimal("0")
 
     def rank_rows(values_qs, label_builder, limit=12):
@@ -1115,6 +1130,82 @@ def profit_dashboard(request):
     for idx, row in enumerate(service_ranking, start=1):
         row["rank"] = idx
 
+    # Per-shirt-style decision detail.  This keeps color/size demand separate
+    # so a popular Oversize color does not distort Polo/Boxy decisions.
+    style_detail_rows = (
+        shirt_sales_qs.values(
+            "shirt_item__sample_style", "shirt_item__name",
+            "color__name", "size__name",
+        )
+        .annotate(qty=Sum("quantity"), revenue=Sum("line_total"))
+        .order_by()
+    )
+
+    style_detail_map = {}
+    preferred_style_order = ["Oversize", "Polo", "Boxy", "Regular"]
+
+    for row in style_detail_rows:
+        raw_style = row.get("shirt_item__sample_style") or ""
+        item_name = (row.get("shirt_item__name") or "").strip()
+        if "regular" in item_name.lower():
+            style_name = "Regular"
+        else:
+            style_name = style_labels.get(raw_style, raw_style.title() if raw_style else "Other")
+
+        bucket = style_detail_map.setdefault(style_name, {
+            "label": style_name, "qty": Decimal("0"), "revenue": Decimal("0"), "colors": {}
+        })
+        qty = _to_decimal(row.get("qty"))
+        revenue = _to_decimal(row.get("revenue"))
+        bucket["qty"] += qty
+        bucket["revenue"] += revenue
+
+        color_name = row.get("color__name") or "No color"
+        color_bucket = bucket["colors"].setdefault(color_name, {
+            "label": color_name, "qty": Decimal("0"), "revenue": Decimal("0"), "sizes": {}
+        })
+        color_bucket["qty"] += qty
+        color_bucket["revenue"] += revenue
+
+        size_name = row.get("size__name") or "No size"
+        color_bucket["sizes"][size_name] = color_bucket["sizes"].get(size_name, Decimal("0")) + qty
+
+    # Always show the main business shirt types, even if one has no sale in the period.
+    for style_name in preferred_style_order:
+        style_detail_map.setdefault(style_name, {
+            "label": style_name, "qty": Decimal("0"), "revenue": Decimal("0"), "colors": {}
+        })
+
+    def _style_sort_key(name):
+        try:
+            return (0, preferred_style_order.index(name))
+        except ValueError:
+            return (1, name.lower())
+
+    shirt_style_details = []
+    for style_name in sorted(style_detail_map, key=_style_sort_key):
+        bucket = style_detail_map[style_name]
+        colors = []
+        for color in sorted(bucket["colors"].values(), key=lambda x: (x["qty"], x["revenue"]), reverse=True):
+            sizes = [
+                {"label": size, "qty": qty}
+                for size, qty in sorted(color["sizes"].items(), key=lambda x: x[1], reverse=True)
+            ]
+            colors.append({
+                "label": color["label"],
+                "qty": color["qty"],
+                "revenue": color["revenue"],
+                "share": (color["qty"] / bucket["qty"] * Decimal("100")) if bucket["qty"] else Decimal("0"),
+                "sizes": sizes,
+            })
+        shirt_style_details.append({
+            "label": bucket["label"],
+            "qty": bucket["qty"],
+            "revenue": bucket["revenue"],
+            "colors": colors,
+            "top_color": colors[0] if colors else None,
+        })
+
     decision_cards = {
         "service": service_ranking[0] if service_ranking else None,
         "style": style_ranking[0] if style_ranking else None,
@@ -1175,6 +1266,7 @@ def profit_dashboard(request):
             "color_ranking": color_ranking,
             "size_ranking": size_ranking,
             "combo_ranking": combo_ranking,
+            "shirt_style_details": shirt_style_details,
             "decision_cards": decision_cards,
         },
     )
