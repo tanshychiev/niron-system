@@ -659,6 +659,52 @@
     </div>
 </div>
 
+<div class="dash-card" id="sales-ranking" style="margin-bottom:20px;">
+    <div class="section-head">
+        <div>
+            <h3 class="section-title">Sales Ranking & Decision Center</h3>
+            <div style="font-size:12px;color:var(--muted);font-weight:800;">Uses the same Date From / Date To filter. Shirt rankings use structured shirt sales only.</div>
+        </div>
+        <div class="section-badge">Decision</div>
+    </div>
+
+    <div class="mini-grid" style="margin-bottom:18px;">
+        <div class="mini-card"><div class="mini-label">Top Service</div><div class="mini-value dark" style="font-size:20px;">{{ decision_cards.service.label|default:"-" }}</div><div class="metric-name">${{ decision_cards.service.revenue|default:0|floatformat:2 }}</div></div>
+        <div class="mini-card"><div class="mini-label">Top Shirt Type</div><div class="mini-value dark" style="font-size:20px;">{{ decision_cards.style.label|default:"-" }}</div><div class="metric-name">{{ decision_cards.style.qty|default:0|floatformat:0 }} pcs</div></div>
+        <div class="mini-card"><div class="mini-label">Top Color / Size</div><div class="mini-value dark" style="font-size:20px;">{{ decision_cards.color.label|default:"-" }} / {{ decision_cards.size.label|default:"-" }}</div><div class="metric-name">Best demand signals</div></div>
+        <div class="mini-card"><div class="mini-label">Stock Attention</div><div class="mini-value {% if decision_cards.reorder_count %}red{% else %}green{% endif %}" style="font-size:20px;">{{ decision_cards.reorder_count }} Reorder</div><div class="metric-name">{{ decision_cards.watch_count }} Watch</div></div>
+    </div>
+
+    <div class="section-grid">
+        <div class="section-card">
+            <h3 class="section-title">Service Ranking</h3>
+            <div class="metric-list">{% for r in service_ranking %}<div class="metric-row"><div class="metric-name">#{{ r.rank }} {{ r.label }}<br><small>{{ r.orders }} orders · {{ r.share|floatformat:1 }}%</small></div><div class="metric-value">${{ r.revenue|floatformat:2 }}</div></div>{% empty %}<div class="metric-name">No sales</div>{% endfor %}</div>
+        </div>
+        <div class="section-card">
+            <h3 class="section-title">Shirt Type Ranking</h3>
+            <div class="metric-list">{% for r in style_ranking %}<div class="metric-row"><div class="metric-name">#{{ r.rank }} {{ r.label }}<br><small>{{ r.share|floatformat:1 }}% of shirt pcs</small></div><div class="metric-value">{{ r.qty|floatformat:0 }} pcs<br><small>${{ r.revenue|floatformat:2 }}</small></div></div>{% empty %}<div class="metric-name">No shirt sales</div>{% endfor %}</div>
+        </div>
+        <div class="section-card">
+            <h3 class="section-title">Color Ranking</h3>
+            <div class="metric-list">{% for r in color_ranking|slice:":8" %}<div class="metric-row"><div class="metric-name">#{{ r.rank }} {{ r.label }}<br><small>{{ r.share|floatformat:1 }}%</small></div><div class="metric-value">{{ r.qty|floatformat:0 }} pcs</div></div>{% empty %}<div class="metric-name">No color sales</div>{% endfor %}</div>
+        </div>
+    </div>
+
+    <div class="section-grid">
+        <div class="section-card">
+            <h3 class="section-title">Size Ranking</h3>
+            <div class="metric-list">{% for r in size_ranking %}<div class="metric-row"><div class="metric-name">#{{ r.rank }} {{ r.label }}<br><small>{{ r.share|floatformat:1 }}%</small></div><div class="metric-value">{{ r.qty|floatformat:0 }} pcs</div></div>{% empty %}<div class="metric-name">No size sales</div>{% endfor %}</div>
+        </div>
+        <div class="section-card" style="grid-column:span 2;">
+            <h3 class="section-title">Best Combination + Stock Decision</h3>
+            <div class="table-scroll"><table class="growth-table" style="min-width:760px;"><thead><tr><th>#</th><th>Type</th><th>Color</th><th>Size</th><th>Sold</th><th>Revenue</th><th>Stock Now</th><th>Coverage</th><th>Decision</th></tr></thead><tbody>
+            {% for r in combo_ranking %}<tr><td>#{{ r.rank }}</td><td><strong>{{ r.style }}</strong></td><td>{{ r.color }}</td><td>{{ r.size }}</td><td>{{ r.qty|floatformat:0 }}</td><td>${{ r.revenue|floatformat:2 }}</td><td>{{ r.stock|floatformat:0 }}</td><td>{{ r.coverage|floatformat:1 }}x</td><td><strong class="{% if r.action_css == 'danger' %}red{% elif r.action_css == 'success' %}green{% elif r.action_css == 'warning' %}dark{% else %}blue{% endif %}">{{ r.action }}</strong></td></tr>{% empty %}<tr><td colspan="9">No shirt combination sales in this period.</td></tr>{% endfor %}
+            </tbody></table></div>
+            <div style="margin-top:12px;font-size:12px;color:var(--muted);font-weight:800;">REORDER = stock below 50% of selected-period sales · WATCH = below 1x · HEALTHY = 1x–2.5x · HIGH STOCK = above 2.5x.</div>
+        </div>
+    </div>
+</div>
+
 <div class="section-grid">
     <div class="section-card">
         <div class="section-head">

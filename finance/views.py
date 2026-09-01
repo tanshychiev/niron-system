@@ -1022,6 +1022,109 @@ def profit_dashboard(request):
         else f"{growth_from.strftime('%b %Y')} – {growth_to.strftime('%b %Y')}"
     )
 
+    # ==========================================================
+    # SALES RANKING + STOCK DECISION (same Profit Dashboard)
+    # Uses the main Date From/To filter above.
+    # ==========================================================
+    from inventory.models import InventoryBatchItem
+
+    shirt_sales_qs = base_item_qs.filter(shirt_item__isnull=False)
+    total_shirt_qty = shirt_sales_qs.aggregate(total=Sum("quantity"))["total"] or Decimal("0")
+
+    def rank_rows(values_qs, label_builder, limit=12):
+        rows = []
+        for idx, row in enumerate(values_qs[:limit], start=1):
+            qty = _to_decimal(row.get("qty"))
+            revenue = _to_decimal(row.get("revenue"))
+            rows.append({
+                "rank": idx,
+                "label": label_builder(row),
+                "qty": qty,
+                "revenue": revenue,
+                "share": (qty / total_shirt_qty * Decimal("100")) if total_shirt_qty else Decimal("0"),
+            })
+        return rows
+
+    style_values = (
+        shirt_sales_qs.values("shirt_item__sample_style")
+        .annotate(qty=Sum("quantity"), revenue=Sum("line_total"))
+        .order_by("-qty", "-revenue")
+    )
+    style_labels = {"OVERSIZE": "Oversize", "POLO": "Polo", "BOXY": "Boxy", "": "Other"}
+    style_ranking = rank_rows(style_values, lambda r: style_labels.get(r["shirt_item__sample_style"] or "", r["shirt_item__sample_style"] or "Other"))
+
+    color_values = (
+        shirt_sales_qs.filter(color__isnull=False).values("color__name")
+        .annotate(qty=Sum("quantity"), revenue=Sum("line_total"))
+        .order_by("-qty", "-revenue")
+    )
+    color_ranking = rank_rows(color_values, lambda r: r["color__name"] or "No color")
+
+    size_values = (
+        shirt_sales_qs.filter(size__isnull=False).values("size__name")
+        .annotate(qty=Sum("quantity"), revenue=Sum("line_total"))
+        .order_by("-qty", "-revenue")
+    )
+    size_ranking = rank_rows(size_values, lambda r: r["size__name"] or "No size")
+
+    combo_values = (
+        shirt_sales_qs.filter(color__isnull=False, size__isnull=False)
+        .values(
+            "shirt_item_id", "shirt_item__name", "shirt_item__sample_style",
+            "color_id", "color__name", "size_id", "size__name",
+        )
+        .annotate(qty=Sum("quantity"), revenue=Sum("line_total"))
+        .order_by("-qty", "-revenue")
+    )
+    combo_ranking = []
+    for idx, row in enumerate(combo_values[:15], start=1):
+        stock = (
+            InventoryBatchItem.objects.filter(
+                item_id=row["shirt_item_id"], color_id=row["color_id"], size_id=row["size_id"],
+                is_active=True, batch__is_deleted=False,
+            ).aggregate(total=Sum("qty_remaining"))["total"] or Decimal("0")
+        )
+        qty = _to_decimal(row["qty"])
+        if qty <= 0:
+            action, action_css = "No sales", "same"
+        elif stock < qty * Decimal("0.50"):
+            action, action_css = "REORDER", "danger"
+        elif stock < qty:
+            action, action_css = "WATCH", "warning"
+        elif stock > qty * Decimal("2.50"):
+            action, action_css = "HIGH STOCK", "info"
+        else:
+            action, action_css = "HEALTHY", "success"
+        style = style_labels.get(row["shirt_item__sample_style"] or "", row["shirt_item__sample_style"] or row["shirt_item__name"] or "Shirt")
+        combo_ranking.append({
+            "rank": idx, "style": style, "color": row["color__name"], "size": row["size__name"],
+            "qty": qty, "revenue": _to_decimal(row["revenue"]), "stock": stock,
+            "coverage": (stock / qty) if qty else Decimal("0"), "action": action, "action_css": action_css,
+        })
+
+    service_ranking = []
+    selected_revenue = base_order_qs.aggregate(total=Sum("total_amount"))["total"] or Decimal("0")
+    for key, service_code, label in service_definitions:
+        qs = base_order_qs.filter(service_type=service_code)
+        revenue = qs.aggregate(total=Sum("total_amount"))["total"] or Decimal("0")
+        service_ranking.append({
+            "label": label, "orders": qs.count(), "revenue": revenue,
+            "share": (revenue / selected_revenue * Decimal("100")) if selected_revenue else Decimal("0"),
+        })
+    service_ranking.sort(key=lambda x: (x["revenue"], x["orders"]), reverse=True)
+    for idx, row in enumerate(service_ranking, start=1):
+        row["rank"] = idx
+
+    decision_cards = {
+        "service": service_ranking[0] if service_ranking else None,
+        "style": style_ranking[0] if style_ranking else None,
+        "color": color_ranking[0] if color_ranking else None,
+        "size": size_ranking[0] if size_ranking else None,
+        "combo": combo_ranking[0] if combo_ranking else None,
+        "reorder_count": sum(1 for row in combo_ranking if row["action"] == "REORDER"),
+        "watch_count": sum(1 for row in combo_ranking if row["action"] == "WATCH"),
+    }
+
     return render(
         request,
         "finance/profit_dashboard.html",
@@ -1067,6 +1170,12 @@ def profit_dashboard(request):
             "monthly_profit_growth_values": monthly_profit_growth_values,
             "niron_service_chart": niron_service_chart,
             "kampu_service_chart": kampu_service_chart,
+            "service_ranking": service_ranking,
+            "style_ranking": style_ranking,
+            "color_ranking": color_ranking,
+            "size_ranking": size_ranking,
+            "combo_ranking": combo_ranking,
+            "decision_cards": decision_cards,
         },
     )
 @login_required
