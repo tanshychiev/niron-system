@@ -51,6 +51,7 @@ class FabricReceiptForm(forms.ModelForm):
             "fabric_type",
             "color",
             "roll_count",
+            "borib_kg",
             "note",
         ]
         widgets = {
@@ -69,6 +70,7 @@ class FabricReceiptForm(forms.ModelForm):
             "color": forms.Select(
                 attrs={"class": "form-select"}
             ),
+            "borib_kg": forms.NumberInput(attrs={"class": "form-control", "min": "0", "step": "0.001"}),
             "roll_count": forms.NumberInput(
                 attrs={
                     "class": "form-control",
@@ -152,6 +154,16 @@ class FabricReceiptLineForm(forms.Form):
                 "class": "form-select color-select",
             }
         ),
+    )
+
+    borib_kg = forms.DecimalField(
+        required=False,
+        min_value=Decimal("0"),
+        decimal_places=3,
+        max_digits=10,
+        initial=Decimal("0"),
+        widget=forms.NumberInput(attrs={"class": "form-control", "min": "0", "step": "0.001", "placeholder": "0.000"}),
+        help_text="Borib KG for this same fabric colour.",
     )
 
     roll_count = forms.IntegerField(

@@ -32,6 +32,8 @@ from .forms import (
 )
 from .models import (
     CuttingRollUsage,
+    CuttingBoribUsage,
+    BoribStock,
     CuttingSizeLine,
     FabricReceipt,
     FabricRoll,
@@ -244,8 +246,14 @@ def material_stock(request):
             elif roll.status == FabricRoll.STATUS_PARTIAL:
                 group["partial_count"] += 1
 
+    borib_stocks = BoribStock.objects.select_related("color").filter(quantity_kg__gt=0)
+    if q:
+        borib_stocks = borib_stocks.filter(color__name__icontains=q)
+
     return render(request, "production/material_stock.html", {
         "roll_groups": list(grouped.values()),
+        "borib_stocks": borib_stocks.order_by("color__name"),
+        "borib_total_kg": borib_stocks.aggregate(total=Sum("quantity_kg"))["total"] or Decimal("0"),
         "q": q,
         "full_count": available.filter(status=FabricRoll.STATUS_FULL).count(),
         "partial_count": available.filter(status=FabricRoll.STATUS_PARTIAL).count(),
@@ -280,6 +288,7 @@ def fabric_receipt_create(request):
                         fabric_name=data["fabric_type"].name,
                         color=data["color"],
                         roll_count=data["roll_count"],
+                        borib_kg=data.get("borib_kg") or Decimal("0"),
                         total_goods_cost=data.get("total_goods_cost") or Decimal("0"),
                         shipping_cost=data.get("shipping_cost") or Decimal("0"),
                         extra_cost=data.get("extra_cost") or Decimal("0"),
@@ -289,6 +298,13 @@ def fabric_receipt_create(request):
                     )
                     receipt.save()
                     create_fabric_rolls(receipt, data["roll_weights_list"])
+                    borib_qty = Decimal(receipt.borib_kg or 0)
+                    if borib_qty > 0:
+                        borib_stock, _ = BoribStock.objects.select_for_update().get_or_create(
+                            color=receipt.color, defaults={"quantity_kg": Decimal("0")}
+                        )
+                        borib_stock.quantity_kg = Decimal(borib_stock.quantity_kg or 0) + borib_qty
+                        borib_stock.save(update_fields=["quantity_kg", "updated_at"])
                     created_receipts.append(receipt)
                     total_rolls += receipt.roll_count
                     saved_lines += 1
@@ -408,11 +424,29 @@ def fabric_receipt_detail(request, pk):
 def fabric_receipt_edit(request, pk):
     receipt = get_object_or_404(FabricReceipt, pk=pk)
     if request.method == "POST":
+        old_borib_kg = Decimal(receipt.borib_kg or 0)
+        old_color_id = receipt.color_id
         form = FabricReceiptForm(request.POST, instance=receipt, user=request.user)
         if form.is_valid():
-            obj = form.save(commit=False)
-            obj.updated_by = request.user
-            obj.save()
+            with transaction.atomic():
+                obj = form.save(commit=False)
+                obj.updated_by = request.user
+                new_borib_kg = Decimal(obj.borib_kg or 0)
+                # Return the old receipt's Borib to its old colour, then apply the edited amount.
+                if old_color_id:
+                    old_stock, _ = BoribStock.objects.select_for_update().get_or_create(
+                        color_id=old_color_id, defaults={"quantity_kg": Decimal("0")}
+                    )
+                    old_stock.quantity_kg = Decimal(old_stock.quantity_kg or 0) - old_borib_kg
+                    if old_stock.quantity_kg < 0:
+                        raise ValidationError("Borib stock has already been consumed; this receipt cannot reduce it below zero.")
+                    old_stock.save(update_fields=["quantity_kg", "updated_at"])
+                obj.save()
+                new_stock, _ = BoribStock.objects.select_for_update().get_or_create(
+                    color=obj.color, defaults={"quantity_kg": Decimal("0")}
+                )
+                new_stock.quantity_kg = Decimal(new_stock.quantity_kg or 0) + new_borib_kg
+                new_stock.save(update_fields=["quantity_kg", "updated_at"])
             messages.success(request, "Fabric receipt updated.")
             return redirect("production_material_stock")
     else:
@@ -798,8 +832,16 @@ def project_detail(request, pk):
         partial_available = sum(1 for r in available_rolls if r.status == FabricRoll.STATUS_PARTIAL or Decimal(r.available_qty or 0) < 1)
         available_equivalent = sum((Decimal(r.available_qty or 0) for r in available_rolls), Decimal("0"))
 
+        borib_stock = BoribStock.objects.filter(color_id=pc.color_id).first()
+        try:
+            borib_usage = pc.borib_usage
+        except CuttingBoribUsage.DoesNotExist:
+            borib_usage = None
+
         color_rows.append({
             "pc": pc,
+            "borib_stock_kg": Decimal(borib_stock.quantity_kg or 0) if borib_stock else Decimal("0"),
+            "borib_used_kg": Decimal(borib_usage.quantity_kg or 0) if borib_usage else Decimal("0"),
             "rows": rows,
             "rolls": reserved_rolls,
             "available_rolls": available_rolls,
@@ -1365,6 +1407,43 @@ def project_confirm_cutting(request, pk):
                     usage.returned_qty = returned
                     usage.save(update_fields=["returned_qty"])
                     amount_left -= returned
+
+            # Deduct Borib by the exact production colour. If cutting was reopened,
+            # only apply the difference from the previously confirmed Borib usage.
+            for pc in project.project_colors.select_related("color").all():
+                raw_borib = request.POST.get(f"borib_kg_{pc.id}", "0")
+                try:
+                    new_borib = Decimal(str(raw_borib or "0")).quantize(Decimal("0.001"))
+                except (InvalidOperation, TypeError, ValueError):
+                    raise ValidationError(f"Enter a valid Borib KG for {pc.color.name}.")
+                if new_borib < 0:
+                    raise ValidationError(f"{pc.color.name}: Borib KG cannot be negative.")
+
+                existing = CuttingBoribUsage.objects.select_for_update().filter(project_color=pc).first()
+                old_borib = Decimal(existing.quantity_kg or 0) if existing else Decimal("0")
+                delta = new_borib - old_borib
+                stock, _ = BoribStock.objects.select_for_update().get_or_create(
+                    color=pc.color, defaults={"quantity_kg": Decimal("0")}
+                )
+                before = Decimal(stock.quantity_kg or 0)
+                after = before - delta
+                if after < 0:
+                    raise ValidationError(
+                        f"Not enough {pc.color.name} Borib. Available {before.normalize()} KG; "
+                        f"additional required {delta.normalize()} KG."
+                    )
+                stock.quantity_kg = after
+                stock.save(update_fields=["quantity_kg", "updated_at"])
+                if existing:
+                    existing.quantity_kg = new_borib
+                    existing.stock_qty_before = before
+                    existing.stock_qty_after = after
+                    existing.save(update_fields=["quantity_kg", "stock_qty_before", "stock_qty_after", "updated_at"])
+                elif new_borib > 0:
+                    CuttingBoribUsage.objects.create(
+                        project=project, project_color=pc, quantity_kg=new_borib,
+                        stock_qty_before=before, stock_qty_after=after,
+                    )
 
             for usage in usages:
                 roll = FabricRoll.objects.select_for_update().get(

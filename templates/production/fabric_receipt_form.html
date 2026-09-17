@@ -499,6 +499,10 @@
                   <label>Roll Count</label>
                   {{ line_form.roll_count }}
                 </div>
+                <div class="field">
+                  <label>Borib (KG) · same colour</label>
+                  {{ line_form.borib_kg }}
+                </div>
 
                 {% if can_view_cost %}
                 <div class="field cost-field">
@@ -550,6 +554,10 @@
               <div class="field">
                 <label>Roll Count</label>
                 {{ line_formset.empty_form.roll_count }}
+              </div>
+              <div class="field">
+                <label>Borib (KG) · same colour</label>
+                {{ line_formset.empty_form.borib_kg }}
               </div>
 
               {% if can_view_cost %}

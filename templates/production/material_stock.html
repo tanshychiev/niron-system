@@ -11,10 +11,18 @@
     <div class="prod-card prod-metric"><span>Full Rolls</span><strong>{{ full_count }}</strong></div>
     <div class="prod-card prod-metric"><span>Partial Rolls</span><strong>{{ partial_count }}</strong></div>
     <div class="prod-card prod-metric"><span>Total Roll Rows</span><strong>{{ physical_count }}</strong></div>
-    <div class="prod-card prod-metric"><span>Equivalent Rolls</span><strong>{{ equivalent_total|floatformat:"-3" }}</strong></div>
+    <div class="prod-card prod-metric"><span>Fabric KG</span><strong>{{ equivalent_total|floatformat:"-3" }}</strong></div>
+    <div class="prod-card prod-metric"><span>Borib Stock</span><strong>{{ borib_total_kg|floatformat:"-3" }} KG</strong></div>
     {% if can_view_cost %}<div class="prod-card prod-metric cost-box"><span>Remaining Value</span><strong>${{ remaining_value|floatformat:2 }}</strong></div>{% endif %}
   </div>
   <form class="prod-card search-form" method="get"><input name="q" value="{{ q }}" placeholder="Fabric, colour or supplier"><button class="btn-primary">Search</button><a class="btn-light" href="{% url 'production_material_stock' %}">Reset</a></form>
+
+  <div class="prod-card" style="margin-bottom:14px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><strong>Borib Inventory</strong><span class="pill good">Matched by fabric colour</span></div>
+    <div class="child-table-wrap"><table class="child-table" style="min-width:500px"><thead><tr><th>Colour</th><th class="num">Borib Stock (KG)</th></tr></thead><tbody>
+      {% for stock in borib_stocks %}<tr><td><span class="swatch" style="display:inline-block;vertical-align:middle;margin-right:8px;background:{{ stock.color.hex_code|default:'#D1D5DB' }}"></span><strong>{{ stock.color.name }}</strong></td><td class="num"><strong>{{ stock.quantity_kg|floatformat:"-3" }} KG</strong></td></tr>{% empty %}<tr><td colspan="2" class="empty">No Borib stock yet. Add Borib KG when receiving fabric.</td></tr>{% endfor %}
+    </tbody></table></div>
+  </div>
 
   <div class="group-list">
     {% for group in roll_groups %}

@@ -120,6 +120,7 @@ class FabricReceipt(models.Model):
         related_name="production_fabric_receipts",
     )
     roll_count = models.PositiveIntegerField(default=1)
+    borib_kg = models.DecimalField(max_digits=10, decimal_places=3, default=ZERO, validators=[MinValueValidator(ZERO)])
     total_goods_cost = models.DecimalField(max_digits=14, decimal_places=2, default=ZERO)
     shipping_cost = models.DecimalField(max_digits=14, decimal_places=2, default=ZERO)
     extra_cost = models.DecimalField(max_digits=14, decimal_places=2, default=ZERO)
@@ -301,6 +302,50 @@ class FabricRoll(models.Model):
     @property
     def remaining_value(self):
         return Decimal(self.remaining_qty or 0) * self.unit_cost
+
+
+class BoribStock(models.Model):
+    """Current Borib stock, tracked in KG and matched strictly by fabric colour."""
+    color = models.OneToOneField(
+        "inventory.Color", on_delete=models.PROTECT, related_name="borib_stock"
+    )
+    quantity_kg = models.DecimalField(
+        max_digits=12, decimal_places=3, default=ZERO, validators=[MinValueValidator(ZERO)]
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["color__name"]
+
+    def __str__(self):
+        return f"{self.color.name} Borib: {self.quantity_kg} KG"
+
+
+class CuttingBoribUsage(models.Model):
+    """Borib consumed by one production colour when cutting is finished."""
+    project = models.ForeignKey(
+        "ProductionProject", on_delete=models.CASCADE, related_name="borib_usages"
+    )
+    project_color = models.OneToOneField(
+        "ProductionProjectColor", on_delete=models.CASCADE, related_name="borib_usage"
+    )
+    quantity_kg = models.DecimalField(
+        max_digits=10, decimal_places=3, default=ZERO, validators=[MinValueValidator(ZERO)]
+    )
+    stock_qty_before = models.DecimalField(max_digits=12, decimal_places=3, default=ZERO)
+    stock_qty_after = models.DecimalField(max_digits=12, decimal_places=3, default=ZERO)
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["id"]
+
+    def clean(self):
+        if self.project_color_id and self.project_id and self.project_color.project_id != self.project_id:
+            raise ValidationError("Borib colour must belong to the same production project.")
+
+    def __str__(self):
+        return f"{self.project.project_no} / {self.project_color.color.name}: {self.quantity_kg} KG"
 
 
 class SewingPartner(models.Model):

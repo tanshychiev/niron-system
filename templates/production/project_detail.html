@@ -1105,6 +1105,17 @@ function changeRollCount(button, delta){
         {% endfor %}
       </div>
 
+      <div class="fabric-return-card total-return-card" style="margin-top:12px">
+        <div>
+          <strong>{{ row.pc.color.name }} Borib used</strong>
+          <div class="sub">Borib must match this fabric colour. Current stock: <strong>{{ row.borib_stock_kg|floatformat:"-3" }} KG</strong>.</div>
+        </div>
+        <div class="field">
+          <label>Borib used (KG)</label>
+          <input type="number" step="0.001" min="0" name="borib_kg_{{ row.pc.id }}" value="{{ row.borib_used_kg|floatformat:'-3' }}" {% if project.cutting_is_complete %}readonly{% endif %}>
+        </div>
+      </div>
+
       {% if row.reserved_count %}
         {% if not project.cutting_is_complete %}
         <div class="fabric-return-card total-return-card">
