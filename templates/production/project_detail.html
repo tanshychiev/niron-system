@@ -822,9 +822,16 @@ function changeRollCount(button, delta){
     </div>
   </div>
 
+  <div class="material-selection-summary" id="materialSelectionSummary">
+    <span class="material-summary-label">MATERIAL SUMMARY</span>
+    <strong><span id="totalFabricRolls">0</span> Fabric Rolls</strong>
+    <span class="material-summary-sep">•</span>
+    <strong><span id="totalBoribKg">0.000</span> KG Borib</strong>
+  </div>
+
   <div class="simple-fabric-list">
     {% for row in color_rows %}
-    <div class="simple-fabric-row">
+    <div class="simple-fabric-row" data-fabric-rolls="{{ row.reserved_count|default:0 }}">
       <div class="simple-fabric-info">
         <div class="simple-fabric-title">
           <span class="color-dot"
@@ -840,6 +847,36 @@ function changeRollCount(button, delta){
           {% if row.reserved_count %}
             <span>• {{ row.reserved_count }} selected</span>
           {% endif %}
+        </div>
+
+        <div class="simple-borib-line">
+          <div class="simple-borib-left">
+            <div class="simple-borib-badge">BORIB</div>
+            <span class="color-dot simple-borib-dot" style="display:inline-block;background:{{ row.pc.color.hex_code }}"></span>
+            <div class="simple-borib-info">
+              <div class="simple-borib-name">{{ row.pc.color.name }} Borib</div>
+              <div class="simple-borib-available">Available <b>{{ row.borib_stock_kg|floatformat:"-3" }} KG</b></div>
+              <div class="simple-borib-row-summary"><b>{{ row.reserved_count|default:0 }}</b> Fabric Rolls <span>•</span> <b data-row-borib-summary>{{ row.borib_used_kg|floatformat:'-3' }}</b> KG Borib</div>
+            </div>
+          </div>
+          <div class="simple-borib-input">
+            <label for="boribTop{{ row.pc.id }}">USED</label>
+            <div class="simple-borib-field">
+              <input
+                id="boribTop{{ row.pc.id }}"
+                form="cuttingForm"
+                type="number"
+                step="0.001"
+                min="0"
+                max="{{ row.borib_stock_kg|add:row.borib_used_kg }}"
+                name="borib_kg_{{ row.pc.id }}"
+                value="{{ row.borib_used_kg|floatformat:'-3' }}"
+                placeholder="0.000"
+                {% if project.cutting_is_complete %}readonly{% endif %}
+              >
+              <span>KG</span>
+            </div>
+          </div>
         </div>
 
         {% if row.rolls %}
@@ -1103,17 +1140,6 @@ function changeRollCount(button, delta){
         </div>
         {% endif %}
         {% endfor %}
-      </div>
-
-      <div class="fabric-return-card total-return-card" style="margin-top:12px">
-        <div>
-          <strong>{{ row.pc.color.name }} Borib used</strong>
-          <div class="sub">Borib must match this fabric colour. Current stock: <strong>{{ row.borib_stock_kg|floatformat:"-3" }} KG</strong>.</div>
-        </div>
-        <div class="field">
-          <label>Borib used (KG)</label>
-          <input type="number" step="0.001" min="0" name="borib_kg_{{ row.pc.id }}" value="{{ row.borib_used_kg|floatformat:'-3' }}" {% if project.cutting_is_complete %}readonly{% endif %}>
-        </div>
       </div>
 
       {% if row.reserved_count %}
@@ -4790,6 +4816,57 @@ body.fabric-modal-open{overflow:hidden}
 
 
 <style>
+/* Borib usage is tied to the same production colour as the selected fabric. */
+.simple-borib-line{
+  margin-top:10px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  min-height:54px;
+  padding:8px 10px;
+  border:1px solid #eadfc9;
+  border-radius:11px;
+  background:#fffaf0;
+}
+.simple-borib-left{display:flex;align-items:center;gap:9px;min-width:0;}
+.simple-borib-badge{font-size:9px;font-weight:800;letter-spacing:.06em;color:#8a641c;background:#f8e8bc;border:1px solid #efd28a;border-radius:6px;padding:4px 6px;line-height:1;}
+.simple-borib-dot{width:12px!important;height:12px!important;min-width:12px;border:1px solid rgba(0,0,0,.15);border-radius:50%;}
+.simple-borib-info{display:flex;align-items:baseline;gap:9px;min-width:0;font-size:12px;}
+.simple-borib-info strong{font-size:12px;color:#241d14;white-space:nowrap;}
+.simple-borib-available{font-size:11px;color:#7b6d5a;white-space:nowrap;}
+.simple-borib-available b{color:#4b3b24;font-weight:800;}
+.simple-borib-input{display:flex;align-items:center;gap:7px;white-space:nowrap;}
+.simple-borib-input label{font-size:9px;font-weight:800;letter-spacing:.05em;color:#8a7658;margin:0;}
+.simple-borib-field{display:flex;align-items:center;height:34px;border:1px solid #ddcba9;border-radius:8px;background:#fff;overflow:hidden;}
+.simple-borib-field input{width:84px;height:32px;padding:6px 8px;border:0!important;border-radius:0!important;background:transparent!important;outline:none;font-size:12px;font-weight:700;}
+.simple-borib-field span{padding:0 8px 0 2px;font-size:10px;font-weight:700;color:#8a7658;}
+.simple-borib-field:focus-within{border-color:#e2aa28;box-shadow:0 0 0 2px rgba(226,170,40,.12);}
+@media (max-width:760px){
+  .simple-borib-line{align-items:stretch;flex-direction:column;gap:8px;}
+  .simple-borib-info{flex-wrap:wrap;gap:4px 8px;}
+  .simple-borib-input{width:100%;justify-content:flex-end;}
+}
+
+
+.material-selection-summary{display:flex;align-items:center;gap:10px;margin:0 0 12px;padding:12px 14px;border:1px solid #e6d2a7;border-radius:12px;background:#fff7e4;color:#342818;}
+.material-summary-label{font-size:10px;font-weight:900;letter-spacing:.08em;color:#9b6b00;background:#ffe8a6;padding:5px 8px;border-radius:7px;}
+.material-selection-summary strong{font-size:14px;font-weight:900;}
+.material-summary-sep{color:#b59a67;}
+.simple-borib-line{min-height:76px!important;padding:12px 14px!important;border:2px solid #e7c16d!important;background:linear-gradient(180deg,#fff9e9,#fff5dc)!important;}
+.simple-borib-badge{font-size:11px!important;padding:6px 9px!important;background:#f4c95d!important;color:#5b3b00!important;border-color:#dba72a!important;}
+.simple-borib-dot{width:16px!important;height:16px!important;min-width:16px!important;}
+.simple-borib-info{display:grid!important;grid-template-columns:auto auto;column-gap:12px!important;row-gap:3px!important;align-items:center!important;}
+.simple-borib-name{font-size:14px;font-weight:900;color:#21180c;white-space:nowrap;}
+.simple-borib-available{font-size:12px!important;}
+.simple-borib-row-summary{grid-column:1 / -1;font-size:12px;color:#6d5632;font-weight:700;}
+.simple-borib-row-summary b{font-size:13px;color:#3d2b0e;}
+.simple-borib-row-summary span{padding:0 5px;color:#c29432;}
+.simple-borib-input label{font-size:10px!important;color:#76520d!important;}
+.simple-borib-field{height:42px!important;border:2px solid #dca72d!important;border-radius:10px!important;}
+.simple-borib-field input{width:105px!important;height:38px!important;font-size:14px!important;font-weight:900!important;}
+.simple-borib-field span{font-size:11px!important;font-weight:900!important;}
+
 /* Critical: filtered roll rows must actually disappear.
    The .fabric-modal-roll { display:grid } rule was overriding the HTML hidden state. */
 .fabric-modal-roll[hidden]{
