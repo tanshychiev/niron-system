@@ -734,11 +734,11 @@
             <div class="panel-title">
               <span class="panel-icon">＄</span>
               <div>
-                <h2>Purchase Cost <span style="color:var(--stock-red);font-weight:900">Required</span></h2>
-                <small>Goods Cost is required. Delivery Fee and Extra Cost can be 0.</small>
+                <h2>Purchase Cost <span style="color:var(--muted);font-weight:800">Optional</span></h2>
+                <small>You can skip cost now and add or edit it later.</small>
               </div>
             </div>
-            <span class="cost-status" id="inventoryCostStatus">Cost missing</span>
+            <span class="cost-status" id="inventoryCostStatus">Cost skipped</span>
           </div>
 
           <div class="cost-grid">
@@ -877,11 +877,11 @@
             <div class="panel-title">
               <span class="panel-icon">＄</span>
               <div>
-                <h2>Purchase Cost <span style="color:var(--stock-red);font-weight:900">Required</span></h2>
-                <small>Goods Cost is required. Delivery Fee and Extra Cost can be 0.</small>
+                <h2>Purchase Cost <span style="color:var(--muted);font-weight:800">Optional</span></h2>
+                <small>You can skip cost now and add or edit it later.</small>
               </div>
             </div>
-            <span class="cost-status" id="fabricCostStatus">Cost missing</span>
+            <span class="cost-status" id="fabricCostStatus">Cost skipped</span>
           </div>
 
           <div class="cost-grid">
@@ -1640,13 +1640,13 @@
       if(summaryFabricKg) summaryFabricKg.textContent=totalKg.toFixed(2);
       document.getElementById('fabricRowCount').textContent=rows.length;
       document.getElementById('summaryCostTotal').textContent=cost.toFixed(2);
-      document.getElementById('summaryCostStatus').textContent=cost>0?'Filled':'Missing';
+      document.getElementById('summaryCostStatus').textContent=cost>0?'Filled':'Skipped';
 
       const fabricCostTotal=document.getElementById('fabricCostTotal');
       if(fabricCostTotal) fabricCostTotal.textContent=cost.toFixed(2);
       const fabricCostStatus=document.getElementById('fabricCostStatus');
       if(fabricCostStatus){
-        fabricCostStatus.textContent=cost>0?'Cost added':'Cost missing';
+        fabricCostStatus.textContent=cost>0?'Cost added':'Cost skipped';
         fabricCostStatus.classList.toggle('filled',cost>0);
       }
       return;
@@ -1667,10 +1667,10 @@
     document.getElementById('inventoryRowCount').textContent=rows.length;
     document.getElementById('inventoryCostTotal').textContent=cost.toFixed(2);
     document.getElementById('summaryCostTotal').textContent=cost.toFixed(2);
-    document.getElementById('summaryCostStatus').textContent=cost>0?'Filled':'Missing';
+    document.getElementById('summaryCostStatus').textContent=cost>0?'Filled':'Skipped';
 
     const badge=document.getElementById('inventoryCostStatus');
-    badge.textContent=cost>0?'✓ Cost filled':'Cost missing';
+    badge.textContent=cost>0?'✓ Cost filled':'Cost skipped';
     badge.classList.toggle('filled',cost>0);
   }
 

@@ -1000,9 +1000,10 @@ def inventory_batch_create(request):
                 except Exception:
                     fabric_goods_cost = fabric_shipping_cost = fabric_extra_cost = Decimal("-1")
 
-                # Purchased stock must carry its purchase cost. Production Stock In never uses this form.
-                if fabric_goods_cost <= 0 or fabric_shipping_cost < 0 or fabric_extra_cost < 0:
-                    message = "Failed: Goods Cost is required and must be greater than 0. Delivery/Extra Cost can be 0."
+                # Cost is optional at Stock In/Purchase time. Staff can skip it and Finance can edit it later.
+                # Negative values are still invalid.
+                if fabric_goods_cost < 0 or fabric_shipping_cost < 0 or fabric_extra_cost < 0:
+                    message = "Failed: Purchase cost cannot be negative. You can leave cost at 0 and add it later."
                     if request.headers.get("x-requested-with") == "XMLHttpRequest":
                         transaction.set_rollback(True)
                         return JsonResponse({"ok": False, "message": message}, status=400)
@@ -1129,20 +1130,7 @@ def inventory_batch_create(request):
             is_purchase = submit_action == "save_purchase"
 
             batch = form.save(commit=False)
-            if Decimal(batch.total_goods_cost or 0) <= 0:
-                message = "Failed: Goods Cost is required and must be greater than 0. Delivery/Extra Cost can be 0."
-                if request.headers.get("x-requested-with") == "XMLHttpRequest":
-                    transaction.set_rollback(True)
-                    return JsonResponse({"ok": False, "message": message}, status=400)
-                messages.error(request, message)
-                return render(request, "inventory/inventory_batch_form.html", {
-                    "form": form, "formset": formset,
-                    "fabric_header_form": FabricReceiptHeaderForm(initial={"received_date": timezone.localdate()}),
-                    "fabric_formset": fabric_receipt_line_formset(user=request.user, prefix="fabric_items"),
-                    "stock_type": stock_type, "page_title": "Stock In", "submit_label": "Stock In Now",
-                    "items": InventoryItem.objects.filter(is_active=True).order_by("code", "name"),
-                    "can_view_stock_cost": _can_view_stock_cost(request.user),
-                })
+            # Purchase cost may be left at 0 during Stock In and added/edited later.
 
             batch.status = InventoryBatch.STATUS_COMING_SOON if is_purchase else InventoryBatch.STATUS_RECEIVED
             batch.expected_date = form.cleaned_data.get("received_date") if is_purchase else None

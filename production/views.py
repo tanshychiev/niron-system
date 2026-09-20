@@ -73,6 +73,14 @@ def _active_sizes():
     return Size.objects.filter(is_active=True).order_by("sort_order", "id")
 
 
+def _validate_borib_required_for_cut(color_name, cut_qty, borib_kg):
+    """Every colour with cut pieces must consume matching-colour Borib."""
+    if int(cut_qty or 0) > 0 and Decimal(borib_kg or 0) <= 0:
+        raise ValidationError(
+            f"{color_name}: Borib is required when fabric is used for production. Enter Borib used (KG)."
+        )
+
+
 def _cutting_is_complete(project):
     """
     Cutting is complete when it was explicitly finished OR when the production
@@ -1410,6 +1418,7 @@ def project_confirm_cutting(request, pk):
 
             # Deduct Borib by the exact production colour. If cutting was reopened,
             # only apply the difference from the previously confirmed Borib usage.
+            # Any colour that actually produced cut pieces MUST consume Borib too.
             for pc in project.project_colors.select_related("color").all():
                 raw_borib = request.POST.get(f"borib_kg_{pc.id}", "0")
                 try:
@@ -1418,6 +1427,11 @@ def project_confirm_cutting(request, pk):
                     raise ValidationError(f"Enter a valid Borib KG for {pc.color.name}.")
                 if new_borib < 0:
                     raise ValidationError(f"{pc.color.name}: Borib KG cannot be negative.")
+
+                cut_qty_for_color = int(
+                    project.cut_sizes.filter(project_color=pc).aggregate(total=Sum("cut_qty"))["total"] or 0
+                )
+                _validate_borib_required_for_cut(pc.color.name, cut_qty_for_color, new_borib)
 
                 existing = CuttingBoribUsage.objects.select_for_update().filter(project_color=pc).first()
                 old_borib = Decimal(existing.quantity_kg or 0) if existing else Decimal("0")
