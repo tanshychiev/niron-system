@@ -734,11 +734,11 @@
             <div class="panel-title">
               <span class="panel-icon">＄</span>
               <div>
-                <h2>Purchase Cost <span style="color:var(--muted);font-weight:800">Optional</span></h2>
-                <small>You can skip cost now and add or edit it later.</small>
+                <h2>Purchase Cost <span style="color:var(--stock-red);font-weight:900">Required</span></h2>
+                <small>Goods Cost is required. Delivery Fee and Extra Cost can be 0.</small>
               </div>
             </div>
-            <span class="cost-status" id="inventoryCostStatus">Cost skipped</span>
+            <span class="cost-status" id="inventoryCostStatus">Cost missing</span>
           </div>
 
           <div class="cost-grid">
@@ -877,11 +877,11 @@
             <div class="panel-title">
               <span class="panel-icon">＄</span>
               <div>
-                <h2>Purchase Cost <span style="color:var(--muted);font-weight:800">Optional</span></h2>
-                <small>You can skip cost now and add or edit it later.</small>
+                <h2>Purchase Cost <span style="color:var(--stock-red);font-weight:900">Required</span></h2>
+                <small>Goods Cost is required. Delivery Fee and Extra Cost can be 0.</small>
               </div>
             </div>
-            <span class="cost-status" id="fabricCostStatus">Cost skipped</span>
+            <span class="cost-status" id="fabricCostStatus">Cost missing</span>
           </div>
 
           <div class="cost-grid">
@@ -1012,6 +1012,18 @@
               </div>
             {% endfor %}
           </div>
+        </section>
+
+        <section class="panel" id="boribPanel">
+          <div class="panel-head">
+            <div class="panel-title">
+              <span class="panel-icon">B</span>
+              <div><h2>Borib</h2><small>Add Borib separately by colour. Quantity is tracked in KG.</small></div>
+            </div>
+            <button type="button" class="btn-light" id="addBoribRow">＋ Add Borib</button>
+          </div>
+          <input type="hidden" name="borib_row_count" id="boribRowCountInput" value="0">
+          <div class="fabric-lines" id="boribLines"></div>
         </section>
 
         <div class="form-actions">
@@ -1640,13 +1652,13 @@
       if(summaryFabricKg) summaryFabricKg.textContent=totalKg.toFixed(2);
       document.getElementById('fabricRowCount').textContent=rows.length;
       document.getElementById('summaryCostTotal').textContent=cost.toFixed(2);
-      document.getElementById('summaryCostStatus').textContent=cost>0?'Filled':'Skipped';
+      document.getElementById('summaryCostStatus').textContent=cost>0?'Filled':'Missing';
 
       const fabricCostTotal=document.getElementById('fabricCostTotal');
       if(fabricCostTotal) fabricCostTotal.textContent=cost.toFixed(2);
       const fabricCostStatus=document.getElementById('fabricCostStatus');
       if(fabricCostStatus){
-        fabricCostStatus.textContent=cost>0?'Cost added':'Cost skipped';
+        fabricCostStatus.textContent=cost>0?'Cost added':'Cost missing';
         fabricCostStatus.classList.toggle('filled',cost>0);
       }
       return;
@@ -1667,10 +1679,10 @@
     document.getElementById('inventoryRowCount').textContent=rows.length;
     document.getElementById('inventoryCostTotal').textContent=cost.toFixed(2);
     document.getElementById('summaryCostTotal').textContent=cost.toFixed(2);
-    document.getElementById('summaryCostStatus').textContent=cost>0?'Filled':'Skipped';
+    document.getElementById('summaryCostStatus').textContent=cost>0?'Filled':'Missing';
 
     const badge=document.getElementById('inventoryCostStatus');
-    badge.textContent=cost>0?'✓ Cost filled':'Cost skipped';
+    badge.textContent=cost>0?'✓ Cost filled':'Cost missing';
     badge.classList.toggle('filled',cost>0);
   }
 
@@ -7334,6 +7346,16 @@
   -moz-appearance:textfield!important;
   appearance:textfield!important;
 }
+
+/* Compact Borib rows. Fabric colours are mirrored automatically. */
+#boribPanel .fabric-lines{display:grid;gap:10px}
+#boribPanel .borib-line{padding:12px 14px}
+#boribPanel .borib-line-grid{display:grid;grid-template-columns:minmax(180px,1.1fr) minmax(130px,.65fr) minmax(220px,1.4fr);gap:12px;align-items:end}
+#boribPanel .borib-line-grid .field{margin:0;min-width:0}
+#boribPanel .borib-line-grid select,#boribPanel .borib-line-grid input{width:100%;min-height:42px}
+#boribPanel .borib-auto-badge{margin-left:auto;margin-right:8px;padding:4px 8px;border-radius:999px;background:#fff3cf;color:#7a5415;font-size:10px;font-weight:700}
+@media(max-width:800px){#boribPanel .borib-line-grid{grid-template-columns:1fr}}
+
 </style>
 
 <script id="purchase-cost-behaviour">
@@ -7362,6 +7384,143 @@
 
   if (typeof updateAllSummary === 'function') updateAllSummary();
 })();
+
+
+// Smart Borib rows: mirror selected Fabric colours, while still allowing extra Borib-only colours.
+(function(){
+  const lines = document.getElementById('boribLines');
+  const countInput = document.getElementById('boribRowCountInput');
+  const addTop = document.getElementById('addBoribRow');
+  const fabricLines = document.getElementById('fabricLines');
+  if (!lines || !countInput || !fabricLines) return;
+
+  function fabricColorSelects(){
+    return [...fabricLines.querySelectorAll('select.color-select, select[name$="-color"]')]
+      .filter(select => select.closest('.fabric-line')?.style.display !== 'none');
+  }
+
+  function selectedFabricColors(){
+    const seen = new Set();
+    return fabricColorSelects().map(select => {
+      const option = select.options[select.selectedIndex];
+      return {value: select.value, label: option?.textContent?.trim() || ''};
+    }).filter(item => item.value && !seen.has(item.value) && seen.add(item.value));
+  }
+
+  function sourceColorSelect(){
+    return fabricColorSelects()[0] || document.querySelector('#emptyFabricRow select.color-select, #emptyFabricRow select[name$="-color"]');
+  }
+
+  function buildColorSelect(index, selectedValue=''){
+    const source = sourceColorSelect();
+    if (!source) return `<select class="form-control borib-color" name="borib_color_${index}" id="id_borib_color_${index}"><option value="">Choose colour</option></select>`;
+    const clone = source.cloneNode(true);
+    clone.classList.add('borib-color');
+    clone.classList.remove('color-select');
+    clone.name = `borib_color_${index}`;
+    clone.id = `id_borib_color_${index}`;
+    clone.required = false;
+
+    // Put colours selected for Fabric at the top, then all remaining colours.
+    const fabric = selectedFabricColors();
+    const options = [...clone.options];
+    const placeholder = options.find(o => !o.value);
+    const byValue = new Map(options.filter(o => o.value).map(o => [String(o.value), o]));
+    clone.innerHTML = '';
+    if (placeholder) clone.appendChild(placeholder);
+    fabric.forEach(item => { const option=byValue.get(String(item.value)); if(option){ clone.appendChild(option); byValue.delete(String(item.value)); }});
+    options.forEach(option => { if(option.value && byValue.has(String(option.value))){ clone.appendChild(option); byValue.delete(String(option.value)); }});
+    clone.value = selectedValue;
+    return clone.outerHTML;
+  }
+
+  function renumber(){
+    [...lines.querySelectorAll('.borib-line')].forEach((row,i)=>{
+      row.querySelector('.row-number').textContent=i+1;
+      const sel=row.querySelector('.borib-color');
+      const kg=row.querySelector('.borib-kg');
+      const note=row.querySelector('.borib-note');
+      if(sel){sel.name=`borib_color_${i}`; sel.id=`id_borib_color_${i}`;}
+      if(kg){kg.name=`borib_kg_${i}`; kg.id=`id_borib_kg_${i}`;}
+      if(note){note.name=`borib_note_${i}`; note.id=`id_borib_note_${i}`;}
+    });
+    countInput.value=lines.querySelectorAll('.borib-line').length;
+  }
+
+  function createRow({color='', automatic=false}={}){
+    const i=lines.querySelectorAll('.borib-line').length;
+    const row=document.createElement('div');
+    row.className='fabric-line borib-line';
+    row.dataset.auto = automatic ? '1' : '0';
+    if (automatic) row.dataset.fabricColor = String(color);
+    row.innerHTML=`
+      <div class="fabric-line-head">
+        <span class="row-number">${i+1}</span>
+        <span class="borib-auto-badge" ${automatic?'':'hidden'}>Fabric colour</span>
+        <button type="button" class="btn-danger-soft removeBoribRow" ${automatic?'hidden':''}>Remove</button>
+      </div>
+      <div class="borib-line-grid">
+        <div class="field"><label>Colour</label>${buildColorSelect(i,color)}</div>
+        <div class="field"><label>Borib (KG)</label><input class="form-control borib-kg" type="number" name="borib_kg_${i}" id="id_borib_kg_${i}" min="0" step="0.001" value="0.000"></div>
+        <div class="field borib-note-field"><label>Note</label><input class="form-control borib-note" type="text" name="borib_note_${i}" id="id_borib_note_${i}" placeholder="Optional note"></div>
+      </div>`;
+    lines.appendChild(row);
+    if (automatic) row.querySelector('.borib-color').disabled = true;
+    renumber();
+    return row;
+  }
+
+  function refreshManualOptions(){
+    [...lines.querySelectorAll('.borib-line[data-auto="0"]')].forEach(row=>{
+      const old=row.querySelector('.borib-color');
+      if(!old) return;
+      const value=old.value;
+      const holder=document.createElement('div'); holder.innerHTML=buildColorSelect(0,value);
+      old.replaceWith(holder.firstElementChild);
+    });
+    renumber();
+  }
+
+  function syncAutomaticBorib(){
+    const wanted=selectedFabricColors();
+    const wantedValues=new Set(wanted.map(item=>String(item.value)));
+    const existing=[...lines.querySelectorAll('.borib-line[data-auto="1"]')];
+
+    existing.forEach(row=>{
+      if(!wantedValues.has(String(row.dataset.fabricColor||''))) row.remove();
+    });
+
+    wanted.forEach(item=>{
+      let row=[...lines.querySelectorAll('.borib-line[data-auto="1"]')]
+        .find(r=>String(r.dataset.fabricColor)===String(item.value));
+      if(!row) row=createRow({color:item.value,automatic:true});
+      const select=row.querySelector('.borib-color');
+      if(select){ select.disabled=false; select.value=item.value; select.disabled=true; }
+    });
+    refreshManualOptions();
+    renumber();
+  }
+
+  lines.addEventListener('click',event=>{
+    const button=event.target.closest('.removeBoribRow');
+    if(button){ button.closest('.borib-line')?.remove(); renumber(); }
+  });
+  addTop?.addEventListener('click',()=>createRow({automatic:false}));
+
+  // Disabled automatic colour selects are enabled just for submit so their values are posted.
+  lines.closest('form')?.addEventListener('submit',()=>{
+    lines.querySelectorAll('.borib-line[data-auto="1"] .borib-color').forEach(select=>select.disabled=false);
+  });
+
+  fabricLines.addEventListener('change',event=>{
+    if(event.target.matches('select.color-select, select[name$="-color"]')) syncAutomaticBorib();
+  });
+  fabricLines.addEventListener('click',()=>setTimeout(syncAutomaticBorib,0));
+  document.getElementById('addFabricRow')?.addEventListener('click',()=>setTimeout(syncAutomaticBorib,0));
+  document.getElementById('addFabricRowBottom')?.addEventListener('click',()=>setTimeout(syncAutomaticBorib,0));
+
+  syncAutomaticBorib();
+})();;
 </script>
 
 {% endblock %}
