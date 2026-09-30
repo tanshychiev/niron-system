@@ -14,10 +14,6 @@ from .views import (
     inventory_batch_add_cost,
     inventory_batch_confirm_received,
     inventory_fabric_confirm_received,
-    inventory_fabric_batch_detail,
-    inventory_fabric_batch_edit,
-    inventory_fabric_batch_add_cost,
-    inventory_fabric_add_delivery_cost,
     inventory_fabric_print_labels,
     inventory_batch_create,
     inventory_batch_delete,
@@ -37,6 +33,7 @@ from .views import (
     size_list,
     stock_ledger_by_batch_item,
     stock_ledger_list,
+    stock_damage,
 )
 
 urlpatterns = [
@@ -97,26 +94,6 @@ urlpatterns = [
         name="inventory_fabric_print_labels",
     ),
     path(
-        "fabric-purchases/<int:pk>/detail/",
-        inventory_fabric_batch_detail,
-        name="inventory_fabric_batch_detail",
-    ),
-    path(
-        "fabric-purchases/<int:pk>/edit/",
-        inventory_fabric_batch_edit,
-        name="inventory_fabric_batch_edit",
-    ),
-    path(
-        "fabric-purchases/<int:pk>/add-cost/",
-        inventory_fabric_batch_add_cost,
-        name="inventory_fabric_batch_add_cost",
-    ),
-    path(
-        "fabric-purchases/add-delivery-cost/",
-        inventory_fabric_add_delivery_cost,
-        name="inventory_fabric_add_delivery_cost",
-    ),
-    path(
         "batches/<int:pk>/add-cost/",
         inventory_batch_add_cost,
         name="inventory_batch_add_cost",
@@ -129,6 +106,7 @@ urlpatterns = [
     # Adjust
     path("adjust-stock/", inventory_adjust_stock_select, name="inventory_adjust_stock_select"),
     path("adjustments/", inventory_adjustment_list, name="inventory_adjustment_list"),
+    path("stock-damage/", stock_damage, name="stock_damage"),
     path(
         "adjustments/new/<int:batch_item_id>/",
         inventory_adjustment_create,

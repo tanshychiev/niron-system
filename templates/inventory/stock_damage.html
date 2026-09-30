@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+
+{% block page_title %}Stock Damage{% endblock %}
+{% block page_subtitle %}Record damaged or lost stock, then review monthly damage totals{% endblock %}
+
+{% block content %}
+<style>
+  .damage-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+  .damage-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:0 0 16px}
+  .damage-kpi{padding:16px;border:1px solid var(--line);border-radius:16px;background:#fff}
+  .damage-kpi .label{font-size:12px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.03em}
+  .damage-kpi .value{font-size:26px;font-weight:900;margin-top:5px}
+  .damage-stock{font-size:26px;font-weight:900}
+  .damage-help{font-size:13px;color:var(--muted)}
+  .damage-history-wrap{overflow-x:auto}
+  .damage-badge{display:inline-flex;padding:4px 9px;border-radius:999px;background:#f3f4f6;font-size:12px;font-weight:800}
+  .filter-row{display:grid;grid-template-columns:minmax(180px,240px) minmax(220px,1fr) auto;gap:10px;align-items:end}
+  .breakdown-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+  .color-picker-button{width:100%;min-height:42px;text-align:left;display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;color:inherit}
+  .color-dot{width:14px;height:14px;border-radius:50%;border:1px solid #bbb;display:inline-block;vertical-align:-2px;margin-right:8px}
+  .damage-modal[hidden]{display:none}.damage-modal{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:20px;background:rgba(0,0,0,.35)}
+  .damage-modal-card{width:min(520px,100%);max-height:80vh;display:flex;flex-direction:column;background:#fff;border-radius:18px;border:1px solid var(--line);padding:18px}
+  .color-list{overflow:auto;max-height:430px;margin-top:12px;border:1px solid var(--line);border-radius:12px}
+  .color-option{width:100%;border:0;background:#fff;padding:11px 13px;text-align:left;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line)}
+  .color-option:last-child{border-bottom:0}.color-option:hover,.color-option:focus{background:#f8f8f8}
+  @media(max-width:900px){.damage-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  @media(max-width:768px){.damage-grid,.filter-row{grid-template-columns:1fr}.damage-summary{grid-template-columns:1fr 1fr}}
+</style>
+
+<div class="form-card">
+  <div class="section-head">
+    <h2>Record Stock Damage</h2>
+    <p class="section-sub">Choose the exact product, color and size. Saving deducts the stock automatically.</p>
+  </div>
+
+  <form method="post">
+    {% csrf_token %}
+    <div class="damage-grid">
+      <div class="field">
+        <label for="damage-item">Product</label>
+        <select class="form-select" id="damage-item" name="item" required>
+          <option value="">Choose product</option>
+          {% for item in items %}
+            <option value="{{ item.id }}" data-product-type="{{ item.item_type }}" {% if selected_item and selected_item.id == item.id %}selected{% endif %}>{{ item.code }} - {{ item.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Color</label>
+        <input type="hidden" id="damage-color" name="color" value="{% if selected_color %}{{ selected_color.id }}{% endif %}" required>
+        <button type="button" class="color-picker-button" id="open-color-picker">
+          <span id="selected-color-label">{% if selected_color %}{{ selected_color.name }}{% else %}Choose color{% endif %}</span>
+          <span>⌄</span>
+        </button>
+      </div>
+
+      <div class="field">
+        <label for="damage-size">Size</label>
+        <select class="form-select" id="damage-size" name="size" required>
+          <option value="">Choose size</option>
+          {% for size in sizes %}
+            <option value="{{ size.id }}" data-product-type="{{ size.product_type }}" {% if selected_size and selected_size.id == size.id %}selected{% endif %}>{{ size.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    {% if selected_item %}
+    <div class="damage-kpi" style="margin:14px 0;display:flex;gap:18px;align-items:center;flex-wrap:wrap;">
+      <div><div class="damage-help">Current Stock</div><div class="damage-stock">{{ current_stock|floatformat:-2 }}</div></div>
+      <div class="damage-help">{{ selected_item.name }} / {{ selected_color.name|default:"-" }} / {{ selected_size.name|default:"-" }}</div>
+    </div>
+    {% endif %}
+
+    <div class="damage-grid">
+      <div class="field">
+        <label for="damage-type">Damage Type</label>
+        <select class="form-select" id="damage-type" name="damage_type" required>
+          {% for value,label in damage_types %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="damage-qty">Quantity</label>
+        <input class="form-control" id="damage-qty" type="number" min="0.01" step="0.01" name="qty" required placeholder="0">
+      </div>
+      <div class="field">
+        <label for="damage-reason">Reason / Note</label>
+        <input class="form-control" id="damage-reason" type="text" name="reason" required placeholder="e.g. Wrong print, stain, torn">
+      </div>
+    </div>
+
+    <div class="actions" style="justify-content:flex-start;">
+      <button type="submit" class="btn-primary">Record Damage & Deduct Stock</button>
+    </div>
+  </form>
+</div>
+
+<div class="damage-modal" id="color-modal" hidden aria-hidden="true">
+  <div class="damage-modal-card" role="dialog" aria-modal="true" aria-labelledby="color-modal-title">
+    <div class="breakdown-bar">
+      <div><strong id="color-modal-title">Choose Color</strong><div class="damage-help">Search and select a color.</div></div>
+      <button type="button" class="btn-secondary" id="close-color-picker">Close</button>
+    </div>
+    <input class="form-control" type="search" id="color-search" placeholder="Search color..." autocomplete="off">
+    <div class="color-list" id="color-list">
+      {% for color in colors %}
+      <button type="button" class="color-option" data-id="{{ color.id }}" data-name="{{ color.name|lower }}" data-label="{{ color.name }}">
+        <span class="color-dot" style="background:{{ color.hex_code|default:'#ffffff' }}"></span>
+        <span>{{ color.name }}</span>
+      </button>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="table-card">
+  <div class="section-head">
+    <h2>Damage History</h2>
+    <p class="section-sub">Search by month, product, color, size, reason, or who recorded it.</p>
+  </div>
+
+  <form method="get" class="filter-row" style="margin-bottom:16px;">
+    <div class="field">
+      <label for="damage-month">Month</label>
+      <input class="form-control" type="month" id="damage-month" name="month" value="{{ month_value }}">
+    </div>
+    <div class="field">
+      <label for="damage-search">Search</label>
+      <input class="form-control" type="search" id="damage-search" name="q" value="{{ search_value }}" placeholder="Product, color, size, reason, staff...">
+    </div>
+    <div class="actions" style="margin:0;">
+      <button type="submit" class="btn-primary">Search</button>
+      <a class="btn-secondary" href="{% url 'stock_damage' %}">Current Month</a>
+    </div>
+  </form>
+
+  <div class="damage-summary">
+    <div class="damage-kpi"><div class="label">Damage Records</div><div class="value">{{ summary.records }}</div></div>
+    <div class="damage-kpi"><div class="label">Total Qty Damaged</div><div class="value">{{ summary.total_qty|floatformat:-2 }}</div></div>
+    <div class="damage-kpi"><div class="label">Affected Variants</div><div class="value">{{ summary.variants }}</div></div>
+    <div class="damage-kpi"><div class="label">Estimated Stock Loss</div><div class="value">${{ summary.total_loss_cost|floatformat:2 }}</div></div>
+  </div>
+
+  <div class="section-head" style="margin-top:18px;">
+    <h3>Damage Summary by Product / Color / Size</h3>
+    <p class="section-sub">Example: 100 total damaged can be broken down into 10 Boxy / M / Blue, etc.</p>
+  </div>
+  <div class="damage-history-wrap" style="margin-bottom:22px;">
+    <table class="app-table">
+      <thead><tr><th>Product</th><th>Color</th><th>Size</th><th>Total Damage Qty</th><th>Records</th><th>Loss Cost</th></tr></thead>
+      <tbody>
+        {% for row in breakdown %}
+        <tr>
+          <td>{{ row.code }} - {{ row.product }}</td>
+          <td>{{ row.color }}</td>
+          <td>{{ row.size }}</td>
+          <td><strong>{{ row.qty|floatformat:-2 }}</strong></td>
+          <td>{{ row.records }}</td>
+          <td>${{ row.loss_cost|floatformat:2 }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6">No damage found for this month/search.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section-head">
+    <h3>Detailed Records</h3>
+  </div>
+  <div class="damage-history-wrap">
+    <table class="app-table">
+      <thead><tr><th>Date</th><th>Product</th><th>Color</th><th>Size</th><th>Type / Reason</th><th>Qty</th><th>Before</th><th>After</th><th>Unit Cost</th><th>Loss Cost</th><th>Recorded By</th></tr></thead>
+      <tbody>
+        {% for row in history %}
+        <tr>
+          <td>{{ row.created_at|date:"d/m/Y H:i" }}</td>
+          <td>{{ row.batch_item.item.name }}</td>
+          <td>{{ row.batch_item.color.name|default:"-" }}</td>
+          <td>{{ row.batch_item.size.name|default:"-" }}</td>
+          <td><span class="damage-badge">{{ row.get_adjustment_type_display }}</span><div class="damage-help">{{ row.reason|default:"-" }}</div></td>
+          <td>{{ row.qty|floatformat:-2 }}</td>
+          <td>{{ row.qty_before|floatformat:-2 }}</td>
+          <td>{{ row.qty_after|floatformat:-2 }}</td>
+          <td>${{ row.damage_unit_cost|floatformat:2 }}</td>
+          <td><strong>${{ row.damage_total_cost|floatformat:2 }}</strong></td>
+          <td>{% if row.created_by %}{{ row.created_by.get_full_name|default:row.created_by.username }}{% else %}-{% endif %}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="11">No stock damage found for this month/search.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+(function(){
+  const item=document.getElementById('damage-item');
+  const size=document.getElementById('damage-size');
+  if(item&&size){
+    function filterSizes(){
+      const type=item.options[item.selectedIndex]?.dataset.productType || '';
+      Array.from(size.options).forEach(function(opt){
+        if(!opt.value){opt.hidden=false;return;}
+        opt.hidden=!!type && opt.dataset.productType!==type;
+        if(opt.hidden && opt.selected) size.value='';
+      });
+    }
+    item.addEventListener('change',filterSizes);
+    filterSizes();
+  }
+
+  const modal=document.getElementById('color-modal');
+  const openBtn=document.getElementById('open-color-picker');
+  const closeBtn=document.getElementById('close-color-picker');
+  const search=document.getElementById('color-search');
+  const hidden=document.getElementById('damage-color');
+  const label=document.getElementById('selected-color-label');
+  const options=Array.from(document.querySelectorAll('.color-option'));
+  function openModal(){modal.hidden=false;modal.setAttribute('aria-hidden','false');search.value='';options.forEach(o=>o.hidden=false);setTimeout(()=>search.focus(),0)}
+  function closeModal(){modal.hidden=true;modal.setAttribute('aria-hidden','true');openBtn.focus()}
+  openBtn.addEventListener('click',openModal);
+  closeBtn.addEventListener('click',closeModal);
+  modal.addEventListener('click',function(e){if(e.target===modal) closeModal()});
+  search.addEventListener('input',function(){const q=search.value.trim().toLowerCase();options.forEach(o=>o.hidden=q && !o.dataset.name.includes(q))});
+  options.forEach(function(o){o.addEventListener('click',function(){hidden.value=o.dataset.id;label.textContent=o.dataset.label;closeModal()})});
+})();
+</script>
+{% endblock %}
