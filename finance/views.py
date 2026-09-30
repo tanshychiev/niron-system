@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
-from django.db.models import Count, Q, Sum
+from django.db.models import Count, Q, Sum, F, DecimalField, ExpressionWrapper
 from django.db.models.functions import TruncDate, TruncMonth
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -568,7 +568,7 @@ def revenue_dashboard(request):
 @login_required
 @permission_required("finance.view_profit_dashboard_nav", raise_exception=True)
 def profit_dashboard(request):
-    from orders.models import Order, OrderItem
+    from orders.models import Order, OrderItem, StockConsumption
 
     today = timezone.localdate()
     default_start = today.replace(day=1)
@@ -696,8 +696,93 @@ def profit_dashboard(request):
     total = get_summary()
 
     expense_total = base_expense_qs.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
-    profit_total = total["total_amount"] - expense_total
+
+    # Profit uses COGS when stock is actually consumed/sold. Stock purchases are
+    # shown separately as Inventory Spend and do not reduce profit immediately.
+    cogs_expression = ExpressionWrapper(
+        F("consumed_qty") * F("unit_cost"),
+        output_field=DecimalField(max_digits=18, decimal_places=4),
+    )
+    cogs_total = (
+        StockConsumption.objects.filter(
+            order__created_at__date__gte=date_from,
+            order__created_at__date__lte=date_to,
+            order__is_deleted=False,
+        )
+        .exclude(order__status__in=excluded_statuses)
+        .aggregate(total=Sum(cogs_expression))["total"]
+        or Decimal("0.00")
+    )
+
+    inventory_spend_total = (
+        base_expense_qs.filter(expense_type=Expense.TYPE_BATCH)
+        .aggregate(total=Sum("amount"))["total"]
+        or Decimal("0.00")
+    )
+
+    # Stock damage/loss is inventory value that disappeared without a sale.
+    # Keep it separate from normal COGS so the owner can see exactly how much
+    # profit was lost from damaged, missing, or manually deducted stock.
+    from inventory.models import InventoryAdjustment
+
+    stock_loss_types = [
+        InventoryAdjustment.TYPE_DAMAGE,
+        InventoryAdjustment.TYPE_LOST,
+        InventoryAdjustment.TYPE_REMOVE,
+    ]
+    stock_loss_expression = ExpressionWrapper(
+        F("qty") * F("batch_item__final_unit_cost"),
+        output_field=DecimalField(max_digits=18, decimal_places=4),
+    )
+    stock_loss_qs = InventoryAdjustment.objects.filter(
+        adjustment_type__in=stock_loss_types,
+        created_at__date__gte=date_from,
+        created_at__date__lte=date_to,
+        batch_item__is_active=True,
+        batch_item__batch__is_deleted=False,
+    )
+    inventory_damage_total = (
+        stock_loss_qs.aggregate(total=Sum(stock_loss_expression))["total"]
+        or Decimal("0.00")
+    )
+
+    recent_stock_losses = list(
+        stock_loss_qs
+        .select_related(
+            "batch_item__item",
+            "batch_item__color",
+            "batch_item__size",
+            "created_by",
+        )
+        .annotate(loss_cost=stock_loss_expression)
+        .order_by("-created_at", "-id")[:8]
+    )
+
+    operating_expense_total = max(expense_total - inventory_spend_total, Decimal("0.00"))
+    gross_profit_before_loss_total = total["total_amount"] - cogs_total
+    gross_profit_total = gross_profit_before_loss_total - inventory_damage_total
+    net_profit_total = gross_profit_total - operating_expense_total
+    profit_total = net_profit_total
+
     total_inventory = _get_total_inventory()
+
+    # Current stock value uses the landed unit cost already stored on each
+    # inventory batch row. This is a current balance, not limited by date filter.
+    from inventory.models import InventoryBatchItem
+    inventory_value_expression = ExpressionWrapper(
+        F("qty_remaining") * F("final_unit_cost"),
+        output_field=DecimalField(max_digits=18, decimal_places=4),
+    )
+    inventory_value = (
+        InventoryBatchItem.objects.filter(
+            is_active=True,
+            batch__is_deleted=False,
+        ).aggregate(total=Sum(inventory_value_expression))["total"]
+        or Decimal("0.00")
+    )
+
+    cash_collected_total = total["deposit"] + total["paid"]
+    order_count = base_order_qs.count()
 
     expense_by_type = {
         "other": base_expense_qs.filter(expense_type=Expense.TYPE_OTHER).aggregate(total=Sum("amount"))["total"] or Decimal("0.00"),
@@ -865,8 +950,33 @@ def profit_dashboard(request):
         )
 
         revenue = month_orders.aggregate(total=Sum("total_amount"))["total"] or Decimal("0.00")
-        expense = month_expenses.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
-        profit = revenue - expense
+        inventory_spend = month_expenses.filter(expense_type=Expense.TYPE_BATCH).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+        all_expense = month_expenses.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+        expense = max(all_expense - inventory_spend, Decimal("0.00"))
+        month_cogs = (
+            StockConsumption.objects.filter(
+                order__created_at__date__gte=month_start,
+                order__created_at__date__lte=month_end,
+                order__is_deleted=False,
+            )
+            .exclude(order__status__in=excluded_statuses)
+            .aggregate(total=Sum(cogs_expression))["total"]
+            or Decimal("0.00")
+        )
+        month_stock_loss = (
+            InventoryAdjustment.objects.filter(
+                adjustment_type__in=stock_loss_types,
+                created_at__date__gte=month_start,
+                created_at__date__lte=month_end,
+                batch_item__is_active=True,
+                batch_item__batch__is_deleted=False,
+            )
+            .aggregate(total=Sum(stock_loss_expression))["total"]
+            or Decimal("0.00")
+        )
+        gross_profit_before_loss = revenue - month_cogs
+        gross_profit = gross_profit_before_loss - month_stock_loss
+        profit = gross_profit - expense
         margin = (profit / revenue * Decimal("100")) if revenue else Decimal("0.00")
 
         niron_orders = month_orders.filter(order_type=Order.TYPE_NIRON)
@@ -910,7 +1020,12 @@ def profit_dashboard(request):
             "month_name": month_start.strftime("%b %Y"),
             "month_full_name": month_start.strftime("%B %Y"),
             "revenue": revenue,
+            "cogs": month_cogs,
+            "inventory_damage": month_stock_loss,
+            "gross_profit_before_loss": gross_profit_before_loss,
+            "gross_profit": gross_profit,
             "expense": expense,
+            "inventory_spend": inventory_spend,
             "profit": profit,
             "margin": margin,
             "orders": month_orders.count(),
@@ -1224,8 +1339,19 @@ def profit_dashboard(request):
             "kampu": kampu,
             "total": total,
             "expense_total": expense_total,
+            "cogs_total": cogs_total,
+            "inventory_damage_total": inventory_damage_total,
+            "gross_profit_before_loss_total": gross_profit_before_loss_total,
+            "gross_profit_total": gross_profit_total,
+            "operating_expense_total": operating_expense_total,
+            "inventory_spend_total": inventory_spend_total,
+            "recent_stock_losses": recent_stock_losses,
+            "net_profit_total": net_profit_total,
             "profit_total": profit_total,
             "total_inventory": total_inventory,
+            "inventory_value": inventory_value,
+            "cash_collected_total": cash_collected_total,
+            "order_count": order_count,
         "top_cloth": top_cloth,
         "top_color": top_color,
         "top_size": top_size,
