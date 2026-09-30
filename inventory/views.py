@@ -2118,29 +2118,47 @@ def inventory_fabric_batch_edit(request, pk):
     receipts = _fabric_group_receipts(anchor, for_update=True)
     if request.method == "POST":
         supplier_name = (request.POST.get("supplier") or "").strip()
-        raw_date = (request.POST.get("received_date") or "").strip()
+        raw_order_date = (request.POST.get("order_date") or "").strip()
+        raw_received_date = (request.POST.get("received_date") or "").strip()
         note = (request.POST.get("note") or "").strip()
         if not supplier_name:
             messages.error(request, "Supplier is required.")
         else:
             try:
-                edit_date = date.fromisoformat(raw_date) if raw_date else anchor.received_date
+                edit_order_date = (
+                    date.fromisoformat(raw_order_date)
+                    if raw_order_date
+                    else timezone.localtime(anchor.created_at).date()
+                )
+                edit_received_date = (
+                    date.fromisoformat(raw_received_date)
+                    if raw_received_date
+                    else anchor.received_date
+                )
             except ValueError:
-                edit_date = None
-            if not edit_date:
-                messages.error(request, "Invalid date.")
+                edit_order_date = None
+                edit_received_date = None
+            if not edit_order_date or not edit_received_date:
+                messages.error(request, "Invalid order or received date.")
             else:
                 supplier_ref = ProductionSupplier.objects.filter(name__iexact=supplier_name).first()
                 for receipt in receipts:
                     receipt.supplier_ref = supplier_ref
                     receipt.supplier = supplier_name
-                    receipt.received_date = edit_date
+                    # Order date uses the original created_at time, changing only its calendar date.
+                    receipt.created_at = receipt.created_at.replace(
+                        year=edit_order_date.year,
+                        month=edit_order_date.month,
+                        day=edit_order_date.day,
+                    )
+                    receipt.received_date = edit_received_date
                     if receipt.status == FabricReceipt.STATUS_WAITING:
-                        receipt.expected_date = edit_date
+                        receipt.expected_date = edit_received_date
                     receipt.note = note
                     receipt.updated_by = request.user
                     receipt.save(update_fields=[
-                        "supplier_ref", "supplier", "received_date", "expected_date", "note", "updated_by", "updated_at"
+                        "supplier_ref", "supplier", "created_at", "received_date", "expected_date",
+                        "note", "updated_by", "updated_at"
                     ])
                 _sync_fabric_group_expense(receipts, request.user)
                 messages.success(request, "Fabric batch updated.")

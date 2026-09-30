@@ -10,7 +10,8 @@
   <div class="fbe-summary">{{ anchor.receipt_no }}{% if receipts|length > 1 %} +{{ receipts|length|add:"-1" }}{% endif %} · {{ receipts|length }} fabric type(s). Editing here updates the whole purchase batch.</div>
   <div class="fbe-grid" style="margin-top:14px">
     <label><span>Supplier</span><input name="supplier" value="{{ anchor.supplier }}" required></label>
-    <label><span>{% if anchor.status == "WAITING" %}Expected Date{% else %}Received Date{% endif %}</span><input type="date" name="received_date" value="{{ anchor.received_date|date:'Y-m-d' }}" required></label>
+    <label><span>Order Date</span><input type="date" name="order_date" value="{{ anchor.created_at|date:'Y-m-d' }}" required></label>
+    <label><span>{% if anchor.status == "WAITING" %}Expected Date{% else %}Received Date{% endif %}</span><input type="date" name="received_date" value="{% if anchor.status == 'WAITING' and anchor.expected_date %}{{ anchor.expected_date|date:'Y-m-d' }}{% else %}{{ anchor.received_date|date:'Y-m-d' }}{% endif %}" required></label>
     <label><span>Note</span><textarea name="note">{{ anchor.note }}</textarea></label>
   </div>
   <div class="fbe-actions"><a class="fbe-btn" href="{% url 'inventory_fabric_batch_detail' anchor.pk %}">Cancel</a><button class="fbe-btn primary" type="submit">Save Changes</button></div>
