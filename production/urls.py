@@ -1,9 +1,11 @@
+from accounts import views as account_views
 from django.urls import path
 
 from . import views
 
 
 urlpatterns = [
+    path("payments/staff/", account_views.staff_payroll, name="production_staff_payroll"),
     path("", views.dashboard, name="production_dashboard"),
 
     # Materials

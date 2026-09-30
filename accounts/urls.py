@@ -23,6 +23,9 @@ urlpatterns = [
         views.staff_payroll,
         name="staff_payroll",
     ),
+    path("staff-payroll/add-staff/", views.staff_quick_add, name="staff_quick_add"),
+    path("staff-payroll/<int:staff_id>/edit-staff/", views.staff_quick_edit, name="staff_quick_edit"),
+    path("staff-payroll/<int:staff_id>/edit-month/", views.staff_payroll_edit, name="staff_payroll_edit"),
     path(
         "staff-payroll/<int:staff_id>/salary/",
         views.staff_salary_add,

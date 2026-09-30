@@ -36,6 +36,11 @@ class UserProfile(models.Model):
         blank=True,
         help_text="Optional date the staff member stopped working.",
     )
+    staff_position = models.CharField(
+        max_length=120,
+        blank=True,
+        default="",
+    )
     staff_note = models.TextField(
         blank=True,
         default="",
@@ -184,6 +189,16 @@ class StaffPayroll(models.Model):
         decimal_places=2,
         default=ZERO,
         validators=[MinValueValidator(ZERO)],
+    )
+    deduction_reason = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+    )
+    finance_expense_id = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        editable=False,
     )
 
     # Actual final payment amount paid.
