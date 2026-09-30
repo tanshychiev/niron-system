@@ -211,6 +211,163 @@ def sync_sewing_payables(job):
             payable.save(update_fields=["amount", "payee_name"])
 
 
+
+def _quantize_cost(value):
+    return Decimal(value or 0).quantize(Decimal("0.0001"))
+
+
+def _project_color_cost(project, project_color):
+    """Return (good_qty, total_cost, unit_cost) for one production colour.
+
+    Cost basis:
+    - actual consumed fabric KG at each roll's landed cost/KG
+    - sewing/internal-worker payable amounts directly linked to jobs for this colour
+    - project-level staff payables without a sewing job are allocated by cut quantity
+
+    Damaged/missing pieces do not enter finished inventory. Their consumed fabric cost
+    therefore stays inside the good pieces instead of disappearing from COGS.
+    """
+    color_usages = project.roll_usages.filter(project_color=project_color).select_related("roll__receipt")
+    fabric_cost = sum(
+        (Decimal(u.consumed_qty or 0) * Decimal(u.roll.unit_cost or 0) for u in color_usages),
+        ZERO,
+    )
+
+    jobs = project.sewing_jobs.filter(project_color=project_color)
+    good_qty = (
+        jobs.filter(returns__status=SewingReturn.STATUS_STOCKED)
+        .aggregate(total=Sum("returns__lines__good_qty"))["total"]
+        or 0
+    )
+
+    direct_labor = (
+        project.payables.filter(sewing_job__project_color=project_color)
+        .aggregate(total=Sum("amount"))["total"]
+        or ZERO
+    )
+
+    # Rare/manual production staff costs may be recorded at project level without
+    # a sewing job. Allocate those fairly across colours using actual cut quantity.
+    shared_staff = (
+        project.payables.filter(
+            payable_type=ProductionPayable.TYPE_STAFF,
+            sewing_job__isnull=True,
+        ).aggregate(total=Sum("amount"))["total"]
+        or ZERO
+    )
+    color_cut = Decimal(project_color.cut_total or 0)
+    project_cut = Decimal(project.cut_total or 0)
+    shared_alloc = (Decimal(shared_staff) * color_cut / project_cut) if project_cut > 0 else ZERO
+
+    total_cost = Decimal(fabric_cost) + Decimal(direct_labor) + Decimal(shared_alloc)
+    good_dec = Decimal(good_qty or 0)
+    unit_cost = total_cost / good_dec if good_dec > 0 else ZERO
+    return good_dec, total_cost, _quantize_cost(unit_cost)
+
+
+@transaction.atomic
+def sync_project_finished_goods_cost(project):
+    """Recalculate finished-shirt unit cost and propagate it to COGS.
+
+    This updates both remaining inventory valuation and already-created
+    StockConsumption rows, so historical COGS is corrected after a production
+    return or after running the backfill command.
+    """
+    from orders.models import StockConsumption
+
+    project = (
+        ProductionProject.objects.select_for_update()
+        .prefetch_related("project_colors")
+        .get(pk=project.pk)
+    )
+
+    updated_items = 0
+    updated_consumptions = 0
+
+    colors = list(project.project_colors.all())
+    if colors:
+        for project_color in colors:
+            good_qty, total_cost, unit_cost = _project_color_cost(project, project_color)
+            if good_qty <= 0:
+                continue
+
+            items = list(
+                InventoryBatchItem.objects.select_for_update()
+                .filter(
+                    batch__production_sewing_return__job__project=project,
+                    batch__production_sewing_return__job__project_color=project_color,
+                    is_active=True,
+                )
+            )
+            if not items:
+                continue
+
+            item_ids = []
+            batch_ids = set()
+            for item in items:
+                item.base_unit_cost = unit_cost
+                item.final_unit_cost = unit_cost
+                item.save(update_fields=["base_unit_cost", "final_unit_cost"])
+                item_ids.append(item.id)
+                batch_ids.add(item.batch_id)
+                updated_items += 1
+
+            updated_consumptions += StockConsumption.objects.filter(
+                batch_item_id__in=item_ids
+            ).update(unit_cost=unit_cost)
+
+            # Keep each production return batch's goods cost meaningful for detail/reporting.
+            for batch_id in batch_ids:
+                batch = InventoryBatch.objects.select_for_update().get(pk=batch_id)
+                batch_total = sum(
+                    (
+                        Decimal(row.qty_received or 0) * Decimal(row.final_unit_cost or 0)
+                        for row in batch.items.filter(is_active=True)
+                    ),
+                    ZERO,
+                )
+                batch.total_goods_cost = batch_total.quantize(Decimal("0.01"))
+                batch.cost_is_added = True
+                batch.save(update_fields=["total_goods_cost", "cost_is_added", "updated_at"])
+    else:
+        # Legacy projects created before multi-colour production support.
+        good_qty = Decimal(project.returned_good_total or 0)
+        if good_qty > 0:
+            unit_cost = _quantize_cost(Decimal(project.total_production_cost or 0) / good_qty)
+            items = list(
+                InventoryBatchItem.objects.select_for_update().filter(
+                    batch__production_sewing_return__job__project=project,
+                    is_active=True,
+                )
+            )
+            item_ids = []
+            batch_ids = set()
+            for item in items:
+                item.base_unit_cost = unit_cost
+                item.final_unit_cost = unit_cost
+                item.save(update_fields=["base_unit_cost", "final_unit_cost"])
+                item_ids.append(item.id)
+                batch_ids.add(item.batch_id)
+                updated_items += 1
+            updated_consumptions += StockConsumption.objects.filter(
+                batch_item_id__in=item_ids
+            ).update(unit_cost=unit_cost)
+            for batch_id in batch_ids:
+                batch = InventoryBatch.objects.select_for_update().get(pk=batch_id)
+                batch_total = sum(
+                    (
+                        Decimal(row.qty_received or 0) * Decimal(row.final_unit_cost or 0)
+                        for row in batch.items.filter(is_active=True)
+                    ),
+                    ZERO,
+                )
+                batch.total_goods_cost = batch_total.quantize(Decimal("0.01"))
+                batch.cost_is_added = True
+                batch.save(update_fields=["total_goods_cost", "cost_is_added", "updated_at"])
+
+    return {"inventory_items": updated_items, "consumptions": updated_consumptions}
+
+
 @transaction.atomic
 def confirm_sewing_return(sewing_return, user=None):
     sewing_return = (
@@ -279,6 +436,9 @@ def confirm_sewing_return(sewing_return, user=None):
     sewing_return.save(update_fields=["status", "stock_batch", "stocked_at", "stocked_by"])
 
     sync_sewing_payables(job)
+    # Recalculate finished-goods cost after the payable for this return exists.
+    # This also updates historical StockConsumption unit_cost for this project.
+    sync_project_finished_goods_cost(job.project)
 
     pending = job.pending_total
     job.status = SewingJob.STATUS_COMPLETED if pending <= 0 else SewingJob.STATUS_PARTIAL
