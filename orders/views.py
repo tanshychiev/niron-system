@@ -218,21 +218,21 @@ def _get_prefetched_order_queryset():
 def _order_form_context_base():
     return {
         "shirt_items": InventoryItem.objects.filter(
-            item_type=InventoryItem.TYPE_SHIRT,
+            item_type__in=InventoryItem.VARIANT_TYPES,
             is_active=True,
-        ).order_by("code", "name"),
+        ).order_by("item_type", "code", "name"),
 
         "film_items": InventoryItem.objects.filter(
             item_type=InventoryItem.TYPE_FILM,
             is_active=True,
         ).order_by("code", "name"),
 
-        # Retail Material list:
-        # show Film + Ink + all material items, but do not show Shirt
+        # Retail Material list: printing/material items only.
+        # Shirt and Tote Bag are variant inventory products, not materials.
         "material_items": InventoryItem.objects.filter(
             is_active=True,
         ).exclude(
-            item_type=InventoryItem.TYPE_SHIRT,
+            item_type__in=InventoryItem.VARIANT_TYPES,
         ).order_by("item_type", "code", "name"),
 
         "colors": Color.objects.filter(is_active=True).order_by("name"),
@@ -401,7 +401,25 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
                     or item_data["quantity"] <= 0
                     or item_data["unit_price"] <= 0
                 ):
-                    raise ValidationError("Full Order requires Shirt Item, Color, Size, Qty, and Unit Price.")
+                    raise ValidationError("Full Order requires Product Item, Color, Size, Qty, and Unit Price.")
+
+                product = InventoryItem.objects.filter(
+                    pk=item_data["shirt_item_id"],
+                    item_type__in=InventoryItem.VARIANT_TYPES,
+                    is_active=True,
+                ).first()
+                if not product:
+                    raise ValidationError("Full Order product must be Shirt or Tote Bag.")
+
+                valid_size = Size.objects.filter(
+                    pk=item_data["size_id"],
+                    product_type=product.item_type,
+                    is_active=True,
+                ).exists()
+                if not valid_size:
+                    raise ValidationError(
+                        f"Choose a valid {product.get_item_type_display()} size for {product.name}."
+                    )
 
                 item_data["film_item_id"] = None
                 item_data["material_item_id"] = None
@@ -439,10 +457,10 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
                 has_material = bool(item_data["material_item_id"])
 
                 if not has_shirt and not has_material:
-                    raise ValidationError("Retail Sale requires Shirt Item or Material Item.")
+                    raise ValidationError("Retail Sale requires Product Item or Material Item.")
 
                 if has_shirt and has_material:
-                    raise ValidationError("Retail Sale cannot choose Shirt and Material in the same row.")
+                    raise ValidationError("Retail Sale cannot choose Product and Material in the same row.")
 
                 if item_data["quantity"] <= 0 or item_data["unit_price"] <= 0:
                     raise ValidationError("Retail Sale requires Qty and Unit Price.")
@@ -452,7 +470,25 @@ def _save_design_payloads(order, design_payloads, user=None, is_edit=False):
 
                 if has_shirt:
                     if not item_data["color_id"] or not item_data["size_id"]:
-                        raise ValidationError("Retail shirt sale requires Color and Size.")
+                        raise ValidationError("Retail product sale requires Color and Size.")
+
+                    product = InventoryItem.objects.filter(
+                        pk=item_data["shirt_item_id"],
+                        item_type__in=InventoryItem.VARIANT_TYPES,
+                        is_active=True,
+                    ).first()
+                    if not product:
+                        raise ValidationError("Retail product must be Shirt or Tote Bag.")
+
+                    valid_size = Size.objects.filter(
+                        pk=item_data["size_id"],
+                        product_type=product.item_type,
+                        is_active=True,
+                    ).exists()
+                    if not valid_size:
+                        raise ValidationError(
+                            f"Choose a valid {product.get_item_type_display()} size for {product.name}."
+                        )
                     item_data["material_item_id"] = None
                 else:
                     item_data["shirt_item_id"] = None

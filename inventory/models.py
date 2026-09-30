@@ -9,8 +9,21 @@ from django.utils import timezone
 
 
 class Size(models.Model):
+    PRODUCT_SHIRT = "SHIRT"
+    PRODUCT_TOTE_BAG = "TOTE_BAG"
+
+    PRODUCT_TYPE_CHOICES = [
+        (PRODUCT_SHIRT, "Shirt"),
+        (PRODUCT_TOTE_BAG, "Tote Bag"),
+    ]
+
     code = models.CharField(max_length=20, unique=True)
     name = models.CharField(max_length=50)
+    product_type = models.CharField(
+        max_length=20,
+        choices=PRODUCT_TYPE_CHOICES,
+        default=PRODUCT_SHIRT,
+    )
     sort_order = models.PositiveIntegerField(default=0)
     is_active = models.BooleanField(default=True)
 
@@ -46,6 +59,7 @@ class Color(models.Model):
 class InventoryItem(models.Model):
     # ===== TYPE =====
     TYPE_SHIRT = "SHIRT"
+    TYPE_TOTE_BAG = "TOTE_BAG"
     TYPE_FILM = "FILM"
     TYPE_INK = "INK"
     TYPE_POWDER = "POWDER"
@@ -54,12 +68,16 @@ class InventoryItem(models.Model):
 
     TYPE_CHOICES = [
         (TYPE_SHIRT, "Shirt"),
+        (TYPE_TOTE_BAG, "Tote Bag"),
         (TYPE_FILM, "Film"),
         (TYPE_INK, "Ink"),
         (TYPE_POWDER, "Powder"),
         (TYPE_MAINTENANCE, "Maintenance"),
         (TYPE_OTHER, "Other"),
     ]
+
+    # Products that are stocked and deducted by Color + Size variants.
+    VARIANT_TYPES = (TYPE_SHIRT, TYPE_TOTE_BAG)
 
     # ===== UNIT =====
     UNIT_PCS = "PCS"
@@ -143,6 +161,8 @@ class InventoryItem(models.Model):
                 base = "BX"
             elif "polo" in name_lower:
                 base = "PO"
+            elif "tote" in name_lower or "bag" in name_lower:
+                base = "TB"
             elif "film" in name_lower:
                 base = "FL"
             elif "ink" in name_lower:
@@ -166,7 +186,8 @@ class InventoryItem(models.Model):
 
             self.code = code
 
-        # Only shirt uses style
+        # Only Shirt uses apparel style. Tote Bag still uses Color + Size,
+        # but it does not use Oversize/Polo/Boxy.
         if self.item_type != self.TYPE_SHIRT:
             self.sample_style = ""
 

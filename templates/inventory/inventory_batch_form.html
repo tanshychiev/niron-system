@@ -96,7 +96,10 @@
 .type-tabs{
   display:flex;
   gap:6px;
-  flex-wrap:wrap;
+  flex-wrap:nowrap;
+  align-items:center;
+  flex:0 0 auto;
+  white-space:nowrap;
 }
 
 .type-tab{
@@ -493,7 +496,11 @@
   .main-card{padding:10px;border-radius:17px}
   .top-row{display:grid}
   .title h1{font-size:25px}
-  .type-tabs{display:grid;grid-template-columns:repeat(3,1fr)}
+  .type-tabs{
+    display:grid;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    width:100%;
+  }
   .type-tab{padding:7px 4px;font-size:9.5px}
   .header-grid,.cost-grid{grid-template-columns:1fr}
   .full{grid-column:auto}
@@ -683,7 +690,7 @@
         </div>
 
         <div class="type-tabs" role="tablist">
-          <button type="button" class="type-tab" data-mode="cloth">Cloth</button>
+          <button type="button" class="type-tab" data-mode="cloth">Shirt / Tote Bag</button>
           <button type="button" class="type-tab" data-mode="printing">Printing Material</button>
           <button type="button" class="type-tab" data-mode="fabric">Fabric</button>
         </div>
@@ -703,7 +710,7 @@
               <span class="panel-icon">⌁</span>
               <div>
                 <h2>Batch information</h2>
-                <small>Shared information for Cloth or Printing Material</small>
+                <small>Shared information for Shirt/Tote Bag or Printing Material</small>
               </div>
             </div>
           </div>
@@ -768,7 +775,7 @@
               <span class="panel-icon">▦</span>
               <div>
                 <h2>Batch items</h2>
-                <small>Cloth uses colour and size; Printing Material uses quantity only</small>
+                <small>Shirt/Tote Bag use colour and size; Printing Material uses quantity only</small>
               </div>
             </div>
             <button type="button" class="btn-light addInventoryRow">＋ Add Row</button>
@@ -1049,7 +1056,7 @@
           <div class="summary-box"><span>Total Fabric KG</span><strong id="summaryFabricKg">0.00</strong></div>
         </div>
         <div class="side-lines">
-          <div class="side-line"><span>Mode</span><strong id="summaryMode">Cloth</strong></div>
+          <div class="side-line"><span>Mode</span><strong id="summaryMode">Shirt / Tote Bag</strong></div>
           <div class="side-line"><span>Cost status</span><strong id="summaryCostStatus">Missing</strong></div>
           <div class="side-line"><span>Total cost</span><strong>$<span id="summaryCostTotal">0.00</span></strong></div>
         </div>
@@ -1153,7 +1160,7 @@
   <div class="visual-picker-card" role="dialog" aria-modal="true" aria-labelledby="clothPickerTitle">
     <div class="visual-picker-head">
       <div>
-        <h2 id="clothPickerTitle">Choose Cloth</h2>
+        <h2 id="clothPickerTitle">Choose Product</h2>
         <p id="clothPickerSubtitle">Select the shirt style for this stock row.</p>
       </div>
       <button type="button" class="visual-picker-close" id="closeClothPicker" aria-label="Close">×</button>
@@ -1240,7 +1247,7 @@
     if(hidden) hidden.value=mode;
 
     document.getElementById('summaryMode').textContent=
-      mode==='fabric'?'Fabric':mode==='printing'?'Printing Material':'Cloth';
+      mode==='fabric'?'Fabric':mode==='printing'?'Printing Material':'Shirt / Tote Bag';
 
     if(mode!=='fabric') filterInventoryItems(mode);
     updateAllSummary();
@@ -1251,7 +1258,36 @@
   const inventoryRows=document.getElementById('inventoryRows');
   const inventoryTotal=document.getElementById('id_items-TOTAL_FORMS');
 
+  function filterVariantSizes(row){
+    const item=row.querySelector('.item-select');
+    const size=row.querySelector('.size-select');
+    if(!item||!size) return;
+
+    const selected=item.options[item.selectedIndex];
+    const isVariant=selected?.dataset.isShirt==='1';
+    const productType=selected?.dataset.productType||'';
+    const current=size.value;
+
+    [...size.options].forEach(option=>{
+      if(!option.value){
+        option.hidden=false;
+        option.disabled=false;
+        return;
+      }
+
+      const matches=!isVariant||!productType||option.dataset.productType===productType;
+      option.hidden=!matches;
+      option.disabled=!matches;
+    });
+
+    if(current){
+      const selectedSize=[...size.options].find(option=>option.value===current);
+      if(selectedSize?.disabled) size.value='';
+    }
+  }
+
   function inventoryRowInfo(row){
+    filterVariantSizes(row);
     const select=row.querySelector('.item-select');
     const option=select?.options[select.selectedIndex];
     const hasItem=Boolean(select?.value);
@@ -1312,7 +1348,7 @@
     );
 
     [...sizeSelect.options].forEach(option=>{
-      if(!option.value) return;
+      if(!option.value||option.disabled||option.hidden) return;
 
       const button=document.createElement('button');
       button.type='button';
@@ -3022,12 +3058,24 @@
     </svg>`;
   }
 
+  function toteBagSvg(color){
+    const fill=/^#[0-9a-f]{6}$/i.test(color||'')?color:'#D1D5DB';
+    return `<svg viewBox="0 0 64 64" aria-hidden="true">
+      <path fill="${fill}" d="M13 20h38l5 37H8l5-37Z"/>
+      <path fill="none" stroke="rgba(255,255,255,.7)" stroke-width="4" stroke-linecap="round" d="M22 23c0-10 4-15 10-15s10 5 10 15"/>
+    </svg>`;
+  }
+
   function itemVisual(option,color){
     const image=option?.dataset.itemImage||'';
     const isPrinting=document.getElementById('inventoryStockType')?.value==='printing';
 
     if(image){
       return `<img class="inventory-item-image" src="${safe(image)}" alt="${safe(option?.dataset.itemName||option?.textContent?.trim()||'Inventory item')}">`;
+    }
+
+    if(option?.dataset.itemType==='TOTE_BAG'){
+      return toteBagSvg(color);
     }
 
     if(isPrinting){
@@ -3100,7 +3148,7 @@
       itemButton.innerHTML=`
         <span class="visual-select-thumb">${itemVisual(item.option,color.hex)}</span>
         <span class="visual-select-copy">
-          <strong>${item.value?safe((item.code?item.code+' - ':'')+item.name):(isPrinting?'Choose Material':'Choose Cloth')}</strong>
+          <strong>${item.value?safe((item.code?item.code+' - ':'')+item.name):(isPrinting?'Choose Material':'Choose Product')}</strong>
           <span>${item.value?safe(
             isPrinting
               ? ([item.typeLabel,item.unitLabel].filter(Boolean).join(' · ')||'Printing Material')
@@ -3151,7 +3199,7 @@
         document.getElementById('clothPickerTitle').textContent=
           document.getElementById('inventoryStockType')?.value==='printing'
             ? 'Choose Printing Material'
-            : 'Choose Cloth';
+            : 'Choose Product';
         document.getElementById('clothPickerSubtitle').textContent=
           document.getElementById('inventoryStockType')?.value==='printing'
             ? 'Select a material item from Inventory.'
@@ -3298,10 +3346,9 @@
     );
 
     [...select.options].forEach(option=>{
-      if(!option.value) return;
+      if(!option.value||option.disabled||option.hidden) return;
 
-      const label=option.textContent.trim().toUpperCase();
-      if(!['S','M','L','XL','XXL'].includes(label)) return;
+      const label=option.textContent.trim();
 
       const button=document.createElement('button');
       button.type='button';
@@ -3932,6 +3979,14 @@
     </svg>`;
   }
 
+  function toteBagSvg(color){
+    const fill=/^#[0-9a-f]{6}$/i.test(color||'')?color:'#D1D5DB';
+    return `<svg viewBox="0 0 64 64" aria-hidden="true">
+      <path fill="${fill}" d="M13 20h38l5 37H8l5-37Z"/>
+      <path fill="none" stroke="rgba(255,255,255,.7)" stroke-width="4" stroke-linecap="round" d="M22 23c0-10 4-15 10-15s10 5 10 15"/>
+    </svg>`;
+  }
+
   function rowKey(row){
     const item=itemSelect(row)?.value||'';
     const color=colorSelect(row)?.value||'';
@@ -3949,7 +4004,8 @@
     return {
       code:option?.dataset.itemCode||label.split(' - ')[0]||'',
       name:option?.dataset.itemName||label.split(' - ').slice(1).join(' - ')||label,
-      style:option?.dataset.itemStyle||'Cloth',
+      style:option?.dataset.itemStyle||'Product',
+      productType:option?.dataset.productType||option?.dataset.itemType||'',
       image:option?.dataset.itemImage||''
     };
   }
@@ -3988,7 +4044,7 @@
     itemBox.className='niron-parent-item';
     itemBox.innerHTML=`
       <span class="niron-parent-picture">
-        ${item.image?`<img src="${item.image}" alt="">`:shirtSvg(color.hex)}
+        ${item.image?`<img src="${item.image}" alt="">`:(item.productType==='TOTE_BAG'?toteBagSvg(color.hex):shirtSvg(color.hex))}
       </span>
       <span class="niron-parent-copy">
         <strong>${item.code?item.code+' - ':''}${item.name}</strong>
@@ -4032,10 +4088,9 @@
 
     group
       .sort((a,b)=>{
-        const order=['S','M','L','XL','XXL','XXXL'];
-        const aText=sizeSelect(a)?.options[sizeSelect(a).selectedIndex]?.text?.trim().toUpperCase()||'';
-        const bText=sizeSelect(b)?.options[sizeSelect(b).selectedIndex]?.text?.trim().toUpperCase()||'';
-        return order.indexOf(aText)-order.indexOf(bText);
+        const aSelect=sizeSelect(a);
+        const bSelect=sizeSelect(b);
+        return (aSelect?.selectedIndex||0)-(bSelect?.selectedIndex||0);
       })
       .forEach(row=>children.appendChild(row));
 
@@ -4325,7 +4380,7 @@
           if(itemButton && !row.querySelector('.item-select')?.value){
             const strong=itemButton.querySelector('strong');
             const small=itemButton.querySelector('.visual-select-copy span');
-            if(strong) strong.textContent=isPrinting?'Choose Material':'Choose Cloth';
+            if(strong) strong.textContent=isPrinting?'Choose Material':'Choose Product';
             if(small) small.textContent=isPrinting
               ?'Tap anywhere to choose material'
               :'Tap anywhere to choose cloth';

@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Edit Fabric Batch{% endblock %}
+{% block page_title %}Edit Fabric Batch{% endblock %}
+{% block page_subtitle %}Edit batch information only. Purchase cost and delivery cost stay separate.{% endblock %}
+{% block content %}
+<style>
+.fbe-card{max-width:760px;margin:0 auto;background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:20px}.fbe-grid{display:grid;gap:14px}.fbe-grid label span{display:block;font-size:10px;font-weight:900;color:var(--muted);text-transform:uppercase;margin-bottom:6px}.fbe-grid input,.fbe-grid textarea{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:#fff}.fbe-grid input{height:42px}.fbe-grid textarea{min-height:110px;resize:vertical}.fbe-summary{padding:12px;border-radius:11px;background:#fff8e8;border:1px solid #f1d99d;font-size:12px;font-weight:800}.fbe-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}.fbe-btn{height:38px;padding:0 14px;border-radius:9px;border:1px solid var(--line);background:#fff;font-weight:900;cursor:pointer;text-decoration:none;color:var(--text);display:inline-flex;align-items:center}.fbe-btn.primary{background:#f5a900;border-color:#f5a900;color:#111827}
+</style>
+<form class="fbe-card" method="post">{% csrf_token %}
+  <div class="fbe-summary">{{ anchor.receipt_no }}{% if receipts|length > 1 %} +{{ receipts|length|add:"-1" }}{% endif %} · {{ receipts|length }} fabric type(s). Editing here updates the whole purchase batch.</div>
+  <div class="fbe-grid" style="margin-top:14px">
+    <label><span>Supplier</span><input name="supplier" value="{{ anchor.supplier }}" required></label>
+    <label><span>{% if anchor.status == "WAITING" %}Expected Date{% else %}Received Date{% endif %}</span><input type="date" name="received_date" value="{{ anchor.received_date|date:'Y-m-d' }}" required></label>
+    <label><span>Note</span><textarea name="note">{{ anchor.note }}</textarea></label>
+  </div>
+  <div class="fbe-actions"><a class="fbe-btn" href="{% url 'inventory_fabric_batch_detail' anchor.pk %}">Cancel</a><button class="fbe-btn primary" type="submit">Save Changes</button></div>
+</form>
+{% endblock %}

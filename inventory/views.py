@@ -14,7 +14,13 @@ from django.utils import timezone
 
 from orders.models import Order, OrderItem
 from production.forms import FabricReceiptHeaderForm, fabric_receipt_line_formset
-from production.models import FabricReceipt, FabricRoll, ProductionSupplier
+from production.models import (
+    FabricDeliveryAllocation,
+    FabricDeliveryCharge,
+    FabricReceipt,
+    FabricRoll,
+    ProductionSupplier,
+)
 from production.services import create_fabric_rolls
 from finance.models import Expense
 
@@ -229,7 +235,7 @@ def inventory_list(request):
         .filter(
             is_active=True,
             item__is_active=True,
-            item__item_type=InventoryItem.TYPE_SHIRT,
+            item__item_type__in=InventoryItem.VARIANT_TYPES,
             batch__is_deleted=False,
         )
         .order_by(
@@ -249,8 +255,12 @@ def inventory_list(request):
         grouped[key]["item_id"] = row.item_id
         grouped[key]["item_code"] = row.item.code
         grouped[key]["item_name"] = row.item.name
-        grouped[key]["item_style"] = getattr(row.item, "sample_style", InventoryItem.STYLE_OVERSIZE)
-        grouped[key]["item_style_label"] = row.item.get_sample_style_display()
+        if row.item.item_type == InventoryItem.TYPE_TOTE_BAG:
+            grouped[key]["item_style"] = InventoryItem.TYPE_TOTE_BAG
+            grouped[key]["item_style_label"] = "Tote Bag"
+        else:
+            grouped[key]["item_style"] = getattr(row.item, "sample_style", InventoryItem.STYLE_OVERSIZE)
+            grouped[key]["item_style_label"] = row.item.get_sample_style_display()
         grouped[key]["color_id"] = row.color_id
         grouped[key]["color_name"] = row.color.name if row.color else "-"
         grouped[key]["color_hex"] = getattr(row.color, "hex_code", "#D1D5DB") if row.color else "#D1D5DB"
@@ -291,8 +301,12 @@ def inventory_list(request):
         grouped[key]["item_id"] = row.shirt_item_id
         grouped[key]["item_code"] = row.shirt_item.code
         grouped[key]["item_name"] = row.shirt_item.name
-        grouped[key]["item_style"] = getattr(row.shirt_item, "sample_style", InventoryItem.STYLE_OVERSIZE)
-        grouped[key]["item_style_label"] = row.shirt_item.get_sample_style_display()
+        if row.shirt_item.item_type == InventoryItem.TYPE_TOTE_BAG:
+            grouped[key]["item_style"] = InventoryItem.TYPE_TOTE_BAG
+            grouped[key]["item_style_label"] = "Tote Bag"
+        else:
+            grouped[key]["item_style"] = getattr(row.shirt_item, "sample_style", InventoryItem.STYLE_OVERSIZE)
+            grouped[key]["item_style_label"] = row.shirt_item.get_sample_style_display()
         grouped[key]["color_id"] = row.color_id
         grouped[key]["color_name"] = row.color.name if row.color else "-"
         grouped[key]["color_hex"] = getattr(row.color, "hex_code", "#D1D5DB") if row.color else "#D1D5DB"
@@ -353,6 +367,7 @@ def inventory_list(request):
         InventoryItem.STYLE_OVERSIZE: 1,
         InventoryItem.STYLE_POLO: 2,
         InventoryItem.STYLE_BOXY: 3,
+        InventoryItem.TYPE_TOTE_BAG: 4,
     }
 
     grouped_styles = defaultdict(list)
@@ -475,7 +490,7 @@ def inventory_list(request):
         total_cloth = 0
 
         for item in batch.items.all():
-            if item.item and item.item.item_type == InventoryItem.TYPE_SHIRT:
+            if item.item and item.item.item_type in InventoryItem.VARIANT_TYPES:
                 total_cloth += _to_int(item.qty_received or 0)
 
         batch_rows.append(
@@ -512,7 +527,7 @@ def inventory_list(request):
 
             qty = Decimal(row.qty_received or 0)
 
-            if row.item.item_type == InventoryItem.TYPE_SHIRT:
+            if row.item.item_type in InventoryItem.VARIANT_TYPES:
                 cloth_qty += qty
             else:
                 material_qty += qty
@@ -524,8 +539,8 @@ def inventory_list(request):
         if cloth_qty > 0:
             activity_type = "Cloth"
             quantity = cloth_qty
-            unit = "shirt" if cloth_qty == 1 else "shirts"
-            item_summary = "Cloth Stock In"
+            unit = "pc" if cloth_qty == 1 else "pcs"
+            item_summary = "Product Stock In"
         else:
             activity_type = "Printing Material"
             quantity = material_qty
@@ -972,6 +987,141 @@ def _allocate_fabric_batch_cost(receipts, goods_cost, shipping_cost, extra_cost)
         )
 
 
+
+def _fabric_group_receipts(anchor, for_update=False):
+    """Return all FabricReceipt rows that belong to the same purchase batch as anchor."""
+    qs = FabricReceipt.objects
+    if for_update:
+        qs = qs.select_for_update()
+    qs = qs.select_related("fabric_type", "color", "supplier_ref", "created_by", "updated_by").prefetch_related("rolls")
+    if anchor.purchase_group:
+        return list(qs.filter(purchase_group=anchor.purchase_group).order_by("id"))
+    return list(qs.filter(pk=anchor.pk))
+
+
+def _fabric_receipt_kg(receipt):
+    if receipt.status == FabricReceipt.STATUS_WAITING:
+        total = sum(
+            (Decimal(str(x)) for x in (receipt.pending_roll_weights or []) if str(x).strip()),
+            Decimal("0"),
+        )
+        if total > 0:
+            return total
+    total = sum((Decimal(roll.original_qty or 0) for roll in receipt.rolls.all()), Decimal("0"))
+    return total
+
+
+def _fabric_group_totals(receipts):
+    return {
+        "rolls": sum((int(receipt.roll_count or 0) for receipt in receipts), 0),
+        "kg": sum((_fabric_receipt_kg(receipt) for receipt in receipts), Decimal("0")),
+        "goods": sum((Decimal(receipt.total_goods_cost or 0) for receipt in receipts), Decimal("0")),
+        "shipping": sum((Decimal(receipt.shipping_cost or 0) for receipt in receipts), Decimal("0")),
+        "extra": sum((Decimal(receipt.extra_cost or 0) for receipt in receipts), Decimal("0")),
+    }
+
+
+def _split_decimal_total(total, weights):
+    """Split a money total exactly to cents while preserving the grand total."""
+    total = Decimal(total or 0).quantize(Decimal("0.01"))
+    if not weights:
+        return []
+    weights = [Decimal(w or 0) for w in weights]
+    weight_total = sum(weights, Decimal("0"))
+    if weight_total <= 0:
+        weights = [Decimal("1") for _ in weights]
+        weight_total = Decimal(len(weights))
+    out = []
+    remaining = total
+    for index, weight in enumerate(weights):
+        if index == len(weights) - 1:
+            part = remaining
+        else:
+            part = (total * weight / weight_total).quantize(Decimal("0.01"))
+            remaining -= part
+        out.append(part)
+    return out
+
+
+def _set_fabric_group_cost(receipts, goods_cost=None, extra_cost=None):
+    """Replace batch-level goods/extra cost, allocated to child FabricReceipt rows by KG."""
+    if not receipts:
+        return
+    weights = [_fabric_receipt_kg(receipt) for receipt in receipts]
+    if sum(weights, Decimal("0")) <= 0:
+        weights = [Decimal(receipt.roll_count or 0) for receipt in receipts]
+    goods_parts = _split_decimal_total(goods_cost, weights) if goods_cost is not None else None
+    extra_parts = _split_decimal_total(extra_cost, weights) if extra_cost is not None else None
+    for index, receipt in enumerate(receipts):
+        fields = ["updated_at"]
+        if goods_parts is not None:
+            receipt.total_goods_cost = goods_parts[index]
+            fields.append("total_goods_cost")
+        if extra_parts is not None:
+            receipt.extra_cost = extra_parts[index]
+            fields.append("extra_cost")
+        receipt.save(update_fields=fields)
+
+
+def _add_fabric_group_delivery(receipts, allocated_amount):
+    """Add one delivery allocation to a fabric batch and distribute it by KG inside the batch."""
+    if not receipts:
+        return
+    weights = [_fabric_receipt_kg(receipt) for receipt in receipts]
+    if sum(weights, Decimal("0")) <= 0:
+        weights = [Decimal(receipt.roll_count or 0) for receipt in receipts]
+    parts = _split_decimal_total(allocated_amount, weights)
+    for receipt, part in zip(receipts, parts):
+        receipt.shipping_cost = Decimal(receipt.shipping_cost or 0) + part
+        receipt.save(update_fields=["shipping_cost", "updated_at"])
+
+
+def _sync_fabric_group_expense(receipts, user):
+    """Keep the original Finance Stock In expense synchronized after later cost changes."""
+    if not receipts:
+        return None
+    receipt_ids = [receipt.pk for receipt in receipts]
+    target_ids = set(receipt_ids)
+    expense = None
+    candidates = Expense.objects.filter(
+        expense_type=Expense.TYPE_BATCH,
+        stock_source_type=Expense.SOURCE_FABRIC,
+    ).order_by("-id")
+    for candidate in candidates:
+        try:
+            if set(int(x) for x in (candidate.fabric_receipt_ids or [])) == target_ids:
+                expense = candidate
+                break
+        except (TypeError, ValueError):
+            continue
+
+    totals = _fabric_group_totals(receipts)
+    amount = totals["goods"] + totals["shipping"] + totals["extra"]
+    refs = [receipt.receipt_no for receipt in receipts if receipt.receipt_no]
+    reference = refs[0] if len(refs) == 1 else (f"{refs[0]} +{len(refs)-1}" if refs else "Fabric")
+    anchor = receipts[0]
+
+    if expense is None:
+        expense = Expense(
+            expense_type=Expense.TYPE_BATCH,
+            created_by=user,
+            stock_source_type=Expense.SOURCE_FABRIC,
+            fabric_receipt_ids=receipt_ids,
+        )
+    expense.amount = amount
+    expense.batch_cost = totals["goods"]
+    expense.batch_delivery_fee = totals["shipping"]
+    expense.batch_other_fee = totals["extra"]
+    expense.expense_status = Expense.STATUS_COMPLETED if amount > 0 else Expense.STATUS_PENDING
+    expense.source_reference = reference
+    expense.supplier_name = anchor.supplier or ""
+    expense.received_date = anchor.received_date if anchor.status == FabricReceipt.STATUS_RECEIVED else None
+    expense.fabric_receipt_ids = receipt_ids
+    expense.note = "Fabric Stock In cost updated from Stock In List." if amount > 0 else "Fabric Stock In cost pending."
+    expense.save()
+    return expense
+
+
 @login_required
 @permission_required("inventory.add_inventorybatch", raise_exception=True)
 @transaction.atomic
@@ -1293,11 +1443,17 @@ def _fabric_purchase_groups(receipts, status_kind):
             "total_rolls": Decimal("0"),
             "total_kg": Decimal("0"),
             "total_cost": Decimal("0"),
+            "goods_cost": Decimal("0"),
+            "shipping_cost": Decimal("0"),
+            "extra_cost": Decimal("0"),
         })
         group["receipts"].append(receipt)
         group["total_rolls"] += Decimal(receipt.roll_count or 0)
         group["total_kg"] += Decimal(getattr(receipt, "total_kg_display", 0) or 0)
         group["total_cost"] += Decimal(receipt.total_cost or 0)
+        group["goods_cost"] += Decimal(receipt.total_goods_cost or 0)
+        group["shipping_cost"] += Decimal(receipt.shipping_cost or 0)
+        group["extra_cost"] += Decimal(receipt.extra_cost or 0)
         if receipt.pk < group["anchor"].pk:
             group["anchor"] = receipt
 
@@ -1339,6 +1495,9 @@ def _fabric_purchase_groups(receipts, status_kind):
             "status": "waiting" if status_kind == "waiting" else "received",
             "cost_added": bool(group["total_cost"] > 0),
             "cost_text": f"$ {group['total_cost']:.2f}",
+            "goods_cost": group["goods_cost"],
+            "shipping_cost": group["shipping_cost"],
+            "extra_cost": group["extra_cost"],
             "created_by": anchor.created_by.username if anchor.created_by else "-",
             "obj": anchor,
             "children": children,
@@ -1456,7 +1615,7 @@ def inventory_stock_in_list(request):
             total_qty += Decimal(row.qty_received or 0)
             if row.item.name not in item_names:
                 item_names.append(row.item.name)
-            if row.item.item_type == InventoryItem.TYPE_SHIRT:
+            if row.item.item_type in InventoryItem.VARIANT_TYPES:
                 has_cloth = True
             else:
                 has_printing = True
@@ -1510,11 +1669,13 @@ def inventory_stock_in_list(request):
     # Fabric purchases do not use InventoryBatch.cost_is_added. New fabric
     # purchases always carry total_cost, while legacy missing-cost records are 0.
     if cost_status == "missing":
-        waiting_fabric_qs = waiting_fabric_qs.filter(total_cost__lte=0)
-        purchased_fabric_qs = purchased_fabric_qs.filter(total_cost__lte=0)
+        zero_cost = Q(total_goods_cost=0, shipping_cost=0, extra_cost=0)
+        waiting_fabric_qs = waiting_fabric_qs.filter(zero_cost)
+        purchased_fabric_qs = purchased_fabric_qs.filter(zero_cost)
     elif cost_status == "added":
-        waiting_fabric_qs = waiting_fabric_qs.filter(total_cost__gt=0)
-        purchased_fabric_qs = purchased_fabric_qs.filter(total_cost__gt=0)
+        has_cost = Q(total_goods_cost__gt=0) | Q(shipping_cost__gt=0) | Q(extra_cost__gt=0)
+        waiting_fabric_qs = waiting_fabric_qs.filter(has_cost)
+        purchased_fabric_qs = purchased_fabric_qs.filter(has_cost)
 
     if q:
         fabric_filter = (
@@ -1927,6 +2088,196 @@ def inventory_batch_confirm_received(request, pk):
     })
 
 @login_required
+@permission_required("inventory.view_inventorybatch", raise_exception=True)
+def inventory_fabric_batch_detail(request, pk):
+    anchor = get_object_or_404(FabricReceipt, pk=pk)
+    receipts = _fabric_group_receipts(anchor)
+    totals = _fabric_group_totals(receipts)
+    group_key = anchor.purchase_group or f"legacy-{anchor.pk}"
+    allocations = (
+        FabricDeliveryAllocation.objects
+        .filter(purchase_group=group_key)
+        .select_related("charge", "charge__created_by")
+        .order_by("-charge__charge_date", "-charge_id")
+    )
+    return render(request, "inventory/inventory_fabric_batch_detail.html", {
+        "anchor": anchor,
+        "receipts": receipts,
+        "totals": totals,
+        "allocations": allocations,
+        "group_key": group_key,
+        "can_view_stock_cost": _can_view_stock_cost(request.user),
+    })
+
+
+@login_required
+@permission_required("inventory.change_inventorybatch", raise_exception=True)
+@transaction.atomic
+def inventory_fabric_batch_edit(request, pk):
+    anchor = get_object_or_404(FabricReceipt.objects.select_for_update(), pk=pk)
+    receipts = _fabric_group_receipts(anchor, for_update=True)
+    if request.method == "POST":
+        supplier_name = (request.POST.get("supplier") or "").strip()
+        raw_date = (request.POST.get("received_date") or "").strip()
+        note = (request.POST.get("note") or "").strip()
+        if not supplier_name:
+            messages.error(request, "Supplier is required.")
+        else:
+            try:
+                edit_date = date.fromisoformat(raw_date) if raw_date else anchor.received_date
+            except ValueError:
+                edit_date = None
+            if not edit_date:
+                messages.error(request, "Invalid date.")
+            else:
+                supplier_ref = ProductionSupplier.objects.filter(name__iexact=supplier_name).first()
+                for receipt in receipts:
+                    receipt.supplier_ref = supplier_ref
+                    receipt.supplier = supplier_name
+                    receipt.received_date = edit_date
+                    if receipt.status == FabricReceipt.STATUS_WAITING:
+                        receipt.expected_date = edit_date
+                    receipt.note = note
+                    receipt.updated_by = request.user
+                    receipt.save(update_fields=[
+                        "supplier_ref", "supplier", "received_date", "expected_date", "note", "updated_by", "updated_at"
+                    ])
+                _sync_fabric_group_expense(receipts, request.user)
+                messages.success(request, "Fabric batch updated.")
+                return redirect("inventory_fabric_batch_detail", pk=anchor.pk)
+    return render(request, "inventory/inventory_fabric_batch_edit.html", {
+        "anchor": anchor,
+        "receipts": receipts,
+    })
+
+
+@login_required
+@permission_required("inventory.add_inventorybatch", raise_exception=True)
+@transaction.atomic
+def inventory_fabric_batch_add_cost(request, pk):
+    if not _can_view_stock_cost(request.user):
+        messages.error(request, "You do not have permission to view or change purchase cost.")
+        return redirect("inventory_stock_in_list")
+    anchor = get_object_or_404(FabricReceipt.objects.select_for_update(), pk=pk)
+    receipts = _fabric_group_receipts(anchor, for_update=True)
+    if request.method != "POST":
+        return redirect("inventory_stock_in_list")
+    try:
+        goods = Decimal(request.POST.get("total_goods_cost") or "0")
+        extra = Decimal(request.POST.get("extra_cost") or "0")
+        if goods < 0 or extra < 0:
+            raise ValueError
+    except Exception:
+        messages.error(request, "Invalid cost. Enter 0 or a positive amount.")
+        return redirect("inventory_stock_in_list")
+    _set_fabric_group_cost(receipts, goods_cost=goods, extra_cost=extra)
+    _sync_fabric_group_expense(receipts, request.user)
+    messages.success(request, f"Batch cost saved for {anchor.receipt_no}.")
+    return redirect(request.POST.get("next") or "inventory_stock_in_list")
+
+
+@login_required
+@permission_required("inventory.add_inventorybatch", raise_exception=True)
+@transaction.atomic
+def inventory_fabric_add_delivery_cost(request):
+    if not _can_view_stock_cost(request.user):
+        messages.error(request, "You do not have permission to view or change purchase cost.")
+        return redirect("inventory_stock_in_list")
+    if request.method != "POST":
+        return redirect("inventory_stock_in_list")
+
+    raw_ids = request.POST.getlist("fabric_batch_ids")
+    anchor_ids = []
+    for value in raw_ids:
+        try:
+            pk = int(value)
+            if pk not in anchor_ids:
+                anchor_ids.append(pk)
+        except (TypeError, ValueError):
+            continue
+    if not anchor_ids:
+        messages.error(request, "Select at least one Fabric batch.")
+        return redirect("inventory_stock_in_list")
+
+    try:
+        amount = Decimal(request.POST.get("delivery_amount") or "0").quantize(Decimal("0.01"))
+        if amount <= 0:
+            raise ValueError
+    except Exception:
+        messages.error(request, "Enter a delivery cost greater than 0.")
+        return redirect("inventory_stock_in_list")
+
+    method = (request.POST.get("allocation_method") or FabricDeliveryCharge.METHOD_KG).upper()
+    valid_methods = {choice[0] for choice in FabricDeliveryCharge.METHOD_CHOICES}
+    if method not in valid_methods:
+        method = FabricDeliveryCharge.METHOD_KG
+
+    groups = []
+    seen_group_keys = set()
+    for pk in anchor_ids:
+        anchor = get_object_or_404(FabricReceipt.objects.select_for_update(), pk=pk)
+        receipts = _fabric_group_receipts(anchor, for_update=True)
+        group_key = anchor.purchase_group or f"legacy-{anchor.pk}"
+        if group_key in seen_group_keys:
+            continue
+        seen_group_keys.add(group_key)
+        totals = _fabric_group_totals(receipts)
+        groups.append({"anchor": anchor, "receipts": receipts, "key": group_key, "totals": totals})
+
+    if method == FabricDeliveryCharge.METHOD_MANUAL:
+        allocations = []
+        try:
+            for group in groups:
+                part = Decimal(request.POST.get(f"manual_{group['anchor'].pk}") or "0").quantize(Decimal("0.01"))
+                if part < 0:
+                    raise ValueError
+                allocations.append(part)
+        except Exception:
+            messages.error(request, "Invalid manual allocation amount.")
+            return redirect("inventory_stock_in_list")
+        if sum(allocations, Decimal("0")) != amount:
+            messages.error(request, f"Manual allocations must total ${amount:.2f}.")
+            return redirect("inventory_stock_in_list")
+    else:
+        if method == FabricDeliveryCharge.METHOD_KG:
+            weights = [group["totals"]["kg"] for group in groups]
+        elif method == FabricDeliveryCharge.METHOD_ROLLS:
+            weights = [Decimal(group["totals"]["rolls"]) for group in groups]
+        else:
+            weights = [Decimal("1") for _ in groups]
+        allocations = _split_decimal_total(amount, weights)
+
+    raw_date = (request.POST.get("charge_date") or "").strip()
+    try:
+        charge_date = date.fromisoformat(raw_date) if raw_date else timezone.localdate()
+    except ValueError:
+        charge_date = timezone.localdate()
+
+    charge = FabricDeliveryCharge.objects.create(
+        charge_date=charge_date,
+        amount=amount,
+        allocation_method=method,
+        delivery_company=(request.POST.get("delivery_company") or "").strip(),
+        note=(request.POST.get("delivery_note") or "").strip(),
+        created_by=request.user,
+    )
+    for group, allocated in zip(groups, allocations):
+        FabricDeliveryAllocation.objects.create(
+            charge=charge,
+            purchase_group=group["key"],
+            anchor_receipt=group["anchor"],
+            allocated_amount=allocated,
+            batch_kg=group["totals"]["kg"],
+            batch_rolls=group["totals"]["rolls"],
+        )
+        _add_fabric_group_delivery(group["receipts"], allocated)
+        _sync_fabric_group_expense(group["receipts"], request.user)
+
+    messages.success(request, f"Delivery cost ${amount:.2f} added to {len(groups)} Fabric batch(es).")
+    return redirect("inventory_stock_in_list")
+
+
+@login_required
 @permission_required("inventory.add_inventorybatch", raise_exception=True)
 @transaction.atomic
 def inventory_batch_add_cost(request, pk):
@@ -2103,7 +2454,7 @@ def inventory_batch_edit(request, pk):
             "batch": batch,
             "stock_type": "printing"
             if batch.items.filter(item__item_type=InventoryItem.TYPE_FILM).exists()
-            and not batch.items.filter(item__item_type=InventoryItem.TYPE_SHIRT).exists()
+            and not batch.items.filter(item__item_type__in=InventoryItem.VARIANT_TYPES).exists()
             else "cloth",
             "page_title": f"Edit Batch {batch.batch_no}",
             "submit_label": "Update Batch",

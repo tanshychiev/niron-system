@@ -58,9 +58,9 @@ def _stock_queryset(item_id, color_id=None, size_id=None, is_material=False):
     )
 
     if is_material:
-        return qs.exclude(item__item_type=InventoryItem.TYPE_SHIRT)
+        return qs.exclude(item__item_type__in=InventoryItem.VARIANT_TYPES)
 
-    qs = qs.filter(item__item_type=InventoryItem.TYPE_SHIRT)
+    qs = qs.filter(item__item_type__in=InventoryItem.VARIANT_TYPES)
 
     if color_id:
         qs = qs.filter(color_id=color_id)
@@ -107,7 +107,7 @@ def _collect_stock_data():
     variants = {}
 
     for row in rows:
-        is_material = row.item.item_type != InventoryItem.TYPE_SHIRT
+        is_material = row.item.item_type not in InventoryItem.VARIANT_TYPES
         key = _variant_key(
             row.item_id,
             row.color_id,
@@ -185,7 +185,7 @@ def _collect_stock_data():
 
     for log in confirm_logs:
         item = log.batch_item.item
-        is_material = item.item_type != InventoryItem.TYPE_SHIRT
+        is_material = item.item_type not in InventoryItem.VARIANT_TYPES
         key = _variant_key(
             item.id,
             log.batch_item.color_id,
@@ -822,7 +822,7 @@ def stock_confirm(request):
 
 def _report_variant_identity(log):
     item = log.batch_item.item
-    is_material = item.item_type != InventoryItem.TYPE_SHIRT
+    is_material = item.item_type not in InventoryItem.VARIANT_TYPES
     return _variant_key(
         item.id,
         log.batch_item.color_id,
@@ -834,7 +834,7 @@ def _report_variant_identity(log):
 def _report_row(log, recheck_count=1):
     batch_item = log.batch_item
     item = batch_item.item
-    is_material = item.item_type != InventoryItem.TYPE_SHIRT
+    is_material = item.item_type not in InventoryItem.VARIANT_TYPES
     before = Decimal(log.qty_before or 0)
     after = Decimal(log.qty_after or 0)
     difference = after - before
@@ -1031,7 +1031,7 @@ def _history_variant_identity(log):
     """
     item = log.batch_item.item
 
-    if item.item_type != InventoryItem.TYPE_SHIRT:
+    if item.item_type not in InventoryItem.VARIANT_TYPES:
         return f"M:{item.id}"
 
     return (
@@ -1047,7 +1047,7 @@ def _history_row_from_log(log):
     difference = after - before
 
     item = log.batch_item.item
-    is_material = item.item_type != InventoryItem.TYPE_SHIRT
+    is_material = item.item_type not in InventoryItem.VARIANT_TYPES
 
     local_created_at = (
         timezone.localtime(log.created_at)

@@ -96,10 +96,11 @@ class ColorForm(forms.ModelForm):
 class SizeForm(forms.ModelForm):
     class Meta:
         model = Size
-        fields = ["code", "name", "sort_order", "is_active"]
+        fields = ["code", "name", "product_type", "sort_order", "is_active"]
         widgets = {
             "code": forms.TextInput(attrs={"class": "form-control", "placeholder": "Size code"}),
-            "name": forms.TextInput(attrs={"class": "form-control", "placeholder": "Size name"}),
+            "name": forms.TextInput(attrs={"class": "form-control", "placeholder": "Size name (e.g. 30x20)"}),
+            "product_type": forms.Select(attrs={"class": "form-select"}),
             "sort_order": forms.NumberInput(attrs={"class": "form-control"}),
             "is_active": forms.CheckboxInput(attrs={"class": "form-check-input"}),
         }
@@ -246,17 +247,25 @@ class InventoryItemSelect(forms.Select):
         item = getattr(value, "instance", None)
 
         if item:
-            is_shirt = item.item_type == InventoryItem.TYPE_SHIRT
+            is_variant = item.item_type in InventoryItem.VARIANT_TYPES
+            display_style = (
+                item.get_sample_style_display()
+                if item.item_type == InventoryItem.TYPE_SHIRT
+                else ("Tote Bag" if item.item_type == InventoryItem.TYPE_TOTE_BAG else "")
+            )
             option["attrs"].update(
                 {
                     "data-item-type": item.item_type or "",
                     "data-type-label": item.get_item_type_display(),
                     "data-unit": item.unit or "",
                     "data-unit-label": item.get_unit_display(),
-                    "data-is-shirt": "1" if is_shirt else "0",
+                    # Keep data-is-shirt for existing JavaScript compatibility.
+                    # It now means "variant inventory product" (Shirt or Tote Bag).
+                    "data-is-shirt": "1" if is_variant else "0",
+                    "data-product-type": item.item_type or "",
                     "data-item-code": item.code or "",
                     "data-item-name": item.name or "",
-                    "data-item-style": item.sample_style or "",
+                    "data-item-style": display_style,
                     "data-item-image": item.image.url if getattr(item, "image", None) else "",
                 }
             )
@@ -279,6 +288,17 @@ class InventoryColorSelect(forms.Select):
         return option
 
 
+class InventorySizeSelect(forms.Select):
+    """Expose which variant product type a size belongs to."""
+
+    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
+        option = super().create_option(name, value, label, selected, index, subindex, attrs)
+        size = getattr(value, "instance", None)
+        if size:
+            option["attrs"]["data-product-type"] = size.product_type or Size.PRODUCT_SHIRT
+        return option
+
+
 class InventoryBatchItemForm(forms.ModelForm):
     quantity = forms.DecimalField(
         max_digits=12,
@@ -298,7 +318,7 @@ class InventoryBatchItemForm(forms.ModelForm):
         widgets = {
             "item": InventoryItemSelect(attrs={"class": "form-select item-select"}),
             "color": InventoryColorSelect(attrs={"class": "form-select color-select"}),
-            "size": forms.Select(attrs={"class": "form-select size-select"}),
+            "size": InventorySizeSelect(attrs={"class": "form-select size-select"}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -337,12 +357,17 @@ class InventoryBatchItemForm(forms.ModelForm):
         if not item:
             return cleaned_data
 
-        if item.item_type == InventoryItem.TYPE_SHIRT:
+        if item.item_type in InventoryItem.VARIANT_TYPES:
             if not color:
-                self.add_error("color", "Color is required for shirt stock.")
+                self.add_error("color", f"Color is required for {item.get_item_type_display()} stock.")
 
             if not size:
-                self.add_error("size", "Size is required for shirt stock.")
+                self.add_error("size", f"Size is required for {item.get_item_type_display()} stock.")
+            elif size.product_type != item.item_type:
+                self.add_error(
+                    "size",
+                    f"Choose a {item.get_item_type_display()} size for this product.",
+                )
         else:
             cleaned_data["color"] = None
             cleaned_data["size"] = None
@@ -360,7 +385,7 @@ class InventoryBatchItemForm(forms.ModelForm):
                     "This row already has stock used. Please use stock adjustment instead of editing qty."
                 )
 
-        if instance.item and instance.item.item_type != InventoryItem.TYPE_SHIRT:
+        if instance.item and instance.item.item_type not in InventoryItem.VARIANT_TYPES:
             instance.color = None
             instance.size = None
 
@@ -451,8 +476,8 @@ class InventoryAdjustStockSelectForm(forms.Form):
     item = forms.ModelChoiceField(
         queryset=InventoryItem.objects.filter(
             is_active=True,
-            item_type=InventoryItem.TYPE_SHIRT,
-        ).order_by("code"),
+            item_type__in=InventoryItem.VARIANT_TYPES,
+        ).order_by("item_type", "code"),
         widget=forms.Select(attrs={"class": "form-select"}),
     )
 
@@ -467,6 +492,23 @@ class InventoryAdjustStockSelectForm(forms.Form):
         required=False,
         widget=forms.Select(attrs={"class": "form-select"}),
     )
+
+
+    def clean(self):
+        cleaned_data = super().clean()
+        item = cleaned_data.get("item")
+        size = cleaned_data.get("size")
+
+        if item and item.item_type not in InventoryItem.VARIANT_TYPES:
+            self.add_error("item", "Choose a Shirt or Tote Bag product.")
+
+        if item and size and size.product_type != item.item_type:
+            self.add_error(
+                "size",
+                f"Choose a {item.get_item_type_display()} size for this product.",
+            )
+
+        return cleaned_data
 
 
 class InventoryAdjustVariantForm(forms.Form):

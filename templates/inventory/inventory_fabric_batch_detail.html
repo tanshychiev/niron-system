@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Fabric Batch Detail{% endblock %}
+{% block page_title %}Fabric Batch Detail{% endblock %}
+{% block page_subtitle %}Full purchase batch, cost and delivery allocation history.{% endblock %}
+{% block content %}
+<style>
+.fbd-shell{max-width:1180px;margin:0 auto}.fbd-card{background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);margin-bottom:14px;overflow:hidden}.fbd-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;padding:18px;border-bottom:1px solid var(--line)}.fbd-head h2{margin:0;font-size:22px}.fbd-head p{margin:5px 0 0;color:var(--muted);font-size:12px}.fbd-actions{display:flex;gap:7px;flex-wrap:wrap}.fbd-btn{height:36px;padding:0 13px;border-radius:9px;border:1px solid var(--line);background:#fff;color:var(--text);text-decoration:none;display:inline-flex;align-items:center;font-size:11px;font-weight:900}.fbd-btn.primary{background:#f5a900;border-color:#f5a900;color:#111827}.fbd-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:16px}.fbd-stat{padding:12px;border:1px solid var(--line);border-radius:12px;background:#fffdf8}.fbd-stat span{display:block;font-size:9px;text-transform:uppercase;font-weight:900;color:var(--muted);margin-bottom:5px}.fbd-stat strong{font-size:18px}.fbd-table{width:100%;border-collapse:collapse}.fbd-table th,.fbd-table td{padding:11px 13px;border-bottom:1px solid var(--line);text-align:left;font-size:12px}.fbd-table th{font-size:9px;text-transform:uppercase;color:var(--muted);background:#fffdf8}.swatch{display:inline-block;width:12px;height:12px;border-radius:50%;border:1px solid rgba(0,0,0,.15);margin-right:6px;vertical-align:-1px}.section-title{padding:14px 16px;font-size:14px;font-weight:950;border-bottom:1px solid var(--line)}.empty{padding:20px;text-align:center;color:var(--muted)}
+@media(max-width:800px){.fbd-grid{grid-template-columns:1fr 1fr}.fbd-head{flex-direction:column}}
+</style>
+<div class="fbd-shell">
+  <section class="fbd-card">
+    <div class="fbd-head">
+      <div><h2>{{ anchor.receipt_no }}{% if receipts|length > 1 %} +{{ receipts|length|add:"-1" }}{% endif %}</h2><p>{{ anchor.supplier }} · {{ anchor.received_date|date:"d M Y" }} · {% if anchor.status == "WAITING" %}Waiting{% else %}Received{% endif %}</p></div>
+      <div class="fbd-actions"><a class="fbd-btn" href="{% url 'inventory_stock_in_list' %}?list_type=all&material_type=fabric">Back</a><a class="fbd-btn primary" href="{% url 'inventory_fabric_batch_edit' anchor.pk %}">Edit Batch</a></div>
+    </div>
+    <div class="fbd-grid">
+      <div class="fbd-stat"><span>Fabric Types</span><strong>{{ receipts|length }}</strong></div>
+      <div class="fbd-stat"><span>Total Rolls</span><strong>{{ totals.rolls }}</strong></div>
+      <div class="fbd-stat"><span>Total KG</span><strong>{{ totals.kg|floatformat:2 }}</strong></div>
+      {% if can_view_stock_cost %}<div class="fbd-stat"><span>Total Landed Cost</span><strong>${{ totals.goods|add:totals.shipping|add:totals.extra|floatformat:2 }}</strong></div>{% endif %}
+    </div>
+  </section>
+
+  <section class="fbd-card">
+    <div class="section-title">Batch Items</div>
+    <div style="overflow:auto"><table class="fbd-table"><thead><tr><th>Receipt</th><th>Fabric</th><th>Color</th><th>Rolls</th><th>KG</th>{% if can_view_stock_cost %}<th>Fabric Cost</th><th>Delivery</th><th>Extra</th><th>Total</th>{% endif %}</tr></thead><tbody>
+      {% for receipt in receipts %}<tr><td>{{ receipt.receipt_no }}</td><td>{{ receipt.fabric_name }}</td><td><span class="swatch" style="background:{{ receipt.color.hex_code|default:'#d1d5db' }}"></span>{{ receipt.color.name }}</td><td>{{ receipt.roll_count }}</td><td>{{ receipt.total_weight_kg|floatformat:2 }}</td>{% if can_view_stock_cost %}<td>${{ receipt.total_goods_cost|floatformat:2 }}</td><td>${{ receipt.shipping_cost|floatformat:2 }}</td><td>${{ receipt.extra_cost|floatformat:2 }}</td><td><strong>${{ receipt.total_cost|floatformat:2 }}</strong></td>{% endif %}</tr>{% endfor %}
+    </tbody></table></div>
+  </section>
+
+  {% if can_view_stock_cost %}
+  <section class="fbd-card">
+    <div class="section-title">Cost Summary</div>
+    <div class="fbd-grid">
+      <div class="fbd-stat"><span>Fabric Purchase Cost</span><strong>${{ totals.goods|floatformat:2 }}</strong></div>
+      <div class="fbd-stat"><span>Delivery Cost</span><strong>${{ totals.shipping|floatformat:2 }}</strong></div>
+      <div class="fbd-stat"><span>Extra Cost</span><strong>${{ totals.extra|floatformat:2 }}</strong></div>
+      <div class="fbd-stat"><span>Total</span><strong>${{ totals.goods|add:totals.shipping|add:totals.extra|floatformat:2 }}</strong></div>
+    </div>
+  </section>
+
+  <section class="fbd-card">
+    <div class="section-title">Delivery Cost History</div>
+    <div style="overflow:auto"><table class="fbd-table"><thead><tr><th>Date</th><th>Delivery Company</th><th>Allocation</th><th>Batch KG</th><th>Batch Rolls</th><th>This Batch</th><th>Total Delivery</th><th>Added By</th><th>Note</th></tr></thead><tbody>
+      {% for allocation in allocations %}<tr><td>{{ allocation.charge.charge_date|date:"d M Y" }}</td><td>{{ allocation.charge.delivery_company|default:"-" }}</td><td>{{ allocation.charge.get_allocation_method_display }}</td><td>{{ allocation.batch_kg|floatformat:2 }}</td><td>{{ allocation.batch_rolls }}</td><td><strong>${{ allocation.allocated_amount|floatformat:2 }}</strong></td><td>${{ allocation.charge.amount|floatformat:2 }}</td><td>{{ allocation.charge.created_by.username|default:"-" }}</td><td>{{ allocation.charge.note|default:"-" }}</td></tr>{% empty %}<tr><td colspan="9" class="empty">No delivery cost has been added to this batch yet.</td></tr>{% endfor %}
+    </tbody></table></div>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

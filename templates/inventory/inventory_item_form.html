@@ -41,7 +41,7 @@
   <div class="page-head">
     <div>
       <h1>{{ page_title|default:"Create Item" }}</h1>
-      <p class="sub">Create cloth or material item</p>
+      <p class="sub">Create Shirt, Tote Bag, or printing material item</p>
     </div>
     <a href="{% url 'inventory_item_list' %}" class="btn-secondary">Item List</a>
   </div>
@@ -72,7 +72,7 @@
       </div>
 
       <div class="field" id="imageField">
-        <label>Image for Material Item</label>
+        <label>Image for Tote Bag / Material Item</label>
 
         <div id="dropZone" class="drop-zone">
           {{ form.image }}
@@ -183,6 +183,10 @@
       return typeField && typeField.value === "SHIRT";
     }
 
+    function isToteBag() {
+      return typeField && typeField.value === "TOTE_BAG";
+    }
+
     function clearImage() {
       if (fileInput) fileInput.value = "";
       if (previewImage) previewImage.src = "";
@@ -195,12 +199,16 @@
       if (isShirt()) {
         if (previewPanel) previewPanel.style.display = "block";
         if (imageField) imageField.style.display = "none";
-        if (typeHelp) typeHelp.textContent = "Shirt item: preview and shirt style only.";
+        if (typeHelp) typeHelp.textContent = "Shirt: uses Color + Shirt Size and shirt style.";
         clearImage();
+      } else if (isToteBag()) {
+        if (previewPanel) previewPanel.style.display = "none";
+        if (imageField) imageField.style.display = "block";
+        if (typeHelp) typeHelp.textContent = "Tote Bag: uses Color + Tote Bag Size (for example 30x20) and deducts stock when ordered.";
       } else {
         if (previewPanel) previewPanel.style.display = "none";
         if (imageField) imageField.style.display = "block";
-        if (typeHelp) typeHelp.textContent = "Material item: click, drag, or paste image.";
+        if (typeHelp) typeHelp.textContent = "Printing/material item: quantity stock without Color + Size variants.";
       }
     }
 

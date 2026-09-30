@@ -1,14 +1,14 @@
 {% extends "base.html" %}
 
 {% block page_title %}{{ page_title|default:"Create Size" }}{% endblock %}
-{% block page_subtitle %}Add shirt size master data{% endblock %}
+{% block page_subtitle %}Add Shirt or Tote Bag size master data{% endblock %}
 
 {% block content %}
 <div class="page-wrap">
   <div class="page-head">
     <div>
       <h1>{{ page_title|default:"Create Size" }}</h1>
-      <p class="sub">Add shirt size master data.</p>
+      <p class="sub">Create sizes for Shirt or Tote Bag (for example Tote Bag 30x20).</p>
     </div>
 
     <div class="page-head-actions">
@@ -37,6 +37,12 @@
           <label for="{{ form.name.id_for_label }}">Size Name</label>
           {{ form.name }}
           {% for e in form.name.errors %}<div class="error">{{ e }}</div>{% endfor %}
+        </div>
+
+        <div class="field">
+          <label for="{{ form.product_type.id_for_label }}">Product Type</label>
+          {{ form.product_type }}
+          {% for e in form.product_type.errors %}<div class="error">{{ e }}</div>{% endfor %}
         </div>
 
         <div class="field">

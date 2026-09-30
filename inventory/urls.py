@@ -14,6 +14,10 @@ from .views import (
     inventory_batch_add_cost,
     inventory_batch_confirm_received,
     inventory_fabric_confirm_received,
+    inventory_fabric_batch_detail,
+    inventory_fabric_batch_edit,
+    inventory_fabric_batch_add_cost,
+    inventory_fabric_add_delivery_cost,
     inventory_fabric_print_labels,
     inventory_batch_create,
     inventory_batch_delete,
@@ -91,6 +95,26 @@ urlpatterns = [
         "fabric-purchases/<int:pk>/labels/",
         inventory_fabric_print_labels,
         name="inventory_fabric_print_labels",
+    ),
+    path(
+        "fabric-purchases/<int:pk>/detail/",
+        inventory_fabric_batch_detail,
+        name="inventory_fabric_batch_detail",
+    ),
+    path(
+        "fabric-purchases/<int:pk>/edit/",
+        inventory_fabric_batch_edit,
+        name="inventory_fabric_batch_edit",
+    ),
+    path(
+        "fabric-purchases/<int:pk>/add-cost/",
+        inventory_fabric_batch_add_cost,
+        name="inventory_fabric_batch_add_cost",
+    ),
+    path(
+        "fabric-purchases/add-delivery-cost/",
+        inventory_fabric_add_delivery_cost,
+        name="inventory_fabric_add_delivery_cost",
     ),
     path(
         "batches/<int:pk>/add-cost/",

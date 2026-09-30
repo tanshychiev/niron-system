@@ -7,7 +7,7 @@
     <div>
       <h1>Inventory List</h1>
       <p class="sub">
-        View Cloth, Printing Material, and Fabric stock from one inventory entry point.
+        View Shirt/Tote Bag, Printing Material, and Fabric stock from one inventory entry point.
       </p>
     </div>
 
@@ -39,7 +39,7 @@
       <button type="button" id="inventorySearchClear" class="instant-search-clear" hidden aria-label="Clear search">×</button>
     </div>
     <div class="picker-actions">
-      <button type="button" class="inventory-type-btn is-active" data-inventory-filter="cloth">Cloth</button>
+      <button type="button" class="inventory-type-btn is-active" data-inventory-filter="cloth">Shirt / Tote Bag</button>
       <button type="button" class="inventory-type-btn" data-inventory-filter="material">Material</button>
       <button type="button" class="inventory-type-btn" data-inventory-filter="fabric">Fabric</button>
       <button type="button" class="inventory-type-btn" data-inventory-filter="all">All</button>
@@ -69,31 +69,19 @@
             <div class="shirt-card-top"><span class="card-scan-line" aria-hidden="true"></span><button type="button" class="drag-grip" aria-label="Drag to reorder" title="Drag to reorder">⋮⋮</button><button type="button" class="drag-grip" aria-label="Drag to reorder" title="Drag to reorder">⋮⋮</button>
               <div class="shirt-preview-wrap">
                 <div class="shirt-preview style-{{ card.item_style }}">
-                  <svg viewBox="0 0 220 220" class="shirt-svg" aria-hidden="true">
-                    <path
-                      class="shape shape-oversize"
-                      fill="{{ card.color_hex|default:'#D1D5DB' }}"
-                      d="M55 48 L82 30 L138 30 L165 48 L190 83 L170 96 L160 78 L160 190 L60 190 L60 78 L50 96 L30 83 Z">
-                    </path>
-
-                    <path
-                      class="shape shape-polo"
-                      fill="{{ card.color_hex|default:'#D1D5DB' }}"
-                      d="M65 46 L88 28 L132 28 L155 46 L178 80 L160 92 L150 74 L150 190 L70 190 L70 74 L60 92 L42 80 Z">
-                    </path>
-
-                    <path
-                      class="collar collar-polo"
-                      fill="#E5E7EB"
-                      d="M92 30 L110 48 L128 30 L118 62 L102 62 Z">
-                    </path>
-
-                    <path
-                      class="shape shape-boxy"
-                      fill="{{ card.color_hex|default:'#D1D5DB' }}"
-                      d="M48 58 L75 34 L145 34 L172 58 L188 86 L168 97 L158 80 L158 175 L62 175 L62 80 L52 97 L32 86 Z">
-                    </path>
-                  </svg>
+                  {% if card.item_style == "TOTE_BAG" %}
+                    <svg viewBox="0 0 220 220" class="shirt-svg" aria-hidden="true">
+                      <path fill="{{ card.color_hex|default:'#D1D5DB' }}" d="M54 72 H166 L182 190 H38 Z"></path>
+                      <path fill="none" stroke="#E5E7EB" stroke-width="12" stroke-linecap="round" d="M78 82 C78 40 92 25 110 25 C128 25 142 40 142 82"></path>
+                    </svg>
+                  {% else %}
+                    <svg viewBox="0 0 220 220" class="shirt-svg" aria-hidden="true">
+                      <path class="shape shape-oversize" fill="{{ card.color_hex|default:'#D1D5DB' }}" d="M55 48 L82 30 L138 30 L165 48 L190 83 L170 96 L160 78 L160 190 L60 190 L60 78 L50 96 L30 83 Z"></path>
+                      <path class="shape shape-polo" fill="{{ card.color_hex|default:'#D1D5DB' }}" d="M65 46 L88 28 L132 28 L155 46 L178 80 L160 92 L150 74 L150 190 L70 190 L70 74 L60 92 L42 80 Z"></path>
+                      <path class="collar collar-polo" fill="#E5E7EB" d="M92 30 L110 48 L128 30 L118 62 L102 62 Z"></path>
+                      <path class="shape shape-boxy" fill="{{ card.color_hex|default:'#D1D5DB' }}" d="M48 58 L75 34 L145 34 L172 58 L188 86 L168 97 L158 80 L158 175 L62 175 L62 80 L52 97 L32 86 Z"></path>
+                    </svg>
+                  {% endif %}
                 </div>
               </div>
 
@@ -197,7 +185,7 @@
               </div>
 
               <div class="metric metric-total">
-                <div class="metric-label">Total Cloth</div>
+                <div class="metric-label">Total Stock</div>
                 <div class="metric-value">{{ card.total_qty|floatformat:0 }}</div>
               </div>
             </div>
@@ -209,7 +197,7 @@
       </div>
     </section>
   {% empty %}
-    <div class="empty-main inventory-category inventory-category-cloth">No cloth inventory data found.</div>
+    <div class="empty-main inventory-category inventory-category-cloth">No Shirt or Tote Bag inventory data found.</div>
   {% endfor %}
 
   <!-- =========================

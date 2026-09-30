@@ -58,6 +58,7 @@
 .fabric-child-indent{padding-left:28px!important}
 .fabric-swatch{display:inline-block;width:13px;height:13px;border-radius:50%;border:1px solid rgba(0,0,0,.16);vertical-align:-2px;margin-right:6px}
 .fabric-child-count{display:inline-flex;min-width:20px;height:20px;padding:0 6px;align-items:center;justify-content:center;border-radius:999px;background:#fff0c2;color:#7c5200;font-size:9px;font-weight:950}
+.fabric-select{width:18px;height:18px;accent-color:#f5a900;cursor:pointer}.delivery-toolbar{display:none;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;margin:0 0 12px;background:#fff7df;border:1px solid #efcf83;border-radius:12px}.delivery-toolbar.is-visible{display:flex}.delivery-toolbar strong{font-size:12px}.delivery-modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.delivery-modal-grid label{display:grid;gap:5px;font-size:9px;font-weight:900;text-transform:uppercase;color:#725f47}.delivery-modal-grid input,.delivery-modal-grid select,.delivery-modal-grid textarea{width:100%;border:1px solid #dfcdb0;border-radius:10px;padding:9px 10px;background:#fff}.delivery-modal-grid textarea{min-height:72px;resize:vertical}.delivery-selected{margin:10px 0;padding:10px;border:1px solid #eadac3;border-radius:10px;background:#fff;font-size:11px;display:grid;gap:6px}.manual-row{display:grid;grid-template-columns:1fr 120px;gap:8px;align-items:center}.manual-row input{height:34px;text-align:right}
 @media(max-width:1200px){.stock-filter-grid{grid-template-columns:minmax(200px,1fr) 135px 135px 155px 175px 125px auto auto}}
 @media(max-width:980px){.stock-filter-grid{grid-template-columns:1fr 1fr 1fr}.stock-filter-grid .search-field{grid-column:1/-1}}
 @media(max-width:600px){.stock-shell{padding:0 2px}.stock-filter-grid{grid-template-columns:1fr}.stock-filter-grid .search-field{grid-column:auto}.stock-card-head{align-items:flex-start}.source-badge{flex:0 0 auto}}
@@ -115,6 +116,7 @@
     </form>
   </div>
 
+  {% if can_view_stock_cost %}<div class="delivery-toolbar" id="deliveryToolbar"><strong><span id="selectedFabricCount">0</span> fabric batch(es) selected</strong><button type="button" class="btn-stock btn-primary-stock" id="openDeliveryModal">+ Add Delivery Cost</button></div>{% endif %}
 
 {% if show_waiting %}
 <section class="stock-card waiting-card">
@@ -130,6 +132,7 @@
     <table class="stock-table">
       <thead>
         <tr>
+          {% if can_view_stock_cost %}<th>Select</th>{% endif %}
           <th>Reference</th>
           <th>Expected Date</th>
           <th>Supplier</th>
@@ -148,6 +151,7 @@
       <tbody>
         {% for row in waiting_rows %}
         <tr{% if row.kind == "fabric_group" %} class="fabric-batch-row"{% endif %}>
+          {% if can_view_stock_cost %}<td>{% if row.kind == "fabric_group" %}<input type="checkbox" class="fabric-select js-fabric-select" value="{{ row.obj.pk }}" data-ref="{{ row.ref }}" data-kg="{{ row.qty_label }}">{% else %}-{% endif %}</td>{% endif %}
           <td>
             {% if row.kind == "batch" %}
               <a class="ref-link" href="{% url 'inventory_batch_detail' row.obj.pk %}">{{ row.ref }}</a>
@@ -172,7 +176,7 @@
               <span class="badge badge-coming">Waiting to Receive</span>
             {% endif %}
           </td>
-          <td>
+          {% if can_view_stock_cost %}<td>
             {% if row.kind == "batch" %}
               {% if row.cost_added %}
                 <span class="badge badge-cost-ok">Cost Added</span>
@@ -184,7 +188,7 @@
                 {{ row.cost_text }}
               </span>
             {% endif %}
-          </td>
+          </td>{% endif %}
           <td>{{ row.created_by }}</td>
           <td>
             <div class="action-cell">
@@ -245,6 +249,9 @@
                 {% endif %}
               {% elif row.kind == "fabric_group" %}
                 <a class="action-link" href="{% url 'inventory_fabric_confirm_received' row.obj.pk %}">✓ Confirm Batch</a>
+                <a class="action-link action-light" href="{% url 'inventory_fabric_batch_detail' row.obj.pk %}">Detail</a>
+                <a class="action-link action-light" href="{% url 'inventory_fabric_batch_edit' row.obj.pk %}">Edit</a>
+                {% if can_view_stock_cost %}<button type="button" class="action-link action-light js-open-fabric-cost" data-action="{% url 'inventory_fabric_batch_add_cost' row.obj.pk %}" data-ref="{{ row.ref }}" data-supplier="{{ row.supplier }}" data-goods="{{ row.goods_cost|floatformat:2 }}" data-extra="{{ row.extra_cost|floatformat:2 }}" data-shipping="{{ row.shipping_cost|floatformat:2 }}">{% if row.cost_added %}Edit Cost{% else %}+ Cost{% endif %}</button>{% endif %}
                 <a class="action-link action-light action-print" target="_blank" href="{% url 'inventory_fabric_print_labels' row.obj.pk %}">🖨 Print Labels</a>
               {% else %}
                 <a class="action-link" href="{% url 'inventory_fabric_confirm_received' row.obj.pk %}">✓ Confirm Received</a>
@@ -255,6 +262,7 @@
         {% if row.kind == "fabric_group" %}
           {% for child in row.children %}
           <tr class="fabric-child-row">
+            {% if can_view_stock_cost %}<td></td>{% endif %}
             <td class="fabric-child-indent">↳ {{ child.ref }}</td>
             <td></td><td></td><td><span class="badge type-badge">Child</span></td>
             <td><span class="fabric-swatch" style="background:{{ child.color_hex }}"></span>{{ child.fabric }} / {{ child.color }}</td>
@@ -296,6 +304,7 @@
     <table class="stock-table">
       <thead>
         <tr>
+          {% if can_view_stock_cost %}<th>Select</th>{% endif %}
           <th>Reference</th>
           <th>Received Date</th>
           <th>Supplier</th>
@@ -312,6 +321,7 @@
       <tbody>
         {% for row in purchased_rows %}
         <tr{% if row.kind == "fabric_group" %} class="fabric-batch-row"{% endif %}>
+          {% if can_view_stock_cost %}<td>{% if row.kind == "fabric_group" %}<input type="checkbox" class="fabric-select js-fabric-select" value="{{ row.obj.pk }}" data-ref="{{ row.ref }}" data-kg="{{ row.qty_label }}">{% else %}-{% endif %}</td>{% endif %}
           <td>
             {% if row.kind == "batch" %}
               <a class="ref-link" href="{% url 'inventory_batch_detail' row.obj.pk %}">{{ row.ref }}</a>
@@ -328,7 +338,7 @@
           <td><strong>{{ row.qty|floatformat:"-2" }}</strong></td>
           <td>{% if row.qty_label %}<strong>{{ row.qty_label }}</strong>{% else %}-{% endif %}</td>
           <td><span class="badge badge-received">Received</span></td>
-          <td>
+          {% if can_view_stock_cost %}<td>
             {% if row.kind == "batch" %}
               {% if row.cost_added %}
                 <span class="badge badge-cost-ok">Cost Added</span>
@@ -340,7 +350,7 @@
                 {{ row.cost_text }}
               </span>
             {% endif %}
-          </td>
+          </td>{% endif %}
           <td>{{ row.created_by }}</td>
           <td>
             <div class="action-cell">
@@ -398,6 +408,9 @@
 </div>
                 {% endif %}
               {% elif row.kind == "fabric_group" %}
+                <a class="action-link action-light" href="{% url 'inventory_fabric_batch_detail' row.obj.pk %}">Detail</a>
+                <a class="action-link action-light" href="{% url 'inventory_fabric_batch_edit' row.obj.pk %}">Edit</a>
+                {% if can_view_stock_cost %}<button type="button" class="action-link action-light js-open-fabric-cost" data-action="{% url 'inventory_fabric_batch_add_cost' row.obj.pk %}" data-ref="{{ row.ref }}" data-supplier="{{ row.supplier }}" data-goods="{{ row.goods_cost|floatformat:2 }}" data-extra="{{ row.extra_cost|floatformat:2 }}" data-shipping="{{ row.shipping_cost|floatformat:2 }}">{% if row.cost_added %}Edit Cost{% else %}+ Cost{% endif %}</button>{% endif %}
                 <a class="action-link action-print" target="_blank" href="{% url 'inventory_fabric_print_labels' row.obj.pk %}">🖨 Print Labels</a>
               {% else %}
                 {% if perms.production.change_fabricreceipt %}
@@ -411,6 +424,7 @@
         {% if row.kind == "fabric_group" %}
           {% for child in row.children %}
           <tr class="fabric-child-row">
+            {% if can_view_stock_cost %}<td></td>{% endif %}
             <td class="fabric-child-indent">↳ {{ child.ref }}</td>
             <td></td><td></td><td><span class="badge type-badge">Child</span></td>
             <td><span class="fabric-swatch" style="background:{{ child.color_hex }}"></span>{{ child.fabric }} / {{ child.color }}</td>
@@ -435,6 +449,12 @@
     Purchase Stock In now combines Cloth, Printing Material and Fabric in one table.
   </div>
 </section>
+{% endif %}
+
+{% if can_view_stock_cost %}
+<div class="cost-modal" id="fabricSharedCostModal" aria-hidden="true"><div class="cost-modal-backdrop" data-close-cost></div><div class="cost-modal-card"><div class="cost-modal-head"><div><h3>Edit Fabric Batch Cost</h3><p id="fabricCostModalSub">Fabric batch</p></div><button type="button" class="cost-modal-close" data-close-cost>×</button></div><form method="post" class="clean-cost-form" id="fabricSharedCostForm">{% csrf_token %}<input type="hidden" name="next" value="{% url 'inventory_stock_in_list' %}?list_type={{ stock_list_type }}&material_type={{ material_type }}"><div class="clean-cost-grid" style="grid-template-columns:1fr 1fr"><label><span>Fabric Purchase Cost</span><div class="money-input"><b>$</b><input class="js-cost-number" id="fabricSharedGoods" type="number" step="0.01" min="0" name="total_goods_cost" required></div></label><label><span>Extra Cost</span><div class="money-input"><b>$</b><input class="js-cost-number" id="fabricSharedExtra" type="number" step="0.01" min="0" name="extra_cost"></div></label></div><div style="margin-top:10px;padding:10px;border:1px solid #dbe5ef;border-radius:10px;background:#f8fbff;font-size:11px"><strong>Delivery Cost:</strong> $<span id="fabricSharedShipping">0.00</span> — add delivery cost by ticking batches in the list.</div><div class="clean-cost-total"><span>Fabric + Extra</span><strong>$<span data-cost-total>0.00</span></strong></div><div class="clean-cost-actions"><button type="button" class="btn-cost-cancel" data-close-cost>Cancel</button><button type="submit" class="btn-cost-save">Save Cost</button></div></form></div></div>
+
+<div class="cost-modal" id="deliveryCostModal" aria-hidden="true"><div class="cost-modal-backdrop" data-close-cost></div><div class="cost-modal-card"><div class="cost-modal-head"><div><h3>Add Delivery Cost</h3><p>Select Fabric batches from the Stock In list and allocate one delivery fee.</p></div><button type="button" class="cost-modal-close" data-close-cost>×</button></div><form method="post" class="clean-cost-form" action="{% url 'inventory_fabric_add_delivery_cost' %}" id="deliveryCostForm">{% csrf_token %}<div id="deliveryHiddenIds"></div><div class="delivery-selected" id="deliverySelectedList"></div><div class="delivery-modal-grid"><label><span>Delivery Cost</span><input type="number" step="0.01" min="0.01" name="delivery_amount" required></label><label><span>Date</span><input type="date" name="charge_date" value="{% now 'Y-m-d' %}"></label><label><span>Allocate By</span><select name="allocation_method" id="deliveryMethod"><option value="KG">By KG</option><option value="ROLLS">By Rolls</option><option value="EQUAL">Equal</option><option value="MANUAL">Manual</option></select></label><label><span>Delivery Company</span><input name="delivery_company" placeholder="Optional"></label><label style="grid-column:1/-1"><span>Note</span><textarea name="delivery_note" placeholder="Optional note"></textarea></label></div><div class="clean-cost-actions"><button type="button" class="btn-cost-cancel" data-close-cost>Cancel</button><button type="submit" class="btn-cost-save">Save Delivery Cost</button></div></form></div></div>
 {% endif %}
 
   {% if show_production %}
@@ -663,4 +683,60 @@ body.cost-modal-open{overflow:hidden}
 }
 </style>
 
+<script>
+(function(){
+  const toolbar=document.getElementById('deliveryToolbar');
+  const countEl=document.getElementById('selectedFabricCount');
+  const modal=document.getElementById('deliveryCostModal');
+  const openBtn=document.getElementById('openDeliveryModal');
+  const hidden=document.getElementById('deliveryHiddenIds');
+  const selectedList=document.getElementById('deliverySelectedList');
+  const method=document.getElementById('deliveryMethod');
+
+  function checked(){return Array.from(document.querySelectorAll('.js-fabric-select:checked'));}
+  function refreshToolbar(){
+    const rows=checked();
+    if(countEl) countEl.textContent=rows.length;
+    if(toolbar) toolbar.classList.toggle('is-visible', rows.length>0);
+  }
+  function renderSelected(){
+    const rows=checked();
+    if(hidden) hidden.innerHTML=rows.map(x=>'<input type="hidden" name="fabric_batch_ids" value="'+x.value+'">').join('');
+    if(selectedList){
+      selectedList.innerHTML=rows.map(function(x){
+        const manual = method && method.value==='MANUAL' ? '<input type="number" step="0.01" min="0" name="manual_'+x.value+'" placeholder="$0.00" required>' : '';
+        return '<div class="manual-row"><span><strong>'+x.dataset.ref+'</strong> <small>'+ (x.dataset.kg||'') +'</small></span>'+manual+'</div>';
+      }).join('');
+    }
+  }
+  document.addEventListener('change',function(e){
+    if(e.target.matches('.js-fabric-select')) refreshToolbar();
+    if(e.target===method) renderSelected();
+  });
+  if(openBtn) openBtn.addEventListener('click',function(){
+    if(!checked().length) return;
+    renderSelected();
+    if(modal){modal.classList.add('is-open');modal.setAttribute('aria-hidden','false');document.body.classList.add('cost-modal-open');}
+  });
+
+  document.addEventListener('click',function(e){
+    const btn=e.target.closest('.js-open-fabric-cost');
+    if(!btn) return;
+    e.preventDefault();
+    const fm=document.getElementById('fabricSharedCostModal');
+    const form=document.getElementById('fabricSharedCostForm');
+    if(!fm || !form) return;
+    form.action=btn.dataset.action;
+    document.getElementById('fabricCostModalSub').textContent=(btn.dataset.ref||'Fabric batch')+' · '+(btn.dataset.supplier||'');
+    document.getElementById('fabricSharedGoods').value=btn.dataset.goods||'0.00';
+    document.getElementById('fabricSharedExtra').value=btn.dataset.extra||'0.00';
+    document.getElementById('fabricSharedShipping').textContent=btn.dataset.shipping||'0.00';
+    fm.classList.add('is-open');fm.setAttribute('aria-hidden','false');document.body.classList.add('cost-modal-open');
+    fm.querySelectorAll('.js-cost-number').forEach(function(input){ input.dispatchEvent(new Event('input',{bubbles:true})); });
+  });
+  refreshToolbar();
+})();
+</script>
+
 {% endblock %}
+

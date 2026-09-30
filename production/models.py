@@ -203,6 +203,74 @@ class FabricReceipt(models.Model):
         return self.total_cost / total_kg if total_kg > 0 else ZERO
 
 
+class FabricDeliveryCharge(models.Model):
+    """One delivery/shipping invoice that can be allocated to several fabric purchase batches."""
+
+    METHOD_KG = "KG"
+    METHOD_ROLLS = "ROLLS"
+    METHOD_EQUAL = "EQUAL"
+    METHOD_MANUAL = "MANUAL"
+    METHOD_CHOICES = [
+        (METHOD_KG, "By KG"),
+        (METHOD_ROLLS, "By Rolls"),
+        (METHOD_EQUAL, "Equal"),
+        (METHOD_MANUAL, "Manual"),
+    ]
+
+    charge_date = models.DateField(default=timezone.localdate)
+    amount = models.DecimalField(max_digits=14, decimal_places=2, default=ZERO, validators=[MinValueValidator(ZERO)])
+    allocation_method = models.CharField(max_length=12, choices=METHOD_CHOICES, default=METHOD_KG)
+    delivery_company = models.CharField(max_length=150, blank=True, default="")
+    note = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(default=timezone.now)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="fabric_delivery_charges_created",
+    )
+
+    class Meta:
+        ordering = ["-charge_date", "-id"]
+
+    def __str__(self):
+        return f"Fabric delivery ${self.amount} - {self.charge_date}"
+
+
+class FabricDeliveryAllocation(models.Model):
+    """Allocated portion of a FabricDeliveryCharge for one purchase_group."""
+
+    charge = models.ForeignKey(
+        FabricDeliveryCharge,
+        on_delete=models.CASCADE,
+        related_name="allocations",
+    )
+    purchase_group = models.CharField(max_length=60, db_index=True)
+    anchor_receipt = models.ForeignKey(
+        FabricReceipt,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="delivery_allocations",
+    )
+    allocated_amount = models.DecimalField(max_digits=14, decimal_places=2, default=ZERO)
+    batch_kg = models.DecimalField(max_digits=14, decimal_places=3, default=ZERO)
+    batch_rolls = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["charge_id", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["charge", "purchase_group"],
+                name="unique_fabric_delivery_charge_group",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.purchase_group} - ${self.allocated_amount}"
+
+
 class FabricRoll(models.Model):
     STATUS_FULL = "FULL"
     STATUS_PARTIAL = "PARTIAL"

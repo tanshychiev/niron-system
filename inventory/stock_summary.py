@@ -18,7 +18,7 @@ def _decimal_text(value):
 
 def _variant_identity(log):
     item = log.batch_item.item
-    is_material = item.item_type != InventoryItem.TYPE_SHIRT
+    is_material = item.item_type not in InventoryItem.VARIANT_TYPES
 
     if is_material:
         return f"M:{item.id}"
@@ -33,7 +33,7 @@ def _variant_identity(log):
 def _report_row(log, recheck_count=1):
     batch_item = log.batch_item
     item = batch_item.item
-    is_material = item.item_type != InventoryItem.TYPE_SHIRT
+    is_material = item.item_type not in InventoryItem.VARIANT_TYPES
 
     before = Decimal(log.qty_before or 0)
     after = Decimal(log.qty_after or 0)

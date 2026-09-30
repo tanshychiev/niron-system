@@ -369,11 +369,15 @@ class OrderItem(models.Model):
 
         if service_type == Order.SERVICE_FULL:
             if not self.shirt_item:
-                raise ValidationError({"shirt_item": "Full Order requires shirt item."})
+                raise ValidationError({"shirt_item": "Full Order requires a product item."})
+            if self.shirt_item.item_type not in InventoryItem.VARIANT_TYPES:
+                raise ValidationError({"shirt_item": "Choose a Shirt or Tote Bag product."})
             if not self.color:
                 raise ValidationError({"color": "Full Order requires color."})
             if not self.size:
                 raise ValidationError({"size": "Full Order requires size."})
+            if self.size and self.shirt_item and self.size.product_type != self.shirt_item.item_type:
+                raise ValidationError({"size": "Size does not belong to the selected product type."})
             if Decimal(self.quantity or 0) < 1:
                 raise ValidationError({"quantity": "Full Order requires quantity."})
             if Decimal(self.unit_price or 0) <= 0:
@@ -433,10 +437,14 @@ class OrderItem(models.Model):
             self.film_meter = Decimal("0.00")
 
             if has_shirt:
+                if self.shirt_item.item_type not in InventoryItem.VARIANT_TYPES:
+                    raise ValidationError({"shirt_item": "Choose a Shirt or Tote Bag product."})
                 if not self.color:
-                    raise ValidationError({"color": "Retail shirt sale requires color."})
+                    raise ValidationError({"color": "Retail product sale requires color."})
                 if not self.size:
-                    raise ValidationError({"size": "Retail shirt sale requires size."})
+                    raise ValidationError({"size": "Retail product sale requires size."})
+                if self.size and self.size.product_type != self.shirt_item.item_type:
+                    raise ValidationError({"size": "Size does not belong to the selected product type."})
                 self.material_item = None
             else:
                 self.shirt_item = None

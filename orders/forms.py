@@ -243,13 +243,13 @@ class OrderItemForm(forms.ModelForm):
         self.order = kwargs.pop("order", None)
         super().__init__(*args, **kwargs)
 
-        # Only active shirt items appear in Create/Edit Order.
+        # Variant inventory products (Shirt + Tote Bag) appear in Create/Edit Order.
         self.fields["shirt_item"].queryset = (
             InventoryItem.objects.filter(
-                item_type=InventoryItem.TYPE_SHIRT,
+                item_type__in=InventoryItem.VARIANT_TYPES,
                 is_active=True,
             )
-            .order_by("code", "name")
+            .order_by("item_type", "code", "name")
         )
 
         # Only active printing-film items appear in Create/Edit Order.
@@ -304,11 +304,20 @@ class OrderItemForm(forms.ModelForm):
         film_item = cleaned.get("film_item")
         film_meter = cleaned.get("film_meter")
 
+        if shirt_item and shirt_item.item_type not in InventoryItem.VARIANT_TYPES:
+            self.add_error("shirt_item", "Choose a Shirt or Tote Bag product.")
+
+        if shirt_item and size and size.product_type != shirt_item.item_type:
+            self.add_error(
+                "size",
+                f"Choose a {shirt_item.get_item_type_display()} size for this product.",
+            )
+
         if service_type == Order.SERVICE_FULL:
             if not shirt_item:
                 self.add_error(
                     "shirt_item",
-                    "Please choose shirt item.",
+                    "Please choose product item.",
                 )
 
             if not color:

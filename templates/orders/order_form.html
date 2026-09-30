@@ -1318,7 +1318,7 @@
                             <div class="item-header-row">
                                 <div class="col-description">Description</div>
                                 <div class="col-retail-item service-retail-only">Item</div>
-                                <div class="col-shirt service-full-only">Shirt Item</div>
+                                <div class="col-shirt service-full-only">Product Item</div>
                                 <div class="col-color service-full-only">Color</div>
                                 <div class="col-size service-full-only">Size</div>
                                 <div class="col-qty">Qty</div>
@@ -1348,7 +1348,7 @@
                                             <select class="form-select retail-item-select">
                                                 <option value="">---------</option>
                                                 {% for opt in shirt_items %}
-                                                <option value="shirt:{{ opt.id }}" data-unit="pcs" {% if item.shirt_item_id == opt.id %}selected{% endif %}>{{ opt }}</option>
+                                                <option value="shirt:{{ opt.id }}" data-unit="pcs" {% if item.shirt_item_id == opt.id %}selected{% endif %} data-product-type="{{ opt.item_type }}">{{ opt }}</option>
                                                 {% endfor %}
                                                 {% for opt in material_items %}
                                                 <option value="material:{{ opt.id }}" data-unit="{{ opt.unit|default:'pcs' }}" {% if item.material_item_id == opt.id %}selected{% endif %}>{{ opt }}</option>
@@ -1360,7 +1360,7 @@
                                             <select name="design-{{ forloop.parentloop.counter0 }}-item-{{ forloop.counter0 }}-shirt_item" class="form-select shirt-select">
                                                 <option value="">---------</option>
                                                 {% for opt in shirt_items %}
-                                                <option value="{{ opt.id }}" {% if item.shirt_item_id == opt.id %}selected{% endif %}>{{ opt }}</option>
+                                                <option value="{{ opt.id }}" {% if item.shirt_item_id == opt.id %}selected{% endif %} data-product-type="{{ opt.item_type }}">{{ opt }}</option>
                                                 {% endfor %}
                                             </select>
                                         </div>
@@ -1378,7 +1378,7 @@
                                             <select name="design-{{ forloop.parentloop.counter0 }}-item-{{ forloop.counter0 }}-size" class="form-select size-select">
                                                 <option value="">---------</option>
                                                 {% for opt in sizes %}
-                                                <option value="{{ opt.id }}" {% if item.size_id == opt.id %}selected{% endif %}>{{ opt }}</option>
+                                                <option value="{{ opt.id }}" {% if item.size_id == opt.id %}selected{% endif %} data-product-type="{{ opt.product_type }}">{{ opt }}</option>
                                                 {% endfor %}
                                             </select>
                                         </div>
@@ -1434,7 +1434,7 @@
                                             <select class="form-select retail-item-select">
                                                 <option value="">---------</option>
                                                 {% for opt in shirt_items %}
-                                                <option value="shirt:{{ opt.id }}" data-unit="pcs">{{ opt }}</option>
+                                                <option value="shirt:{{ opt.id }}" data-unit="pcs" data-product-type="{{ opt.item_type }}">{{ opt }}</option>
                                                 {% endfor %}
                                                 {% for opt in material_items %}
                                                 <option value="material:{{ opt.id }}" data-unit="{{ opt.unit|default:'pcs' }}">{{ opt }}</option>
@@ -1446,7 +1446,7 @@
                                             <select name="design-{{ forloop.parentloop.counter0 }}-item-0-shirt_item" class="form-select shirt-select">
                                                 <option value="">---------</option>
                                                 {% for opt in shirt_items %}
-                                                <option value="{{ opt.id }}">{{ opt }}</option>
+                                                <option value="{{ opt.id }}" data-product-type="{{ opt.item_type }}">{{ opt }}</option>
                                                 {% endfor %}
                                             </select>
                                         </div>
@@ -1464,7 +1464,7 @@
                                             <select name="design-{{ forloop.parentloop.counter0 }}-item-0-size" class="form-select size-select">
                                                 <option value="">---------</option>
                                                 {% for opt in sizes %}
-                                                <option value="{{ opt.id }}">{{ opt }}</option>
+                                                <option value="{{ opt.id }}" data-product-type="{{ opt.product_type }}">{{ opt }}</option>
                                                 {% endfor %}
                                             </select>
                                         </div>
@@ -1562,7 +1562,7 @@
                             <div class="item-header-row">
                                 <div class="col-description">Description</div>
                                 <div class="col-retail-item service-retail-only">Item</div>
-                                <div class="col-shirt service-full-only">Shirt Item</div>
+                                <div class="col-shirt service-full-only">Product Item</div>
                                 <div class="col-color service-full-only">Color</div>
                                 <div class="col-size service-full-only">Size</div>
                                 <div class="col-qty">Qty</div>
@@ -1591,7 +1591,7 @@
                                             <select class="form-select retail-item-select">
                                                 <option value="">---------</option>
                                                 {% for opt in shirt_items %}
-                                                <option value="shirt:{{ opt.id }}" data-unit="pcs">{{ opt }}</option>
+                                                <option value="shirt:{{ opt.id }}" data-unit="pcs" data-product-type="{{ opt.item_type }}">{{ opt }}</option>
                                                 {% endfor %}
                                                 {% for opt in material_items %}
                                                 <option value="material:{{ opt.id }}" data-unit="{{ opt.unit|default:'pcs' }}">{{ opt }}</option>
@@ -1603,7 +1603,7 @@
                                             <select name="design-0-item-0-shirt_item" class="form-select shirt-select">
                                                 <option value="">---------</option>
                                                 {% for opt in shirt_items %}
-                                                <option value="{{ opt.id }}">{{ opt }}</option>
+                                                <option value="{{ opt.id }}" data-product-type="{{ opt.item_type }}">{{ opt }}</option>
                                                 {% endfor %}
                                             </select>
                                         </div>
@@ -1621,7 +1621,7 @@
                                             <select name="design-0-item-0-size" class="form-select size-select">
                                                 <option value="">---------</option>
                                                 {% for opt in sizes %}
-                                                <option value="{{ opt.id }}">{{ opt }}</option>
+                                                <option value="{{ opt.id }}" data-product-type="{{ opt.product_type }}">{{ opt }}</option>
                                                 {% endfor %}
                                             </select>
                                         </div>
@@ -1679,7 +1679,7 @@
                 <div class="summary-note">
                     <div class="summary-note-title">Order Summary</div>
                     <div class="summary-note-text">
-                        Full Order = deduct shirt inventory. Retail Sale = use one Item field for shirt or material. Film Only = deduct film inventory. Print & Heat Press = service only, no inventory deduction.
+                        Full Order = deduct Shirt or Tote Bag inventory. Retail Sale = use one Item field for product or material. Film Only = deduct film inventory. Print & Heat Press = service only, no inventory deduction.
                     </div>
                 </div>
 
@@ -1792,7 +1792,7 @@
             <div class="item-header-row">
                 <div class="col-description">Description</div>
                 <div class="col-retail-item service-retail-only">Item</div>
-                <div class="col-shirt service-full-only">Shirt Item</div>
+                <div class="col-shirt service-full-only">Product Item</div>
                 <div class="col-color service-full-only">Color</div>
                 <div class="col-size service-full-only">Size</div>
                 <div class="col-qty">Qty</div>
@@ -1828,7 +1828,7 @@
                 <select class="form-select retail-item-select">
                     <option value="">---------</option>
                     {% for opt in shirt_items %}
-                    <option value="shirt:{{ opt.id }}" data-unit="pcs">{{ opt }}</option>
+                    <option value="shirt:{{ opt.id }}" data-unit="pcs" data-product-type="{{ opt.item_type }}">{{ opt }}</option>
                     {% endfor %}
                     {% for opt in material_items %}
                     <option value="material:{{ opt.id }}" data-unit="{{ opt.unit|default:'pcs' }}">{{ opt }}</option>
@@ -1840,7 +1840,7 @@
                 <select name="design-__DESIGN_INDEX__-item-__ITEM_INDEX__-shirt_item" class="form-select shirt-select">
                     <option value="">---------</option>
                     {% for opt in shirt_items %}
-                    <option value="{{ opt.id }}">{{ opt }}</option>
+                    <option value="{{ opt.id }}" data-product-type="{{ opt.item_type }}">{{ opt }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -1858,7 +1858,7 @@
                 <select name="design-__DESIGN_INDEX__-item-__ITEM_INDEX__-size" class="form-select size-select">
                     <option value="">---------</option>
                     {% for opt in sizes %}
-                    <option value="{{ opt.id }}">{{ opt }}</option>
+                    <option value="{{ opt.id }}" data-product-type="{{ opt.product_type }}">{{ opt }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -2130,6 +2130,45 @@ document.addEventListener("DOMContentLoaded", function () {
         if (itemTotal) itemTotal.value = rows.length;
     }
 
+    function selectedProductType(row) {
+        if (getServiceType() === "RETAIL") {
+            const retailItem = row.querySelector(".retail-item-select");
+            const value = retailItem?.value || "";
+            if (value.startsWith("shirt:")) {
+                return retailItem.selectedOptions?.[0]?.dataset?.productType || "";
+            }
+            return "";
+        }
+
+        const productSelect = row.querySelector(".shirt-select");
+        return productSelect?.selectedOptions?.[0]?.dataset?.productType || "";
+    }
+
+    function filterSizesForProduct(row, explicitProductType = "") {
+        const sizeSelect = row.querySelector(".size-select");
+        if (!sizeSelect) return;
+
+        const productType = explicitProductType || selectedProductType(row);
+        const currentValue = sizeSelect.value;
+
+        Array.from(sizeSelect.options).forEach(option => {
+            if (!option.value) {
+                option.hidden = false;
+                option.disabled = false;
+                return;
+            }
+
+            const matches = !productType || option.dataset.productType === productType;
+            option.hidden = !matches;
+            option.disabled = !matches;
+        });
+
+        if (currentValue) {
+            const selected = Array.from(sizeSelect.options).find(option => option.value === currentValue);
+            if (selected?.disabled) sizeSelect.value = "";
+        }
+    }
+
     function getRetailMode(row) {
         const retailItem = row.querySelector(".retail-item-select");
         const value = retailItem?.value || "";
@@ -2195,6 +2234,7 @@ document.addEventListener("DOMContentLoaded", function () {
             if (sizeSelect) {
                 sizeSelect.value = "";
                 sizeSelect.disabled = false;
+                filterSizesForProduct(row, "");
             }
         } else if (type === "shirt") {
             row.classList.add("mode-shirt");
@@ -2208,6 +2248,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
             if (colorSelect) colorSelect.disabled = false;
             if (sizeSelect) sizeSelect.disabled = false;
+            filterSizesForProduct(row, option?.dataset?.productType || "");
         } else {
             row.classList.add("mode-shirt");
 
@@ -2227,13 +2268,13 @@ document.addEventListener("DOMContentLoaded", function () {
 
         if (serviceHelpText) {
             if (serviceType === "FULL") {
-                serviceHelpText.textContent = "Full Order: choose shirt, color, size. Total = Qty × Unit Price.";
+                serviceHelpText.textContent = "Full Order: choose Shirt or Tote Bag, color, size. Total = Qty × Unit Price.";
             } else if (serviceType === "FILM_ONLY") {
                 serviceHelpText.textContent = "Film Only: choose film item. Total = Film Meter × Unit Price.";
             } else if (serviceType === "PRINT_HEATPRESS") {
                 serviceHelpText.textContent = "Print & Heat Press: service only, no inventory deduction. Total = Qty × Unit Price.";
             } else if (serviceType === "RETAIL") {
-                serviceHelpText.textContent = "Retail Sale: choose Shirt or Material in Item. Shirt needs Color/Size. Material uses wider Item and hides Color/Size.";
+                serviceHelpText.textContent = "Retail Sale: choose Shirt, Tote Bag, or Material. Shirt/Tote Bag need Color/Size; Material hides Color/Size.";
             } else {
                 serviceHelpText.textContent = "";
             }
@@ -2281,6 +2322,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
                 if (colorSelect) colorSelect.disabled = false;
                 if (sizeSelect) sizeSelect.disabled = false;
+                filterSizesForProduct(row);
             }
 
             if (serviceType === "RETAIL") {
@@ -2320,6 +2362,8 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     function bindRowEvents(row) {
+        filterSizesForProduct(row);
+
         row.querySelectorAll(".qty-input").forEach(el => {
             el.setAttribute("step", "1");
             el.addEventListener("input", function () {
@@ -2339,7 +2383,14 @@ document.addEventListener("DOMContentLoaded", function () {
             });
         });
 
-        row.querySelectorAll(".shirt-select, .film-select").forEach(el => {
+        row.querySelectorAll(".shirt-select").forEach(el => {
+            el.addEventListener("change", function () {
+                filterSizesForProduct(row);
+                updateTotals();
+            });
+        });
+
+        row.querySelectorAll(".film-select").forEach(el => {
             el.addEventListener("change", updateTotals);
         });
 
