@@ -44,6 +44,7 @@ from .models import (
     ProductionProject,
     ProductionProjectColor,
     SewingJob,
+    SewingJobHistory,
     SewingJobLine,
     SewingPartner,
     SewingReturn,
@@ -58,6 +59,7 @@ from .services import (
     job_size_summary,
     pay_selected_payables,
     sync_sewing_payables,
+    sync_project_finished_goods_cost,
     validate_return_quantities,
 )
 
@@ -71,6 +73,86 @@ def _decimal(value, default=Decimal("0")):
 
 def _active_sizes():
     return Size.objects.filter(is_active=True).order_by("sort_order", "id")
+
+
+def _sewing_job_snapshot(job):
+    job = (
+        SewingJob.objects.select_related("project_color__color", "partner")
+        .prefetch_related("lines__size")
+        .get(pk=job.pk)
+    )
+    return {
+        "job_no": job.job_no,
+        "color": job.project_color.color.name if job.project_color_id else "",
+        "color_id": job.project_color_id,
+        "worker_type": job.worker_type,
+        "sewer": job.payee_name,
+        "partner_id": job.partner_id,
+        "staff_name": job.staff_name or "",
+        "sent_date": job.sent_date.isoformat() if job.sent_date else "",
+        "expected_return_date": job.expected_return_date.isoformat() if job.expected_return_date else "",
+        "price_per_piece": str(job.price_per_piece or 0),
+        "status": job.status,
+        "note": job.note or "",
+        "sizes": {line.size.name: int(line.sent_qty or 0) for line in job.lines.all()},
+        "total_sent": int(job.sent_total or 0),
+    }
+
+
+def _record_sewing_job_history(job, user, action, before=None):
+    after = _sewing_job_snapshot(job)
+    before = before or {}
+    changes = {}
+    if before:
+        for key in ["color", "worker_type", "sewer", "sent_date", "expected_return_date", "price_per_piece", "status", "note", "sizes", "total_sent"]:
+            if before.get(key) != after.get(key):
+                changes[key] = {"from": before.get(key), "to": after.get(key)}
+    summary = "Batch created" if action == SewingJobHistory.ACTION_CREATE else ", ".join(changes.keys()) or "Saved without field changes"
+    SewingJobHistory.objects.create(
+        job=job,
+        action=action,
+        summary=summary[:255],
+        before_data=before,
+        after_data=after,
+        changes=changes,
+        changed_by=user,
+    )
+
+
+def _sync_stocked_return_color(job):
+    """Keep already-stocked finished goods aligned when a sewing batch colour is corrected."""
+    if not job.project_color_id:
+        return
+    color_id = job.project_color.color_id
+    for sewing_return in job.returns.filter(status=SewingReturn.STATUS_STOCKED).select_related("stock_batch"):
+        if sewing_return.stock_batch_id:
+            sewing_return.stock_batch.items.update(color_id=color_id)
+            sewing_return.stock_batch.supplier = job.payee_name
+            sewing_return.stock_batch.save(update_fields=["supplier"])
+
+
+def _refresh_job_and_project_status(job):
+    pending = int(job.pending_total or 0)
+    accounted = int(job.good_returned_total or 0) + int(job.damaged_total or 0) + int(job.missing_total or 0)
+    if pending <= 0 and int(job.sent_total or 0) > 0:
+        status = SewingJob.STATUS_COMPLETED
+    elif accounted > 0:
+        status = SewingJob.STATUS_PARTIAL
+    else:
+        status = SewingJob.STATUS_SENT
+    if job.status != status:
+        job.status = status
+        job.save(update_fields=["status"])
+
+    project = job.project
+    project_accounted = int(project.returned_good_total or 0) + int(project.damaged_total or 0) + int(project.missing_total or 0)
+    if int(project.still_with_sewer or 0) <= 0 and int(project.sent_total or 0) > 0:
+        project.status = ProductionProject.STATUS_COMPLETED
+    elif project_accounted > 0:
+        project.status = ProductionProject.STATUS_PARTIAL_RETURN
+    else:
+        project.status = ProductionProject.STATUS_SENT
+    project.save(update_fields=["status", "updated_at"])
 
 
 def _validate_borib_required_for_cut(color_name, cut_qty, borib_kg):
@@ -1628,6 +1710,7 @@ def project_send_sewing_inline(request, pk):
                             size_id=size_id,
                             sent_qty=qty,
                         )
+                _record_sewing_job_history(job, request.user, SewingJobHistory.ACTION_CREATE)
 
                 grand_total += color_total
                 created_jobs += 1
@@ -2415,6 +2498,7 @@ def sewing_job_create(request, project_id):
                 job.save()
                 for sid,qty in values.items():
                     if qty: SewingJobLine.objects.create(job=job,size_id=sid,sent_qty=qty)
+                _record_sewing_job_history(job, request.user, SewingJobHistory.ACTION_CREATE)
                 project.status=ProductionProject.STATUS_SENT; project.save(update_fields=["status","updated_at"])
             messages.success(request,"Pieces sent to sewing.")
             return redirect("production_project_detail",pk=project.pk)
@@ -2424,15 +2508,130 @@ def sewing_job_create(request, project_id):
 @login_required
 @permission_required("production.change_sewingjob", raise_exception=True)
 def sewing_job_edit(request, pk):
-    job=get_object_or_404(SewingJob.objects.select_related("project","project_color__color","partner"),pk=pk)
-    form=SewingJobForm(request.POST or None,instance=job,user=request.user,project=job.project)
-    if request.method=="POST" and form.is_valid():
-        old=job.price_per_piece; job=form.save(commit=False)
-        if "price_per_piece" not in form.cleaned_data: job.price_per_piece=old
-        job.save(); sync_sewing_payables(job)
-        messages.success(request,"Sewing job updated.")
-        return redirect("production_project_detail",pk=job.project_id)
-    return render(request,"production/sewing_job_form.html",{"form":form,"project":job.project,"job":job,"rows":[],"selected_pc":job.project_color,"can_view_cost":request.user.has_perm("production.view_production_cost")})
+    job = get_object_or_404(
+        SewingJob.objects.select_related("project", "project_color__color", "partner").prefetch_related("lines__size"),
+        pk=pk,
+    )
+    project = job.project
+    before = _sewing_job_snapshot(job)
+    form = SewingJobForm(request.POST or None, instance=job, user=request.user, project=project)
+
+    selected_pc_id = request.POST.get("project_color") if request.method == "POST" else job.project_color_id
+    selected_pc = project.project_colors.filter(pk=selected_pc_id).first() or job.project_color
+    existing_qty = {line.size_id: int(line.sent_qty or 0) for line in job.lines.all()}
+    accounted = {
+        row["size_id"]: int(row["total"] or 0)
+        for row in SewingReturnLine.objects.filter(sewing_return__job=job)
+        .exclude(sewing_return__status=SewingReturn.STATUS_CANCELLED)
+        .values("size_id")
+        .annotate(total=Sum("good_qty") + Sum("damaged_qty") + Sum("missing_qty"))
+    }
+
+    def build_rows(pc):
+        if not pc:
+            return []
+        cut = {x.size_id: int(x.cut_qty or 0) for x in pc.cut_sizes.all()}
+        other_sent = {
+            x["size_id"]: int(x["total"] or 0)
+            for x in SewingJobLine.objects.filter(job__project_color=pc).exclude(job=job)
+            .values("size_id").annotate(total=Sum("sent_qty"))
+        }
+        output = []
+        for size in _active_sizes():
+            maximum = max(cut.get(size.id, 0) - other_sent.get(size.id, 0), 0)
+            minimum = accounted.get(size.id, 0)
+            if request.method == "POST":
+                try:
+                    value = max(int(request.POST.get(f"sent_{size.id}") or 0), 0)
+                except (TypeError, ValueError):
+                    value = existing_qty.get(size.id, 0)
+            else:
+                value = existing_qty.get(size.id, 0)
+            # On edit show every active size so changing the colour never hides
+            # a size that is available only on the newly selected colour.
+            output.append({"size": size, "available": maximum, "minimum": minimum, "value": value})
+        return output
+
+    rows = build_rows(selected_pc)
+
+    if request.method == "POST" and form.is_valid():
+        selected_pc = form.cleaned_data.get("project_color")
+        rows = build_rows(selected_pc)
+        errors = []
+        values = {}
+        total = 0
+        for row in rows:
+            size = row["size"]
+            try:
+                qty = max(int(request.POST.get(f"sent_{size.id}") or 0), 0)
+            except (TypeError, ValueError):
+                errors.append(f"{size.name}: enter a valid quantity.")
+                continue
+            if qty < row["minimum"]:
+                errors.append(f"{size.name}: cannot be below {row['minimum']} because that quantity is already returned/accounted.")
+            if qty > row["available"]:
+                errors.append(f"{size.name}: maximum available for this colour is {row['available']}.")
+            values[size.id] = qty
+            total += qty
+        if total <= 0:
+            errors.append("The sewing batch must contain at least one piece.")
+
+        if not errors:
+            with transaction.atomic():
+                old_price = job.price_per_piece
+                job = form.save(commit=False)
+                if "price_per_piece" not in form.cleaned_data:
+                    job.price_per_piece = old_price
+                job.save()
+
+                all_size_ids = set(existing_qty) | set(values)
+                for size_id in all_size_ids:
+                    qty = values.get(size_id, 0)
+                    line = SewingJobLine.objects.filter(job=job, size_id=size_id).first()
+                    if qty > 0:
+                        if line:
+                            if int(line.sent_qty or 0) != qty:
+                                line.sent_qty = qty
+                                line.save(update_fields=["sent_qty"])
+                        else:
+                            SewingJobLine.objects.create(job=job, size_id=size_id, sent_qty=qty)
+                    elif line:
+                        line.delete()
+
+                _sync_stocked_return_color(job)
+                sync_sewing_payables(job)
+                _refresh_job_and_project_status(job)
+                sync_project_finished_goods_cost(project)
+                _record_sewing_job_history(job, request.user, SewingJobHistory.ACTION_UPDATE, before=before)
+
+            messages.success(request, "Sewing batch updated and history recorded.")
+            return redirect("production_return_list")
+
+        for error in errors:
+            messages.error(request, error)
+
+    return render(request, "production/sewing_job_form.html", {
+        "form": form,
+        "project": project,
+        "job": job,
+        "rows": rows,
+        "selected_pc": selected_pc,
+        "history": job.history_entries.select_related("changed_by").all()[:20],
+        "can_view_cost": request.user.has_perm("production.view_production_cost"),
+    })
+
+
+@login_required
+@permission_required("production.view_sewingjob", raise_exception=True)
+def sewing_job_history(request, pk):
+    job = get_object_or_404(
+        SewingJob.objects.select_related("project", "project_color__color", "partner"),
+        pk=pk,
+    )
+    return render(request, "production/sewing_job_history.html", {
+        "job": job,
+        "history": job.history_entries.select_related("changed_by").all(),
+    })
 
 @login_required
 @permission_required("production.add_sewingreturn", raise_exception=True)

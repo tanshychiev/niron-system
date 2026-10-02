@@ -205,6 +205,11 @@ urlpatterns = [
         name="production_sewing_job_edit",
     ),
     path(
+        "sewing/<int:pk>/history/",
+        views.sewing_job_history,
+        name="production_sewing_job_history",
+    ),
+    path(
         "sewing/<int:job_id>/returns/new/",
         views.sewing_return_create,
         name="production_return_create",

@@ -812,6 +812,40 @@ class SewingJob(models.Model):
         return max(value, 0)
 
 
+class SewingJobHistory(models.Model):
+    ACTION_CREATE = "CREATE"
+    ACTION_UPDATE = "UPDATE"
+    ACTION_CHOICES = [
+        (ACTION_CREATE, "Created"),
+        (ACTION_UPDATE, "Updated"),
+    ]
+
+    job = models.ForeignKey(
+        SewingJob,
+        on_delete=models.CASCADE,
+        related_name="history_entries",
+    )
+    action = models.CharField(max_length=20, choices=ACTION_CHOICES, default=ACTION_UPDATE)
+    summary = models.CharField(max_length=255, blank=True, default="")
+    before_data = models.JSONField(default=dict, blank=True)
+    after_data = models.JSONField(default=dict, blank=True)
+    changes = models.JSONField(default=dict, blank=True)
+    changed_at = models.DateTimeField(default=timezone.now)
+    changed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="production_sewing_job_history",
+    )
+
+    class Meta:
+        ordering = ["-changed_at", "-id"]
+
+    def __str__(self):
+        return f"{self.job.job_no} - {self.get_action_display()}"
+
+
 class SewingJobLine(models.Model):
     job = models.ForeignKey(SewingJob, on_delete=models.CASCADE, related_name="lines")
     size = models.ForeignKey("inventory.Size", on_delete=models.PROTECT, related_name="production_sewing_lines")

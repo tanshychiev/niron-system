@@ -118,7 +118,7 @@ Pay the sewer only after the full production project is received
 
   .project-head{
     display:grid;
-    grid-template-columns:auto minmax(0,1fr) auto;
+    grid-template-columns:auto minmax(0,1fr) minmax(150px,220px) auto;
     gap:13px;
     align-items:center;
     padding:15px;
@@ -168,6 +168,35 @@ Pay the sewer only after the full production project is received
   .project-main{
     min-width:0;
   }
+
+  .sewer-highlight{
+    min-width:150px;
+    padding:8px 12px;
+    border:1px solid #e5d8bd;
+    border-radius:12px;
+    background:#fff9eb;
+  }
+
+  .sewer-highlight span{
+    display:block;
+    color:#8b7350;
+    font-size:8px;
+    font-weight:950;
+    letter-spacing:.5px;
+    text-transform:uppercase;
+  }
+
+  .sewer-highlight strong{
+    display:block;
+    margin-top:2px;
+    color:#3f321e;
+    font-size:15px;
+    line-height:1.15;
+    font-weight:1000;
+  }
+
+  .batch-actions{display:flex;gap:6px;flex-wrap:wrap}
+  .batch-actions a{white-space:nowrap;text-decoration:none}
 
   .project-title-line{
     display:flex;
@@ -529,6 +558,11 @@ Pay the sewer only after the full production project is received
       grid-template-columns:auto minmax(0,1fr);
     }
 
+    .sewer-highlight{
+      grid-column:2;
+      min-width:0;
+    }
+
     .project-status{
       grid-column:1/-1;
       padding-left:55px;
@@ -648,7 +682,7 @@ Pay the sewer only after the full production project is received
   }
 
   .project-head{
-    grid-template-columns:auto minmax(0,1fr) auto;
+    grid-template-columns:auto minmax(0,1fr) minmax(150px,220px) auto;
     gap:9px;
     padding:10px 11px;
   }
@@ -756,8 +790,17 @@ Pay the sewer only after the full production project is received
   }
 
   @media(max-width:720px){
+    .project-head{
+      grid-template-columns:auto minmax(0,1fr);
+    }
+    .sewer-highlight{
+      grid-column:2;
+      min-width:0;
+    }
     .project-status{
+      grid-column:1/-1;
       padding-left:43px;
+      text-align:left;
     }
   }
 
@@ -1984,7 +2027,6 @@ Pay the sewer only after the full production project is received
           </div>
 
           <div class="project-meta">
-            <span>Sewer: <strong>{{ row.payee_name }}</strong></span>
             <span>{{ row.children|length }} colour batch{{ row.children|length|pluralize }}</span>
             {% if row.latest_received %}
             <span>Last received:
@@ -1992,6 +2034,11 @@ Pay the sewer only after the full production project is received
             </span>
             {% endif %}
           </div>
+        </div>
+
+        <div class="sewer-highlight">
+          <span>Sewer</span>
+          <strong>{{ row.payee_name }}</strong>
         </div>
 
         <div class="project-status">
@@ -2057,6 +2104,7 @@ Pay the sewer only after the full production project is received
               <th>Received</th>
               <th>Remaining</th>
               <th>Payment</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -2093,6 +2141,7 @@ Pay the sewer only after the full production project is received
                   <span class="status-pill status-wait">Waiting</span>
                 {% endif %}
               </td>
+              <td><div class="batch-actions">{% if perms.production.change_sewingjob %}<a class="btn-light" href="{% url 'production_sewing_job_edit' child.job.id %}">Edit</a>{% endif %}<a class="btn-light" href="{% url 'production_sewing_job_history' child.job.id %}">History</a></div></td>
             </tr>
             {% endfor %}
           </tbody>

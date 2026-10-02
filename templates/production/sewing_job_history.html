@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block page_title %}Batch History · {{ job.job_no }}{% endblock %}
+{% block page_subtitle %}{{ job.project.project_no }} · {{ job.payee_name }}{% endblock %}
+{% block content %}
+<style>
+.hist-wrap{max-width:1050px;margin:0 auto}.hist-head{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:14px}.hist-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:11px}.hist-meta{display:flex;gap:10px;flex-wrap:wrap;color:var(--muted);font-size:11px}.hist-title{display:flex;justify-content:space-between;gap:12px;align-items:center}.hist-title h3{margin:0;font-size:15px}.change-grid{display:grid;grid-template-columns:170px 1fr 1fr;gap:0;margin-top:12px;border:1px solid var(--line);border-radius:12px;overflow:hidden}.change-grid>div{padding:9px 11px;border-bottom:1px solid var(--line);font-size:12px}.change-grid>div:nth-last-child(-n+3){border-bottom:0}.change-label{font-weight:900;background:#faf8f3}.before{background:#fff7f4}.after{background:#f3fbf7}.empty{padding:28px;text-align:center;color:var(--muted);background:#fff;border:1px dashed var(--line);border-radius:16px}@media(max-width:700px){.change-grid{grid-template-columns:1fr}.change-grid>div{border-bottom:1px solid var(--line)!important}.hist-title{align-items:flex-start;flex-direction:column}}
+</style>
+<div class="hist-wrap">
+  <div class="hist-head"><div><strong>Current sewer: {{ job.payee_name }}</strong><div style="color:var(--muted);font-size:12px">Every future edit is saved with who changed it and the before/after values.</div></div><a class="btn-primary" href="{% url 'production_sewing_job_edit' job.id %}">Edit Batch</a></div>
+  {% for item in history %}
+  <div class="hist-card">
+    <div class="hist-title"><h3>{{ item.get_action_display }} · {{ item.summary }}</h3><span class="pill">{{ item.changed_at|date:"d M Y H:i" }}</span></div>
+    <div class="hist-meta"><span>By: <strong>{{ item.changed_by|default:"System" }}</strong></span><span>Batch: {{ job.job_no }}</span></div>
+    {% if item.changes %}
+      <div class="change-grid">
+        <div class="change-label">Field</div><div class="change-label">Before</div><div class="change-label">After</div>
+        {% for field, diff in item.changes.items %}
+          <div class="change-label">{{ field|title }}</div><div class="before">{{ diff.from }}</div><div class="after">{{ diff.to }}</div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div style="margin-top:10px;color:var(--muted);font-size:12px">Initial batch snapshot recorded.</div>
+    {% endif %}
+  </div>
+  {% empty %}<div class="empty">No history recorded yet. The first edit will create a history entry.</div>{% endfor %}
+</div>
+{% endblock %}
