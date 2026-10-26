@@ -1935,6 +1935,118 @@ def inventory_batch_confirm_received(request, pk):
         "today": timezone.localdate(),
     })
 
+
+
+@login_required
+@permission_required("inventory.change_inventorybatch", raise_exception=True)
+@transaction.atomic
+def inventory_fabric_add_delivery_cost(request):
+    """Add a delivery charge across selected Fabric purchase groups without duplicating Finance expenses."""
+    if request.method != "POST":
+        return redirect("inventory_stock_in_list")
+    if not _can_view_stock_cost(request.user):
+        messages.error(request, "You do not have permission to update purchase costs.")
+        return redirect("inventory_stock_in_list")
+
+    from decimal import InvalidOperation
+
+    try:
+        raw_ids = request.POST.getlist("fabric_batch_ids")
+        ids = list(dict.fromkeys(int(value) for value in raw_ids))
+        if not ids or len(ids) > 300 or any(pk <= 0 for pk in ids):
+            raise ValueError("Select at least one valid Fabric batch.")
+        amount = Decimal(request.POST.get("delivery_amount", ""))
+        if not amount.is_finite() or amount <= 0 or amount.as_tuple().exponent < -2:
+            raise ValueError("Enter a positive amount with at most two decimal places.")
+        method = request.POST.get("allocation_method", "KG").upper()
+        if method not in {"KG", "ROLLS", "EQUAL", "MANUAL"}:
+            raise ValueError("Invalid allocation method.")
+    except (TypeError, ValueError, InvalidOperation):
+        messages.error(request, "Invalid delivery cost or Fabric selection.")
+        return redirect("inventory_stock_in_list")
+
+    anchors = list(FabricReceipt.objects.select_for_update().filter(pk__in=ids))
+    if len(anchors) != len(ids):
+        messages.error(request, "Some selected Fabric batches were not found.")
+        return redirect("inventory_stock_in_list")
+
+    # UI selects one anchor per purchase group, but the cost belongs to every receipt
+    # within that purchase. Reject two anchors for the same group to prevent double counting.
+    keys = [receipt.purchase_group or f"legacy-{receipt.pk}" for receipt in anchors]
+    if len(set(keys)) != len(keys):
+        messages.error(request, "A Fabric purchase cannot be selected twice.")
+        return redirect("inventory_stock_in_list")
+    receipt_groups = []
+    for anchor in anchors:
+        if anchor.purchase_group:
+            rows = list(FabricReceipt.objects.select_for_update().filter(
+                purchase_group=anchor.purchase_group).order_by("pk"))
+        else:
+            rows = [anchor]
+        receipt_groups.append(rows)
+
+    weights = []
+    try:
+        for anchor, rows in zip(anchors, receipt_groups):
+            if method == "MANUAL":
+                weight = Decimal(request.POST.get(f"manual_{anchor.pk}", ""))
+            elif method == "ROLLS":
+                weight = sum((Decimal(r.roll_count or 0) for r in rows), Decimal(0))
+            elif method == "KG":
+                weight = sum((Decimal(r.total_kg_display or 0) for r in rows), Decimal(0))
+            else:
+                weight = Decimal(1)
+            if not weight.is_finite() or weight < 0:
+                raise ValueError()
+            weights.append(weight)
+        total_weight = sum(weights, Decimal(0))
+        if total_weight <= 0:
+            raise ValueError()
+        if method == "MANUAL" and total_weight.quantize(Decimal("0.01")) != amount:
+            raise ValueError()
+    except (ValueError, TypeError, InvalidOperation):
+        messages.error(request, "Allocation amounts are invalid. Manual allocations must equal the delivery cost.")
+        return redirect("inventory_stock_in_list")
+
+    remaining = amount
+    for index, rows in enumerate(receipt_groups):
+        group_cost = remaining if index == len(receipt_groups)-1 else (
+            amount * weights[index] / total_weight).quantize(Decimal("0.01"))
+        remaining -= group_cost
+        # Distribute each group's portion by rolls; preserve the exact total.
+        roll_weights = [Decimal(r.roll_count or 0) for r in rows]
+        if sum(roll_weights) <= 0:
+            roll_weights = [Decimal(1)] * len(rows)
+        roll_total = sum(roll_weights)
+        remainder = group_cost
+        for j, receipt in enumerate(rows):
+            part = remainder if j == len(rows)-1 else (
+                group_cost * roll_weights[j] / roll_total).quantize(Decimal("0.01"))
+            remainder -= part
+            receipt.shipping_cost = Decimal(receipt.shipping_cost or 0) + part
+            receipt.updated_by = request.user
+            receipt.save(update_fields=["shipping_cost", "updated_by", "updated_at"])
+
+        # Update the existing Finance record for this purchase group, not a second expense.
+        group_ids = {r.pk for r in rows}
+        for expense in Expense.objects.select_for_update().filter(stock_source_type=Expense.SOURCE_FABRIC):
+            if group_ids == {int(x) for x in (expense.fabric_receipt_ids or []) if str(x).isdigit()}:
+                expense.batch_delivery_fee = sum((Decimal(r.shipping_cost or 0) for r in rows), Decimal(0))
+                expense.batch_cost = sum((Decimal(r.total_goods_cost or 0) for r in rows), Decimal(0))
+                expense.batch_other_fee = sum((Decimal(r.extra_cost or 0) for r in rows), Decimal(0))
+                expense.amount = expense.batch_delivery_fee + expense.batch_cost + expense.batch_other_fee
+                expense.expense_status = Expense.STATUS_COMPLETED if expense.amount > 0 else Expense.STATUS_PENDING
+                expense.save(update_fields=["batch_delivery_fee", "batch_cost", "batch_other_fee", "amount", "expense_status"])
+                break
+        else:
+            # Do not fabricate a duplicate: use existing Stock In expense creation pattern.
+            _create_pending_fabric_expense(rows, rows[0].supplier_ref,
+                                           rows[0].received_date, request.user)
+
+    messages.success(request, "Fabric delivery cost added successfully.")
+    return redirect("inventory_stock_in_list")
+
+
 @login_required
 @permission_required("inventory.add_inventorybatch", raise_exception=True)
 @transaction.atomic

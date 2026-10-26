@@ -13,6 +13,7 @@ from .views import (
     inventory_adjustment_list,
     inventory_batch_add_cost,
     inventory_batch_confirm_received,
+    inventory_fabric_add_delivery_cost,
     inventory_fabric_confirm_received,
     inventory_fabric_print_labels,
     inventory_batch_create,
@@ -76,6 +77,8 @@ urlpatterns = [
         inventory_supplier_ajax_create,
         name="inventory_supplier_ajax_create",
     ),
+
+    path("fabric-purchases/add-delivery-cost/", inventory_fabric_add_delivery_cost, name="inventory_fabric_add_delivery_cost"),
 
     # Batch actions
     path(
