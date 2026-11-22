@@ -187,9 +187,54 @@ html, body {
 
 .bottom-grid {
     display: grid;
-    grid-template-columns: 60mm 1fr;
-    gap: 5mm;
-    margin-top: 3mm;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 6mm;
+    align-items: start;
+    margin-top: 7mm;
+    break-inside: avoid;
+    page-break-inside: avoid;
+}
+
+.invoice-note {
+    border: 1px solid #D7DEE4;
+    border-radius: 5px;
+    background: #F8FAFC;
+    padding: 3mm 4mm;
+    font-size: 7.5pt;
+    line-height: 1.5;
+    color: #0B2F3D;
+}
+.invoice-note strong { color: #F20A78; font-size: 8pt; }
+.invoice-note ul { margin: 2mm 0 0; padding-left: 4mm; }
+.invoice-note li { margin-bottom: 1mm; }
+
+/* Full-width signature section below notes and totals. */
+.signature-area {
+    width: 100%;
+    margin-top: 10mm;
+    margin-bottom: 6mm;
+    break-inside: avoid;
+    page-break-inside: avoid;
+}
+.signature-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 12mm;
+}
+.sign-block { min-width: 0; }
+.sign-label { font-weight: 700; font-size: 9pt; margin-bottom: 4mm; }
+.sign-space {
+    height: 17mm;
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-end;
+    padding-bottom: 1mm;
+}
+.sign-space img { max-height: 16mm; max-width: 100%; object-fit: contain; }
+.sign-line { border-bottom: 1px solid #073848; }
+.sign-issue { font-size: 8pt; margin-top: 3mm; line-height: 1.5; }
+@media print {
+    .bottom-grid, .signature-area { break-inside: avoid; page-break-inside: avoid; }
 }
 
 .label-line {
@@ -433,49 +478,16 @@ html, body {
     </div>
     {% endfor %}
 
+    <!-- Notes replace the former left-side signature box; totals remain on the right. -->
     <div class="bottom-grid">
-        <div>
-            <div class="signature">
-                <div class="label-line">
-                    <span class="icon pink">✎</span>
-                    Signature
-                </div>
-
-                <div class="signature-box">
-                    {% if signature_url %}
-    <img src="{{ signature_url }}" alt="Signature">
-{% else %}
-    No Signature
-{% endif %}
-                </div>
-            </div>
-
-            <div class="issue">
-                <div class="issue-row">
-                    <span class="icon blue">👤</span>
-                    <strong>Issued By:</strong>
-
-                    <span class="issue-user">
-                        {% if printed_by %}
-                            {% if printed_by.get_full_name %}
-                                {{ printed_by.get_full_name }}
-                            {% else %}
-                                {{ printed_by.username }}
-                            {% endif %}
-                        {% elif order.created_by %}
-                            {% if order.created_by.get_full_name %}
-                                {{ order.created_by.get_full_name }}
-                            {% else %}
-                                {{ order.created_by.username }}
-                            {% endif %}
-                        {% else %}
-                            -
-                        {% endif %}
-                    </span>
-
-                    <span class="issue-date">{% now "Y-m-d, g:i a" %}</span>
-                </div>
-            </div>
+        <div class="invoice-note">
+            <strong>Note</strong>
+            <ul>
+                <li>This quotation is valid for 7 days from the date of issue. Prices may vary for future orders.</li>
+                <li>Printing color and quality may vary by approximately 8–10%.</li>
+                <li>Customers should confirm all project details before payment.</li>
+                <li>No refunds after payment confirmation.</li>
+            </ul>
         </div>
 
         <div class="summary">
@@ -493,10 +505,48 @@ html, body {
                     <span>${{ order.paid_amount|floatformat:2 }}</span>
                 </div>
             </div>
-
             <div class="balance-box">
                 <div class="balance-label">Balance Due</div>
                 <div class="balance-value">${{ order.balance_amount|floatformat:2 }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Seller and customer signatures across the bottom, above Kampu footer. -->
+    <div class="signature-area">
+        <div class="signature-grid">
+            <div class="sign-block">
+                <div class="sign-label">Seller Signature:</div>
+                <div class="sign-space">
+                    {% if signature_url %}
+                        <img src="{{ signature_url }}" alt="Seller Signature">
+                    {% endif %}
+                </div>
+                <div class="sign-line"></div>
+                <div class="sign-issue">
+                    <strong>Issued By:</strong>
+                    {% if printed_by %}
+                        {% if printed_by.get_full_name %}
+                            {{ printed_by.get_full_name }}
+                        {% else %}
+                            {{ printed_by.username }}
+                        {% endif %}
+                    {% elif order.created_by %}
+                        {% if order.created_by.get_full_name %}
+                            {{ order.created_by.get_full_name }}
+                        {% else %}
+                            {{ order.created_by.username }}
+                        {% endif %}
+                    {% else %}
+                        -
+                    {% endif %}
+                    <div><strong>Date:</strong> {% now "Y-m-d" %}</div>
+                </div>
+            </div>
+            <div class="sign-block">
+                <div class="sign-label">Customer Signature:</div>
+                <div class="sign-space"></div>
+                <div class="sign-line"></div>
             </div>
         </div>
     </div>

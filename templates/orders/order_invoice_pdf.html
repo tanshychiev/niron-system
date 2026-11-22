@@ -31,6 +31,8 @@ html, body {
     min-height: 297mm;
     padding: 8mm;
     margin: 0 auto;
+    display: flex;
+    flex-direction: column;
 }
 
 :root {
@@ -211,17 +213,23 @@ html, body {
 ========================= */
 .bottom-section {
     display: grid;
-    grid-template-columns: 1fr 78mm;
+    grid-template-columns: minmax(0, 1fr) 78mm;
     gap: 14mm;
     margin-top: 14mm;
     align-items: start;
+    break-inside: avoid;
 }
 
 /* =========================
    SIGNATURE FIX
 ========================= */
 .signature-area {
-    min-height: 52mm;
+    width: 100%;
+    min-height: 43mm;
+    margin-top: auto;
+    padding-top: 10mm;
+    page-break-inside: avoid;
+    break-inside: avoid;
 }
 
 .signature-grid {
@@ -233,7 +241,7 @@ html, body {
 
 .sign-block {
     width: 100%;
-    height: 48mm;
+    min-height: 37mm;
     display: flex;
     flex-direction: column;
 }
@@ -313,14 +321,16 @@ html, body {
 
 
 .invoice-note {
-    margin-top: 12px;
-    padding: 8px 10px;
+    width: 100%;
+    min-width: 0;
+    margin-top: 0;
+    padding: 4mm;
     border: 1px solid var(--border);
     border-radius: 8px;
+    background: #fafafa;
+    color: #374151;
     font-size: 10px;
     line-height: 1.5;
-    color: #444;
-    background: #fafafa;
     page-break-inside: avoid;
 }
 
@@ -527,11 +537,59 @@ html, body {
     </div>
     {% endfor %}
 
-    <!-- BOTTOM SECTION -->
+    <!-- NOTES LEFT / PAYMENT TOTALS RIGHT -->
     <div class="bottom-section">
+        <div class="invoice-note">
+            <strong>Note</strong>
+            <ul>
+                <li>This quotation is valid for 7 days from the date of issue. Please note that prices may vary for future orders.</li>
+                <li>Printing color and quality may vary by ±8–10%.</li>
+                <li>All project information has been confirmed by the customer before payment.</li>
+                <li>No refunds after payment confirmation.</li>
+            </ul>
+        </div>
 
-        <!-- SIGNATURE AREA -->
-        <div class="signature-area">
+        <!-- SUMMARY -->
+        <div class="summary">
+            <div class="summary-row">
+                <span>Subtotal</span>
+                <span>${{ order.items_subtotal|floatformat:2 }}</span>
+            </div>
+            <div class="summary-row">
+                <span>Delivery Fee</span>
+                <span>${{ order.shipping_fee|floatformat:2 }}</span>
+            </div>
+            {% if order.discount_amount %}
+            <div class="summary-row">
+                <span>Discount</span>
+                <span>-${{ order.discount_amount|floatformat:2 }}</span>
+            </div>
+            {% endif %}
+            <div class="summary-row">
+                <span>Total</span>
+                <span>${{ order.total_amount|floatformat:2 }}</span>
+            </div>
+
+            <div class="summary-row">
+                <span>Deposit</span>
+                <span>${{ order.deposit_amount|floatformat:2 }}</span>
+            </div>
+
+            <div class="summary-row">
+                <span>Paid</span>
+                <span>${{ order.paid_amount|floatformat:2 }}</span>
+            </div>
+
+            <div class="balance-row">
+                <span>Balance</span>
+                <span>${{ order.balance_amount|floatformat:2 }}</span>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- FULL-WIDTH SIGNATURES AT THE BOTTOM -->
+    <div class="signature-area">
             <div class="signature-grid">
 
                 <!-- SELLER SIGNATURE -->
@@ -585,56 +643,6 @@ html, body {
 
             </div>
         </div>
-
-        <!-- SUMMARY -->
-        <div class="summary">
-            <div class="summary-row">
-                <span>Subtotal</span>
-                <span>${{ order.items_subtotal|floatformat:2 }}</span>
-            </div>
-            <div class="summary-row">
-                <span>Delivery Fee</span>
-                <span>${{ order.shipping_fee|floatformat:2 }}</span>
-            </div>
-            {% if order.discount_amount %}
-            <div class="summary-row">
-                <span>Discount</span>
-                <span>-${{ order.discount_amount|floatformat:2 }}</span>
-            </div>
-            {% endif %}
-            <div class="summary-row">
-                <span>Total</span>
-                <span>${{ order.total_amount|floatformat:2 }}</span>
-            </div>
-
-            <div class="summary-row">
-                <span>Deposit</span>
-                <span>${{ order.deposit_amount|floatformat:2 }}</span>
-            </div>
-
-            <div class="summary-row">
-                <span>Paid</span>
-                <span>${{ order.paid_amount|floatformat:2 }}</span>
-            </div>
-
-            <div class="balance-row">
-                <span>Balance</span>
-                <span>${{ order.balance_amount|floatformat:2 }}</span>
-            </div>
-        </div>
-
-    </div>
-
-    <!-- PRINTING SERVICE NOTE -->
-    <div class="invoice-note">
-        <strong>Note</strong>
-        <ul>
-            <li>This quotation is valid for 7 days from the date of issue. Please note that prices may vary for future orders.</li>
-            <li>Printing color and quality may vary by ±8–10%.</li>
-            <li>All project information has been confirmed by the customer before payment.</li>
-            <li>No refunds after payment confirmation.</li>
-        </ul>
-    </div>
 
 </div>
 </body>
