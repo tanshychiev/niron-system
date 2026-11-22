@@ -512,38 +512,70 @@ def fabric_receipt_detail(request, pk):
 @login_required
 @permission_required("production.change_fabricreceipt", raise_exception=True)
 def fabric_receipt_edit(request, pk):
+    """Correct a fabric receipt and its physical roll KG without erasing usage."""
     receipt = get_object_or_404(FabricReceipt, pk=pk)
     if request.method == "POST":
-        old_borib_kg = Decimal(receipt.borib_kg or 0)
-        old_color_id = receipt.color_id
         form = FabricReceiptForm(request.POST, instance=receipt, user=request.user)
         if form.is_valid():
-            with transaction.atomic():
-                obj = form.save(commit=False)
-                obj.updated_by = request.user
-                new_borib_kg = Decimal(obj.borib_kg or 0)
-                # Return the old receipt's Borib to its old colour, then apply the edited amount.
-                if old_color_id:
-                    old_stock, _ = BoribStock.objects.select_for_update().get_or_create(
-                        color_id=old_color_id, defaults={"quantity_kg": Decimal("0")}
+            try:
+                with transaction.atomic():
+                    receipt = FabricReceipt.objects.select_for_update().get(pk=pk)
+                    rolls = list(FabricRoll.objects.select_for_update().filter(receipt=receipt).order_by("pk"))
+                    old_color_id = receipt.color_id
+                    old_borib_kg = Decimal(receipt.borib_kg or 0)
+                    obj = form.save(commit=False)
+                    if rolls and (obj.color_id != receipt.color_id or obj.fabric_type_id != receipt.fabric_type_id):
+                        if any(r.cutting_usages.exists() for r in rolls):
+                            raise ValidationError("Cannot change fabric type or colour after a roll has been assigned to production.")
+                    if rolls and obj.roll_count != len(rolls):
+                        raise ValidationError("Roll count cannot be changed here. Correct each existing roll's KG below.")
+                    corrections = []
+                    for roll in rolls:
+                        raw = request.POST.get(f"roll_weight_{roll.pk}")
+                        if raw is None:
+                            raise ValidationError(f"Missing corrected weight for {roll.roll_code}.")
+                        try:
+                            weight = Decimal(raw).quantize(Decimal("0.001"))
+                        except (InvalidOperation, ValueError):
+                            raise ValidationError(f"Invalid KG for {roll.roll_code}.")
+                        consumed = Decimal(roll.original_qty) - Decimal(roll.remaining_qty)
+                        reserved = Decimal(roll.reserved_qty or 0)
+                        if weight <= 0 or weight < consumed + reserved:
+                            raise ValidationError(
+                                f"{roll.roll_code}: weight must be at least {consumed + reserved} KG "
+                                "to preserve used and reserved fabric."
+                            )
+                        corrections.append((roll, weight, weight - consumed))
+                    new_borib_kg = Decimal(obj.borib_kg or 0)
+                    if old_color_id:
+                        old_stock, _ = BoribStock.objects.select_for_update().get_or_create(
+                            color_id=old_color_id, defaults={"quantity_kg": Decimal("0")}
+                        )
+                        old_stock.quantity_kg = Decimal(old_stock.quantity_kg or 0) - old_borib_kg
+                        if old_stock.quantity_kg < 0:
+                            raise ValidationError("Borib has already been consumed; cannot reduce it below zero.")
+                        old_stock.save(update_fields=["quantity_kg", "updated_at"])
+                    obj.updated_by = request.user
+                    obj.save()
+                    new_stock, _ = BoribStock.objects.select_for_update().get_or_create(
+                        color=obj.color, defaults={"quantity_kg": Decimal("0")}
                     )
-                    old_stock.quantity_kg = Decimal(old_stock.quantity_kg or 0) - old_borib_kg
-                    if old_stock.quantity_kg < 0:
-                        raise ValidationError("Borib stock has already been consumed; this receipt cannot reduce it below zero.")
-                    old_stock.save(update_fields=["quantity_kg", "updated_at"])
-                obj.save()
-                new_stock, _ = BoribStock.objects.select_for_update().get_or_create(
-                    color=obj.color, defaults={"quantity_kg": Decimal("0")}
-                )
-                new_stock.quantity_kg = Decimal(new_stock.quantity_kg or 0) + new_borib_kg
-                new_stock.save(update_fields=["quantity_kg", "updated_at"])
-            messages.success(request, "Fabric receipt updated.")
-            return redirect("production_material_stock")
+                    new_stock.quantity_kg = Decimal(new_stock.quantity_kg or 0) + new_borib_kg
+                    new_stock.save(update_fields=["quantity_kg", "updated_at"])
+                    for roll, new_original, new_remaining in corrections:
+                        roll.original_qty = new_original
+                        roll.remaining_qty = new_remaining
+                        roll.save(update_fields=["original_qty", "remaining_qty", "status"])
+                messages.success(request, "Fabric receipt and roll KG corrected. Production consumption preserved.")
+                return redirect("production_material_stock")
+            except ValidationError as exc:
+                form.add_error(None, exc)
     else:
         form = FabricReceiptForm(instance=receipt, user=request.user)
     return render(request, "production/fabric_receipt_form.html", {
         "form": form,
         "receipt": receipt,
+        "edit_rolls": list(receipt.rolls.order_by("pk")),
         "page_title_text": f"Edit {receipt.receipt_no}",
         "can_view_cost": request.user.has_perm("production.view_production_cost"),
         "is_multi_create": False,
@@ -609,7 +641,7 @@ def project_list(request):
     base_projects = (
         ProductionProject.objects
         .select_related("finished_item", "fabric_type", "created_by")
-        .prefetch_related("project_colors__color")
+        .prefetch_related("project_colors__color", "sewing_jobs__partner")
     )
     projects = base_projects
     if q:
@@ -619,9 +651,29 @@ def project_list(request):
             | Q(finished_item__code__icontains=q)
             | Q(fabric_type__name__icontains=q)
             | Q(project_colors__color__name__icontains=q)
+            | Q(sewing_jobs__partner__name__icontains=q)
+            | Q(sewing_jobs__staff_name__icontains=q)
         ).distinct()
     if status:
         projects = projects.filter(status=status)
+
+    # Prepare a compact, unique sewer label for fast scanning in the list.
+    # A project can have several sewing colour batches and may therefore have
+    # more than one sewer. Keep the newest sewing job first.
+    project_rows = list(projects)
+    for project in project_rows:
+        sewer_names = []
+        seen = set()
+        jobs = sorted(project.sewing_jobs.all(), key=lambda job: (job.sent_date, job.id), reverse=True)
+        for job in jobs:
+            name = (job.payee_name or "").strip()
+            key = name.casefold()
+            if name and key not in seen:
+                seen.add(key)
+                sewer_names.append(name)
+        project.sewer_names = sewer_names
+        project.sewer_display = sewer_names[0] if sewer_names else "-"
+        project.sewer_extra_count = max(len(sewer_names) - 1, 0)
 
     all_projects = base_projects
     active_projects = all_projects.exclude(
@@ -634,7 +686,7 @@ def project_list(request):
     ]
 
     return render(request, "production/project_list.html", {
-        "projects": projects,
+        "projects": project_rows,
         "q": q,
         "status": status,
         "status_choices": ProductionProject.STATUS_CHOICES,
@@ -1439,9 +1491,10 @@ def project_confirm_cutting(request, pk):
                 .order_by("id")
             )
 
-            if not usages and not project.roll_usages.exists():
+            if not usages:
                 raise ValidationError(
-                    "Choose fabric rolls before finishing cutting."
+                    "No new fabric roll usage to deduct. Cutting may already have been confirmed; "
+                    "use the existing correction workflow instead."
                 )
 
             usages_by_color = {}
@@ -2303,6 +2356,14 @@ def project_undo_latest_sewing_receive(request, pk):
                         "Some finished stock from this receive was adjusted. "
                         "It cannot be undone."
                     )
+                # Even if stock was restored to the original number, we must
+                # not undo a production receipt already used by an order.
+                from inventory.models import StockLedger
+                if item.ledger_logs.exclude(movement_type=StockLedger.TYPE_STOCK_IN).exists():
+                    raise ValidationError(
+                        "This production receipt has later stock movements. "
+                        "It cannot be undone automatically."
+                    )
 
             return_no = sewing_return.return_no
             good_total = int(sewing_return.good_total or 0)
@@ -2310,16 +2371,36 @@ def project_undo_latest_sewing_receive(request, pk):
             if payable is not None:
                 payable.delete()
 
-            # StockLedger protects batch items, so remove only the ledger entries
-            # created for this untouched production batch before deleting it.
+            # Reverse the stock receipt instead of deleting its ledger records.
+            # Keep a soft-deleted batch and cancelled receive for the audit trail.
+            from inventory.models import StockLedger
+            from inventory.stock_ledger import log_stock_movement
             for item in batch_items:
-                item.ledger_logs.all().delete()
+                before = Decimal(item.qty_remaining or 0)
+                if before != 0:
+                    log_stock_movement(
+                        batch_item=item,
+                        movement_type=StockLedger.TYPE_BATCH_DELETE,
+                        qty_before=before,
+                        qty_after=Decimal("0"),
+                        user=request.user,
+                        reference_no=return_no,
+                        source_type=StockLedger.SOURCE_SYSTEM,
+                        source_id=sewing_return.pk,
+                        remark=f"Undo production receipt {return_no}: reverse received stock",
+                    )
+                item.qty_remaining = Decimal("0")
+                item.is_active = False
+                item.save(update_fields=["qty_remaining", "is_active"])
 
-            # Disconnect first, then remove the inventory batch and receive.
-            sewing_return.stock_batch = None
-            sewing_return.save(update_fields=["stock_batch"])
-            stock_batch.delete()
-            sewing_return.delete()
+            stock_batch.is_deleted = True
+            stock_batch.deleted_at = timezone.now()
+            stock_batch.deleted_by = request.user
+            stock_batch.updated_by = request.user
+            stock_batch.save(update_fields=["is_deleted", "deleted_at", "deleted_by", "updated_by", "updated_at"])
+            sewing_return.status = SewingReturn.STATUS_CANCELLED
+            sewing_return.note = (sewing_return.note or "") + f"\nUndone: production stock receipt {return_no}."
+            sewing_return.save(update_fields=["status", "note"])
 
             pending = int(job.pending_total or 0)
             job.status = (

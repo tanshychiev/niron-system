@@ -387,7 +387,6 @@ html, body {
 
         <div class="info-box">
             <div class="box-title">Order Info</div>
-            <div class="info-line"><strong>Order Type:</strong> {{ order.get_order_type_display|default:"-" }}</div>
             <div class="info-line"><strong>Service Type:</strong> {{ order.get_service_type_display|default:"-" }}</div>
             <div class="info-line"><strong>Deadline:</strong> {{ order.deadline|date:"Y-m-d"|default:"-" }}</div>
             <div class="info-line"><strong>Created:</strong> {{ order.created_at|date:"Y-m-d" }}</div>

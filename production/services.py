@@ -415,6 +415,7 @@ def confirm_sewing_return(sewing_return, user=None):
             color=job.project_color.color if job.project_color_id else job.project.color,
             size=line.size,
             qty_received=good_qty,
+            qty_arrived=good_qty,
             qty_remaining=good_qty,
             base_unit_cost=ZERO,
             final_unit_cost=ZERO,

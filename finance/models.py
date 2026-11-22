@@ -83,6 +83,12 @@ class Expense(models.Model):
         default="",
     )
 
+    # Purchase for an order; does not create inventory.
+    outside_order = models.OneToOneField(
+        "orders.Order", null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="outside_purchase_expense",
+    )
+
     batch = models.ForeignKey(
         "inventory.InventoryBatch",
         null=True,

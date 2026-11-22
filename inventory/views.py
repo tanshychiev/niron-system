@@ -2123,67 +2123,95 @@ def inventory_batch_edit(request, pk):
             batch_obj.updated_by = request.user
             batch_obj.save()
 
-            # Validate deletions before applying any of them.
+            changed_items = formset.save(commit=False)
+
+            # All quantity changes must have a ledger entry. Never hard-delete
+            # an existing stock row: ledger and order allocations refer to its ID.
             for obj in formset.deleted_objects:
                 old_row = existing_rows.get(obj.pk)
-                if not old_row:
+                if old_row is None:
                     continue
-
-                qty_received = Decimal(old_row.qty_received or 0)
-                qty_remaining = Decimal(old_row.qty_remaining or 0)
-                qty_used = qty_received - qty_remaining
-
-                if qty_used != 0:
-                    messages.error(
-                        request,
-                        "Cannot delete a stock row that already has stock used.",
-                    )
+                arrived = Decimal(old_row.qty_arrived or 0)
+                if batch.status == InventoryBatch.STATUS_RECEIVED and arrived == 0:
+                    arrived = Decimal(old_row.qty_received or 0)
+                remaining = Decimal(old_row.qty_remaining or 0)
+                if arrived != remaining or old_row.adjustments.exists():
+                    messages.error(request, "Cannot delete a stock row that has been used or adjusted.")
                     transaction.set_rollback(True)
                     return redirect("inventory_batch_edit", pk=batch.pk)
 
-            changed_items = formset.save(commit=False)
-
-            # Apply deletions only after validation.
             for obj in formset.deleted_objects:
-                obj.delete()
+                old_row = existing_rows.get(obj.pk)
+                if old_row is None:
+                    continue
+                before = Decimal(old_row.qty_remaining or 0)
+                old_row.is_active = False
+                old_row.qty_remaining = Decimal("0")
+                old_row.save(update_fields=["is_active", "qty_remaining"])
+                if before != 0:
+                    log_batch_delete(
+                        batch_item=old_row, qty_before=before,
+                        qty_after=Decimal("0"), batch=batch_obj,
+                        user=request.user, remark=f"Stock row removed from batch {batch_obj.batch_no}",
+                    )
 
             for item in changed_items:
                 if not item.item:
                     continue
-
                 old_row = existing_rows.get(item.pk)
-
                 if old_row:
-                    old_received = Decimal(old_row.qty_received or 0)
-                    old_remaining = Decimal(old_row.qty_remaining or 0)
-                    used_qty = old_received - old_remaining
-                    new_received = Decimal(item.qty_received or 0)
-
-                    if new_received < used_qty:
-                        messages.error(
-                            request,
-                            (
-                                f"Cannot reduce {item.item} received quantity below "
-                                f"the quantity already used ({used_qty})."
-                            ),
-                        )
+                    # Moving a row to another variant rewrites the meaning of
+                    # ALL its prior ledger and order allocations. Block that.
+                    if (old_row.item_id, old_row.color_id, old_row.size_id) != (
+                        item.item_id, item.color_id, item.size_id
+                    ) and (old_row.ledger_logs.exists() or old_row.adjustments.exists()):
+                        messages.error(request, "Cannot change item/color/size after stock movements. Add a new stock row instead.")
                         transaction.set_rollback(True)
                         return redirect("inventory_batch_edit", pk=batch.pk)
 
-                    # Preserve already-used stock and adjust only what remains.
-                    item.qty_remaining = new_received - used_qty
-                else:
-                    # New row added while editing.
-                    if batch.status == InventoryBatch.STATUS_RECEIVED:
-                        item.qty_remaining = Decimal(item.qty_received or 0)
-                    else:
-                        item.qty_remaining = Decimal("0")
+                    before = Decimal(old_row.qty_remaining or 0)
+                    old_arrived = Decimal(old_row.qty_arrived or 0)
+                    old_received = Decimal(old_row.qty_received or 0)
+                    new_received = Decimal(item.qty_received or 0)
+                    # Older production receipts did not populate qty_arrived.
+                    # Their fully received quantity is represented by qty_received.
+                    if batch.status == InventoryBatch.STATUS_RECEIVED and old_arrived == 0 and old_received > 0:
+                        old_arrived = old_received
 
+                    # qty_received is an ORDERED quantity, not necessarily
+                    # physically arrived. Do not turn pending stock into stock.
+                    if batch_obj.status == InventoryBatch.STATUS_RECEIVED:
+                        new_arrived = old_arrived + (new_received - old_received)
+                    else:
+                        new_arrived = old_arrived
+                    used_qty = old_arrived - before
+                    if new_arrived < 0 or new_arrived > new_received or new_arrived < used_qty:
+                        messages.error(request, "New quantity conflicts with already received or used stock. Correct the physical count instead.")
+                        transaction.set_rollback(True)
+                        return redirect("inventory_batch_edit", pk=batch.pk)
+                    item.qty_arrived = new_arrived
+                    item.qty_remaining = new_arrived - used_qty
+                else:
+                    item.qty_arrived = (
+                        Decimal(item.qty_received or 0)
+                        if batch_obj.status == InventoryBatch.STATUS_RECEIVED
+                        else Decimal("0")
+                    )
+                    item.qty_remaining = item.qty_arrived
+
+                before = Decimal(old_row.qty_remaining or 0) if old_row else Decimal("0")
                 item.batch = batch_obj
                 item.base_unit_cost = Decimal(item.base_unit_cost or 0)
                 item.final_unit_cost = Decimal(item.final_unit_cost or 0)
                 item.is_active = True
                 item.save()
+                after = Decimal(item.qty_remaining or 0)
+                if before != after:
+                    log_batch_edit(
+                        batch_item=item, qty_before=before, qty_after=after,
+                        batch=batch_obj, user=request.user,
+                        remark=f"Stock quantity changed in batch {batch_obj.batch_no}",
+                    )
 
             formset.save_m2m()
 
@@ -2264,6 +2292,17 @@ def inventory_batch_delete(request, pk):
                 "Cannot delete this batch because some stock has already been used.",
             )
             return redirect("inventory_batch_detail", pk=batch.pk)
+
+        # Batch is excluded from inventory after soft-delete. Record the
+        # corresponding removal without erasing the batch's audit history.
+        for row in batch.items.select_for_update().filter(is_active=True):
+            before = Decimal(row.qty_remaining or 0)
+            if before != 0:
+                log_batch_delete(
+                    batch_item=row, qty_before=before, qty_after=Decimal("0"),
+                    batch=batch, user=request.user,
+                    remark=f"Stock excluded by deletion of batch {batch.batch_no}",
+                )
 
         batch.is_deleted = True
         batch.deleted_at = timezone.now()
@@ -3165,10 +3204,33 @@ def stock_ledger_list(request):
         if last_correct:
             qs = qs.filter(created_at__gte=last_correct.created_at)
 
+    variant_summary = None
+    if item_id and color_id and size_id:
+        # Inventory uses the sum of active batch rows (including shortage rows).
+        # Ledger before/after instead describe ONE batch only.
+        active_rows = InventoryBatchItem.objects.filter(
+            item_id=item_id, color_id=color_id, size_id=size_id,
+            is_active=True, batch__is_deleted=False,
+        ).values("qty_remaining", "batch__batch_no")
+        positive = Decimal("0")
+        shortage = Decimal("0")
+        for stock_row in active_rows:
+            qty = Decimal(stock_row["qty_remaining"] or 0)
+            if stock_row["batch__batch_no"] == "AUTO-SHORTAGE" or qty < 0:
+                shortage += qty
+            else:
+                positive += qty
+        variant_summary = {
+            "positive": positive,
+            "shortage": shortage,
+            "net": positive + shortage,
+        }
+
     return render(
         request,
         "inventory/stock_ledger_list.html",
         {
+            "variant_summary": variant_summary,
             "rows": qs[:500],
             "keyword": keyword,
             "movement_type": movement_type,

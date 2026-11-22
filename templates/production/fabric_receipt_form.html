@@ -641,6 +641,18 @@
           </div>
         </section>
 
+        {% if receipt and edit_rolls %}
+        <section class="panel">
+          <h2>Correct fabric roll weights (KG)</h2>
+          <p>Enter the actual received KG for each roll. Already consumed fabric is preserved.</p>
+          {% for roll in edit_rolls %}
+          <div class="field" style="margin:10px 0;max-width:360px">
+            <label for="roll_{{ roll.pk }}">{{ roll.roll_code }} — available {{ roll.remaining_qty }} KG</label>
+            <input id="roll_{{ roll.pk }}" name="roll_weight_{{ roll.pk }}" type="number" min="0.001" step="0.001" required value="{{ roll.original_qty }}" class="form-control">
+          </div>
+          {% endfor %}
+        </section>
+        {% endif %}
         <div class="form-actions">
           <div class="action-group">
             <a class="btn-light" href="{% url 'production_material_stock' %}">Cancel</a>

@@ -78,6 +78,8 @@ class OrderForm(forms.ModelForm):
         fields = [
             "order_type",
             "service_type",
+            "product_source",
+            "printing_provider",
             "customer_name",
             "phone",
             "customer_location",
@@ -96,6 +98,8 @@ class OrderForm(forms.ModelForm):
                     "id": "id_service_type",
                 }
             ),
+            "product_source": forms.Select(attrs={"class": "form-select"}),
+            "printing_provider": forms.Select(attrs={"class": "form-select"}),
             "customer_name": forms.TextInput(
                 attrs={
                     "class": "form-control",

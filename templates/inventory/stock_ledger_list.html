@@ -16,6 +16,20 @@
     </div>
   </div>
 
+  {% if variant_summary %}
+    <div class="variant-box" role="status">
+      <div>
+        <strong>Current inventory for selected item / color / size (ALL active batches)</strong>
+        <p>Positive batch stock: <strong>{{ variant_summary.positive|floatformat:2 }}</strong>
+          · Shortage / negative balances: <strong>{{ variant_summary.shortage|floatformat:2 }}</strong>
+          · Net available shown in Inventory: <strong>{{ variant_summary.net|floatformat:2 }}</strong></p>
+        <p>History Before / After figures below belong to individual stock batches, not this combined total.
+          Positive stock is NOT a verified physical count. The last-correct checkpoint may cover only one batch.
+          Search/date filters affect history rows but do not change this current summary.</p>
+      </div>
+    </div>
+  {% endif %}
+
   {% if batch_item %}
     <div class="variant-box">
       <div>

@@ -1203,6 +1203,24 @@
                 </div>
             </div>
 
+            <div class="service-top-grid" style="margin-top:12px">
+                <div class="field">
+                    <label>Product Source</label>
+                    {{ form.product_source }}
+                    {{ form.product_source.errors }}
+                    <small>Buy Outside skips product stock-in and stock deduction.</small>
+                </div>
+                <div class="field">
+                    <label>Printing / Service By</label>
+                    {{ form.printing_provider }}
+                    {{ form.printing_provider.errors }}
+                </div>
+            </div>
+            <div class="field" style="margin-top:12px">
+                <label>Outside Purchase Cost (USD; optional, can be entered later in Stock Expense)</label>
+                <input class="form-control" type="number" name="outside_purchase_cost" min="0" step="0.01" value="{{ outside_purchase_cost|default:'' }}" placeholder="Leave empty for Pending Cost">
+            </div>
+
             <div class="customer-row-grid">
                 <div class="field customer-field">
                     <label>Customer Name</label>

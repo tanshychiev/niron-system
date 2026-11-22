@@ -107,6 +107,24 @@ class Order(models.Model):
         db_index=True,
     )
 
+    SOURCE_EXISTING = "EXISTING"
+    SOURCE_OUTSIDE = "OUTSIDE"
+    SOURCE_CHOICES = [
+        (SOURCE_EXISTING, "Niron Stock"),
+        (SOURCE_OUTSIDE, "Buy Outside (Skip Stock)"),
+    ]
+    product_source = models.CharField(max_length=12, choices=SOURCE_CHOICES, default=SOURCE_EXISTING)
+
+    PRINT_NIRON = "NIRON"
+    PRINT_SUPPLIER = "SUPPLIER"
+    PRINT_NONE = "NONE"
+    PRINT_CHOICES = [
+        (PRINT_NIRON, "Niron Printing / Service"),
+        (PRINT_SUPPLIER, "Supplier Full Service"),
+        (PRINT_NONE, "No Printing / Service"),
+    ]
+    printing_provider = models.CharField(max_length=12, choices=PRINT_CHOICES, default=PRINT_NIRON)
+
     # ===== STOCK =====
     stock_deducted = models.BooleanField(default=False)
 

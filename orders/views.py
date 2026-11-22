@@ -1029,8 +1029,45 @@ def order_list_export_excel(request):
     return response
 
 
-@login_required
-@permission_required("orders.add_order", raise_exception=True)
+def _sync_outside_purchase_expense(order, request, previous_source=None):
+    """A single expense row per outside order, never a stock-in transaction."""
+    from finance.models import Expense
+    existing = Expense.objects.select_for_update().filter(outside_order=order).first()
+    if order.product_source != Order.SOURCE_OUTSIDE:
+        if existing:
+            if existing.expense_status == Expense.STATUS_PENDING:
+                existing.delete()
+            else:
+                # Do not erase an incurred cost on a change of order type.
+                existing.note = (existing.note or "") + "\nREVIEW: order changed to Niron Stock."
+                existing.save(update_fields=["note"])
+        return
+    raw = request.POST.get("outside_purchase_cost", "").strip()
+    if raw:
+        try:
+            cost = Decimal(raw).quantize(Decimal("0.01"))
+        except Exception:
+            raise ValidationError("Outside purchase cost must be a valid number.")
+        if cost < 0:
+            raise ValidationError("Outside purchase cost cannot be negative.")
+    else:
+        cost = None
+    if existing is None:
+        if not request.user.is_authenticated:
+            raise ValidationError("Sign in to create an outside purchase expense.")
+        existing = Expense(outside_order=order, created_by=request.user, expense_type=Expense.TYPE_BATCH,
+            stock_source_type=Expense.SOURCE_INVENTORY, source_reference=order.order_no,
+            expense_date=timezone.localdate(), received_date=timezone.localdate(),
+            note=f"Outside purchase for order {order.order_no} (no inventory stock-in)")
+    if cost is not None:
+        existing.amount = cost
+        existing.expense_status = Expense.STATUS_COMPLETED
+    elif existing.pk is None:
+        existing.amount = Decimal("0.00")
+        existing.expense_status = Expense.STATUS_PENDING
+    existing.save()
+
+
 def order_create(request):
     if request.method == "POST":
         form = OrderForm(request.POST, request.FILES)
@@ -1090,6 +1127,8 @@ def order_create(request):
                         "done_pcs",
                         "status",
                         "stock_deducted",
+                        "product_source",
+                        "printing_provider",
                         "created_by",
                     ])
 
@@ -1101,11 +1140,13 @@ def order_create(request):
                     # ✅ Stock deduct only FULL + RETAIL
                     # ✅ FILM_ONLY no stock deduct
                     # ✅ PRINT_HEATPRESS no stock deduct
-                    if order.service_type in [
+                    if order.product_source == Order.SOURCE_EXISTING and order.service_type in [
                         Order.SERVICE_FULL,
                         Order.SERVICE_RETAIL,
                     ]:
                         deduct_stock_for_order(order, allow_shortage=True, user=request.user)
+
+                    _sync_outside_purchase_expense(order, request)
 
                     _log_order_history(
                         order=order,
@@ -1437,6 +1478,8 @@ def order_edit(request, pk):
                         "customer",
                         "order_type",
                         "service_type",
+                        "product_source",
+                        "printing_provider",
                         "customer_name",
                         "phone",
                         "customer_location",
@@ -1453,12 +1496,13 @@ def order_edit(request, pk):
                     ])
 
                     # 🟢 STEP 2: deduct new stock
-                    if order.service_type in [
+                    if order.product_source == Order.SOURCE_EXISTING and order.service_type in [
                         Order.SERVICE_FULL,
                         Order.SERVICE_RETAIL,
                     ]:
                         deduct_stock_for_order(order, allow_shortage=True, user=request.user)
 
+                    _sync_outside_purchase_expense(order, request)
                     after_order = _snapshot_order(order)
                     _log_order_changes(order, before_order, after_order, request.user)
 
@@ -1478,6 +1522,11 @@ def order_edit(request, pk):
         {
             "form": form,
             "is_edit": True,
+            "outside_purchase_cost": (
+                order.outside_purchase_expense.amount
+                if hasattr(order, "outside_purchase_expense") and order.outside_purchase_expense.expense_status == "COMPLETED"
+                else ""
+            ),
             "submit_label": "Update Order",
             "order": order,
             **_order_form_context_base(),
