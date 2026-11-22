@@ -6,7 +6,7 @@
     <div>
       <h1>Stock History</h1>
       <p>
-        Track every stock movement by date, reference, staff, and remark.
+        Track every stock movement, including automatic stock additions from Production / Sewing Returns, by date, reference, staff, and remark.
         Use “From Last Correct” after stock has been counted correctly.
       </p>
     </div>
@@ -18,17 +18,19 @@
   </div>
 
   {% if variant_summary %}
-    <div class="variant-box" role="status">
-      <div>
-        <strong>Current inventory for selected item / color / size (ALL active batches)</strong>
-        <p>Positive batch stock: <strong>{{ variant_summary.positive|floatformat:2 }}</strong>
-          · Shortage / negative balances: <strong>{{ variant_summary.shortage|floatformat:2 }}</strong>
-          · Net available shown in Inventory: <strong>{{ variant_summary.net|floatformat:2 }}</strong></p>
-        <p>History Before / After figures below belong to individual stock batches, not this combined total.
-          Positive stock is NOT a verified physical count. The last-correct checkpoint may cover only one batch.
-          Search/date filters affect history rows but do not change this current summary.</p>
+    <section class="inventory-reconcile" aria-label="Current available stock for selected variant">
+      <div class="reconcile-main">
+        <span class="reconcile-kicker">Current stock — ALL batches combined</span>
+        <strong class="reconcile-total">{{ variant_summary.net|floatformat:"-2" }} <small>pcs</small></strong>
+        <span class="reconcile-caption">This is the same net stock calculation used by Inventory List.</span>
       </div>
-    </div>
+      <div class="reconcile-breakdown">
+        <div><span>Other / positive batches</span><strong>+{{ variant_summary.positive|floatformat:"-2" }}</strong></div>
+        <div><span>Shortage / negative batches</span><strong>{{ variant_summary.shortage|floatformat:"-2" }}</strong></div>
+        <div class="reconcile-net"><span>Net available</span><strong>{{ variant_summary.net|floatformat:"-2" }}</strong></div>
+      </div>
+      <p class="reconcile-explain"><strong>Why History “After” can differ:</strong> Each row's Before / After is the balance of <em>only that row's stock batch</em>. Inventory List combines all active batches for the same item, color and size, including shortage batches. The History rows are transaction snapshots, not a live total. Review negative shortage quantities before making any physical count correction.</p>
+    </section>
   {% endif %}
 
   {% if batch_item %}
@@ -73,7 +75,7 @@
       <div class="filter-grid">
         <div>
           <label>Search Invoice / Batch / Remark</label>
-          <input type="text" name="q" value="{{ keyword|default:'' }}" placeholder="NR-2605-001, STK..., remark">
+          <input type="text" name="q" value="{{ keyword|default:'' }}" placeholder="Order, PROD-RET-..., stock batch, remark">
         </div>
 
         <div>
@@ -147,6 +149,12 @@
     </form>
   {% endif %}
 
+  {% if variant_summary %}
+    <div class="history-table-note" role="note">
+      <span><strong>Current combined inventory: {{ variant_summary.net|floatformat:"-2" }} pcs.</strong> The “After (batch)” column below is <strong>not</strong> the total available inventory.</span>
+      <a href="{% url 'inventory_list' %}">Compare Inventory List</a>
+    </div>
+  {% endif %}
   <div class="table-card">
     <div class="table-wrap">
       <table class="ledger-table">
@@ -158,10 +166,10 @@
             <th>Size</th>
             <th>Type</th>
             <th>Invoice / Ref</th>
-            <th class="text-end">Before</th>
+            <th class="text-end" title="Balance of this stock batch before this transaction">Before (batch)</th>
             <th class="text-end in-col">IN</th>
             <th class="text-end out-col">OUT</th>
-            <th class="text-end">After</th>
+            <th class="text-end" title="Balance of this stock batch after this transaction; not the combined inventory total">After (batch)</th>
             <th>By</th>
             <th>Remark</th>
           </tr>
@@ -197,9 +205,11 @@
               </td>
 
               <td>
-                <span class="type-pill type-{{ row.movement_type }}">
-                  {{ row.get_movement_type_display }}
-                </span>
+                {% if row.movement_type == "STOCK_IN" and row.batch_no|slice:":5" == "PROD-" %}
+                  <span class="type-pill type-{{ row.movement_type }}">Production / Sewing Return</span>
+                {% else %}
+                  <span class="type-pill type-{{ row.movement_type }}">{{ row.get_movement_type_display }}</span>
+                {% endif %}
                 {% if row.is_correct_checkpoint %}
                   <div class="correct-mini">Checkpoint</div>
                 {% endif %}
@@ -218,6 +228,9 @@
 
                 {% if row.batch_no %}
                   <div class="muted">Batch: {{ row.batch_no }}</div>
+                  {% if row.movement_type == "STOCK_IN" and row.batch_no|slice:":5" == "PROD-" %}
+                    <div class="muted">Automatically received from Production</div>
+                  {% endif %}
                 {% endif %}
               </td>
 
@@ -239,7 +252,7 @@
                 {% endif %}
               </td>
 
-              <td class="text-end after-col">{{ row.qty_after|floatformat:2 }}</td>
+              <td class="text-end after-col" title="Batch {{ row.batch_no }} only — not all batches">{{ row.qty_after|floatformat:2 }}<div class="muted">batch only</div></td>
 
               <td>
                 {% if row.created_by %}
@@ -268,6 +281,21 @@
 </div>
 
 <style>
+  .inventory-reconcile{display:grid;grid-template-columns:minmax(200px,1fr) minmax(240px,1.1fr);gap:16px 22px;background:#fff;border:1px solid #e4d5bb;border-left:5px solid #e8a31b;border-radius:18px;padding:20px;margin:0 0 18px;box-shadow:0 8px 20px rgba(30,34,42,.05)}
+  .reconcile-main{display:flex;flex-direction:column;gap:6px}
+  .reconcile-kicker{font-size:12px;font-weight:850;text-transform:uppercase;letter-spacing:.03em;color:#8b5e16}
+  .reconcile-total{font-size:40px;font-weight:950;line-height:1.1;color:#14243a}
+  .reconcile-total small{font-size:14px;font-weight:650;color:#64748b}
+  .reconcile-caption{font-size:12px;color:#64748b}
+  .reconcile-breakdown{display:flex;flex-direction:column;justify-content:center;gap:9px}
+  .reconcile-breakdown>div{display:flex;justify-content:space-between;gap:14px;font-size:13px;color:#475569}
+  .reconcile-breakdown strong{font-variant-numeric:tabular-nums;color:#14243a}
+  .reconcile-breakdown .reconcile-net{border-top:1px solid #e6eaf0;padding-top:10px;font-weight:800}
+  .reconcile-explain{grid-column:1/-1;margin:0!important;line-height:1.55;color:#5b6472;font-size:12px}
+  .history-table-note{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 15px;margin-bottom:12px;border:1px solid #e6e1d7;background:#fffcf6;border-radius:12px;font-size:13px;color:#374151;flex-wrap:wrap}
+  .history-table-note a{color:#8b5800;font-weight:800}
+  @media(max-width:700px){.inventory-reconcile{grid-template-columns:1fr}.reconcile-total{font-size:32px}}
+
   .ledger-page{
     max-width:1500px;
     margin:26px auto;

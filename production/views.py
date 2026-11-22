@@ -1551,6 +1551,34 @@ def project_confirm_cutting(request, pk):
                     usage.save(update_fields=["returned_qty"])
                     amount_left -= returned
 
+            # STRICT MATERIAL CHECK: every colour with cut pieces must consume
+            # a positive quantity of its own fabric before Finish Cutting.
+            # Runs in the existing transaction; failure does not deduct stock.
+            for pc in project.project_colors.select_related("color").all():
+                cut_qty_for_color = int(
+                    project.cut_sizes.filter(project_color=pc)
+                    .aggregate(total=Sum("cut_qty"))["total"] or 0
+                )
+                if cut_qty_for_color <= 0:
+                    continue
+                fabric_consumed = sum(
+                    (
+                        Decimal(usage.issued_qty or 0)
+                        - Decimal(usage.returned_qty or 0)
+                        for usage in CuttingRollUsage.objects.filter(
+                            project=project, project_color=pc
+                        )
+                    ),
+                    Decimal("0"),
+                )
+                if fabric_consumed <= 0:
+                    raise ValidationError(
+                        f"{pc.color.name}: {cut_qty_for_color} pcs were cut, "
+                        "but no consumed fabric is recorded. Select the fabric "
+                        "rolls and enter the actual remaining quantity before "
+                        "finishing cutting."
+                    )
+
             # Deduct Borib by the exact production colour. If cutting was reopened,
             # only apply the difference from the previously confirmed Borib usage.
             # Any colour that actually produced cut pieces MUST consume Borib too.
