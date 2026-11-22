@@ -126,9 +126,10 @@ class InventoryItem(models.Model):
         default=UNIT_PCS,
     )
 
+    # Open-ended shirt style: existing OVERSIZE/POLO/BOXY values remain valid.
+    # New styles are stored on each item without changing application code.
     sample_style = models.CharField(
-        max_length=20,
-        choices=STYLE_CHOICES,
+        max_length=60,
         default=STYLE_OVERSIZE,
         blank=True,
     )
@@ -192,6 +193,14 @@ class InventoryItem(models.Model):
             self.sample_style = ""
 
         super().save(*args, **kwargs)
+
+    def get_sample_style_display(self):
+        """Preserve the display API used by stock, orders and reports."""
+        raw = (self.sample_style or "").strip()
+        if not raw:
+            return ""
+        predefined = dict(self.STYLE_CHOICES)
+        return predefined.get(raw, raw.replace("_", " ").title())
 
     @property
     def total_stock(self):

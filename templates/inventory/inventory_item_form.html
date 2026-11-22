@@ -35,6 +35,11 @@
 #statusActive:checked + .status-option{background:#dcfce7;color:#166534}#statusInactive:checked + .status-option{background:#fee2e2;color:#991b1b}
 .status-help{margin-top:7px;font-size:12px;color:#6b7280;font-weight:700}
 .actions{margin-top:20px;display:flex;gap:10px;flex-wrap:wrap}
+.shirt-style-hint{font-size:12px;color:#766a5b;margin:7px 0 10px;line-height:1.5}
+.shirt-style-presets{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px}
+.shirt-style-preset{border:1px solid #e5d8c3;background:#fffaf3;color:#764e20;padding:7px 11px;border-radius:999px;cursor:pointer;font-size:12px;font-weight:700}
+.shirt-style-preset:hover,.shirt-style-preset.is-active{background:#ffedc0;border-color:#e6a625;color:#5d370c}
+.shirt-style-preview-note{font-size:12px;color:#7b6c5b;margin-top:8px;line-height:1.5}
 </style>
 
 <div class="page-wrap">
@@ -112,6 +117,18 @@
         <div class="field">
           <label>Shirt Style</label>
           {{ form.sample_style }}
+          <datalist id="shirt-style-suggestions">
+            {% for style in shirt_style_suggestions %}<option value="{{ style }}"></option>{% endfor %}
+          </datalist>
+          <div class="shirt-style-hint">Choose a suggested style or enter a new name. Existing styles are suggested automatically on future items.</div>
+          <div class="shirt-style-presets" aria-label="Quick shirt styles">
+            <button type="button" class="shirt-style-preset" data-shirt-style="OVERSIZE">Oversize</button>
+            <button type="button" class="shirt-style-preset" data-shirt-style="POLO">Polo</button>
+            <button type="button" class="shirt-style-preset" data-shirt-style="BOXY">Boxy</button>
+            <button type="button" class="shirt-style-preset" data-shirt-style="Regular">Regular</button>
+            <button type="button" class="shirt-style-preset" data-shirt-style="Long Sleeve">Long Sleeve</button>
+          </div>
+          <div class="shirt-style-preview-note" id="stylePreviewNote" aria-live="polite"></div>
         </div>
       </div>
 
@@ -158,6 +175,7 @@
     const previewPanel = document.getElementById("previewPanel");
     const typeHelp = document.getElementById("typeHelp");
     const stylePreview = document.getElementById("stylePreview");
+    const stylePreviewNote = document.getElementById("stylePreviewNote");
     const dropZone = document.getElementById("dropZone");
     const previewWrapper = document.getElementById("previewWrapper");
     const previewImage = document.getElementById("previewImage");
@@ -214,8 +232,31 @@
 
     function updateStylePreview() {
       if (!styleSelect || !stylePreview) return;
-      stylePreview.className = "shirt-preview style-" + styleSelect.value;
+      const style = (styleSelect.value || "").trim();
+      const known = ["OVERSIZE", "POLO", "BOXY"];
+      const key = style.toUpperCase();
+      // For custom styles, show a neutral shirt silhouette, not the wrong style name.
+      stylePreview.className = "shirt-preview style-" + (known.includes(key) ? key : "OVERSIZE");
+      if (stylePreviewNote) {
+        stylePreviewNote.textContent = known.includes(key)
+          ? "Preview for " + (style || "Oversize") + "."
+          : "Generic preview only. Your custom shirt style is saved as: " + (style || "Oversize") + ".";
+      }
+      document.querySelectorAll(".shirt-style-preset").forEach(button => {
+        const active = button.dataset.shirtStyle.toUpperCase() === key;
+        button.classList.toggle("is-active", active);
+        button.setAttribute("aria-pressed", String(active));
+      });
     }
+
+    document.querySelectorAll(".shirt-style-preset").forEach(button => {
+      button.addEventListener("click", () => {
+        if (!styleSelect) return;
+        styleSelect.value = button.dataset.shirtStyle;
+        styleSelect.dispatchEvent(new Event("change", {bubbles:true}));
+        styleSelect.focus();
+      });
+    });
 
     function setFile(file) {
       if (!file || !file.type.startsWith("image/")) return;
@@ -241,6 +282,7 @@
 
     if (styleSelect) {
       styleSelect.addEventListener("change", updateStylePreview);
+      styleSelect.addEventListener("input", updateStylePreview);
       updateStylePreview();
     }
 

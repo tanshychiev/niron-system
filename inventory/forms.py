@@ -31,9 +31,33 @@ class InventoryItemForm(forms.ModelForm):
             "item_type": forms.Select(attrs={"class": "form-select"}),
             "unit": forms.Select(attrs={"class": "form-select"}),
             "image": forms.ClearableFileInput(attrs={"class": "form-control", "accept": "image/*"}),
-            "sample_style": forms.Select(attrs={"class": "form-select"}),
+            "sample_style": forms.TextInput(attrs={"class": "form-control", "list": "shirt-style-suggestions", "placeholder": "Choose or type any shirt style", "autocomplete": "off", "maxlength": "60"}),
             "is_active": forms.CheckboxInput(attrs={"class": "form-check-input"}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Suggest styles already used in this system, plus standard starting options.
+        defaults = ["Oversize", "Polo", "Boxy", "Regular", "Slim Fit", "Relaxed Fit",
+                    "Long Sleeve", "Raglan", "Crop", "Sleeveless", "V-Neck", "Hoodie"]
+        saved = InventoryItem.objects.filter(
+            item_type=InventoryItem.TYPE_SHIRT
+        ).exclude(sample_style="").values_list("sample_style", flat=True).distinct()
+        known = {value.strip() for value in saved if value and value.strip()}
+        self.style_suggestions = sorted(set(defaults) | known, key=str.casefold)
+
+    def clean_sample_style(self):
+        value = " ".join((self.cleaned_data.get("sample_style") or "").split())
+        if len(value) > 60:
+            raise forms.ValidationError("Shirt style must be 60 characters or fewer.")
+        # Keep legacy values stable and collapse case-insensitive duplicates.
+        predefined = {"oversize": "OVERSIZE", "polo": "POLO", "boxy": "BOXY"}
+        if value.lower() in predefined:
+            return predefined[value.lower()]
+        previous = InventoryItem.objects.filter(
+            item_type=InventoryItem.TYPE_SHIRT, sample_style__iexact=value
+        ).values_list("sample_style", flat=True).first() if value else None
+        return previous or value or InventoryItem.STYLE_OVERSIZE
 
     def clean(self):
         cleaned_data = super().clean()

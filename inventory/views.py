@@ -655,6 +655,7 @@ def inventory_item_create(request):
             "form": form,
             "page_title": "Create Item",
             "submit_label": "Save Item",
+            "shirt_style_suggestions": form.style_suggestions,
         },
     )
 
@@ -681,6 +682,7 @@ def inventory_item_edit(request, pk):
             "object": item,
             "page_title": "Edit Item",
             "submit_label": "Update Item",
+            "shirt_style_suggestions": form.style_suggestions,
         },
     )
 
