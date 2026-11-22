@@ -475,7 +475,7 @@
             <td>{% if batch.production_sewing_return %}{{ batch.production_sewing_return.job.project.project_no }}{% else %}-{% endif %}</td>
             <td>{% if batch.production_sewing_return %}{{ batch.production_sewing_return.job.project_color.color.name|default:"-" }}{% else %}-{% endif %}</td>
             <td class="item-summary">{{ batch.stock_item_summary }}</td>
-            <td><strong>{{ batch.stock_arrived_qty|floatformat:"-2" }}</strong></td>
+            <td><strong>{{ batch.stock_total_qty|floatformat:"-2" }}</strong></td>
             <td>{{ batch.created_by.username|default:"System" }}</td>
             <td><a class="action-link action-light" href="{% url 'inventory_batch_detail' batch.pk %}">Detail</a></td>
           </tr>
