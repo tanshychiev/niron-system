@@ -1310,6 +1310,33 @@
 
 </style>
 
+    <style>
+
+/* Modern select popups: Niron Production & Inventory only */
+.nm-select-shell{position:relative;display:inline-block;vertical-align:middle;max-width:100%;box-sizing:border-box}
+.nm-select-shell>.nm-native{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;opacity:0!important;pointer-events:none!important;margin:0!important;z-index:-1!important}
+.nm-select-button{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;min-height:34px;text-align:left;padding:7px 11px;border:1px solid #dfd5c5;border-radius:10px;background:#fff;color:#26313d;font:inherit;font-size:inherit;line-height:1.3;cursor:pointer;transition:border-color .15s,box-shadow .15s,background .15s;box-sizing:border-box}
+.nm-select-button:hover{border-color:#d5a648;background:#fffdf9}
+.nm-select-button:focus-visible,.nm-select-shell.nm-open>.nm-select-button{outline:none;border-color:#e5a008;box-shadow:0 0 0 3px rgba(246,178,21,.16)}
+.nm-select-button:disabled{opacity:.5;cursor:not-allowed;background:#f6f5f3}
+.nm-select-caption{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;flex:1;min-width:0}
+.nm-select-muted{color:#8b8275}
+.nm-select-chevron{display:inline-flex;align-items:center;justify-content:center;color:#94764a;flex-shrink:0;transition:transform .18s}
+.nm-open .nm-select-chevron{transform:rotate(180deg)}
+.nm-select-popup{position:fixed;z-index:2147483000;background:#fff;border:1px solid #ecddbd;border-radius:14px;box-shadow:0 16px 46px rgba(30,35,45,.18),0 3px 12px rgba(30,35,45,.07);padding:6px;box-sizing:border-box;overflow:hidden;animation:nm-popup-in .15s ease-out}
+@keyframes nm-popup-in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+.nm-select-search{width:100%;height:35px;margin:1px 0 6px;border:1px solid #ebe1d1;border-radius:9px;padding:6px 10px;background:#fbf9f5;color:#26313d;outline:none;font:inherit;font-size:12px;box-sizing:border-box}
+.nm-select-search:focus{border-color:#dda014;background:#fff}
+.nm-select-items{max-height:260px;overflow:auto;overscroll-behavior:contain;padding:1px;scrollbar-width:thin}
+.nm-select-option{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:33px;padding:8px 10px;border:0;border-radius:8px;background:transparent;font:inherit;font-size:12px;text-align:left;cursor:pointer;color:#303845;gap:10px}
+.nm-select-option:hover,.nm-select-option.nm-focused{background:#fff0cc}
+.nm-select-option.nm-selected{background:#fff5df;color:#925c05;font-weight:600}
+.nm-select-option:disabled{cursor:not-allowed;opacity:.4;background:transparent}
+.nm-select-check{color:#d69300;font-weight:700;flex-shrink:0}
+.nm-select-empty{padding:14px;color:#938c82;text-align:center;font-size:12px}
+@media(prefers-reduced-motion:reduce){.nm-select-popup{animation:none}}
+
+    </style>
     {% block extra_css %}{% endblock %}
 </head>
 <body>
@@ -2043,5 +2070,202 @@
     </script>
 
     {% block extra_js %}{% endblock %}
+    <script>
+
+/* Shared production/inventory custom select; native selects remain the source of form data. */
+(function () {
+  'use strict';
+  const path = window.location.pathname || '';
+  if (!(/^\/(production|inventory)(\/|$)/.test(path) || /^\/orders\/production(\/|$)/.test(path))) return;
+
+  const instances = new WeakMap();
+  let active = null;
+  let scheduled = false;
+
+  function eligible(select) {
+    if (!select || !select.isConnected || instances.has(select)) return false;
+    if (select.multiple || select.size > 1 || select.closest('.nm-select-popup')) return false;
+    if (select.matches('[data-native-select],.select2-hidden-accessible,[data-no-modern-select]')) return false;
+    if (select.closest('.select2-container,.choices,.ts-wrapper')) return false;
+    const style = window.getComputedStyle(select);
+    if (style.display === 'none' || style.visibility === 'hidden') return false;
+    const rect = select.getBoundingClientRect();
+    if (rect.width < 12 || rect.height < 12) return false;
+    return true;
+  }
+
+  function selectedLabel(select) {
+    const o = select.selectedOptions[0];
+    return o ? o.textContent.trim() : (select.getAttribute('placeholder') || 'Select an option');
+  }
+
+  function refresh(select) {
+    const inst = instances.get(select);
+    if (!inst) return;
+    inst.label.textContent = selectedLabel(select);
+    inst.label.classList.toggle('nm-select-muted', !select.value);
+    inst.button.disabled = select.disabled;
+    inst.button.setAttribute('aria-expanded', active && active.select === select ? 'true' : 'false');
+    if (active && active.select === select) drawOptions(active);
+  }
+
+  function position() {
+    if (!active) return;
+    const r = active.button.getBoundingClientRect();
+    const popup = active.popup;
+    const roomBelow = window.innerHeight - r.bottom;
+    const preferred = Math.min(326, popup.scrollHeight);
+    const above = roomBelow < Math.min(preferred, 180) && r.top > roomBelow;
+    const width = Math.min(Math.max(r.width, 190), window.innerWidth - 16);
+    popup.style.width = width + 'px';
+    popup.style.left = Math.max(8, Math.min(r.left, window.innerWidth - width - 8)) + 'px';
+    popup.style.maxHeight = Math.max(105, Math.min(326, above ? r.top - 14 : roomBelow - 12)) + 'px';
+    popup.style.top = above ? Math.max(8, r.top - popup.offsetHeight - 6) + 'px' : r.bottom + 5 + 'px';
+  }
+
+  function close() {
+    if (!active) return;
+    const a = active;
+    active = null;
+    a.popup.remove();
+    a.shell.classList.remove('nm-open');
+    a.button.setAttribute('aria-expanded', 'false');
+  }
+
+  function choose(select, option) {
+    if (option.disabled) return;
+    const old = select.value;
+    select.value = option.value;
+    close();
+    refresh(select);
+    if (old !== select.value) {
+      select.dispatchEvent(new Event('input', {bubbles:true}));
+      select.dispatchEvent(new Event('change', {bubbles:true}));
+    }
+    instances.get(select)?.button.focus({preventScroll:true});
+  }
+
+  function drawOptions(a) {
+    if (!active || active !== a) return;
+    const q = (a.search?.value || '').trim().toLocaleLowerCase();
+    a.items.replaceChildren();
+    const available = Array.from(a.select.options).filter(o => !o.hidden && (!q || o.textContent.toLocaleLowerCase().includes(q)));
+    if (!available.length) {
+      const empty = document.createElement('div');
+      empty.className='nm-select-empty';empty.textContent='No matching options';a.items.append(empty);return;
+    }
+    available.forEach(option => {
+      const b = document.createElement('button');
+      b.type='button';b.className='nm-select-option';b.setAttribute('role','option');
+      b.textContent=option.textContent.trim() || 'All';
+      b.disabled=option.disabled || (option.parentElement?.disabled && option.parentElement.tagName === 'OPTGROUP');
+      if (option.selected) {
+        b.classList.add('nm-selected');b.setAttribute('aria-selected','true');
+        const check=document.createElement('span');check.className='nm-select-check';check.textContent='✓';b.append(check);
+      }
+      b.addEventListener('click', () => choose(a.select, option));
+      a.items.append(b);
+    });
+    position();
+  }
+
+  function open(select) {
+    const inst = instances.get(select);
+    if (!inst || select.disabled) return;
+    if (active?.select === select) {close();return;}
+    close();
+    const popup = document.createElement('div');
+    popup.className='nm-select-popup';popup.setAttribute('role','listbox');
+    let search=null;
+    if (select.options.length >= 5) {
+      search=document.createElement('input');search.className='nm-select-search';search.type='search';
+      search.placeholder='Search options…';search.setAttribute('aria-label','Search options');popup.append(search);
+    }
+    const items=document.createElement('div');items.className='nm-select-items';popup.append(items);
+    document.body.append(popup);
+    active={select,shell:inst.shell,button:inst.button,popup,search,items};
+    inst.shell.classList.add('nm-open');inst.button.setAttribute('aria-expanded','true');
+    if (search) search.addEventListener('input',()=>drawOptions(active));
+    drawOptions(active);position();
+    if (search) search.focus({preventScroll:true});
+  }
+
+  function enhance(select) {
+    if (!eligible(select)) return;
+    const old = select.getBoundingClientRect();
+    const style = getComputedStyle(select);
+    const shell=document.createElement('span');shell.className='nm-select-shell';
+    shell.style.width = Math.max(42,old.width)+'px';
+    shell.style.minHeight = Math.max(28,old.height)+'px';
+    shell.style.margin = style.margin;
+    const button=document.createElement('button');button.type='button';button.className='nm-select-button';
+    button.style.minHeight = Math.max(28,old.height)+'px';
+    button.setAttribute('aria-haspopup','listbox');button.setAttribute('aria-expanded','false');
+    if (select.id && document.querySelector('label[for="'+CSS.escape(select.id)+'"]')) button.setAttribute('aria-label',document.querySelector('label[for="'+CSS.escape(select.id)+'"]').textContent.trim());
+    const label=document.createElement('span');label.className='nm-select-caption';
+    const arrow=document.createElement('span');arrow.className='nm-select-chevron';arrow.textContent='⌄';arrow.setAttribute('aria-hidden','true');
+    button.append(label,arrow);
+    select.before(shell);shell.append(select,button);select.classList.add('nm-native');select.style.margin='0';
+    instances.set(select,{shell,button,label});
+    refresh(select);
+    button.addEventListener('click',()=>open(select));
+    button.addEventListener('keydown', e=>{
+      if (e.key==='ArrowDown'||e.key==='ArrowUp'||e.key==='Enter'||e.key===' ') {
+        e.preventDefault();open(select);
+      }
+    });
+    select.addEventListener('change',()=>refresh(select));
+    select.addEventListener('input',()=>refresh(select));
+    // Standard HTML form reset restores native select value on the next event loop.
+    select.form?.addEventListener('reset',()=>setTimeout(()=>refresh(select),0));
+  }
+
+  function scan(root=document) {
+    if (root instanceof HTMLSelectElement) enhance(root);
+    if (root.querySelectorAll) root.querySelectorAll('select').forEach(enhance);
+  }
+  function schedule() {
+    if (scheduled) return;
+    scheduled=true;
+    requestAnimationFrame(()=>{scheduled=false;scan();if(active)refresh(active.select);});
+  }
+
+  document.addEventListener('pointerdown', e=>{
+    if(active && !active.popup.contains(e.target) && !active.shell.contains(e.target)) close();
+  },true);
+  document.addEventListener('keydown', e=>{
+    if (!active) return;
+    if(e.key==='Escape'){e.preventDefault();close();return;}
+    if (e.target===active.search && (e.key==='ArrowDown'||e.key==='ArrowUp')){e.preventDefault();active.items.querySelector('.nm-select-option:not(:disabled)')?.focus();return;}
+    if (e.target.matches('.nm-select-option')) {
+      const choices=Array.from(active.items.querySelectorAll('.nm-select-option:not(:disabled)'));
+      const idx=choices.indexOf(e.target);
+      if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();choices[(idx+(e.key==='ArrowDown'?1:-1)+choices.length)%choices.length]?.focus();}
+    }
+  });
+  window.addEventListener('resize',()=>{if(active)position();});
+  window.addEventListener('scroll',()=>{if(active)position();},true);
+  const observer = new MutationObserver(records => {
+    let needsScan=false;
+    for (const r of records) {
+      if (r.type==='childList') {
+        if (r.target.closest?.('.nm-select-popup')) continue;
+        if (r.target instanceof HTMLSelectElement || r.target instanceof HTMLOptGroupElement) { if(active?.select === r.target || r.target.closest('select') === active?.select) drawOptions(active); continue; }
+        for(const n of r.addedNodes){
+          if(n.nodeType===1 && !n.closest?.('.nm-select-popup') && (n.matches?.('select') || n.querySelector?.('select'))) {needsScan=true;break;}
+        }
+      } else if (r.type==='attributes' && r.target instanceof HTMLSelectElement) {
+        if(instances.has(r.target)) refresh(r.target); else needsScan=true;
+      }
+    }
+    if(needsScan) schedule();
+  });
+  observer.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['disabled','style','class']});
+  if (document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>scan(),{once:true});
+  else scan();
+  document.addEventListener('click',e=>{ if(e.target.closest('[data-bs-toggle="modal"],button')) schedule(); },true);
+})();
+
+    </script>
 </body>
 </html>

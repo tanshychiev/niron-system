@@ -249,9 +249,8 @@
                 {% endif %}
               {% elif row.kind == "fabric_group" %}
                 <a class="action-link" href="{% url 'inventory_fabric_confirm_received' row.obj.pk %}">✓ Confirm Batch</a>
-                <a class="action-link action-light" href="{% url 'inventory_fabric_batch_detail' row.obj.pk %}">Detail</a>
-                <a class="action-link action-light" href="{% url 'inventory_fabric_batch_edit' row.obj.pk %}">Edit</a>
-                {% if can_view_stock_cost %}<button type="button" class="action-link action-light js-open-fabric-cost" data-action="{% url 'inventory_fabric_batch_add_cost' row.obj.pk %}" data-ref="{{ row.ref }}" data-supplier="{{ row.supplier }}" data-goods="{{ row.goods_cost|floatformat:2 }}" data-extra="{{ row.extra_cost|floatformat:2 }}" data-shipping="{{ row.shipping_cost|floatformat:2 }}">{% if row.cost_added %}Edit Cost{% else %}+ Cost{% endif %}</button>{% endif %}
+                <a class="action-link action-light" href="{% url 'production_fabric_receipt_detail' row.obj.pk %}">Detail</a>
+                {% if perms.production.change_fabricreceipt %}<a class="action-link action-light" href="{% url 'production_fabric_receipt_edit' row.obj.pk %}">Edit</a>{% endif %}
                 <a class="action-link action-light action-print" target="_blank" href="{% url 'inventory_fabric_print_labels' row.obj.pk %}">🖨 Print Labels</a>
               {% else %}
                 <a class="action-link" href="{% url 'inventory_fabric_confirm_received' row.obj.pk %}">✓ Confirm Received</a>
@@ -408,9 +407,8 @@
 </div>
                 {% endif %}
               {% elif row.kind == "fabric_group" %}
-                <a class="action-link action-light" href="{% url 'inventory_fabric_batch_detail' row.obj.pk %}">Detail</a>
-                <a class="action-link action-light" href="{% url 'inventory_fabric_batch_edit' row.obj.pk %}">Edit</a>
-                {% if can_view_stock_cost %}<button type="button" class="action-link action-light js-open-fabric-cost" data-action="{% url 'inventory_fabric_batch_add_cost' row.obj.pk %}" data-ref="{{ row.ref }}" data-supplier="{{ row.supplier }}" data-goods="{{ row.goods_cost|floatformat:2 }}" data-extra="{{ row.extra_cost|floatformat:2 }}" data-shipping="{{ row.shipping_cost|floatformat:2 }}">{% if row.cost_added %}Edit Cost{% else %}+ Cost{% endif %}</button>{% endif %}
+                <a class="action-link action-light" href="{% url 'production_fabric_receipt_detail' row.obj.pk %}">Detail</a>
+                {% if perms.production.change_fabricreceipt %}<a class="action-link action-light" href="{% url 'production_fabric_receipt_edit' row.obj.pk %}">Edit</a>{% endif %}
                 <a class="action-link action-print" target="_blank" href="{% url 'inventory_fabric_print_labels' row.obj.pk %}">🖨 Print Labels</a>
               {% else %}
                 {% if perms.production.change_fabricreceipt %}
