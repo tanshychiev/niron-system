@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+.material-report{max-width:1500px;margin:0 auto;padding:20px 16px 45px;color:#182437}
+.material-report h1{font-size:clamp(23px,2vw,32px);margin:0 0 6px}.material-report .muted{color:#6c7786;font-size:13px}
+.material-report .panel{background:#fff;border:1px solid #e6e2db;border-radius:16px;margin:16px 0;padding:18px}
+.material-report .filters{display:grid;grid-template-columns:minmax(180px,2fr) minmax(160px,1fr) minmax(130px,1fr) minmax(140px,1fr) auto;gap:12px;align-items:end}
+.material-report label{display:block;font-size:12px;font-weight:700;margin:0 0 6px}
+.material-report input,.material-report select{width:100%;height:41px;border:1px solid #dacfc2;border-radius:9px;padding:8px 10px;background:white;font-size:14px}
+.material-report button,.material-report .action{display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:9px;background:#f5aa00;color:#201a0e;padding:12px 16px;font-size:13px;font-weight:750;text-decoration:none;cursor:pointer}
+.material-report .cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.material-report .card{background:white;border:1px solid #e6e2db;border-radius:14px;padding:15px}
+.material-report .card small{display:block;color:#6b7380;font-size:11px;text-transform:uppercase;font-weight:700}
+.material-report .card strong{display:block;font-size:24px;margin:6px 0}
+.material-report .scroll{overflow-x:auto}.material-report table{width:100%;border-collapse:collapse;white-space:nowrap;font-size:12px}
+.material-report th{text-align:left;background:#faf8f4;color:#66707d;text-transform:uppercase;font-size:10px;letter-spacing:.03em;padding:12px 10px}
+.material-report td{border-top:1px solid #eee7dc;padding:11px 10px}.material-report .num{text-align:right;font-variant-numeric:tabular-nums}
+.material-report .sub{display:block;color:#7d8795;font-size:11px;margin-top:3px}.material-report .warning{color:#8a4c00;background:#fff6df;border:1px solid #ffdf96;padding:12px;border-radius:9px;font-size:12px}
+@media(max-width:930px){.material-report .filters{grid-template-columns:1fr 1fr}.material-report .cards{grid-template-columns:1fr 1fr}}
+@media(max-width:480px){.material-report .filters,.material-report .cards{grid-template-columns:1fr}}
+</style>
+<div class="material-report">
+  <h1>Fabric &amp; Borib History</h1>
+  <div class="muted">Review material usage by production project. This report is read-only: it never adds or deducts stock.</div>
+  <p><a class="action" href="{% url 'stock_ledger_list' %}">← Shirt Stock History</a></p>
+  <form class="panel filters" method="get">
+    <div><label for="mq">Search project or finished item</label><input id="mq" name="q" value="{{ q }}" placeholder="PRD-20261122-001"></div>
+    <div><label for="mproject">Project number / ID</label><input id="mproject" name="project" value="{{ project_id }}" placeholder="Project ID"></div>
+    <div><label for="mkind">Material</label><select id="mkind" name="kind"><option value="all" {% if kind == 'all' %}selected{% endif %}>Fabric &amp; Borib</option><option value="fabric" {% if kind == 'fabric' %}selected{% endif %}>Fabric only</option><option value="borib" {% if kind == 'borib' %}selected{% endif %}>Borib only</option></select></div>
+    {% if can_view_cost %}<div><label for="mrate">Borib estimate ($/kg)</label><input id="mrate" type="number" name="borib_rate" min="0" step="0.001" value="{{ borib_rate }}"></div>{% else %}<div></div>{% endif %}
+    <button type="submit">Search</button>
+  </form>
+  <div class="cards">
+    <div class="card"><small>Projects</small><strong>{{ project_count }}</strong></div>
+    <div class="card"><small>Fabric used</small><strong>{{ totals.fabric_used_kg|floatformat:3 }} kg</strong></div>
+    <div class="card"><small>Borib used</small><strong>{{ totals.borib_kg|floatformat:3 }} kg</strong></div>
+    <div class="card"><small>{% if can_view_cost %}Fabric cost{% else %}Cost access{% endif %}</small><strong>{% if can_view_cost %}${{ totals.fabric_cost|floatformat:2 }}{% else %}Restricted{% endif %}</strong></div>
+  </div>
+  {% if can_view_cost %}<div class="warning">Fabric cost is calculated from current receipt prices (including recorded delivery/extra costs) × net kg consumed. <b>Borib has no separate purchase price stored in the current system.</b> Enter $/kg above for a <b>what-if estimate only</b>. Estimated material total: <b>${{ totals.estimated_material_cost|floatformat:2 }}</b>. Do not use the estimate as verified accounting cost. Historical prices edited later may change these calculations.</div>{% endif %}
+  {% if report_limited %}<p class="warning">Showing the most recent 100 matching projects. Filter by project to see earlier records.</p>{% endif %}
+  <section class="panel"><h2>Material cost by project</h2><div class="scroll"><table><thead><tr><th>Production project</th><th>Finished item</th><th class="num">Fabric used</th><th class="num">Fabric cost</th><th class="num">Borib used</th><th class="num">Borib estimate</th><th class="num">Total estimated</th></tr></thead><tbody>
+  {% for entry in projects %}<tr><td><strong>{{ entry.project.project_no }}</strong><span class="sub">{{ entry.project.get_status_display }}</span></td><td>{{ entry.project.finished_item.name }}</td><td class="num">{{ entry.fabric_used_kg|floatformat:3 }} kg</td><td class="num">{% if can_view_cost %}${{ entry.fabric_cost|floatformat:2 }}{% else %}—{% endif %}</td><td class="num">{{ entry.borib_kg|floatformat:3 }} kg</td><td class="num">{% if can_view_cost %}${{ entry.borib_estimate|floatformat:2 }}{% else %}—{% endif %}</td><td class="num">{% if can_view_cost %}${{ entry.total_estimated|floatformat:2 }}{% else %}—{% endif %}</td></tr>{% empty %}<tr><td colspan="7">No projects found.</td></tr>{% endfor %}
+  </tbody></table></div></section>
+  <section class="panel"><h2>Material movement history</h2><div class="scroll"><table><thead><tr><th>Date</th><th>Project</th><th>Material</th><th>Roll / reference</th><th>Color</th><th class="num">Issued / used</th><th class="num">Returned</th><th class="num">Net used</th><th class="num">Cost</th></tr></thead><tbody>
+  {% for row in rows %}<tr><td>{{ row.date|date:'d/m/Y H:i' }}</td><td><strong>{{ row.project.project_no }}</strong></td><td>{{ row.kind }}<span class="sub">{{ row.item }}</span></td><td>{{ row.reference }}{% if row.kind == 'Fabric' and not row.applied %}<span class="sub">Reserved, not yet applied</span>{% endif %}</td><td>{{ row.color }}</td><td class="num">{{ row.issued|floatformat:3 }} kg</td><td class="num">{{ row.returned|floatformat:3 }} kg</td><td class="num">{{ row.used|floatformat:3 }} kg</td><td class="num">{% if can_view_cost %}{% if row.is_estimate %}~{% endif %}${{ row.cost|floatformat:2 }}{% else %}—{% endif %}</td></tr>{% empty %}<tr><td colspan="9">No fabric or Borib usage recorded for these projects.</td></tr>{% endfor %}
+  </tbody></table></div></section>
+</div>
+{% endblock %}

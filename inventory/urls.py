@@ -1,3 +1,4 @@
+from .material_history import material_history
 from django.urls import path
 
 from .stock_confirm import stock_confirm, stock_history, stock_history_detail
@@ -38,6 +39,7 @@ from .views import (
 )
 
 urlpatterns = [
+    path("ledger/materials/", material_history, name="inventory_material_history"),
     # Dashboard
     path("", inventory_list, name="inventory_list"),
 
